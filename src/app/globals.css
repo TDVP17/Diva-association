@@ -1,0 +1,191 @@
+@import "tailwindcss";
+
+/* Design tokens ported from ui-templates/.../emerald_gold_standard/DESIGN.md
+   and the tailwind-config block embedded in every template screen. */
+@theme {
+  --color-secondary-fixed-dim: #e9c349;
+  --color-primary: #003528;
+  --color-on-background: #191c1d;
+  --color-inverse-on-surface: #f0f1f2;
+  --color-primary-fixed-dim: #96d3bc;
+  --color-on-secondary: #ffffff;
+  --color-tertiary-fixed-dim: #bcc7de;
+  --color-tertiary-container: #394457;
+  --color-on-primary: #ffffff;
+  --color-on-secondary-fixed-variant: #574500;
+  --color-on-primary-fixed-variant: #10503f;
+  --color-on-secondary-container: #745c00;
+  --color-secondary: #735c00;
+  --color-secondary-fixed: #ffe088;
+  --color-on-secondary-fixed: #241a00;
+  --color-on-tertiary-fixed: #111c2d;
+  --color-on-error-container: #93000a;
+  --color-background: #f8f9fa;
+  --color-on-surface: #191c1d;
+  --color-on-primary-fixed: #002117;
+  --color-on-tertiary-fixed-variant: #3c475a;
+  --color-surface: #f8f9fa;
+  --color-error: #ba1a1a;
+  --color-primary-fixed: #b2efd8;
+  --color-inverse-surface: #2e3132;
+  --color-outline-variant: #bfc9c3;
+  --color-on-error: #ffffff;
+  --color-surface-container: #edeeef;
+  --color-surface-tint: #2d6956;
+  --color-error-container: #ffdad6;
+  --color-tertiary-fixed: #d8e3fb;
+  --color-surface-variant: #e1e3e4;
+  --color-on-primary-container: #81bda7;
+  --color-surface-container-low: #f3f4f5;
+  --color-surface-container-highest: #e1e3e4;
+  --color-on-surface-variant: #404945;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary: #232e40;
+  --color-surface-container-lowest: #ffffff;
+  --color-on-tertiary-container: #a6b1c8;
+  --color-surface-container-high: #e7e8e9;
+  --color-surface-bright: #f8f9fa;
+  --color-outline: #707974;
+  --color-inverse-primary: #96d3bc;
+  --color-surface-dim: #d9dadb;
+  --color-primary-container: #0a4d3c;
+  --color-secondary-container: #fed65b;
+
+  --radius: 0.25rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-full: 9999px;
+
+  --spacing-unit: 4px;
+  --spacing-container-padding: 20px;
+  --spacing-stack-gap-sm: 8px;
+  --spacing-stack-gap-md: 16px;
+  --spacing-stack-gap-lg: 24px;
+  --spacing-section-margin: 32px;
+  --spacing-gutter: 16px;
+
+  --font-display-lg: var(--font-inter), sans-serif;
+  --font-label-sm: var(--font-inter), sans-serif;
+  --font-label-md: var(--font-inter), sans-serif;
+  --font-body-md: var(--font-inter), sans-serif;
+  --font-body-lg: var(--font-inter), sans-serif;
+  --font-numeric-data: var(--font-inter), sans-serif;
+  --font-headline-lg: var(--font-inter), sans-serif;
+  --font-headline-lg-mobile: var(--font-inter), sans-serif;
+  --font-title-md: var(--font-inter), sans-serif;
+
+  --text-display-lg: 48px;
+  --text-display-lg--line-height: 56px;
+  --text-display-lg--letter-spacing: -0.02em;
+  --text-display-lg--font-weight: 700;
+
+  --text-label-sm: 12px;
+  --text-label-sm--line-height: 16px;
+  --text-label-sm--letter-spacing: 0.02em;
+  --text-label-sm--font-weight: 500;
+
+  --text-label-md: 14px;
+  --text-label-md--line-height: 20px;
+  --text-label-md--letter-spacing: 0.01em;
+  --text-label-md--font-weight: 600;
+
+  --text-body-md: 16px;
+  --text-body-md--line-height: 24px;
+  --text-body-md--font-weight: 400;
+
+  --text-body-lg: 18px;
+  --text-body-lg--line-height: 28px;
+  --text-body-lg--font-weight: 400;
+
+  --text-numeric-data: 24px;
+  --text-numeric-data--line-height: 24px;
+  --text-numeric-data--letter-spacing: -0.01em;
+  --text-numeric-data--font-weight: 700;
+
+  --text-headline-lg: 32px;
+  --text-headline-lg--line-height: 40px;
+  --text-headline-lg--letter-spacing: -0.01em;
+  --text-headline-lg--font-weight: 700;
+
+  --text-headline-lg-mobile: 24px;
+  --text-headline-lg-mobile--line-height: 32px;
+  --text-headline-lg-mobile--font-weight: 700;
+
+  --text-title-md: 20px;
+  --text-title-md--line-height: 28px;
+  --text-title-md--font-weight: 600;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-on-background);
+  font-family: var(--font-inter), sans-serif;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0px 4px 30px rgba(30, 41, 59, 0.08);
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-15px) rotate(5deg);
+  }
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+}
+
+.floating-label-group {
+  position: relative;
+}
+
+.floating-input {
+  width: 100%;
+  padding: 24px 16px 8px;
+  background: #ffffff;
+  border: 1px solid #bfc9c3;
+  border-radius: 8px;
+  font-size: 16px;
+  color: #191c1d;
+  transition: all 0.2s ease;
+}
+
+.floating-input:focus {
+  outline: none;
+  border-color: #003528;
+  box-shadow: 0 0 0 1px #003528;
+}
+
+.floating-label {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #707974;
+  transition: all 0.2s ease;
+  pointer-events: none;
+  font-size: 16px;
+}
+
+.floating-input:focus ~ .floating-label,
+.floating-input:not(:placeholder-shown) ~ .floating-label {
+  top: 12px;
+  font-size: 12px;
+  color: #003528;
+  font-weight: 500;
+}

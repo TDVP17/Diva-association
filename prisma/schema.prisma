@@ -1,0 +1,257 @@
+// Prisma schema for DIVA Associations
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  MEMBER
+  ADMIN
+}
+
+enum KycStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TontineType {
+  HEBDO_SUNDAY
+  MONTHLY_25
+  MONTHLY_28
+}
+
+enum TontineStatus {
+  DRAFT
+  DRAWING
+  ACTIVE
+  CLOSED
+}
+
+enum ContributionStatus {
+  PAID
+  LATE
+  PENDING
+}
+
+enum FineStatus {
+  UNPAID
+  PAID
+  DEDUCTED
+}
+
+enum SwapStatus {
+  PENDING_MEMBERSHIP
+  PENDING_ADMIN
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String
+  avatar        String?
+  image         String?
+  role          Role      @default(MEMBER)
+  kycStatus     KycStatus @default(PENDING)
+  sponsorCode   String?
+  city          String?
+  neighborhood  String?
+  /// E.164-ish digits-only phone number used for WhatsApp notifications (Evolution API).
+  phone         String?
+  cniFrontUrl   String?
+  cniBackUrl    String?
+  selfieUrl     String?
+  createdAt     DateTime  @default(now())
+
+  accounts             Account[]
+  sessions             Session[]
+  memberships          Membership[]
+  contributions        Contribution[]
+  fines                Fine[]
+  swapRequestsMade     PositionSwapRequest[] @relation("SwapRequester")
+  swapRequestsReceived PositionSwapRequest[] @relation("SwapTarget")
+  messagesSent         ChatMessage[]         @relation("MessageSender")
+  messagesReceived     ChatMessage[]         @relation("MessageReceiver")
+  notificationLogs     NotificationLog[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model TontineSession {
+  id        String        @id @default(cuid())
+  type      TontineType
+  amount    Decimal       @db.Decimal(12, 2)
+  fee       Decimal       @db.Decimal(12, 2)
+  status    TontineStatus @default(DRAFT)
+  startDate DateTime
+  limitTime String
+
+  memberships       Membership[]
+  contributions     Contribution[]
+  fines             Fine[]
+  swapRequests      PositionSwapRequest[]
+  notificationLogs  NotificationLog[]
+
+  @@map("tontine_sessions")
+}
+
+model Membership {
+  id               String   @id @default(cuid())
+  userId           String
+  tontineSessionId String
+  /// Final payout order (1..N), set by the admin when publishing the official
+  /// ranking. Null until published.
+  officialPosition Int?
+  /// The member's own self-service draw result. Null until they draw.
+  ballDrawn        Int?
+  joinedAt         DateTime @default(now())
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tontineSession TontineSession @relation(fields: [tontineSessionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tontineSessionId])
+  @@map("memberships")
+}
+
+model Contribution {
+  id               String              @id @default(cuid())
+  userId           String
+  tontineSessionId String
+  /// Calendar date (Cameroon-local) of the contribution cycle this row belongs
+  /// to — each Sunday for HEBDO_SUNDAY, the 25th/28th for the monthly types.
+  dueDate          DateTime
+  amountPaid       Decimal             @db.Decimal(12, 2)
+  feePaid          Decimal             @db.Decimal(12, 2)
+  finePaid         Decimal             @default(0) @db.Decimal(12, 2)
+  status           ContributionStatus  @default(PENDING)
+  fapshiTxRef      String?             @unique
+  paidAt           DateTime?
+  receiptPdfUrl    String?
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tontineSession TontineSession @relation(fields: [tontineSessionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tontineSessionId, dueDate])
+  @@map("contributions")
+}
+
+model Fine {
+  id               String     @id @default(cuid())
+  userId           String
+  tontineSessionId String
+  /// Same cycle key as Contribution.dueDate — one fine per member per cycle,
+  /// recomputed (upserted) idempotently by the daily penalty cron.
+  dueDate          DateTime
+  amount           Decimal    @db.Decimal(12, 2)
+  status           FineStatus @default(UNPAID)
+  createdAt        DateTime   @default(now())
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tontineSession TontineSession @relation(fields: [tontineSessionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tontineSessionId, dueDate])
+  @@map("fines")
+}
+
+model PositionSwapRequest {
+  id               String     @id @default(cuid())
+  requesterId      String
+  targetId         String
+  tontineSessionId String
+  status           SwapStatus @default(PENDING_MEMBERSHIP)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  requester      User           @relation("SwapRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  target         User           @relation("SwapTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  tontineSession TontineSession @relation(fields: [tontineSessionId], references: [id], onDelete: Cascade)
+
+  @@map("position_swap_requests")
+}
+
+model ChatMessage {
+  id         String   @id @default(cuid())
+  senderId   String
+  receiverId String
+  content    String
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+enum NotificationType {
+  REMINDER_NOON
+  REMINDER_URGENT
+  PAYMENT_SUCCESS
+  FINE_NOTICE
+}
+
+/// Records which WhatsApp notifications have already been sent for a given
+/// user + session + cycle, so the noon/urgent reminder crons (and the fine
+/// notice sent from the penalty cron) stay idempotent across retries/re-runs.
+model NotificationLog {
+  id               String           @id @default(cuid())
+  userId           String
+  tontineSessionId String
+  dueDate          DateTime
+  type             NotificationType
+  sentAt           DateTime         @default(now())
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tontineSession TontineSession @relation(fields: [tontineSessionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tontineSessionId, dueDate, type])
+  @@map("notification_logs")
+}
