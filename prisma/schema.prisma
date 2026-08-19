@@ -53,6 +53,13 @@ enum SwapStatus {
   REJECTED
 }
 
+enum NotificationType {
+  REMINDER_NOON
+  REMINDER_URGENT
+  PAYMENT_SUCCESS
+  FINE_NOTICE
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -135,11 +142,11 @@ model TontineSession {
   startDate DateTime
   limitTime String
 
-  memberships       Membership[]
-  contributions     Contribution[]
-  fines             Fine[]
-  swapRequests      PositionSwapRequest[]
-  notificationLogs  NotificationLog[]
+  memberships      Membership[]
+  contributions    Contribution[]
+  fines            Fine[]
+  swapRequests     PositionSwapRequest[]
+  notificationLogs NotificationLog[]
 
   @@map("tontine_sessions")
 }
@@ -163,17 +170,17 @@ model Membership {
 }
 
 model Contribution {
-  id               String              @id @default(cuid())
+  id               String             @id @default(cuid())
   userId           String
   tontineSessionId String
   /// Calendar date (Cameroon-local) of the contribution cycle this row belongs
   /// to — each Sunday for HEBDO_SUNDAY, the 25th/28th for the monthly types.
   dueDate          DateTime
-  amountPaid       Decimal             @db.Decimal(12, 2)
-  feePaid          Decimal             @db.Decimal(12, 2)
-  finePaid         Decimal             @default(0) @db.Decimal(12, 2)
-  status           ContributionStatus  @default(PENDING)
-  fapshiTxRef      String?             @unique
+  amountPaid       Decimal            @db.Decimal(12, 2)
+  feePaid          Decimal            @db.Decimal(12, 2)
+  finePaid         Decimal            @default(0) @db.Decimal(12, 2)
+  status           ContributionStatus @default(PENDING)
+  fapshiTxRef      String?            @unique
   paidAt           DateTime?
   receiptPdfUrl    String?
 
@@ -229,13 +236,6 @@ model ChatMessage {
   receiver User @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
 
   @@map("chat_messages")
-}
-
-enum NotificationType {
-  REMINDER_NOON
-  REMINDER_URGENT
-  PAYMENT_SUCCESS
-  FINE_NOTICE
 }
 
 /// Records which WhatsApp notifications have already been sent for a given

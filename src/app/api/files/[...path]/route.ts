@@ -1,19 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { readStoredFile } from "@/lib/storage";
-
-const MIME_TYPES: Record<string, string> = {
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".png": "image/png",
-  ".webp": "image/webp",
-  ".pdf": "application/pdf",
-};
-
-function mimeTypeFor(filename: string): string {
-  const ext = filename.slice(filename.lastIndexOf(".")).toLowerCase();
-  return MIME_TYPES[ext] ?? "application/octet-stream";
-}
+import { mimeTypeFor } from "@/lib/mime";
 
 export async function GET(
   _request: Request,

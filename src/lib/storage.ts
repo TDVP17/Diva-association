@@ -1,30 +1,46 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { mimeTypeFor } from "@/lib/mime";
 
-// Local-disk storage for KYC documents and generated receipts, kept outside
-// /public so files are never directly reachable by URL — everything must go
-// through the authenticated /api/files/[...path] route. Swap this module for
-// an S3/GCS-backed implementation when moving off a single server instance.
-// turbopackIgnore: the dir is env-configurable, but this is a dev-only local
-// disk backend (see comment above) — never the storage path in a real
-// deployment, so it shouldn't pull the whole project into the server bundle.
-const STORAGE_ROOT = path.resolve(/*turbopackIgnore: true*/ process.cwd(), process.env.STORAGE_DIR ?? "./storage");
+// KYC documents and generated receipts live in a private Supabase Storage
+// bucket — never reachable directly by URL. Everything must go through the
+// authenticated /api/files/[...path] route, which enforces its own
+// owner-or-admin check before calling readStoredFile. Because that check
+// already happens at the application layer, this client uses the *service
+// role* key (server-only, bypasses Row Level Security) rather than the
+// public anon key — a private bucket's RLS policies would otherwise need to
+// replicate the same owner-or-admin logic a second time, in SQL.
+const bucket = process.env.SUPABASE_STORAGE_BUCKET ?? "diva-storage";
 
-function resolveKey(key: string): string {
-  const resolved = path.resolve(/*turbopackIgnore: true*/ STORAGE_ROOT, key);
-  if (!resolved.startsWith(STORAGE_ROOT + path.sep) && resolved !== STORAGE_ROOT) {
-    throw new Error("Invalid storage key: path traversal detected");
+// Lazily constructed: `createClient` throws immediately if the key is an
+// empty string, which would otherwise break `next build`'s route analysis
+// (it imports this module without the real runtime env available).
+let client: SupabaseClient | null = null;
+
+function getClient(): SupabaseClient {
+  if (!client) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+    const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+    client = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: { persistSession: false },
+    });
   }
-  return resolved;
+  return client;
 }
 
 export async function saveFile(key: string, data: Buffer): Promise<string> {
-  const filePath = resolveKey(key);
-  await mkdir(path.dirname(filePath), { recursive: true });
-  await writeFile(filePath, data);
+  const { error } = await getClient()
+    .storage.from(bucket)
+    .upload(key, data, { contentType: mimeTypeFor(key), upsert: true });
+  if (error) {
+    throw new Error(`Supabase Storage upload failed for "${key}": ${error.message}`);
+  }
   return key;
 }
 
 export async function readStoredFile(key: string): Promise<Buffer> {
-  return readFile(resolveKey(key));
+  const { data, error } = await getClient().storage.from(bucket).download(key);
+  if (error) {
+    throw new Error(`Supabase Storage download failed for "${key}": ${error.message}`);
+  }
+  return Buffer.from(await data.arrayBuffer());
 }

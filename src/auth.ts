@@ -1,10 +1,25 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
-import Apple from "next-auth/providers/apple";
+import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { SPONSOR_CODE_COOKIE } from "@/lib/constants";
+
+// Local-only "log in as any seeded user" provider — lets you click through
+// the app without setting up real Google OAuth credentials. Excluded from
+// the providers list entirely outside development, so it can never be
+// reached on a deployed/production build.
+const devLoginProvider = Credentials({
+  id: "dev-login",
+  name: "Dev Login",
+  credentials: { email: { label: "Email", type: "text" } },
+  async authorize(credentials) {
+    const email = typeof credentials?.email === "string" ? credentials.email : null;
+    if (!email) return null;
+    return prisma.user.findUnique({ where: { email } });
+  },
+});
 
 export const {
   handlers,
@@ -14,7 +29,7 @@ export const {
   unstable_update: updateSession,
 } = NextAuth({
   adapter: PrismaAdapter(prisma),
-  providers: [Google, Apple],
+  providers: [Google, ...(process.env.NODE_ENV !== "production" ? [devLoginProvider] : [])],
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",

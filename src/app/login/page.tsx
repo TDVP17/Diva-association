@@ -1,12 +1,16 @@
 import { cookies } from "next/headers";
 import { signIn } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { SPONSOR_CODE_COOKIE } from "@/lib/constants";
 
-async function signInWithProvider(
-  provider: "google" | "apple",
-  callbackUrl: string,
-  formData: FormData,
-) {
+const isDev = process.env.NODE_ENV !== "production";
+
+async function devSignIn(email: string, callbackUrl: string) {
+  "use server";
+  await signIn("dev-login", { email, redirectTo: callbackUrl });
+}
+
+async function signInWithProvider(provider: "google", callbackUrl: string, formData: FormData) {
   "use server";
 
   const sponsorCode = String(formData.get("sponsorCode") ?? "").trim();
@@ -31,7 +35,16 @@ export default async function LoginPage({
 }) {
   const { callbackUrl = "/dashboard" } = await searchParams;
   const signInWithGoogle = signInWithProvider.bind(null, "google", callbackUrl);
-  const signInWithApple = signInWithProvider.bind(null, "apple", callbackUrl);
+
+  const devUsers = isDev
+    ? await prisma.user
+        .findMany({
+          select: { email: true, name: true, role: true },
+          orderBy: { createdAt: "asc" },
+          take: 10,
+        })
+        .catch(() => [])
+    : [];
 
   return (
     <main className="flex-grow flex flex-col items-center justify-center p-container-padding bg-background min-h-screen">
@@ -104,16 +117,6 @@ export default async function LoginPage({
                 Continue with Google
               </span>
             </button>
-
-            <button
-              formAction={signInWithApple}
-              className="w-full flex items-center justify-center gap-stack-gap-sm bg-on-background text-white rounded-lg py-3 px-4 hover:opacity-90 transition-opacity active:scale-[0.98]"
-            >
-              <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
-                <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.09 2.31-.86 3.65-.74 1.74.15 2.92.8 3.73 1.99-3.25 1.83-2.63 5.96.65 7.21-.76 1.63-1.68 3.12-3.11 3.71zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.02 4.43-3.74 4.25z" />
-              </svg>
-              <span className="font-label-md text-label-md">Continue with Apple</span>
-            </button>
           </div>
         </form>
 
@@ -124,6 +127,33 @@ export default async function LoginPage({
           </p>
         </div>
       </div>
+
+      {isDev && (
+        <div className="w-full max-w-[440px] mt-stack-gap-lg bg-white/90 rounded-2xl p-stack-gap-md border border-dashed border-outline-variant">
+          <p className="font-label-sm text-label-sm text-on-surface-variant mb-stack-gap-sm text-center">
+            Dev only — log in as a seeded user (never shown in production)
+          </p>
+          {devUsers.length === 0 ? (
+            <p className="font-label-sm text-label-sm text-error text-center">
+              No users found. Run <code>npm run db:seed</code> first.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-stack-gap-sm">
+              {devUsers.map((u) => (
+                <form key={u.email} action={devSignIn.bind(null, u.email, callbackUrl)}>
+                  <button
+                    type="submit"
+                    className="w-full flex items-center justify-between gap-2 border border-outline-variant rounded-lg py-2 px-3 hover:bg-surface-container-low transition-colors text-left"
+                  >
+                    <span className="font-label-md text-label-md text-on-surface">{u.name}</span>
+                    <span className="font-label-sm text-label-sm text-on-surface-variant">{u.role}</span>
+                  </button>
+                </form>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </main>
   );
 }
