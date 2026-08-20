@@ -8,14 +8,12 @@ export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
+
     seed: "tsx prisma/seed.ts",
   },
   datasource: {
-    // Prisma CLI commands (migrate/generate/studio) need a direct, non-pooled
-    // connection — PgBouncer transaction-mode poolers (like Supabase's
-    // DATABASE_URL) don't support the session-level features Migrate needs.
-    // The running app is unaffected: src/lib/prisma.ts builds its own
-    // connection straight from DATABASE_URL for runtime queries.
+    
+    
     url: process.env["DIRECT_URL"] || process.env["DATABASE_URL"],
     shadowDatabaseUrl: process.env["SHADOW_DATABASE_URL"] || undefined,
   },
