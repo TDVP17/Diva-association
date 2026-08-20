@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { signIn } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { SPONSOR_CODE_COOKIE } from "@/lib/constants";
+import { CredentialsForm } from "./credentials-form";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -67,6 +68,16 @@ export default async function LoginPage({
           </p>
         </div>
 
+        <CredentialsForm callbackUrl={callbackUrl} />
+
+        <div className="relative z-10 flex items-center py-stack-gap-sm mt-stack-gap-lg">
+          <div className="flex-grow border-t border-outline-variant" />
+          <span className="flex-shrink-0 mx-4 font-label-sm text-label-sm text-outline">
+            OR CONTINUE WITH
+          </span>
+          <div className="flex-grow border-t border-outline-variant" />
+        </div>
+
         <form className="space-y-stack-gap-md relative z-10">
           <div className="floating-label-group">
             <input
@@ -80,14 +91,6 @@ export default async function LoginPage({
             <label className="floating-label" htmlFor="sponsorCode">
               Sponsor/Garant Code or Phone
             </label>
-          </div>
-
-          <div className="relative flex items-center py-stack-gap-sm">
-            <div className="flex-grow border-t border-outline-variant" />
-            <span className="flex-shrink-0 mx-4 font-label-sm text-label-sm text-outline">
-              OR CONTINUE WITH
-            </span>
-            <div className="flex-grow border-t border-outline-variant" />
           </div>
 
           <div className="space-y-stack-gap-sm">

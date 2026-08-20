@@ -5,6 +5,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { SPONSOR_CODE_COOKIE } from "@/lib/constants";
+import { getSupabaseAuthClient } from "@/lib/supabase-auth";
 
 // Local-only "log in as any seeded user" provider — lets you click through
 // the app without setting up real Google OAuth credentials. Excluded from
@@ -21,6 +22,35 @@ const devLoginProvider = Credentials({
   },
 });
 
+// Email/password sign-in. Supabase Auth is the source of truth for
+// credential storage/verification (its own `auth.users` table, never
+// touched by Prisma); on success we look the matching row up in our own
+// `users` table so the resulting session carries role/kycStatus/sponsorCode
+// exactly like every other provider. Sign-*up* is handled separately (see
+// src/app/login/actions.ts) since creating an account is a different
+// operation from verifying one — this provider only ever verifies.
+const emailPasswordProvider = Credentials({
+  id: "email-password",
+  name: "Email and Password",
+  credentials: {
+    email: { label: "Email", type: "email" },
+    password: { label: "Password", type: "password" },
+  },
+  async authorize(credentials) {
+    const email = typeof credentials?.email === "string" ? credentials.email : null;
+    const password = typeof credentials?.password === "string" ? credentials.password : null;
+    if (!email || !password) return null;
+
+    const { data, error } = await getSupabaseAuthClient().auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error || !data.user) return null;
+
+    return prisma.user.findUnique({ where: { email } });
+  },
+});
+
 export const {
   handlers,
   auth,
@@ -29,7 +59,11 @@ export const {
   unstable_update: updateSession,
 } = NextAuth({
   adapter: PrismaAdapter(prisma),
-  providers: [Google, ...(process.env.NODE_ENV !== "production" ? [devLoginProvider] : [])],
+  providers: [
+    Google,
+    emailPasswordProvider,
+    ...(process.env.NODE_ENV !== "production" ? [devLoginProvider] : []),
+  ],
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",
