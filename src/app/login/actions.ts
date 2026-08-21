@@ -10,6 +10,17 @@ export interface AuthFormState {
   success?: string;
 }
 
+/** Next.js's redirect control-flow signal — must always propagate, never be swallowed as an error. */
+function isRedirectSignal(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "digest" in err &&
+    typeof (err as { digest?: unknown }).digest === "string" &&
+    (err as { digest: string }).digest.startsWith("NEXT_REDIRECT")
+  );
+}
+
 export async function signInAction(
   callbackUrl: string,
   _prevState: AuthFormState,
@@ -23,13 +34,15 @@ export async function signInAction(
 
   try {
     await signIn("email-password", { email, password, redirectTo: callbackUrl });
+    return {};
   } catch (err) {
+    if (isRedirectSignal(err)) throw err; // successful sign-in — let the redirect happen
     if (err instanceof AuthError) {
       return { error: "Incorrect email or password." };
     }
-    throw err; // NEXT_REDIRECT (on success) and other framework internals must propagate
+    console.error("[signInAction] unexpected error:", err);
+    return { error: "Something went wrong while signing you in. Please try again." };
   }
-  return {};
 }
 
 export async function signUpAction(
@@ -40,57 +53,59 @@ export async function signUpAction(
   const fullName = String(formData.get("fullName") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const sponsorCode = String(formData.get("sponsorCode") ?? "").trim();
 
-  if (!fullName || !email || !password || !sponsorCode) {
+  if (!fullName || !email || !password) {
     return { error: "All fields are required." };
   }
   if (password.length < 6) {
     return { error: "Password must be at least 6 characters." };
   }
 
-  const { data, error } = await getSupabaseAuthClient().auth.signUp({
-    email,
-    password,
-    options: { data: { full_name: fullName } },
-  });
-
-  if (error) {
-    return { error: error.message };
-  }
-  if (!data.user) {
-    return { error: "Could not create your account. Please try again." };
-  }
-  if (data.user.identities && data.user.identities.length === 0) {
-    // Supabase's signal for "this email is already registered" when email
-    // enumeration protection is on: it returns a fake-success user instead
-    // of a clear error, to avoid leaking which emails already have accounts.
-    return { error: "An account with this email already exists. Try signing in instead." };
-  }
-
-  // Supabase Auth now owns the credential; mirror the account into our own
-  // users table so the rest of the app (role, kycStatus, memberships, etc.)
-  // has something to attach to.
-  await prisma.user.upsert({
-    where: { email },
-    update: {},
-    create: { email, name: fullName, sponsorCode },
-  });
-
-  if (!data.session) {
-    // Email confirmation is required before the account can sign in.
-    return {
-      success: "Account created! Check your email to confirm it, then sign in.",
-    };
-  }
-
   try {
+    const { data, error } = await getSupabaseAuthClient().auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: fullName } },
+    });
+
+    if (error) {
+      return { error: error.message };
+    }
+    if (!data.user) {
+      return { error: "Could not create your account. Please try again." };
+    }
+    if (data.user.identities && data.user.identities.length === 0) {
+      // Supabase's signal for "this email is already registered" when email
+      // enumeration protection is on: it returns a fake-success user instead
+      // of a clear error, to avoid leaking which emails already have accounts.
+      return { error: "An account with this email already exists. Try signing in instead." };
+    }
+
+    // Supabase Auth now owns the credential; mirror the account into our own
+    // users table so the rest of the app (role, kycStatus, memberships, etc.)
+    // has something to attach to. A personal/sponsor code, if the user ever
+    // sets one, is added later — not required to create an account.
+    await prisma.user.upsert({
+      where: { email },
+      update: {},
+      create: { email, name: fullName },
+    });
+
+    if (!data.session) {
+      // Email confirmation is required before the account can sign in.
+      return {
+        success: "Account created! Check your email to confirm it, then sign in.",
+      };
+    }
+
     await signIn("email-password", { email, password, redirectTo: callbackUrl });
+    return {};
   } catch (err) {
+    if (isRedirectSignal(err)) throw err; // successful sign-in — let the redirect happen
     if (err instanceof AuthError) {
       return { success: "Account created — please sign in." };
     }
-    throw err;
+    console.error("[signUpAction] unexpected error:", err);
+    return { error: "Something went wrong while creating your account. Please try again." };
   }
-  return {};
 }

@@ -3,10 +3,11 @@
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { signInAction, signUpAction, type AuthFormState } from "./actions";
+import { useLanguage } from "./language-context";
 
 const initialState: AuthFormState = {};
 
-function SubmitButton({ children }: { children: React.ReactNode }) {
+function SubmitButton({ children, pendingLabel }: { children: React.ReactNode; pendingLabel: string }) {
   const { pending } = useFormStatus();
   return (
     <button
@@ -20,12 +21,53 @@ function SubmitButton({ children }: { children: React.ReactNode }) {
           className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"
         />
       )}
-      {pending ? "Please wait..." : children}
+      {pending ? pendingLabel : children}
     </button>
   );
 }
 
+function PasswordField({
+  id,
+  label,
+  minLength,
+}: {
+  id: string;
+  label: string;
+  minLength?: number;
+}) {
+  const { t } = useLanguage();
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <div className="floating-label-group">
+      <input
+        className="floating-input pr-11"
+        id={id}
+        name="password"
+        type={visible ? "text" : "password"}
+        placeholder=" "
+        required
+        minLength={minLength}
+      />
+      <label className="floating-label" htmlFor={id}>
+        {label}
+      </label>
+      <button
+        type="button"
+        onClick={() => setVisible((v) => !v)}
+        aria-label={visible ? t("hidePassword") : t("showPassword")}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-primary transition-colors"
+      >
+        <span className="material-symbols-outlined text-[20px]">
+          {visible ? "visibility_off" : "visibility"}
+        </span>
+      </button>
+    </div>
+  );
+}
+
 export function CredentialsForm({ callbackUrl }: { callbackUrl: string }) {
+  const { t } = useLanguage();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [signInState, signInFormAction] = useActionState(
     signInAction.bind(null, callbackUrl),
@@ -48,7 +90,7 @@ export function CredentialsForm({ callbackUrl }: { callbackUrl: string }) {
               : "flex-1 py-1.5 rounded-md font-label-md text-label-md text-on-surface-variant transition-all"
           }
         >
-          Sign In
+          {t("signIn")}
         </button>
         <button
           type="button"
@@ -59,7 +101,7 @@ export function CredentialsForm({ callbackUrl }: { callbackUrl: string }) {
               : "flex-1 py-1.5 rounded-md font-label-md text-label-md text-on-surface-variant transition-all"
           }
         >
-          Sign Up
+          {t("signUp")}
         </button>
       </div>
 
@@ -75,26 +117,14 @@ export function CredentialsForm({ callbackUrl }: { callbackUrl: string }) {
               required
             />
             <label className="floating-label" htmlFor="signin-email">
-              Email
+              {t("email")}
             </label>
           </div>
-          <div className="floating-label-group">
-            <input
-              className="floating-input"
-              id="signin-password"
-              name="password"
-              type="password"
-              placeholder=" "
-              required
-            />
-            <label className="floating-label" htmlFor="signin-password">
-              Password
-            </label>
-          </div>
+          <PasswordField id="signin-password" label={t("password")} />
           {signInState.error && (
             <p className="font-label-sm text-label-sm text-error text-center">{signInState.error}</p>
           )}
-          <SubmitButton>Sign In</SubmitButton>
+          <SubmitButton pendingLabel={t("pleaseWait")}>{t("signIn")}</SubmitButton>
         </form>
       ) : (
         <form action={signUpFormAction} className="space-y-stack-gap-md">
@@ -108,7 +138,7 @@ export function CredentialsForm({ callbackUrl }: { callbackUrl: string }) {
               required
             />
             <label className="floating-label" htmlFor="signup-name">
-              Full Name
+              {t("fullName")}
             </label>
           </div>
           <div className="floating-label-group">
@@ -121,43 +151,17 @@ export function CredentialsForm({ callbackUrl }: { callbackUrl: string }) {
               required
             />
             <label className="floating-label" htmlFor="signup-email">
-              Email
+              {t("email")}
             </label>
           </div>
-          <div className="floating-label-group">
-            <input
-              className="floating-input"
-              id="signup-password"
-              name="password"
-              type="password"
-              placeholder=" "
-              required
-              minLength={6}
-            />
-            <label className="floating-label" htmlFor="signup-password">
-              Password
-            </label>
-          </div>
-          <div className="floating-label-group">
-            <input
-              className="floating-input"
-              id="signup-sponsor"
-              name="sponsorCode"
-              type="text"
-              placeholder=" "
-              required
-            />
-            <label className="floating-label" htmlFor="signup-sponsor">
-              Sponsor/Garant Code
-            </label>
-          </div>
+          <PasswordField id="signup-password" label={t("password")} minLength={6} />
           {signUpState.error && (
             <p className="font-label-sm text-label-sm text-error text-center">{signUpState.error}</p>
           )}
           {signUpState.success && (
             <p className="font-label-sm text-label-sm text-primary text-center">{signUpState.success}</p>
           )}
-          <SubmitButton>Create Account</SubmitButton>
+          <SubmitButton pendingLabel={t("pleaseWait")}>{t("createAccount")}</SubmitButton>
         </form>
       )}
     </div>

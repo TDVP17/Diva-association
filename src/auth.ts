@@ -2,9 +2,7 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { SPONSOR_CODE_COOKIE } from "@/lib/constants";
 import { getSupabaseAuthClient } from "@/lib/supabase-auth";
 
 // Local-only "log in as any seeded user" provider — lets you click through
@@ -41,13 +39,21 @@ const emailPasswordProvider = Credentials({
     const password = typeof credentials?.password === "string" ? credentials.password : null;
     if (!email || !password) return null;
 
-    const { data, error } = await getSupabaseAuthClient().auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error || !data.user) return null;
+    try {
+      const { data, error } = await getSupabaseAuthClient().auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error || !data.user) return null;
 
-    return prisma.user.findUnique({ where: { email } });
+      return await prisma.user.findUnique({ where: { email } });
+    } catch (err) {
+      // Never let a network hiccup or unexpected Supabase/Prisma error
+      // surface as an unhandled crash here — treat it as "not authorized"
+      // and let the caller show a normal "try again" message instead.
+      console.error("[email-password authorize] unexpected error:", err);
+      return null;
+    }
   },
 });
 
@@ -60,7 +66,13 @@ export const {
 } = NextAuth({
   adapter: PrismaAdapter(prisma),
   providers: [
-    Google,
+    // Google verifies email ownership itself, so it's safe to link a Google
+    // sign-in to an existing `users` row with the same email even if that
+    // row was created via the email/password flow (which never creates an
+    // Account row). Without this, anyone who signed up with email/password
+    // and later taps "Continue with Google" gets refused with
+    // OAuthAccountNotLinked instead of just being logged in.
+    Google({ allowDangerousEmailAccountLinking: true }),
     emailPasswordProvider,
     ...(process.env.NODE_ENV !== "production" ? [devLoginProvider] : []),
   ],
@@ -68,23 +80,6 @@ export const {
   pages: {
     signIn: "/login",
     error: "/login",
-  },
-  events: {
-    async createUser({ user }) {
-      // First-time OAuth sign-up: attach the sponsor code the user entered
-      // on the login screen before starting the OAuth flow (see login page),
-      // carried through via a short-lived cookie since OAuth providers don't
-      // let us pass arbitrary form fields through the redirect flow.
-      if (!user.id) return;
-      const cookieStore = await cookies();
-      const sponsorCode = cookieStore.get(SPONSOR_CODE_COOKIE)?.value;
-      if (sponsorCode) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { sponsorCode },
-        });
-      }
-    },
   },
   callbacks: {
     async jwt({ token, user, trigger }) {

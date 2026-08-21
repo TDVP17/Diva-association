@@ -29,10 +29,6 @@ export default auth((req) => {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (!session.user.sponsorCode && path !== "/onboarding/sponsor") {
-    return NextResponse.redirect(new URL("/onboarding/sponsor", nextUrl));
-  }
-
   if (
     matchesPrefix(path, KYC_GATED_PATH_PREFIXES) &&
     session.user.kycStatus !== "APPROVED" &&

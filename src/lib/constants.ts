@@ -1,5 +1,3 @@
-export const SPONSOR_CODE_COOKIE = "diva_sponsor_code";
-
 // Paths that require a signed-in session. Everything else (landing page,
 // /login, static assets, webhooks, cron routes) is reachable without auth.
 export const PROTECTED_PATH_PREFIXES = [
@@ -7,7 +5,6 @@ export const PROTECTED_PATH_PREFIXES = [
   "/sessions",
   "/chat",
   "/kyc",
-  "/onboarding",
   "/admin",
   "/profile",
 ] as const;
