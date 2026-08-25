@@ -32,7 +32,7 @@ export async function GET(request: Request) {
         memberships: {
           where: { status: "APPROVED" },
           include: {
-            user: { select: { id: true, name: true, phone: true } },
+            user: { select: { id: true, name: true, phone: true, preferredLang: true } },
             slots: true,
           },
         },
@@ -83,7 +83,12 @@ export async function GET(request: Request) {
             if (log) {
               await sendWhatsAppMessageSafe(
                 membership.user.phone,
-                fineNoticeMessage(membership.user.name, type, fineAmount),
+                fineNoticeMessage(
+                  membership.user.preferredLang === "fr" ? "fr" : "en",
+                  membership.user.name,
+                  type,
+                  fineAmount,
+                ),
               );
             }
           }

@@ -72,11 +72,31 @@ export function AdminClient({ lang }: { lang: Lang }) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [payoutSlotId, setPayoutSlotId] = useState<string>("");
   const [payoutResult, setPayoutResult] = useState<string | null>(null);
+  const [payoutPreview, setPayoutPreview] = useState<{
+    pot: number;
+    deducted: number;
+    netPayout: number;
+    beneficiaryName: string;
+    memberName: string;
+  } | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [releasing, setReleasing] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [startingDraw, setStartingDraw] = useState(false);
   const [contributionSlotId, setContributionSlotId] = useState<string>("");
   const [contributionResult, setContributionResult] = useState<string | null>(null);
   const [recordingContribution, setRecordingContribution] = useState(false);
+  const [userQuery, setUserQuery] = useState("");
+  const [userResults, setUserResults] = useState<{ id: string; name: string; email: string }[]>([]);
+  const [selectedUser, setSelectedUser] = useState<{ id: string; name: string } | null>(null);
+  const [addSlotCount, setAddSlotCount] = useState(1);
+  const [addNames, setAddNames] = useState<string[]>([""]);
+  const [addingMember, setAddingMember] = useState(false);
+  const [addMemberResult, setAddMemberResult] = useState<string | null>(null);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailResult, setEmailResult] = useState<string | null>(null);
 
   const refreshSessions = useCallback(async (keepSelected?: string) => {
     const body = await fetch("/api/admin/sessions").then((r) => r.json());
@@ -120,6 +140,17 @@ export function AdminClient({ lang }: { lang: Lang }) {
       .then((r) => r.json())
       .then(setLedger);
   }, [selectedSessionId]);
+
+  useEffect(() => {
+    if (!userQuery.trim() || selectedUser) return;
+    const handle = setTimeout(() => {
+      fetch(`/api/admin/users/search?q=${encodeURIComponent(userQuery.trim())}`)
+        .then((r) => r.json())
+        .then((b) => setUserResults(b.users ?? []));
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [userQuery, selectedUser]);
+  const visibleUserResults = !selectedUser && userQuery.trim() ? userResults : [];
 
   // Reset the draggable order whenever the selected session changes,
   // without a setState-in-effect round trip (React's documented pattern for
@@ -215,28 +246,117 @@ export function AdminClient({ lang }: { lang: Lang }) {
     await refreshSessions(selectedSessionId ?? undefined);
   }
 
-  async function releasePayout() {
+  async function loadPayoutPreview() {
     if (!selectedSessionId || !payoutSlotId) return;
+    setLoadingPreview(true);
     setPayoutResult(null);
-    const res = await fetch("/api/admin/payouts/release", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tontineSessionId: selectedSessionId, membershipSlotId: payoutSlotId }),
-    });
-    const body = await res.json();
-    if (!res.ok) {
-      setPayoutResult(body.error ?? t("failedToReleasePayout"));
-      return;
+    setPayoutPreview(null);
+    try {
+      const res = await fetch(
+        `/api/admin/payouts/preview?tontineSessionId=${selectedSessionId}&membershipSlotId=${payoutSlotId}`,
+      );
+      const body = await res.json();
+      if (!res.ok) {
+        setPayoutResult(body.error ?? t("failedToReleasePayout"));
+        return;
+      }
+      setPayoutPreview(body);
+    } finally {
+      setLoadingPreview(false);
     }
-    setPayoutResult(
-      t("payoutResultLine", {
-        pot: body.pot.toLocaleString("en-US"),
-        deducted: body.deducted.toLocaleString("en-US"),
-        net: body.netPayout.toLocaleString("en-US"),
-      }),
-    );
-    if (selectedSessionId) {
+  }
+
+  async function confirmReleasePayout() {
+    if (!selectedSessionId || !payoutSlotId) return;
+    setReleasing(true);
+    setPayoutResult(null);
+    try {
+      const res = await fetch("/api/admin/payouts/release", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tontineSessionId: selectedSessionId, membershipSlotId: payoutSlotId }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        setPayoutResult(body.error ?? t("failedToReleasePayout"));
+        return;
+      }
+      setPayoutResult(
+        t("payoutResultLine", {
+          pot: body.pot.toLocaleString("en-US"),
+          deducted: body.deducted.toLocaleString("en-US"),
+          net: body.netPayout.toLocaleString("en-US"),
+        }),
+      );
+      setPayoutPreview(null);
+      setPayoutSlotId("");
       fetch(`/api/admin/sessions/${selectedSessionId}/ledger`).then((r) => r.json()).then(setLedger);
+    } finally {
+      setReleasing(false);
+    }
+  }
+
+  function handleAddSlotCountChange(next: number) {
+    setAddSlotCount(next);
+    const nextNamed = Math.floor(next);
+    setAddNames((current) => {
+      const copy = current.slice(0, nextNamed);
+      while (copy.length < nextNamed) copy.push("");
+      return copy;
+    });
+  }
+
+  async function addMemberManually() {
+    if (!selectedSessionId || !selectedUser || addNames.some((n) => !n.trim())) return;
+    setAddingMember(true);
+    setAddMemberResult(null);
+    try {
+      const res = await fetch("/api/admin/memberships/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: selectedUser.id,
+          tontineSessionId: selectedSessionId,
+          slotCount: addSlotCount,
+          beneficiaryNames: addNames.map((n) => n.trim()),
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        setAddMemberResult(body.error ?? t("couldNotAddMember"));
+        return;
+      }
+      setAddMemberResult(t("memberAddedSuccessfully"));
+      setSelectedUser(null);
+      setUserQuery("");
+      setAddSlotCount(1);
+      setAddNames([""]);
+      await refreshSessions(selectedSessionId);
+    } finally {
+      setAddingMember(false);
+    }
+  }
+
+  async function sendMassEmail() {
+    if (!selectedSessionId || !emailSubject.trim() || !emailBody.trim()) return;
+    setSendingEmail(true);
+    setEmailResult(null);
+    try {
+      const res = await fetch(`/api/admin/sessions/${selectedSessionId}/broadcast-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject: emailSubject.trim(), body: emailBody.trim() }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        setEmailResult(body.error ?? t("couldNotAddMember"));
+        return;
+      }
+      setEmailResult(t("emailSentSummary", { count: String(body.sent) }));
+      setEmailSubject("");
+      setEmailBody("");
+    } finally {
+      setSendingEmail(false);
     }
   }
 
@@ -534,7 +654,10 @@ export function AdminClient({ lang }: { lang: Lang }) {
               <div className="flex gap-2 mb-3">
                 <select
                   value={payoutSlotId}
-                  onChange={(e) => setPayoutSlotId(e.target.value)}
+                  onChange={(e) => {
+                    setPayoutSlotId(e.target.value);
+                    setPayoutPreview(null);
+                  }}
                   className="flex-1 border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
                 >
                   <option value="">{t("selectBeneficiary")}</option>
@@ -545,13 +668,44 @@ export function AdminClient({ lang }: { lang: Lang }) {
                   ))}
                 </select>
                 <button
-                  onClick={releasePayout}
-                  disabled={!payoutSlotId}
+                  onClick={loadPayoutPreview}
+                  disabled={!payoutSlotId || loadingPreview}
                   className="bg-primary text-on-primary font-label-md text-label-md px-4 rounded-lg hover:opacity-90 disabled:opacity-50"
                 >
                   {t("release")}
                 </button>
               </div>
+
+              {payoutPreview && (
+                <div className="bg-surface-container-lowest rounded-lg p-3 mb-3 flex flex-col gap-2">
+                  <h4 className="font-label-md text-label-md text-on-surface">{t("payoutPreviewTitle")}</h4>
+                  <div className="flex justify-between">
+                    <span className="font-label-sm text-label-sm text-on-surface-variant">
+                      {t("beneficiaryOnFileLabel")}
+                    </span>
+                    <span className="font-label-md text-label-md text-on-surface">
+                      {payoutPreview.beneficiaryName} ({payoutPreview.memberName})
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-label-sm text-label-sm text-on-surface-variant">
+                      {t("amountToSendLabel")}
+                    </span>
+                    <span className="font-numeric-data text-numeric-data text-primary">
+                      {payoutPreview.netPayout.toLocaleString("en-US")} F
+                    </span>
+                  </div>
+                  <p className="font-label-sm text-label-sm text-error">{t("onFileNotVerifiedNote")}</p>
+                  <button
+                    onClick={confirmReleasePayout}
+                    disabled={releasing}
+                    className="w-full bg-primary text-on-primary font-label-md text-label-md py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50 mt-1"
+                  >
+                    {releasing ? t("recordingEllipsis") : t("confirmAndSend")}
+                  </button>
+                </div>
+              )}
+
               {payoutResult && (
                 <p className="font-label-sm text-label-sm text-on-surface-variant">{payoutResult}</p>
               )}
@@ -589,6 +743,122 @@ export function AdminClient({ lang }: { lang: Lang }) {
               {contributionResult && (
                 <p className="font-label-sm text-label-sm text-on-surface-variant">{contributionResult}</p>
               )}
+            </section>
+          )}
+
+          {/* Add member manually */}
+          {selectedSession && (
+            <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4">
+              <h3 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-4">
+                <span className="material-symbols-outlined">person_add</span>
+                {t("addMemberManually")}
+              </h3>
+
+              {!selectedUser ? (
+                <div className="relative mb-3">
+                  <input
+                    value={userQuery}
+                    onChange={(e) => setUserQuery(e.target.value)}
+                    placeholder={t("searchUserPlaceholder")}
+                    className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
+                  />
+                  {visibleUserResults.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border border-outline-variant rounded-lg shadow-md overflow-hidden">
+                      {visibleUserResults.map((u) => (
+                        <button
+                          key={u.id}
+                          onClick={() => {
+                            setSelectedUser(u);
+                            setUserResults([]);
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-surface-container-low"
+                        >
+                          <p className="font-label-md text-label-md text-on-surface">{u.name}</p>
+                          <p className="font-label-sm text-label-sm text-on-surface-variant">{u.email}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3 mb-3">
+                  <div className="flex items-center justify-between bg-surface-container-lowest rounded-lg px-3 py-2">
+                    <span className="font-label-md text-label-md text-on-surface">{selectedUser.name}</span>
+                    <button
+                      onClick={() => setSelectedUser(null)}
+                      className="text-outline hover:text-error"
+                      aria-label={t("cancel")}
+                    >
+                      <span className="material-symbols-outlined text-[18px]">close</span>
+                    </button>
+                  </div>
+                  <select
+                    value={addSlotCount}
+                    onChange={(e) => handleAddSlotCountChange(Number(e.target.value))}
+                    className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
+                  >
+                    {[1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5].map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt} {opt !== 1 ? t("slots") : t("slot")}
+                      </option>
+                    ))}
+                  </select>
+                  {addNames.map((name, i) => (
+                    <input
+                      key={i}
+                      value={name}
+                      onChange={(e) =>
+                        setAddNames((current) => current.map((n, idx) => (idx === i ? e.target.value : n)))
+                      }
+                      placeholder={`${t("beneficiaryName")} — ${t("slot")} ${i + 1}`}
+                      className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+                    />
+                  ))}
+                  <button
+                    onClick={addMemberManually}
+                    disabled={addingMember || addNames.some((n) => !n.trim())}
+                    className="w-full bg-primary text-on-primary font-label-md text-label-md py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50"
+                  >
+                    {addingMember ? t("recordingEllipsis") : t("addMemberManually")}
+                  </button>
+                </div>
+              )}
+              {addMemberResult && (
+                <p className="font-label-sm text-label-sm text-on-surface-variant">{addMemberResult}</p>
+              )}
+            </section>
+          )}
+
+          {/* Mass email */}
+          {selectedSession && (
+            <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4">
+              <h3 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-4">
+                <span className="material-symbols-outlined">mail</span>
+                {t("massEmailTitle")}
+              </h3>
+              <div className="flex flex-col gap-2 mb-3">
+                <input
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  placeholder={t("emailSubjectLabel")}
+                  className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
+                />
+                <textarea
+                  value={emailBody}
+                  onChange={(e) => setEmailBody(e.target.value)}
+                  placeholder={t("emailBodyLabel")}
+                  rows={4}
+                  className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
+                />
+                <button
+                  onClick={sendMassEmail}
+                  disabled={sendingEmail || !emailSubject.trim() || !emailBody.trim()}
+                  className="bg-primary text-on-primary font-label-md text-label-md px-4 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50"
+                >
+                  {sendingEmail ? t("recordingEllipsis") : t("sendToAllMembers")}
+                </button>
+              </div>
+              {emailResult && <p className="font-label-sm text-label-sm text-on-surface-variant">{emailResult}</p>}
             </section>
           )}
         </div>

@@ -1,11 +1,15 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getContributionTotal, getNextDueDate } from "@/lib/tontine-engine";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
-import { ProfileForm } from "./profile-form";
-import { ChangePasswordForm } from "./change-password-form";
 import { AvatarUpload } from "./avatar-upload";
+import { InlineField } from "./inline-field";
+import { InlineLocationField } from "./inline-location-field";
+import { InlinePasswordField } from "./inline-password-field";
+import { updatePhoneAction, updateEmailAction } from "./actions";
+import { InstallAppButton } from "@/components/install-app-button";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -22,7 +26,8 @@ const MEMBERSHIP_STATUS_CLASS: Record<string, string> = {
 export default async function ProfilePage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  const t = getTranslator(await getLang());
+  const lang = await getLang();
+  const t = getTranslator(lang);
   const MEMBERSHIP_STATUS_LABEL: Record<string, string> = {
     PENDING: t("membershipStatusPending"),
     APPROVED: t("membershipStatusApproved"),
@@ -86,30 +91,41 @@ export default async function ProfilePage() {
     contributions.map((c) => [`${c.membershipSlotId}:${c.dueDate.toISOString()}`, c]),
   );
 
-  const rows: Array<[string, string]> = [
-    [t("emailLabel"), user.email],
-    [t("phoneLabel"), user.phone ?? t("notSet")],
-    [t("sponsorCodeLabel"), user.sponsorCode ?? t("notSet")],
-    [t("roleLabel"), user.role],
-  ];
-
   return (
     <main className="px-container-padding py-stack-gap-lg max-w-md mx-auto">
       <div className="flex flex-col items-center mb-stack-gap-lg">
-        <AvatarUpload currentAvatarUrl={user.avatar ?? user.image} userName={user.name} />
+        <AvatarUpload currentAvatarUrl={user.avatar ?? user.image} userName={user.name} lang={lang} />
         <h1 className="font-title-md text-title-md text-primary mt-3">{user.name}</h1>
       </div>
 
       <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant overflow-hidden mb-stack-gap-lg">
-        {rows.map(([label, value], i) => (
-          <div
-            key={label}
-            className={`flex justify-between items-center px-4 py-3 ${i < rows.length - 1 ? "border-b border-surface-variant" : ""}`}
-          >
-            <span className="font-label-sm text-label-sm text-on-surface-variant">{label}</span>
-            <span className="font-label-md text-label-md text-on-surface">{value}</span>
-          </div>
-        ))}
+        <InlineField
+          label={t("emailLabel")}
+          currentValue={user.email}
+          fieldName="email"
+          purpose="EMAIL_CHANGE"
+          action={updateEmailAction}
+          lang={lang}
+          inputType="email"
+        />
+        <InlineField
+          label={t("phoneLabel")}
+          currentValue={user.phone ?? ""}
+          fieldName="phone"
+          purpose="PHONE_CHANGE"
+          action={updatePhoneAction}
+          lang={lang}
+          inputType="tel"
+        />
+        <InlineLocationField city={user.city} neighborhood={user.neighborhood} lang={lang} />
+        <div className="flex justify-between items-center px-4 py-3 border-t border-surface-variant">
+          <span className="font-label-sm text-label-sm text-on-surface-variant">{t("sponsorCodeLabel")}</span>
+          <span className="font-label-md text-label-md text-on-surface">{user.sponsorCode ?? t("notSet")}</span>
+        </div>
+        <div className="flex justify-between items-center px-4 py-3 border-t border-surface-variant">
+          <span className="font-label-sm text-label-sm text-on-surface-variant">{t("roleLabel")}</span>
+          <span className="font-label-md text-label-md text-on-surface">{user.role}</span>
+        </div>
       </div>
 
       <section className="mb-stack-gap-lg">
@@ -170,14 +186,29 @@ export default async function ProfilePage() {
         )}
       </section>
 
-      <section className="mb-stack-gap-lg">
-        <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md px-1">{t("editProfile")}</h2>
-        <ProfileForm phone={user.phone} city={user.city} neighborhood={user.neighborhood} />
-      </section>
-
-      <section className="mb-stack-gap-lg">
-        <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md px-1">{t("changePassword")}</h2>
-        <ChangePasswordForm />
+      <section className="mb-stack-gap-lg flex flex-col gap-stack-gap-sm">
+        <InlinePasswordField lang={lang} />
+        <InstallAppButton lang={lang} />
+        <Link
+          href="/history"
+          className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant hover:bg-surface-container-low transition-colors"
+        >
+          <span className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-primary">receipt_long</span>
+            <span className="font-label-md text-label-md text-on-surface">{t("transactionHistory")}</span>
+          </span>
+          <span className="material-symbols-outlined text-outline">chevron_right</span>
+        </Link>
+        <Link
+          href="/help"
+          className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant hover:bg-surface-container-low transition-colors"
+        >
+          <span className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-primary">help</span>
+            <span className="font-label-md text-label-md text-on-surface">{t("helpAndSupport")}</span>
+          </span>
+          <span className="material-symbols-outlined text-outline">chevron_right</span>
+        </Link>
       </section>
 
       <form

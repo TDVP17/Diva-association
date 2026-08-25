@@ -118,6 +118,13 @@ export function getMostRecentDueDate(type: TontineType, from: Date): Date {
   throw new Error(`Could not determine most recent due date for ${type}`);
 }
 
+/** The contribution-day cycle immediately before `dueDate` — never returns `dueDate` itself. */
+export function getPreviousDueDate(type: TontineType, dueDate: Date): Date {
+  const cursor = new Date(dueDate);
+  cursor.setUTCDate(cursor.getUTCDate() - 1);
+  return getMostRecentDueDate(type, cursor);
+}
+
 /** Whether `date` (evaluated in Cameroon local time) is a contribution day for `type`. */
 export function isContributionDay(type: TontineType, date: Date): boolean {
   const { day, weekday } = getCameroonDateParts(date);

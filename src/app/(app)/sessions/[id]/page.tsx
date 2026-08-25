@@ -234,7 +234,14 @@ export default async function SessionDetailPage({
       )}
 
       <section className="mb-stack-gap-lg">
-        <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md px-1">{t("yourSlots")}</h2>
+        <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md px-1 flex items-center gap-2">
+          {t("yourSlots")}
+          {Number(myMembership.slotCount) % 1 !== 0 && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-secondary-container/30 text-on-secondary-container font-label-sm text-label-sm">
+              {t("halfSlotBadge")}
+            </span>
+          )}
+        </h2>
         <div className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant overflow-hidden">
           {mySlots.map((s, index) => {
             const c = contributionBySlot.get(s.id);
@@ -314,6 +321,17 @@ export default async function SessionDetailPage({
           })}
         </div>
       </section>
+
+      {tontineSession.rules && (
+        <section className="mt-stack-gap-lg">
+          <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md px-1">{t("rulesTitle")}</h2>
+          <div className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
+            <p className="font-body-md text-body-md text-on-surface-variant whitespace-pre-wrap">
+              {tontineSession.rules}
+            </p>
+          </div>
+        </section>
+      )}
     </main>
   );
 }

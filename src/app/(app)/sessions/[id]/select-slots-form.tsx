@@ -13,6 +13,7 @@ export function SelectSlotsForm({ tontineSessionId, lang }: { tontineSessionId: 
   const [names, setNames] = useState<string[]>([""]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [adjustedNotice, setAdjustedNotice] = useState<string | null>(null);
 
   const namedSlots = Math.floor(slotCount);
 
@@ -35,18 +36,43 @@ export function SelectSlotsForm({ tontineSessionId, lang }: { tontineSessionId: 
     setSubmitting(true);
     setError(null);
     try {
+      const trimmedNames = names.map((n) => n.trim());
       const res = await fetch(`/api/sessions/${tontineSessionId}/slots`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slotCount, beneficiaryNames: names.map((n) => n.trim()) }),
+        body: JSON.stringify({ slotCount, beneficiaryNames: trimmedNames }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? t("couldNotSaveSlots"));
-      router.refresh();
+
+      const finalNames: string[] = body.beneficiaryNames ?? trimmedNames;
+      const changes = trimmedNames
+        .map((original, i) => (original !== finalNames[i] ? `${original} → ${finalNames[i]}` : null))
+        .filter((s): s is string => s !== null);
+      if (changes.length > 0) {
+        setAdjustedNotice(t("namesAdjustedForUniqueness", { changes: changes.join(", ") }));
+        setSubmitting(false);
+      } else {
+        router.refresh();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSaveSlots"));
       setSubmitting(false);
     }
+  }
+
+  if (adjustedNotice) {
+    return (
+      <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4 flex flex-col gap-4 text-left">
+        <p className="font-label-sm text-label-sm text-on-surface-variant">{adjustedNotice}</p>
+        <button
+          onClick={() => router.refresh()}
+          className="w-full py-3 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all"
+        >
+          {t("confirmSlots")}
+        </button>
+      </div>
+    );
   }
 
   return (

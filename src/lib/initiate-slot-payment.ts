@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getContributionTotal, getNextDueDate } from "@/lib/tontine-engine";
 import { initiatePayment, FapshiError } from "@/lib/fapshi";
+import { assertPriorCyclePaidOut } from "@/lib/round-robin-lock";
 
 export type InitiateSlotPaymentResult =
   | { ok: true; paymentUrl: string; transId: string }
@@ -28,6 +29,17 @@ export async function initiateSlotPayment(
   const { tontineSession } = slot.membership;
   const now = new Date();
   const dueDate = getNextDueDate(tontineSession.type, now);
+
+  const roundLock = await assertPriorCyclePaidOut(
+    tontineSession.id,
+    tontineSession.type,
+    dueDate,
+    tontineSession.startDate,
+  );
+  if (!roundLock.ok) {
+    return { ok: false, status: roundLock.status, error: roundLock.error };
+  }
+
   const { amount, fee } = getContributionTotal({
     amount: Number(tontineSession.amount),
     fee: Number(tontineSession.fee),

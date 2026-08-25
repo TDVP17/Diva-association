@@ -71,20 +71,36 @@ enum NotificationType {
   FINE_NOTICE
 }
 
+enum OtpPurpose {
+  EMAIL_CHANGE
+  PHONE_CHANGE
+  PASSWORD_CHANGE
+}
+
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  emailVerified DateTime?
-  name          String
-  avatar        String?
-  image         String?
-  role          Role      @default(MEMBER)
-  sponsorCode   String?
-  city          String?
-  neighborhood  String?
+  id                   String    @id @default(cuid())
+  email                String    @unique
+  emailVerified        DateTime?
+  name                 String
+  avatar               String?
+  image                String?
+  role                 Role      @default(MEMBER)
+  sponsorCode          String?
+  city                 String?
+  neighborhood         String?
   /// E.164-ish digits-only phone number used for WhatsApp notifications (Evolution API).
-  phone         String?
-  createdAt     DateTime  @default(now())
+  phone                String?
+  /// Optional separate mobile-money number for admin payouts, when it
+  /// differs from the WhatsApp contact number above. Falls back to `phone`
+  /// when null.
+  payoutPhone          String?
+  /// "en" | "fr" — synced from the language cookie whenever a signed-in user
+  /// switches language, so server-side flows with no request-scoped cookie
+  /// access (e.g. the support auto-reply bot) can still localize correctly.
+  preferredLang        String?
+  /// Throttles the support-chat auto-reply bot to once per rolling 30 days.
+  lastAdminAutoReplyAt DateTime?
+  createdAt            DateTime  @default(now())
 
   accounts                     Account[]
   sessions                     Session[]
@@ -96,8 +112,34 @@ model User {
   messagesReceived             ChatMessage[]         @relation("MessageReceiver")
   notificationLogs             NotificationLog[]
   kycVerifications             KycVerification[]
+  otpChallenges                OtpChallenge[]
+  payoutsReleasedAsAdmin       Payout[]              @relation("PayoutReleasedByAdmin")
 
   @@map("users")
+}
+
+/// Short-lived numeric verification codes gating changes to sensitive
+/// profile fields (email, phone, password). Always delivered via WhatsApp
+/// (see src/lib/otp.ts) — a DB row (not a stateless token) so requests can
+/// be rate-limited, invalidated on use, and capped on brute-force attempts.
+model OtpChallenge {
+  id           String     @id @default(cuid())
+  userId       String
+  purpose      OtpPurpose
+  /// sha256(code + OTP_PEPPER) — the plaintext code is never stored.
+  codeHash     String
+  /// New value being verified toward (new email/phone). Null for
+  /// PASSWORD_CHANGE, which has nothing new to stage.
+  pendingValue String?
+  expiresAt    DateTime
+  consumedAt   DateTime?
+  attempts     Int        @default(0)
+  createdAt    DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@map("otp_challenges")
 }
 
 model Account {
@@ -161,6 +203,7 @@ model TontineSession {
   swapRequests     PositionSwapRequest[]
   notificationLogs NotificationLog[]
   kycVerifications KycVerification[]
+  payouts          Payout[]
 
   @@map("tontine_sessions")
 }
@@ -206,8 +249,35 @@ model MembershipSlot {
   membership    Membership     @relation(fields: [membershipId], references: [id], onDelete: Cascade)
   contributions Contribution[]
   fines         Fine[]
+  payouts       Payout[]
 
   @@map("membership_slots")
+}
+
+/// Durable record of a released round-robin payout — one row per session
+/// per cycle. Existence of a row here is the single source of truth for
+/// "has this cycle's designated beneficiary been paid out yet," which the
+/// round-robin pre-pay-ahead lock (src/lib/round-robin-lock.ts) depends on.
+model Payout {
+  id                String   @id @default(cuid())
+  tontineSessionId  String
+  membershipSlotId  String
+  /// The cycle (Contribution.dueDate-style key) this payout closes out.
+  dueDate           DateTime
+  pot               Decimal  @db.Decimal(12, 2)
+  deducted          Decimal  @db.Decimal(12, 2)
+  netPayout         Decimal  @db.Decimal(12, 2)
+  /// Fapshi payout transaction id (POST /payout response.transId).
+  fapshiTransId     String?  @unique
+  releasedByAdminId String
+  releasedAt        DateTime @default(now())
+
+  tontineSession  TontineSession @relation(fields: [tontineSessionId], references: [id], onDelete: Cascade)
+  membershipSlot  MembershipSlot @relation(fields: [membershipSlotId], references: [id], onDelete: Cascade)
+  releasedByAdmin User           @relation("PayoutReleasedByAdmin", fields: [releasedByAdminId], references: [id])
+
+  @@unique([tontineSessionId, dueDate])
+  @@map("payouts")
 }
 
 /// One row per KYC (Didit) verification attempt. Created when a member

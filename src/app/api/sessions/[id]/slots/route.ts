@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { resolveUniqueSlotNames } from "@/lib/slot-naming";
 
 const bodySchema = z.object({
   slotCount: z.coerce.number().min(0.5).max(20),
@@ -41,20 +42,29 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "You've already selected your slots" }, { status: 409 });
     }
 
+    const existingSlots = await prisma.membershipSlot.findMany({
+      where: { membership: { tontineSessionId } },
+      select: { beneficiaryName: true },
+    });
+    const finalNames = resolveUniqueSlotNames(
+      existingSlots.map((s) => s.beneficiaryName),
+      beneficiaryNames,
+    );
+
     await prisma.$transaction(async (tx) => {
       await tx.membership.update({
         where: { id: membership.id },
         data: { slotCount },
       });
       await tx.membershipSlot.createMany({
-        data: beneficiaryNames.map((beneficiaryName) => ({
+        data: finalNames.map((beneficiaryName) => ({
           membershipId: membership.id,
           beneficiaryName,
         })),
       });
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, beneficiaryNames: finalNames });
   } catch (err) {
     console.error("[sessions/slots] unexpected error:", err);
     return NextResponse.json(

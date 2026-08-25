@@ -75,6 +75,73 @@ export const translations = {
     positionLabel: "Position",
     paidAtLabel: "Paid at {time}",
     fineSuffix: "fine",
+    rulesTitle: "Rules",
+    noRulesYet: "No rules have been set for this cotisation yet.",
+    autoReplySupport:
+      "Hello {name}, please explain your issue in detail. A customer service agent will attend to you shortly.",
+    helpCenterTitle: "Help Center",
+    helpAndSupport: "Help & Support",
+    contactAdminSupport: "Contact Admin Support",
+    helpQ1: "How do a cotisation and its rounds work?",
+    helpA1:
+      "Each cotisation runs on a fixed schedule (weekly on Sundays, or monthly on the 25th/28th). Every member's registered slots contribute the same amount each round. Once a round closes, the round's designated beneficiary (by draw position) receives the collected pot as their payout.",
+    helpQ2: "How do I join a cotisation and pick my slots?",
+    helpA2:
+      "Request to join from the session page — you'll complete a quick identity verification first. Once an admin approves you, you choose how many slots you're taking (in 0.5 increments) and name a beneficiary for each whole slot.",
+    helpQ3: "What happens if I pay late?",
+    helpA3:
+      "A late fine is added automatically after the daily cutoff time, calculated per period you're overdue. Settling your contribution also settles any outstanding fine for that same cycle.",
+    helpQ4: "Can someone else pay for my slot?",
+    helpA4:
+      "Yes — every session has a public contribution link (shown on the session page) that lets a third party pay for any specific unpaid slot by name, no account required.",
+    helpQ5: "How do I reach an admin if I have a problem?",
+    helpA5:
+      "Use Admin Support in the Chat tab — send a message describing your issue and an admin will follow up. You'll get an automatic acknowledgement the first time you reach out.",
+    installApp: "Install App",
+    installAppDescription: "Add DIVA Associations to your home screen for quick, app-like access.",
+    otpMessage: "Your DIVA Associations verification code is {code}. It expires in 10 minutes.",
+    save: "Save",
+    verifyCode: "Verify code",
+    locationLabel: "Location",
+    cityLabel: "City",
+    neighborhoodLabel: "Neighborhood",
+    transactionHistory: "Transaction History",
+    changeEmail: "Change email",
+    changePhone: "Change phone",
+    enterOtpCode: "Enter the 6-digit code",
+    sendCode: "Send code",
+    otpSent: "We've sent a 6-digit code to your WhatsApp number.",
+    otpInvalid: "That code didn't work. Please try again.",
+    otpExpired: "This code has expired. Please request a new one.",
+    cropAvatar: "Adjust your photo",
+    saveAvatar: "Save photo",
+    viewFullImage: "View full image",
+    addMemberManually: "Add Member Manually",
+    searchUserPlaceholder: "Search by name, email, or phone…",
+    memberAddedSuccessfully: "Member added successfully.",
+    couldNotAddMember: "Could not add this member",
+    noTransactionsYet: "You don't have any transactions yet.",
+    contributionLabel: "Contribution",
+    fineLabel: "Fine",
+    payoutPreviewTitle: "Confirm before sending",
+    beneficiaryOnFileLabel: "Beneficiary (on file)",
+    amountToSendLabel: "Amount to send",
+    onFileNotVerifiedNote: "This name is on file and has not been independently verified by the payment provider.",
+    confirmAndSend: "Confirm & Send",
+    massEmailTitle: "Mass Email",
+    emailSubjectLabel: "Subject",
+    emailBodyLabel: "Message",
+    sendToAllMembers: "Send to All Members",
+    emailSentSummary: "Sent to {count} member(s).",
+    waReminderNoon:
+      "Hi {name}, this is a friendly reminder from DIVA Associations 🌿\n\nYour contribution of {amount} for the {cotisation} is due today. You have until 18:30 to pay before a late fine applies.\n\nThank you for staying on track with the community!",
+    waReminderUrgent:
+      "⚠️ URGENT — DIVA Associations\n\n{name}, your {amount} contribution for the {cotisation} is still unpaid. The 18:30 deadline is approaching — after 18:31 a late fine will automatically apply.\n\nPlease complete your payment now to avoid the fine.",
+    waPaymentSuccess:
+      "✅ You have successfully contributed {amount} for {cotisation}.\n\nThank you, {name}!\n\nDownload your receipt: {receiptUrl}",
+    waFineNotice:
+      "🔴 Late payment notice — DIVA Associations\n\n{name}, your contribution for the {cotisation} was not received before the 18:30 deadline. A late fine of {amount} has been applied to your account.\n\nPlease settle your contribution and fine as soon as possible.",
+    myConversations: "My Conversations",
 
     // Slot selection form
     contributionSlots: "Contribution slots",
@@ -86,6 +153,8 @@ export const translations = {
     fillAllNames: "Please fill in every beneficiary name.",
     saving: "Saving...",
     couldNotSaveSlots: "Could not save your slots",
+    namesAdjustedForUniqueness: "Some names were adjusted to stay unique: {changes}",
+    halfSlotBadge: "+0.5 slot",
 
     // Draw
     cycleDraw: "Cycle Draw",
@@ -272,6 +341,74 @@ export const translations = {
     positionLabel: "Position",
     paidAtLabel: "Payé à {time}",
     fineSuffix: "amende",
+    rulesTitle: "Règles",
+    noRulesYet: "Aucune règle n'a encore été définie pour cette cotisation.",
+    autoReplySupport:
+      "Bonjour {name}, veuillez expliquer votre problème en détail. Un agent du service client vous répondra sous peu.",
+    helpCenterTitle: "Centre d'aide",
+    helpAndSupport: "Aide et support",
+    contactAdminSupport: "Contacter le support admin",
+    helpQ1: "Comment fonctionnent une cotisation et ses cycles ?",
+    helpA1:
+      "Chaque cotisation suit un calendrier fixe (chaque dimanche, ou chaque 25 ou 28 du mois). Tous les créneaux enregistrés d'un membre contribuent le même montant à chaque cycle. Une fois le cycle clôturé, le bénéficiaire désigné du cycle (selon sa position de tirage) reçoit la cagnotte collectée en paiement.",
+    helpQ2: "Comment rejoindre une cotisation et choisir mes créneaux ?",
+    helpA2:
+      "Demandez à rejoindre depuis la page de la session — vous compléterez d'abord une vérification d'identité rapide. Une fois approuvé(e) par un admin, vous choisissez combien de créneaux vous prenez (par incréments de 0,5) et nommez un bénéficiaire pour chaque créneau entier.",
+    helpQ3: "Que se passe-t-il si je paie en retard ?",
+    helpA3:
+      "Une amende de retard est ajoutée automatiquement après l'heure limite quotidienne, calculée par période de retard. Régler votre contribution règle aussi toute amende en attente pour ce même cycle.",
+    helpQ4: "Quelqu'un d'autre peut-il payer pour mon créneau ?",
+    helpA4:
+      "Oui — chaque session dispose d'un lien de contribution public (affiché sur la page de la session) qui permet à un tiers de payer pour un créneau impayé spécifique par son nom, sans compte requis.",
+    helpQ5: "Comment contacter un admin en cas de problème ?",
+    helpA5:
+      "Utilisez Support Admin dans l'onglet Chat — envoyez un message décrivant votre problème et un admin vous répondra. Vous recevrez un accusé de réception automatique la première fois que vous nous contactez.",
+    installApp: "Installer l'application",
+    installAppDescription: "Ajoutez DIVA Associations à votre écran d'accueil pour un accès rapide, comme une app.",
+    otpMessage: "Votre code de vérification DIVA Associations est {code}. Il expire dans 10 minutes.",
+    save: "Enregistrer",
+    verifyCode: "Vérifier le code",
+    locationLabel: "Localisation",
+    cityLabel: "Ville",
+    neighborhoodLabel: "Quartier",
+    transactionHistory: "Historique des transactions",
+    changeEmail: "Modifier l'e-mail",
+    changePhone: "Modifier le téléphone",
+    enterOtpCode: "Entrez le code à 6 chiffres",
+    sendCode: "Envoyer le code",
+    otpSent: "Nous avons envoyé un code à 6 chiffres à votre numéro WhatsApp.",
+    otpInvalid: "Ce code n'a pas fonctionné. Veuillez réessayer.",
+    otpExpired: "Ce code a expiré. Veuillez en demander un nouveau.",
+    cropAvatar: "Ajustez votre photo",
+    saveAvatar: "Enregistrer la photo",
+    viewFullImage: "Voir l'image complète",
+    addMemberManually: "Ajouter un membre manuellement",
+    searchUserPlaceholder: "Rechercher par nom, e-mail ou téléphone…",
+    memberAddedSuccessfully: "Membre ajouté avec succès.",
+    couldNotAddMember: "Impossible d'ajouter ce membre",
+    noTransactionsYet: "Vous n'avez encore aucune transaction.",
+    contributionLabel: "Contribution",
+    fineLabel: "Amende",
+    payoutPreviewTitle: "Confirmer avant l'envoi",
+    beneficiaryOnFileLabel: "Bénéficiaire (sur dossier)",
+    amountToSendLabel: "Montant à envoyer",
+    onFileNotVerifiedNote:
+      "Ce nom est celui enregistré sur dossier et n'a pas été vérifié indépendamment par le prestataire de paiement.",
+    confirmAndSend: "Confirmer et envoyer",
+    massEmailTitle: "E-mail groupé",
+    emailSubjectLabel: "Objet",
+    emailBodyLabel: "Message",
+    sendToAllMembers: "Envoyer à tous les membres",
+    emailSentSummary: "Envoyé à {count} membre(s).",
+    waReminderNoon:
+      "Bonjour {name}, ceci est un rappel amical de DIVA Associations 🌿\n\nVotre contribution de {amount} pour la {cotisation} est due aujourd'hui. Vous avez jusqu'à 18h30 pour payer avant qu'une amende de retard ne s'applique.\n\nMerci de rester à jour avec la communauté !",
+    waReminderUrgent:
+      "⚠️ URGENT — DIVA Associations\n\n{name}, votre contribution de {amount} pour la {cotisation} est toujours impayée. L'échéance de 18h30 approche — après 18h31, une amende de retard s'appliquera automatiquement.\n\nVeuillez effectuer votre paiement maintenant pour éviter l'amende.",
+    waPaymentSuccess:
+      "✅ Vous avez contribué avec succès {amount} pour {cotisation}.\n\nMerci, {name} !\n\nTéléchargez votre reçu : {receiptUrl}",
+    waFineNotice:
+      "🔴 Avis de retard de paiement — DIVA Associations\n\n{name}, votre contribution pour la {cotisation} n'a pas été reçue avant l'échéance de 18h30. Une amende de retard de {amount} a été appliquée à votre compte.\n\nVeuillez régler votre contribution et votre amende dès que possible.",
+    myConversations: "Mes conversations",
 
     // Slot selection form
     contributionSlots: "Créneaux de contribution",
@@ -284,6 +421,8 @@ export const translations = {
     fillAllNames: "Veuillez remplir chaque nom de bénéficiaire.",
     saving: "Enregistrement...",
     couldNotSaveSlots: "Impossible d'enregistrer vos créneaux",
+    namesAdjustedForUniqueness: "Certains noms ont été ajustés pour rester uniques : {changes}",
+    halfSlotBadge: "+0,5 créneau",
 
     // Draw
     cycleDraw: "Tirage du cycle",

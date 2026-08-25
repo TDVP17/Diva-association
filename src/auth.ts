@@ -76,7 +76,10 @@ export const {
     emailPasswordProvider,
     ...(process.env.NODE_ENV !== "production" ? [devLoginProvider] : []),
   ],
-  session: { strategy: "jwt" },
+  // 90-day persistence per product requirement — a session only ends when
+  // the user explicitly logs out, or after 90 days of inactivity.
+  session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 90 },
+  jwt: { maxAge: 60 * 60 * 24 * 90 },
   pages: {
     signIn: "/login",
     error: "/login",

@@ -1,4 +1,5 @@
 import type { TontineType } from "@/generated/prisma/enums";
+import { translate, type Lang } from "@/lib/i18n/translations";
 
 const TONTINE_LABELS: Record<TontineType, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -10,41 +11,56 @@ function formatXAF(amount: number): string {
   return `${amount.toLocaleString("en-US")} F`;
 }
 
-export function reminderNoonMessage(memberName: string, type: TontineType, amount: number): string {
-  return (
-    `Hi ${memberName}, this is a friendly reminder from DIVA Associations 🌿\n\n` +
-    `Your contribution of ${formatXAF(amount)} for the ${TONTINE_LABELS[type]} is due today. ` +
-    `You have until 18:30 to pay before a late fine applies.\n\n` +
-    `Thank you for staying on track with the community!`
-  );
+export function reminderNoonMessage(
+  lang: Lang,
+  memberName: string,
+  type: TontineType,
+  amount: number,
+): string {
+  return translate(lang, "waReminderNoon", {
+    name: memberName,
+    amount: formatXAF(amount),
+    cotisation: TONTINE_LABELS[type],
+  });
 }
 
-export function reminderUrgentMessage(memberName: string, type: TontineType, amount: number): string {
-  return (
-    `⚠️ URGENT — DIVA Associations\n\n` +
-    `${memberName}, your ${formatXAF(amount)} contribution for the ${TONTINE_LABELS[type]} is still unpaid. ` +
-    `The 18:30 deadline is approaching — after 18:31 a late fine will automatically apply.\n\n` +
-    `Please complete your payment now to avoid the fine.`
-  );
+export function reminderUrgentMessage(
+  lang: Lang,
+  memberName: string,
+  type: TontineType,
+  amount: number,
+): string {
+  return translate(lang, "waReminderUrgent", {
+    name: memberName,
+    amount: formatXAF(amount),
+    cotisation: TONTINE_LABELS[type],
+  });
 }
 
 export function paymentSuccessMessage(
+  lang: Lang,
   memberName: string,
   totalPaid: number,
+  cotisationName: string,
   receiptUrl: string,
 ): string {
-  return (
-    `✅ Payment received — DIVA Associations\n\n` +
-    `Thank you, ${memberName}! We've confirmed your payment of ${formatXAF(totalPaid)}.\n\n` +
-    `Download your receipt: ${receiptUrl}`
-  );
+  return translate(lang, "waPaymentSuccess", {
+    name: memberName,
+    amount: formatXAF(totalPaid),
+    cotisation: cotisationName,
+    receiptUrl,
+  });
 }
 
-export function fineNoticeMessage(memberName: string, type: TontineType, fineAmount: number): string {
-  return (
-    `🔴 Late payment notice — DIVA Associations\n\n` +
-    `${memberName}, your contribution for the ${TONTINE_LABELS[type]} was not received before the 18:30 deadline. ` +
-    `A late fine of ${formatXAF(fineAmount)} has been applied to your account.\n\n` +
-    `Please settle your contribution and fine as soon as possible.`
-  );
+export function fineNoticeMessage(
+  lang: Lang,
+  memberName: string,
+  type: TontineType,
+  fineAmount: number,
+): string {
+  return translate(lang, "waFineNotice", {
+    name: memberName,
+    amount: formatXAF(fineAmount),
+    cotisation: TONTINE_LABELS[type],
+  });
 }

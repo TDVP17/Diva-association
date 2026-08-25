@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getSupportAdmin } from "@/lib/chat/support-admin";
 
 interface Contact {
   id: string;
@@ -79,9 +80,7 @@ export async function GET() {
 
   const [members, adminUser] = await Promise.all([
     withLastMessage(session.user.id, memberIds),
-    isAdmin
-      ? Promise.resolve(null)
-      : prisma.user.findFirst({ where: { role: "ADMIN" }, select: { id: true, name: true, avatar: true, image: true } }),
+    isAdmin ? Promise.resolve(null) : getSupportAdmin(),
   ]);
 
   let admin: Contact | null = null;

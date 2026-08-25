@@ -5,6 +5,12 @@ import { saveFile } from "@/lib/storage";
 import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
 import { paymentSuccessMessage } from "@/lib/whatsapp/templates";
 
+const TONTINE_LABELS: Record<string, string> = {
+  HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
+  MONTHLY_28: "Monthly Tontine (28th)",
+  MONTHLY_25: "Monthly Tontine (25th)",
+};
+
 type ContributionWithSlot = Contribution & {
   membershipSlot: MembershipSlot & {
     membership: Membership & { user: User; tontineSession: TontineSession };
@@ -62,8 +68,10 @@ export async function settleContribution(
   await sendWhatsAppMessageSafe(
     user.phone,
     paymentSuccessMessage(
+      user.preferredLang === "fr" ? "fr" : "en",
       `${user.name} (${contribution.membershipSlot.beneficiaryName})`,
       totalPaid,
+      tontineSession.title || TONTINE_LABELS[tontineSession.type],
       `${options.origin}/api/files/${receiptKey}`,
     ),
   );

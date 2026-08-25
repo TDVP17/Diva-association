@@ -28,7 +28,7 @@ export async function getUnpaidSlots(tontineSessionId: string, dueDate: Date) {
   const memberships = await prisma.membership.findMany({
     where: { tontineSessionId, status: "APPROVED" },
     include: {
-      user: { select: { id: true, name: true, phone: true } },
+      user: { select: { id: true, name: true, phone: true, preferredLang: true } },
       slots: {
         include: { contributions: { where: { dueDate }, select: { status: true } } },
       },

@@ -47,7 +47,9 @@ export default async function SessionsPage() {
   return (
     <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto flex flex-col gap-section-margin">
       <section>
-        <h2 className="font-title-md text-title-md text-primary mb-stack-gap-md">{t("mySessions")}</h2>
+        <h2 className="sticky top-16 z-30 bg-background py-2 -mx-container-padding px-container-padding font-title-md text-title-md text-primary mb-stack-gap-md shadow-[0px_4px_20px_rgba(30,41,59,0.05)]">
+          {t("mySessions")}
+        </h2>
         {memberships.length === 0 ? (
           <div className="bg-white rounded-xl p-6 text-center shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant">
             <p className="font-body-md text-body-md text-on-surface-variant">{t("notJoinedYet")}</p>

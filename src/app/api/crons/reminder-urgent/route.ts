@@ -39,7 +39,12 @@ export async function GET(request: Request) {
 
       await sendWhatsAppMessageSafe(
         slot.user.phone,
-        reminderUrgentMessage(slot.user.name, tontineSession.type, amount),
+        reminderUrgentMessage(
+          slot.user.preferredLang === "fr" ? "fr" : "en",
+          slot.user.name,
+          tontineSession.type,
+          amount,
+        ),
       );
       sent++;
     }

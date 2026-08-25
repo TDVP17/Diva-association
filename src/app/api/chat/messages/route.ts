@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { translate } from "@/lib/i18n/translations";
+
+const AUTO_REPLY_THROTTLE_MS = 30 * 24 * 60 * 60 * 1000;
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -88,6 +91,37 @@ export async function POST(request: Request) {
       content: parsed.data.content,
     },
   });
+
+  // A non-admin messaging an admin (the "Admin Support" thread) gets exactly
+  // one automated acknowledgement per rolling 30 days — not on every message,
+  // so an ongoing conversation doesn't get spammed with the bot reply.
+  if (receiver.role === "ADMIN" && session.user.role !== "ADMIN") {
+    const sender = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { name: true, preferredLang: true, lastAdminAutoReplyAt: true },
+    });
+    const dueForAutoReply =
+      sender &&
+      (!sender.lastAdminAutoReplyAt ||
+        Date.now() - sender.lastAdminAutoReplyAt.getTime() > AUTO_REPLY_THROTTLE_MS);
+    if (sender && dueForAutoReply) {
+      await prisma.$transaction([
+        prisma.chatMessage.create({
+          data: {
+            senderId: receiver.id,
+            receiverId: session.user.id,
+            content: translate(sender.preferredLang === "fr" ? "fr" : "en", "autoReplySupport", {
+              name: sender.name,
+            }),
+          },
+        }),
+        prisma.user.update({
+          where: { id: session.user.id },
+          data: { lastAdminAutoReplyAt: new Date() },
+        }),
+      ]);
+    }
+  }
 
   return NextResponse.json({
     kind: "message" as const,

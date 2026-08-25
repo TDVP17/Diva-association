@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
-import { getMostRecentDueDate } from "@/lib/tontine-engine";
+import { computePayoutPreview } from "@/lib/payout-preview";
+import { sendPayout, FapshiPayoutError } from "@/lib/fapshi-payout";
 import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
 
 const bodySchema = z.object({
@@ -31,39 +32,56 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Session or slot not found" }, { status: 404 });
   }
 
-  const dueDate = getMostRecentDueDate(tontineSession.type, new Date());
+  // Never trust a client-echoed amount — recompute server-side right before sending money.
+  const { pot, deducted, netPayout, dueDate, toDeductFineIds } = await computePayoutPreview(tontineSession, slot);
 
-  const [potAgg, unpaidFines] = await Promise.all([
-    prisma.contribution.aggregate({
-      where: { membershipSlot: { membership: { tontineSessionId } }, dueDate, status: "PAID" },
-      _sum: { amountPaid: true },
-    }),
-    prisma.fine.findMany({
-      where: { membershipSlotId, status: "UNPAID" },
-      orderBy: { createdAt: "asc" },
-    }),
-  ]);
-
-  const pot = Number(potAgg._sum.amountPaid ?? 0);
-
-  let deducted = 0;
-  const toDeduct: string[] = [];
-  for (const fine of unpaidFines) {
-    const amount = Number(fine.amount);
-    if (deducted + amount > pot) break;
-    deducted += amount;
-    toDeduct.push(fine.id);
-  }
-  const netPayout = pot - deducted;
-
-  if (toDeduct.length > 0) {
-    await prisma.fine.updateMany({
-      where: { id: { in: toDeduct } },
-      data: { status: "DEDUCTED" },
-    });
+  const existingPayout = await prisma.payout.findUnique({
+    where: { tontineSessionId_dueDate: { tontineSessionId, dueDate } },
+  });
+  if (existingPayout) {
+    return NextResponse.json({ error: "This cycle's payout has already been released" }, { status: 409 });
   }
 
   const { user } = slot.membership;
+  const payoutPhone = user.payoutPhone ?? user.phone;
+  if (!payoutPhone) {
+    return NextResponse.json({ error: "This member has no payout phone number on file" }, { status: 400 });
+  }
+
+  let fapshiResult;
+  try {
+    fapshiResult = await sendPayout({
+      amount: Math.round(netPayout),
+      phone: payoutPhone,
+      name: `${user.name} — ${slot.beneficiaryName}`,
+      externalId: `${tontineSessionId}:${slot.id}:${dueDate.toISOString()}`,
+      message: "DIVA Associations tontine payout",
+    });
+  } catch (err) {
+    if (err instanceof FapshiPayoutError) {
+      return NextResponse.json({ error: err.message }, { status: 502 });
+    }
+    return NextResponse.json({ error: "Payout could not be sent. Please try again." }, { status: 502 });
+  }
+
+  await prisma.$transaction([
+    ...(toDeductFineIds.length > 0
+      ? [prisma.fine.updateMany({ where: { id: { in: toDeductFineIds } }, data: { status: "DEDUCTED" } })]
+      : []),
+    prisma.payout.create({
+      data: {
+        tontineSessionId,
+        membershipSlotId,
+        dueDate,
+        pot,
+        deducted,
+        netPayout,
+        fapshiTransId: fapshiResult.transId,
+        releasedByAdminId: admin.user.id,
+      },
+    }),
+  ]);
+
   await sendWhatsAppMessageSafe(
     user.phone,
     `🎉 Payout released — DIVA Associations\n\n` +

@@ -12,6 +12,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (session.user.role === "ADMIN") {
+    return NextResponse.json({ error: "Admin accounts cannot join tontine sessions" }, { status: 403 });
+  }
 
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {

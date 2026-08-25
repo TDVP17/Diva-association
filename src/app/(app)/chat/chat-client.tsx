@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { translate, type Lang } from "@/lib/i18n/translations";
 
 interface Contact {
   id: string;
@@ -39,8 +41,18 @@ function initials(name: string) {
   return name.slice(0, 2).toUpperCase();
 }
 
-export function ChatClient({ currentUserId, isAdmin }: { currentUserId: string; isAdmin: boolean }) {
-  const [tab, setTab] = useState<"members" | "admin">("members");
+export function ChatClient({
+  currentUserId,
+  isAdmin,
+  lang,
+}: {
+  currentUserId: string;
+  isAdmin: boolean;
+  lang: Lang;
+}) {
+  const t = (key: Parameters<typeof translate>[1]) => translate(lang, key);
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<"members" | "admin">(searchParams.get("tab") === "admin" ? "admin" : "members");
   const [contacts, setContacts] = useState<{ members: Contact[]; admin: Contact | null } | null>(null);
   const [active, setActive] = useState<Contact | null>(null);
   const [feed, setFeed] = useState<FeedItem[]>([]);
@@ -245,6 +257,9 @@ export function ChatClient({ currentUserId, isAdmin }: { currentUserId: string; 
 
   return (
     <main className="px-container-padding pt-4 pb-8 max-w-2xl mx-auto">
+      <h1 className="sticky top-16 z-30 bg-background py-2 -mx-container-padding px-container-padding font-title-md text-title-md text-primary mb-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)]">
+        {t("myConversations")}
+      </h1>
       {!isAdmin && (
         <div className="flex bg-surface-container-low rounded-lg p-1 mb-4 max-w-xs">
           <button
