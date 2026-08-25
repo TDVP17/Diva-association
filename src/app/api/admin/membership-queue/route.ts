@@ -13,12 +13,28 @@ export async function GET() {
         id: true,
         joinedAt: true,
         user: { select: { id: true, name: true, avatar: true, image: true } },
-        tontineSession: { select: { id: true, type: true, status: true } },
+        tontineSession: { select: { id: true, title: true, type: true, status: true } },
+        kycVerification: {
+          select: { documentType: true, matchConfidence: true, documentImageUrl: true, verifiedAt: true },
+        },
       },
       orderBy: { joinedAt: "asc" },
     });
 
-    return NextResponse.json({ memberships });
+    return NextResponse.json({
+      memberships: memberships.map((m) => ({
+        ...m,
+        kycVerification: m.kycVerification
+          ? {
+              ...m.kycVerification,
+              matchConfidence:
+                m.kycVerification.matchConfidence !== null
+                  ? Number(m.kycVerification.matchConfidence)
+                  : null,
+            }
+          : null,
+      })),
+    });
   } catch (err) {
     console.error("[membership-queue] unexpected error:", err);
     return NextResponse.json({ error: "Could not load pending membership requests" }, { status: 500 });

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getActiveSessionsDueToday, getUnpaidMembers } from "@/lib/notify";
+import { getActiveSessionsDueToday, getUnpaidSlots } from "@/lib/notify";
 import { getContributionTotal } from "@/lib/tontine-engine";
 import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
 import { reminderUrgentMessage } from "@/lib/whatsapp/templates";
@@ -16,16 +16,19 @@ export async function GET(request: Request) {
   let sent = 0;
 
   for (const { tontineSession, dueDate } of dueSessions) {
-    const { amount } = getContributionTotal(tontineSession.type);
-    const unpaid = await getUnpaidMembers(tontineSession.id, dueDate);
+    const { amount } = getContributionTotal({
+      amount: Number(tontineSession.amount),
+      fee: Number(tontineSession.fee),
+    });
+    const unpaid = await getUnpaidSlots(tontineSession.id, dueDate);
 
-    for (const membership of unpaid) {
-      if (!membership.user.phone) continue;
+    for (const slot of unpaid) {
+      if (!slot.user.phone) continue;
 
       const log = await prisma.notificationLog
         .create({
           data: {
-            userId: membership.userId,
+            userId: slot.userId,
             tontineSessionId: tontineSession.id,
             dueDate,
             type: "REMINDER_URGENT",
@@ -35,8 +38,8 @@ export async function GET(request: Request) {
       if (!log) continue;
 
       await sendWhatsAppMessageSafe(
-        membership.user.phone,
-        reminderUrgentMessage(membership.user.name, tontineSession.type, amount),
+        slot.user.phone,
+        reminderUrgentMessage(slot.user.name, tontineSession.type, amount),
       );
       sent++;
     }

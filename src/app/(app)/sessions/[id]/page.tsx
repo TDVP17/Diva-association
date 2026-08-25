@@ -3,8 +3,11 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getContributionTotal, getNextDueDate } from "@/lib/tontine-engine";
+import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { PayButton } from "./pay-button";
 import { JoinButton } from "./join-button";
+import { VerificationPollingRefresh } from "./verification-status";
+import { SelectSlotsForm } from "./select-slots-form";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -20,34 +23,75 @@ export default async function SessionDetailPage({
   const { id } = await params;
   const session = await auth();
   const userId = session!.user.id;
+  const lang = await getLang();
+  const t = getTranslator(lang);
 
   const tontineSession = await prisma.tontineSession.findUnique({
     where: { id },
     include: {
       memberships: {
-        include: { user: { select: { id: true, name: true, avatar: true, image: true } } },
-        orderBy: [{ officialPosition: "asc" }, { ballDrawn: "asc" }],
+        include: {
+          user: { select: { id: true, name: true, avatar: true, image: true } },
+          slots: { orderBy: [{ officialPosition: "asc" }, { ballDrawn: "asc" }, { createdAt: "asc" }] },
+        },
       },
     },
   });
   if (!tontineSession) notFound();
 
   const myMembership = tontineSession.memberships.find((m) => m.userId === userId);
+  const sessionLabel = tontineSession.title || TONTINE_LABELS[tontineSession.type];
 
   if (!myMembership) {
+    const latestVerification = await prisma.kycVerification.findFirst({
+      where: { userId, tontineSessionId: id },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (latestVerification?.status === "PENDING") {
+      return (
+        <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto">
+          <VerificationPollingRefresh />
+          <section className="bg-surface rounded-xl p-6 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant text-center flex flex-col items-center gap-2">
+            <span className="material-symbols-outlined text-primary text-4xl">hourglass_top</span>
+            <h1 className="font-title-md text-title-md text-primary">{t("verificationInProgress")}</h1>
+            <p className="font-body-md text-body-md text-on-surface-variant">
+              {t("verificationInProgressBody", { session: sessionLabel })}
+            </p>
+          </section>
+        </main>
+      );
+    }
+
+    if (latestVerification?.status === "FAILED") {
+      return (
+        <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto">
+          <section className="bg-surface rounded-xl p-6 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant text-center flex flex-col items-center gap-3">
+            <span className="material-symbols-outlined text-error text-4xl">gpp_bad</span>
+            <h1 className="font-title-md text-title-md text-error">{t("verificationFailed")}</h1>
+            <p className="font-body-md text-body-md text-on-surface-variant">
+              {t("verificationFailedBody", { session: sessionLabel })}
+            </p>
+            <div className="w-full max-w-xs">
+              <JoinButton tontineSessionId={id} label={t("tryAgain")} lang={lang} />
+            </div>
+          </section>
+        </main>
+      );
+    }
+
     return (
       <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto">
         <section className="bg-surface rounded-xl p-6 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant text-center flex flex-col items-center gap-3">
           <span className="material-symbols-outlined text-primary text-4xl">groups</span>
           <h1 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">
-            {TONTINE_LABELS[tontineSession.type]}
+            {sessionLabel}
           </h1>
           <p className="font-body-md text-body-md text-on-surface-variant">
-            You&rsquo;re not a member of this tontine yet. Request to join and an admin will review
-            your request.
+            {t("notYetMemberBody")}
           </p>
           <div className="w-full max-w-xs">
-            <JoinButton tontineSessionId={id} label="Request to Join" />
+            <JoinButton tontineSessionId={id} label={t("requestToJoin")} lang={lang} />
           </div>
         </section>
       </main>
@@ -59,9 +103,9 @@ export default async function SessionDetailPage({
       <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto">
         <section className="bg-surface rounded-xl p-6 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant text-center flex flex-col items-center gap-2">
           <span className="material-symbols-outlined text-primary text-4xl">hourglass_top</span>
-          <h1 className="font-title-md text-title-md text-primary">Approval Pending</h1>
+          <h1 className="font-title-md text-title-md text-primary">{t("approvalPending")}</h1>
           <p className="font-body-md text-body-md text-on-surface-variant">
-            Your request to join {TONTINE_LABELS[tontineSession.type]} is awaiting admin approval.
+            {t("approvalPendingBody", { session: sessionLabel })}
           </p>
         </section>
       </main>
@@ -73,45 +117,65 @@ export default async function SessionDetailPage({
       <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto">
         <section className="bg-surface rounded-xl p-6 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant text-center flex flex-col items-center gap-3">
           <span className="material-symbols-outlined text-error text-4xl">cancel</span>
-          <h1 className="font-title-md text-title-md text-error">Request Rejected</h1>
+          <h1 className="font-title-md text-title-md text-error">{t("requestRejectedTitle")}</h1>
           <p className="font-body-md text-body-md text-on-surface-variant">
-            Your request to join {TONTINE_LABELS[tontineSession.type]} was not approved. You can
-            submit a new request below.
+            {t("requestRejectedBody", { session: sessionLabel })}
           </p>
           <div className="w-full max-w-xs">
-            <JoinButton tontineSessionId={id} label="Request Again" />
+            <JoinButton tontineSessionId={id} label={t("requestAgain")} lang={lang} />
           </div>
         </section>
       </main>
     );
   }
 
+  // APPROVED but hasn't picked slots yet — mandatory one-time step.
+  if (myMembership.slotCount === null) {
+    return (
+      <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto">
+        <section className="bg-surface rounded-xl p-6 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant text-center flex flex-col items-center gap-3 mb-stack-gap-lg">
+          <span className="material-symbols-outlined text-primary text-4xl">confirmation_number</span>
+          <h1 className="font-title-md text-title-md text-primary">{t("selectYourSlots")}</h1>
+          <p className="font-body-md text-body-md text-on-surface-variant">
+            {t("selectYourSlotsBody", { session: sessionLabel })}
+          </p>
+        </section>
+        <SelectSlotsForm tontineSessionId={id} lang={lang} />
+      </main>
+    );
+  }
+
   const approvedMemberships = tontineSession.memberships.filter((m) => m.status === "APPROVED");
+  const totalRegisteredSlots = approvedMemberships.reduce(
+    (sum, m) => sum + (m.slotCount ? Number(m.slotCount) : 0),
+    0,
+  );
 
   const now = new Date();
   const dueDate = getNextDueDate(tontineSession.type, now);
-  const { total } = getContributionTotal(tontineSession.type);
+  const { total: perSlotTotal } = getContributionTotal({
+    amount: Number(tontineSession.amount),
+    fee: Number(tontineSession.fee),
+  });
 
-  const [contributions, fines] = await Promise.all([
-    prisma.contribution.findMany({
-      where: { tontineSessionId: id, dueDate },
-    }),
-    prisma.fine.findMany({
-      where: { tontineSessionId: id, dueDate, status: "UNPAID" },
-    }),
-  ]);
+  const allSlotIds = approvedMemberships.flatMap((m) => m.slots.map((s) => s.id));
+  const [contributions, fines] = allSlotIds.length
+    ? await Promise.all([
+        prisma.contribution.findMany({ where: { membershipSlotId: { in: allSlotIds }, dueDate } }),
+        prisma.fine.findMany({ where: { membershipSlotId: { in: allSlotIds }, dueDate, status: "UNPAID" } }),
+      ])
+    : [[], []];
 
-  const contributionByUser = new Map(contributions.map((c) => [c.userId, c]));
-  const fineByUser = new Map(fines.map((f) => [f.userId, f]));
+  const contributionBySlot = new Map(contributions.map((c) => [c.membershipSlotId, c]));
+  const fineBySlot = new Map(fines.map((f) => [f.membershipSlotId, f]));
 
-  const myContribution = contributionByUser.get(userId);
-  const myFine = fineByUser.get(userId);
-  const alreadyPaid = myContribution?.status === "PAID";
-  const myTotal = total + (myFine ? Number(myFine.amount) : 0);
+  const allSlotsFlat = approvedMemberships.flatMap((m) =>
+    m.slots.map((s) => ({ ...s, member: m.user, isMine: m.userId === userId })),
+  );
+  const paidCount = allSlotsFlat.filter((s) => contributionBySlot.get(s.id)?.status === "PAID").length;
 
-  const paidCount = approvedMemberships.filter(
-    (m) => contributionByUser.get(m.userId)?.status === "PAID",
-  ).length;
+  const mySlots = myMembership.slots;
+  const myUndrawnSlots = mySlots.filter((s) => s.ballDrawn === null);
 
   return (
     <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto pb-32">
@@ -122,72 +186,109 @@ export default async function SessionDetailPage({
               {tontineSession.status}
             </span>
             <h1 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">
-              {TONTINE_LABELS[tontineSession.type]}
+              {sessionLabel}
             </h1>
             <p className="font-body-md text-body-md text-on-surface-variant flex items-center gap-1 mt-1">
               <span className="material-symbols-outlined text-sm">schedule</span>
-              Deadline: {tontineSession.limitTime}
+              {t("deadlineLabel")}: {tontineSession.limitTime}
             </p>
           </div>
           <div className="text-right">
-            <div className="font-label-md text-label-md text-on-surface-variant mb-1">Your Total</div>
+            <div className="font-label-md text-label-md text-on-surface-variant mb-1">{t("totalRegisteredSlots")}</div>
             <div className="font-numeric-data text-numeric-data text-primary">
-              {myTotal.toLocaleString("en-US")} F
+              {totalRegisteredSlots}
+              {tontineSession.maxSlots ? ` / ${Number(tontineSession.maxSlots)}` : ""}
             </div>
           </div>
         </div>
         <div className="mt-5 pt-4 border-t border-surface-variant flex items-center justify-between">
           <div className="font-label-sm text-label-sm text-on-surface-variant">
-            {paidCount}/{approvedMemberships.length} paid this cycle
+            {paidCount}/{allSlotsFlat.length} {t("slotsPaidThisCycle")}
           </div>
           <div className="w-24 h-2 bg-surface-variant rounded-full overflow-hidden">
             <div
               className="h-full bg-primary rounded-full"
-              style={{
-                width: `${approvedMemberships.length ? (paidCount / approvedMemberships.length) * 100 : 0}%`,
-              }}
+              style={{ width: `${allSlotsFlat.length ? (paidCount / allSlotsFlat.length) * 100 : 0}%` }}
             />
           </div>
         </div>
+        <div className="mt-4 pt-4 border-t border-surface-variant">
+          <Link
+            href={`/pay/${id}`}
+            className="font-label-sm text-label-sm text-primary underline flex items-center gap-1"
+          >
+            <span className="material-symbols-outlined text-[16px]">share</span>
+            {t("shareContributionLink")}
+          </Link>
+        </div>
       </section>
 
-      {tontineSession.status === "DRAWING" && !myMembership.ballDrawn && (
+      {tontineSession.status === "DRAWING" && myUndrawnSlots.length > 0 && (
         <Link
           href={`/sessions/${id}/draw`}
           className="mb-stack-gap-lg flex items-center justify-between bg-primary text-on-primary rounded-xl p-4 shadow-md hover:opacity-90 transition-opacity"
         >
-          <span className="font-label-md text-label-md">Draw your lucky ball for this cycle</span>
+          <span className="font-label-md text-label-md">{t("drawYourBall")}</span>
           <span className="material-symbols-outlined">casino</span>
         </Link>
       )}
 
-      <section>
-        <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md px-1">Member Status</h2>
+      <section className="mb-stack-gap-lg">
+        <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md px-1">{t("yourSlots")}</h2>
         <div className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant overflow-hidden">
-          {approvedMemberships.map((m, index) => {
-            const c = contributionByUser.get(m.userId);
-            const f = fineByUser.get(m.userId);
+          {mySlots.map((s, index) => {
+            const c = contributionBySlot.get(s.id);
+            const f = fineBySlot.get(s.id);
+            const paid = c?.status === "PAID";
+            const slotTotal = perSlotTotal + (f ? Number(f.amount) : 0);
+            return (
+              <div
+                key={s.id}
+                className={`flex items-center p-4 ${index < mySlots.length - 1 ? "border-b border-surface-variant" : ""}`}
+              >
+                <div className="flex-grow min-w-0">
+                  <div className="font-label-md text-label-md text-on-surface truncate">{s.beneficiaryName}</div>
+                  <div className="font-label-sm text-label-sm text-on-surface-variant">
+                    {t("positionLabel")} {s.officialPosition ?? "—"} · {paid ? t("paid") : `${slotTotal.toLocaleString("en-US")} F ${t("due")}`}
+                  </div>
+                </div>
+                {!paid && <PayButton membershipSlotId={s.id} amountLabel={`${slotTotal.toLocaleString("en-US")} F`} />}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section>
+        <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md px-1">{t("memberStatus")}</h2>
+        <div className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant overflow-hidden">
+          {allSlotsFlat.map((s, index) => {
+            const c = contributionBySlot.get(s.id);
+            const f = fineBySlot.get(s.id);
             const paid = c?.status === "PAID";
             return (
               <div
-                key={m.id}
-                className={`flex items-center p-4 ${index < approvedMemberships.length - 1 ? "border-b border-surface-variant" : ""} ${m.userId === userId ? "bg-primary/5" : ""}`}
+                key={s.id}
+                className={`flex items-center p-4 ${index < allSlotsFlat.length - 1 ? "border-b border-surface-variant" : ""} ${s.isMine ? "bg-primary/5" : ""}`}
               >
                 <div className="font-label-md text-label-md text-on-surface-variant w-8 text-center mr-2">
-                  {m.officialPosition ?? "—"}
+                  {s.officialPosition ?? "—"}
                 </div>
                 <div className="w-10 h-10 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center font-label-md text-label-md mr-4 overflow-hidden">
-                  {m.user.avatar || m.user.image ? (
+                  {s.member.avatar || s.member.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={m.user.avatar ?? m.user.image!} alt={m.user.name} className="w-full h-full object-cover" />
+                    <img src={s.member.avatar ?? s.member.image!} alt={s.member.name} className="w-full h-full object-cover" />
                   ) : (
-                    m.user.name.slice(0, 2).toUpperCase()
+                    s.member.name.slice(0, 2).toUpperCase()
                   )}
                 </div>
                 <div className="flex-grow min-w-0">
-                  <div className="font-label-md text-label-md text-on-surface truncate">{m.user.name}</div>
+                  <div className="font-label-md text-label-md text-on-surface truncate">{s.beneficiaryName}</div>
                   <div className="font-label-sm text-label-sm text-on-surface-variant">
-                    {paid ? `Paid${c?.paidAt ? ` at ${c.paidAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` : ""}` : "Not yet paid"}
+                    {s.member.name}
+                    {paid
+                      ? ` · ${c?.paidAt ? t("paidAtLabel", { time: c.paidAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) }) : t("paid")}`
+                      : ` · ${t("notYetPaid")}`}
                   </div>
                 </div>
                 <div className="text-right">
@@ -200,11 +301,11 @@ export default async function SessionDetailPage({
                           : "inline-flex items-center px-2 py-1 rounded-md bg-secondary-fixed text-on-secondary-fixed-variant font-label-sm text-label-sm"
                     }
                   >
-                    {paid ? "Paid" : f ? "Late" : "Pending"}
+                    {paid ? t("paid") : f ? t("late") : t("pending")}
                   </span>
                   {f && (
                     <div className="font-label-sm text-label-sm text-error mt-1">
-                      +{Number(f.amount).toLocaleString("en-US")} F fine
+                      +{Number(f.amount).toLocaleString("en-US")} F {t("fineSuffix")}
                     </div>
                   )}
                 </div>
@@ -213,13 +314,6 @@ export default async function SessionDetailPage({
           })}
         </div>
       </section>
-
-      {!alreadyPaid && (
-        <PayButton
-          tontineSessionId={id}
-          amountLabel={`${myTotal.toLocaleString("en-US")} F`}
-        />
-      )}
     </main>
   );
 }

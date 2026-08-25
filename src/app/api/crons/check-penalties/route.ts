@@ -29,7 +29,13 @@ export async function GET(request: Request) {
     const sessions = await prisma.tontineSession.findMany({
       where: { type, status: "ACTIVE" },
       include: {
-        memberships: { include: { user: { select: { id: true, name: true, phone: true } } } },
+        memberships: {
+          where: { status: "APPROVED" },
+          include: {
+            user: { select: { id: true, name: true, phone: true } },
+            slots: true,
+          },
+        },
       },
     });
 
@@ -37,56 +43,49 @@ export async function GET(request: Request) {
       let finesIssued = 0;
 
       for (const membership of tontineSession.memberships) {
-        const key = {
-          userId_tontineSessionId_dueDate: {
-            userId: membership.userId,
-            tontineSessionId: tontineSession.id,
-            dueDate,
-          },
-        };
+        for (const slot of membership.slots) {
+          const key = { membershipSlotId_dueDate: { membershipSlotId: slot.id, dueDate } };
 
-        const [contribution, existingFine] = await Promise.all([
-          prisma.contribution.findUnique({ where: key }),
-          prisma.fine.findUnique({ where: key }),
-        ]);
+          const [contribution, existingFine] = await Promise.all([
+            prisma.contribution.findUnique({ where: key }),
+            prisma.fine.findUnique({ where: key }),
+          ]);
 
-        if (contribution?.status === "PAID") continue;
-        // Never touch a fine that's already been settled (paid, or manually
-        // deducted from a payout by an admin) — only recompute open ones.
-        if (existingFine && existingFine.status !== "UNPAID") continue;
+          if (contribution?.status === "PAID") continue;
+          // Never touch a fine that's already been settled (paid, or manually
+          // deducted from a payout by an admin) — only recompute open ones.
+          if (existingFine && existingFine.status !== "UNPAID") continue;
 
-        const isNewFine = !existingFine;
-        if (existingFine) {
-          await prisma.fine.update({
-            where: { id: existingFine.id },
-            data: { amount: fineAmount },
-          });
-        } else {
-          await prisma.fine.create({
-            data: {
-              userId: membership.userId,
-              tontineSessionId: tontineSession.id,
-              dueDate,
-              amount: fineAmount,
-              status: "UNPAID",
-            },
-          });
-        }
-        finesIssued++;
+          const isNewFine = !existingFine;
+          if (existingFine) {
+            await prisma.fine.update({
+              where: { id: existingFine.id },
+              data: { amount: fineAmount },
+            });
+          } else {
+            await prisma.fine.create({
+              data: { membershipSlotId: slot.id, dueDate, amount: fineAmount, status: "UNPAID" },
+            });
+          }
+          finesIssued++;
 
-        // Notify once per cycle, the first time a member becomes late —
-        // not on every subsequent daily re-run as the fine keeps growing.
-        if (isNewFine && membership.user.phone) {
-          const log = await prisma.notificationLog
-            .create({
-              data: { userId: membership.userId, tontineSessionId: tontineSession.id, dueDate, type: "FINE_NOTICE" },
-            })
-            .catch(() => null);
-          if (log) {
-            await sendWhatsAppMessageSafe(
-              membership.user.phone,
-              fineNoticeMessage(membership.user.name, type, fineAmount),
-            );
+          // Notify once per cycle, the first time a member becomes late —
+          // not on every subsequent daily re-run as the fine keeps growing.
+          // NotificationLog is still one row per (user, session, cycle,
+          // type), so a member with several newly-late slots in the same
+          // run gets one combined notice, not one per slot.
+          if (isNewFine && membership.user.phone) {
+            const log = await prisma.notificationLog
+              .create({
+                data: { userId: membership.userId, tontineSessionId: tontineSession.id, dueDate, type: "FINE_NOTICE" },
+              })
+              .catch(() => null);
+            if (log) {
+              await sendWhatsAppMessageSafe(
+                membership.user.phone,
+                fineNoticeMessage(membership.user.name, type, fineAmount),
+              );
+            }
           }
         }
       }

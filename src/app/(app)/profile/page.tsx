@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getContributionTotal, getNextDueDate } from "@/lib/tontine-engine";
+import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { ProfileForm } from "./profile-form";
 import { ChangePasswordForm } from "./change-password-form";
 import { AvatarUpload } from "./avatar-upload";
@@ -10,12 +11,6 @@ const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
   MONTHLY_28: "Monthly Tontine (28th)",
   MONTHLY_25: "Monthly Tontine (25th)",
-};
-
-const MEMBERSHIP_STATUS_LABEL: Record<string, string> = {
-  PENDING: "Pending Admin Approval",
-  APPROVED: "Active",
-  REJECTED: "Rejected",
 };
 
 const MEMBERSHIP_STATUS_CLASS: Record<string, string> = {
@@ -27,6 +22,12 @@ const MEMBERSHIP_STATUS_CLASS: Record<string, string> = {
 export default async function ProfilePage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  const t = getTranslator(await getLang());
+  const MEMBERSHIP_STATUS_LABEL: Record<string, string> = {
+    PENDING: t("membershipStatusPending"),
+    APPROVED: t("membershipStatusApproved"),
+    REJECTED: t("membershipStatusRejected"),
+  };
 
   const [user, memberships] = await Promise.all([
     prisma.user.findUnique({
@@ -40,13 +41,12 @@ export default async function ProfilePage() {
         city: true,
         neighborhood: true,
         sponsorCode: true,
-        accountStatus: true,
         role: true,
       },
     }),
     prisma.membership.findMany({
       where: { userId: session.user.id },
-      include: { tontineSession: true },
+      include: { tontineSession: true, slots: true },
       orderBy: { joinedAt: "desc" },
     }),
   ]);
@@ -55,7 +55,7 @@ export default async function ProfilePage() {
     return (
       <main className="px-container-padding py-stack-gap-lg max-w-md mx-auto text-center">
         <p className="font-body-md text-body-md text-on-surface-variant mb-stack-gap-md">
-          We couldn&rsquo;t find your profile. Try signing out and back in.
+          {t("couldNotFindProfile")}
         </p>
         <form
           action={async () => {
@@ -67,7 +67,7 @@ export default async function ProfilePage() {
             type="submit"
             className="py-2 px-4 rounded-lg border-2 border-error text-error font-label-md text-label-md hover:bg-error/5"
           >
-            Sign out
+            {t("signOut")}
           </button>
         </form>
       </main>
@@ -78,25 +78,19 @@ export default async function ProfilePage() {
   const approvedActiveMemberships = memberships.filter(
     (m) => m.status === "APPROVED" && m.tontineSession.status === "ACTIVE",
   );
-  const contributions = approvedActiveMemberships.length
-    ? await prisma.contribution.findMany({
-        where: {
-          userId: session.user.id,
-          tontineSessionId: { in: approvedActiveMemberships.map((m) => m.tontineSessionId) },
-          dueDate: { in: approvedActiveMemberships.map((m) => getNextDueDate(m.tontineSession.type, now)) },
-        },
-      })
+  const allMySlotIds = approvedActiveMemberships.flatMap((m) => m.slots.map((s) => s.id));
+  const contributions = allMySlotIds.length
+    ? await prisma.contribution.findMany({ where: { membershipSlotId: { in: allMySlotIds } } })
     : [];
-  const contributionByCycle = new Map(
-    contributions.map((c) => [`${c.tontineSessionId}:${c.dueDate.toISOString()}`, c]),
+  const contributionBySlotCycle = new Map(
+    contributions.map((c) => [`${c.membershipSlotId}:${c.dueDate.toISOString()}`, c]),
   );
 
   const rows: Array<[string, string]> = [
-    ["Email", user.email],
-    ["Phone", user.phone ?? "Not set"],
-    ["Sponsor Code", user.sponsorCode ?? "Not set"],
-    ["Account Status", user.accountStatus],
-    ["Role", user.role],
+    [t("emailLabel"), user.email],
+    [t("phoneLabel"), user.phone ?? t("notSet")],
+    [t("sponsorCodeLabel"), user.sponsorCode ?? t("notSet")],
+    [t("roleLabel"), user.role],
   ];
 
   return (
@@ -120,27 +114,38 @@ export default async function ProfilePage() {
 
       <section className="mb-stack-gap-lg">
         <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md px-1">
-          Your Cotisations
+          {t("yourCotisations")}
         </h2>
         {memberships.length === 0 ? (
           <div className="bg-white rounded-xl p-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant text-center">
             <p className="font-label-sm text-label-sm text-on-surface-variant">
-              You haven&rsquo;t joined any tontine yet.
+              {t("noTontineYet")}
             </p>
           </div>
         ) : (
           <div className="flex flex-col gap-stack-gap-sm">
             {memberships.map((m) => {
-              const label = TONTINE_LABELS[m.tontineSession.type] ?? m.tontineSession.type;
+              const label = m.tontineSession.title || TONTINE_LABELS[m.tontineSession.type] || m.tontineSession.type;
               let summary: string | null = null;
-              if (m.status === "APPROVED" && m.tontineSession.status === "ACTIVE") {
+              if (m.status === "APPROVED" && m.tontineSession.status === "ACTIVE" && m.slots.length > 0) {
                 const dueDate = getNextDueDate(m.tontineSession.type, now);
-                const { total } = getContributionTotal(m.tontineSession.type);
-                const contribution = contributionByCycle.get(`${m.tontineSessionId}:${dueDate.toISOString()}`);
+                const { total } = getContributionTotal({
+                  amount: Number(m.tontineSession.amount),
+                  fee: Number(m.tontineSession.fee),
+                });
+                const paidSlots = m.slots.filter(
+                  (s) => contributionBySlotCycle.get(`${s.id}:${dueDate.toISOString()}`)?.status === "PAID",
+                ).length;
                 summary =
-                  contribution?.status === "PAID"
-                    ? "Paid this cycle"
-                    : `${total.toLocaleString("en-US")} F due this cycle`;
+                  paidSlots === m.slots.length
+                    ? t("allSlotsPaidThisCycle")
+                    : t("slotsPaidSummary", {
+                        paid: String(paidSlots),
+                        total: String(m.slots.length),
+                        amount: total.toLocaleString("en-US"),
+                      });
+              } else if (m.status === "APPROVED" && m.slotCount === null) {
+                summary = t("selectSlotsToStart");
               }
               return (
                 <div
@@ -166,12 +171,12 @@ export default async function ProfilePage() {
       </section>
 
       <section className="mb-stack-gap-lg">
-        <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md px-1">Edit Profile</h2>
+        <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md px-1">{t("editProfile")}</h2>
         <ProfileForm phone={user.phone} city={user.city} neighborhood={user.neighborhood} />
       </section>
 
       <section className="mb-stack-gap-lg">
-        <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md px-1">Change Password</h2>
+        <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md px-1">{t("changePassword")}</h2>
         <ChangePasswordForm />
       </section>
 
@@ -185,7 +190,7 @@ export default async function ProfilePage() {
           type="submit"
           className="w-full py-3 rounded-lg border-2 border-error text-error font-label-md text-label-md hover:bg-error/5 active:scale-95 transition-all"
         >
-          Sign out
+          {t("signOut")}
         </button>
       </form>
     </main>

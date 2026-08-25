@@ -1,8 +1,8 @@
 "use client";
 
 import { CredentialsForm } from "./credentials-form";
-import { LanguageProvider, LanguageToggle, useLanguage } from "./language-context";
-import type { TranslationKey } from "./i18n";
+import { LanguageToggle } from "@/components/language-toggle";
+import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 
 interface DevUser {
   email: string;
@@ -27,8 +27,7 @@ function oauthErrorKey(code: string): TranslationKey {
   }
 }
 
-function OAuthErrorBanner({ error }: { error?: string }) {
-  const { t } = useLanguage();
+function OAuthErrorBanner({ error, lang }: { error?: string; lang: Lang }) {
   if (!error || error === "CredentialsSignin") return null;
 
   return (
@@ -36,29 +35,31 @@ function OAuthErrorBanner({ error }: { error?: string }) {
       role="alert"
       className="relative z-10 mb-stack-gap-md rounded-lg bg-error-container text-on-error-container px-4 py-3 font-label-sm text-label-sm text-center"
     >
-      {t(oauthErrorKey(error))}
+      {translate(lang, oauthErrorKey(error))}
     </div>
   );
 }
 
-function LoginCard({
+export function LoginContent({
   callbackUrl,
   signInWithGoogleAction,
   devUsers,
   isDev,
   oauthError,
+  lang,
 }: {
   callbackUrl: string;
   signInWithGoogleAction: () => Promise<void>;
   devUsers: DevUser[];
   isDev: boolean;
   oauthError?: string;
+  lang: Lang;
 }) {
-  const { t } = useLanguage();
+  const t = (key: TranslationKey) => translate(lang, key);
 
   return (
     <main className="flex-grow flex flex-col items-center justify-center p-container-padding bg-background min-h-screen">
-      <LanguageToggle />
+      <LanguageToggle currentLang={lang} className="mb-stack-gap-md relative z-10" />
 
       <div className="w-full max-w-[440px] glass-card rounded-[24px] p-stack-gap-lg sm:p-section-margin relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-secondary-container rounded-full blur-[80px] opacity-20 -mr-10 -mt-10" />
@@ -77,9 +78,9 @@ function LoginCard({
           <p className="font-body-md text-body-md text-on-surface-variant">{t("subtitle")}</p>
         </div>
 
-        <OAuthErrorBanner error={oauthError} />
+        <OAuthErrorBanner error={oauthError} lang={lang} />
 
-        <CredentialsForm callbackUrl={callbackUrl} />
+        <CredentialsForm callbackUrl={callbackUrl} lang={lang} />
 
         <div className="relative z-10 flex items-center py-stack-gap-sm mt-stack-gap-lg">
           <div className="flex-grow border-t border-outline-variant" />
@@ -151,19 +152,5 @@ function LoginCard({
         </div>
       )}
     </main>
-  );
-}
-
-export function LoginContent(props: {
-  callbackUrl: string;
-  signInWithGoogleAction: () => Promise<void>;
-  devUsers: DevUser[];
-  isDev: boolean;
-  oauthError?: string;
-}) {
-  return (
-    <LanguageProvider>
-      <LoginCard {...props} />
-    </LanguageProvider>
   );
 }

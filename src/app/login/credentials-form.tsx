@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { signInAction, signUpAction, type AuthFormState } from "./actions";
-import { useLanguage } from "./language-context";
+import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 
 const initialState: AuthFormState = {};
 
@@ -30,12 +30,14 @@ function PasswordField({
   id,
   label,
   minLength,
+  lang,
 }: {
   id: string;
   label: string;
   minLength?: number;
+  lang: Lang;
 }) {
-  const { t } = useLanguage();
+  const t = (key: TranslationKey) => translate(lang, key);
   const [visible, setVisible] = useState(false);
 
   return (
@@ -66,8 +68,8 @@ function PasswordField({
   );
 }
 
-export function CredentialsForm({ callbackUrl }: { callbackUrl: string }) {
-  const { t } = useLanguage();
+export function CredentialsForm({ callbackUrl, lang }: { callbackUrl: string; lang: Lang }) {
+  const t = (key: TranslationKey) => translate(lang, key);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [signInState, signInFormAction] = useActionState(
     signInAction.bind(null, callbackUrl),
@@ -120,7 +122,7 @@ export function CredentialsForm({ callbackUrl }: { callbackUrl: string }) {
               {t("email")}
             </label>
           </div>
-          <PasswordField id="signin-password" label={t("password")} />
+          <PasswordField id="signin-password" label={t("password")} lang={lang} />
           {signInState.error && (
             <p className="font-label-sm text-label-sm text-error text-center">{signInState.error}</p>
           )}
@@ -154,7 +156,7 @@ export function CredentialsForm({ callbackUrl }: { callbackUrl: string }) {
               {t("email")}
             </label>
           </div>
-          <PasswordField id="signup-password" label={t("password")} minLength={6} />
+          <PasswordField id="signup-password" label={t("password")} minLength={6} lang={lang} />
           {signUpState.error && (
             <p className="font-label-sm text-label-sm text-error text-center">{signUpState.error}</p>
           )}

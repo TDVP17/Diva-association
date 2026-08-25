@@ -1,6 +1,7 @@
 import { AuthError } from "next-auth";
 import { signIn } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getLang } from "@/lib/i18n/get-lang";
 import { LoginContent } from "./login-content";
 
 const isDev = process.env.NODE_ENV !== "production";
@@ -38,6 +39,7 @@ export default async function LoginPage({
 }) {
   const { callbackUrl = "/dashboard", error } = await searchParams;
   const signInWithGoogleAction = signInWithGoogle.bind(null, callbackUrl);
+  const lang = await getLang();
 
   const seededUsers = isDev
     ? await prisma.user
@@ -68,6 +70,7 @@ export default async function LoginPage({
       devUsers={devUsers}
       isDev={isDev}
       oauthError={error}
+      lang={lang}
     />
   );
 }

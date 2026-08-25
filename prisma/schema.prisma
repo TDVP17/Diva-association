@@ -15,16 +15,21 @@ enum Role {
   ADMIN
 }
 
-enum AccountStatus {
+enum MembershipStatus {
   PENDING
   APPROVED
   REJECTED
 }
 
-enum MembershipStatus {
+enum KycDocumentType {
+  CNI
+  PASSPORT
+}
+
+enum KycVerificationStatus {
   PENDING
-  APPROVED
-  REJECTED
+  VERIFIED
+  FAILED
 }
 
 enum TontineType {
@@ -67,31 +72,30 @@ enum NotificationType {
 }
 
 model User {
-  id            String        @id @default(cuid())
-  email         String        @unique
+  id            String    @id @default(cuid())
+  email         String    @unique
   emailVerified DateTime?
   name          String
   avatar        String?
   image         String?
-  role          Role          @default(MEMBER)
-  accountStatus AccountStatus @default(PENDING)
+  role          Role      @default(MEMBER)
   sponsorCode   String?
   city          String?
   neighborhood  String?
   /// E.164-ish digits-only phone number used for WhatsApp notifications (Evolution API).
   phone         String?
-  createdAt     DateTime      @default(now())
+  createdAt     DateTime  @default(now())
 
-  accounts             Account[]
-  sessions             Session[]
-  memberships          Membership[]
-  contributions        Contribution[]
-  fines                Fine[]
-  swapRequestsMade     PositionSwapRequest[] @relation("SwapRequester")
-  swapRequestsReceived PositionSwapRequest[] @relation("SwapTarget")
-  messagesSent         ChatMessage[]         @relation("MessageSender")
-  messagesReceived     ChatMessage[]         @relation("MessageReceiver")
-  notificationLogs     NotificationLog[]
+  accounts                     Account[]
+  sessions                     Session[]
+  memberships                  Membership[]
+  contributionsRecordedAsAdmin Contribution[]        @relation("ContributionRecordedByAdmin")
+  swapRequestsMade             PositionSwapRequest[] @relation("SwapRequester")
+  swapRequestsReceived         PositionSwapRequest[] @relation("SwapTarget")
+  messagesSent                 ChatMessage[]         @relation("MessageSender")
+  messagesReceived             ChatMessage[]         @relation("MessageReceiver")
+  notificationLogs             NotificationLog[]
+  kycVerifications             KycVerification[]
 
   @@map("users")
 }
@@ -138,18 +142,25 @@ model VerificationToken {
 
 model TontineSession {
   id        String        @id @default(cuid())
+  title     String?
   type      TontineType
+  /// Per-slot amount.
   amount    Decimal       @db.Decimal(12, 2)
+  /// Per-slot service/platform fee.
   fee       Decimal       @db.Decimal(12, 2)
   status    TontineStatus @default(DRAFT)
   startDate DateTime
   limitTime String
+  rules     String?       @db.Text
+  /// Maximum total registered slots (sum of Membership.slotCount) this
+  /// session accepts. Null = uncapped. Reaching this locks new join
+  /// requests the same way passing startDate does.
+  maxSlots  Decimal?      @db.Decimal(5, 1)
 
   memberships      Membership[]
-  contributions    Contribution[]
-  fines            Fine[]
   swapRequests     PositionSwapRequest[]
   notificationLogs NotificationLog[]
+  kycVerifications KycVerification[]
 
   @@map("tontine_sessions")
 }
@@ -159,57 +170,110 @@ model Membership {
   userId           String
   tontineSessionId String
   status           MembershipStatus @default(PENDING)
-  /// Final payout order (1..N), set by the admin when publishing the official
-  /// ranking. Null until published.
-  officialPosition Int?
-  /// The member's own self-service draw result. Null until they draw.
-  ballDrawn        Int?
+  /// Billing multiplier chosen post-approval (e.g. 1.5, 2.5). Only the
+  /// whole-number part gets named, positioned MembershipSlot rows — the
+  /// fractional remainder just adds to what's owed each cycle. Null until
+  /// the member selects it (mandatory one-time step after approval).
+  slotCount        Decimal?         @db.Decimal(3, 1)
   joinedAt         DateTime         @default(now())
 
-  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tontineSession TontineSession @relation(fields: [tontineSessionId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tontineSession  TontineSession   @relation(fields: [tontineSessionId], references: [id], onDelete: Cascade)
+  kycVerification KycVerification?
+  slots           MembershipSlot[]
 
   @@unique([userId, tontineSessionId])
   @@map("memberships")
 }
 
-model Contribution {
-  id               String             @id @default(cuid())
+/// One row per named, positioned slot — Math.floor(Membership.slotCount)
+/// rows per membership, created together when the member selects their
+/// slots. Each slot has its own draw position and its own fully
+/// independent contribution/payment history (a third party can pay for
+/// one named slot while a sibling slot under the same membership stays
+/// unpaid).
+model MembershipSlot {
+  id               String   @id @default(cuid())
+  membershipId     String
+  beneficiaryName  String
+  /// Final payout order (1..N) for this slot, set by the admin when
+  /// publishing the official ranking. Null until published.
+  officialPosition Int?
+  /// This slot's own self-service draw result. Null until drawn.
+  ballDrawn        Int?
+  createdAt        DateTime @default(now())
+
+  membership    Membership     @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  contributions Contribution[]
+  fines         Fine[]
+
+  @@map("membership_slots")
+}
+
+/// One row per KYC (Didit) verification attempt. Created when a member
+/// starts identity verification to join a specific tontine — before a
+/// Membership exists — and linked to the resulting Membership only once
+/// Didit's automated check passes. A user can have multiple rows across
+/// retries (e.g. after a FAILED attempt); `membershipId` stays null until
+/// a VERIFIED result actually creates/attaches a Membership.
+model KycVerification {
+  id               String                @id @default(cuid())
   userId           String
   tontineSessionId String
-  /// Calendar date (Cameroon-local) of the contribution cycle this row belongs
-  /// to — each Sunday for HEBDO_SUNDAY, the 25th/28th for the monthly types.
-  dueDate          DateTime
-  amountPaid       Decimal            @db.Decimal(12, 2)
-  feePaid          Decimal            @db.Decimal(12, 2)
-  finePaid         Decimal            @default(0) @db.Decimal(12, 2)
-  status           ContributionStatus @default(PENDING)
-  fapshiTxRef      String?            @unique
-  paidAt           DateTime?
-  receiptPdfUrl    String?
+  membershipId     String?               @unique
+  documentType     KycDocumentType
+  status           KycVerificationStatus @default(PENDING)
+  diditSessionId   String                @unique
+  matchConfidence  Decimal?              @db.Decimal(5, 2)
+  documentImageUrl String?
+  createdAt        DateTime              @default(now())
+  verifiedAt       DateTime?
 
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   tontineSession TontineSession @relation(fields: [tontineSessionId], references: [id], onDelete: Cascade)
+  membership     Membership?    @relation(fields: [membershipId], references: [id], onDelete: SetNull)
 
-  @@unique([userId, tontineSessionId, dueDate])
+  @@index([userId, tontineSessionId])
+  @@map("kyc_verifications")
+}
+
+model Contribution {
+  id                String             @id @default(cuid())
+  membershipSlotId  String
+  /// Calendar date (Cameroon-local) of the contribution cycle this row belongs
+  /// to — each Sunday for HEBDO_SUNDAY, the 25th/28th for the monthly types.
+  dueDate           DateTime
+  amountPaid        Decimal            @db.Decimal(12, 2)
+  feePaid           Decimal            @db.Decimal(12, 2)
+  finePaid          Decimal            @default(0) @db.Decimal(12, 2)
+  status            ContributionStatus @default(PENDING)
+  fapshiTxRef       String?            @unique
+  paidAt            DateTime?
+  receiptPdfUrl     String?
+  /// Set only when an admin records this contribution manually (off-platform
+  /// payment) rather than it being confirmed via the Fapshi webhook.
+  recordedByAdminId String?
+
+  membershipSlot  MembershipSlot @relation(fields: [membershipSlotId], references: [id], onDelete: Cascade)
+  recordedByAdmin User?          @relation("ContributionRecordedByAdmin", fields: [recordedByAdminId], references: [id])
+
+  @@unique([membershipSlotId, dueDate])
   @@map("contributions")
 }
 
 model Fine {
   id               String     @id @default(cuid())
-  userId           String
-  tontineSessionId String
-  /// Same cycle key as Contribution.dueDate — one fine per member per cycle,
+  membershipSlotId String
+  /// Same cycle key as Contribution.dueDate — one fine per slot per cycle,
   /// recomputed (upserted) idempotently by the daily penalty cron.
   dueDate          DateTime
   amount           Decimal    @db.Decimal(12, 2)
   status           FineStatus @default(UNPAID)
   createdAt        DateTime   @default(now())
 
-  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tontineSession TontineSession @relation(fields: [tontineSessionId], references: [id], onDelete: Cascade)
+  membershipSlot MembershipSlot @relation(fields: [membershipSlotId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, tontineSessionId, dueDate])
+  @@unique([membershipSlotId, dueDate])
   @@map("fines")
 }
 

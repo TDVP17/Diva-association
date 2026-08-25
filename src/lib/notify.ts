@@ -23,19 +23,21 @@ export async function getActiveSessionsDueToday(
   return results;
 }
 
-/** Members of `tontineSession` who have not paid for `dueDate` yet. */
-export async function getUnpaidMembers(tontineSessionId: string, dueDate: Date) {
-  const [memberships, paidContributions] = await Promise.all([
-    prisma.membership.findMany({
-      where: { tontineSessionId },
-      include: { user: { select: { id: true, name: true, phone: true } } },
-    }),
-    prisma.contribution.findMany({
-      where: { tontineSessionId, dueDate, status: "PAID" },
-      select: { userId: true },
-    }),
-  ]);
+/** Slots under `tontineSession`'s approved memberships that have not paid for `dueDate` yet. */
+export async function getUnpaidSlots(tontineSessionId: string, dueDate: Date) {
+  const memberships = await prisma.membership.findMany({
+    where: { tontineSessionId, status: "APPROVED" },
+    include: {
+      user: { select: { id: true, name: true, phone: true } },
+      slots: {
+        include: { contributions: { where: { dueDate }, select: { status: true } } },
+      },
+    },
+  });
 
-  const paidUserIds = new Set(paidContributions.map((c) => c.userId));
-  return memberships.filter((m) => !paidUserIds.has(m.userId));
+  return memberships.flatMap((m) =>
+    m.slots
+      .filter((s) => s.contributions[0]?.status !== "PAID")
+      .map((s) => ({ slotId: s.id, beneficiaryName: s.beneficiaryName, userId: m.userId, user: m.user })),
+  );
 }

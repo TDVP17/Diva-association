@@ -3,10 +3,10 @@
 import { useState } from "react";
 
 export function PayButton({
-  tontineSessionId,
+  membershipSlotId,
   amountLabel,
 }: {
-  tontineSessionId: string;
+  membershipSlotId: string;
   amountLabel: string;
 }) {
   const [loading, setLoading] = useState(false);
@@ -19,7 +19,7 @@ export function PayButton({
       const res = await fetch("/api/payments/fapshi/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tontineSessionId }),
+        body: JSON.stringify({ membershipSlotId }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Payment initiation failed");
@@ -31,22 +31,16 @@ export function PayButton({
   }
 
   return (
-    <div className="fixed bottom-24 md:bottom-6 left-0 right-0 px-container-padding z-40">
-      <div className="max-w-3xl mx-auto">
-        {error && (
-          <p className="font-label-sm text-label-sm text-error text-center mb-2 bg-white rounded-lg py-2 shadow-sm">
-            {error}
-          </p>
-        )}
-        <button
-          onClick={handlePay}
-          disabled={loading}
-          className="w-full bg-primary text-on-primary font-label-md text-label-md h-14 rounded-lg flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-[0px_8px_30px_rgba(30,41,59,0.12)] disabled:opacity-60"
-        >
-          <span className="material-symbols-outlined">payments</span>
-          {loading ? "Redirecting to Fapshi..." : `Pay ${amountLabel} via Fapshi`}
-        </button>
-      </div>
+    <div>
+      <button
+        onClick={handlePay}
+        disabled={loading}
+        className="px-3 py-1.5 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm flex items-center gap-1 hover:opacity-90 active:scale-95 transition-all disabled:opacity-60"
+      >
+        <span className="material-symbols-outlined text-[16px]">payments</span>
+        {loading ? "Redirecting..." : `Pay ${amountLabel}`}
+      </button>
+      {error && <p className="font-label-sm text-label-sm text-error mt-1">{error}</p>}
     </div>
   );
 }

@@ -17,27 +17,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   const tontineSession = await prisma.tontineSession.findUnique({
     where: { id },
-    include: { memberships: { select: { id: true } } },
+    include: { memberships: { select: { slots: { select: { id: true } } } } },
   });
   if (!tontineSession) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
 
-  const existingIds = new Set(tontineSession.memberships.map((m) => m.id));
+  const existingIds = new Set(tontineSession.memberships.flatMap((m) => m.slots.map((s) => s.id)));
   const submittedIds = parsed.data.order;
   const sameSet =
-    submittedIds.length === existingIds.size && submittedIds.every((mid) => existingIds.has(mid));
+    submittedIds.length === existingIds.size && submittedIds.every((sid) => existingIds.has(sid));
   if (!sameSet) {
     return NextResponse.json(
-      { error: "The submitted order must include every member exactly once" },
+      { error: "The submitted order must include every slot exactly once" },
       { status: 400 },
     );
   }
 
   await prisma.$transaction([
-    ...submittedIds.map((membershipId, index) =>
-      prisma.membership.update({
-        where: { id: membershipId },
+    ...submittedIds.map((slotId, index) =>
+      prisma.membershipSlot.update({
+        where: { id: slotId },
         data: { officialPosition: index + 1 },
       }),
     ),

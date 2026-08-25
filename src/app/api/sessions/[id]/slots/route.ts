@@ -1,0 +1,65 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+
+const bodySchema = z.object({
+  slotCount: z.coerce.number().min(0.5).max(20),
+  beneficiaryNames: z.array(z.string().trim().min(1).max(100)).min(1).max(40),
+});
+
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const { id: tontineSessionId } = await params;
+  const { slotCount, beneficiaryNames } = parsed.data;
+  const namedSlots = Math.floor(slotCount);
+
+  if (beneficiaryNames.length !== namedSlots) {
+    return NextResponse.json(
+      { error: `Please provide exactly ${namedSlots} beneficiary name(s) for ${slotCount} slot(s)` },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const membership = await prisma.membership.findUnique({
+      where: { userId_tontineSessionId: { userId: session.user.id, tontineSessionId } },
+    });
+    if (!membership || membership.status !== "APPROVED") {
+      return NextResponse.json({ error: "Your membership isn't approved yet" }, { status: 403 });
+    }
+    if (membership.slotCount !== null) {
+      return NextResponse.json({ error: "You've already selected your slots" }, { status: 409 });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.membership.update({
+        where: { id: membership.id },
+        data: { slotCount },
+      });
+      await tx.membershipSlot.createMany({
+        data: beneficiaryNames.map((beneficiaryName) => ({
+          membershipId: membership.id,
+          beneficiaryName,
+        })),
+      });
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("[sessions/slots] unexpected error:", err);
+    return NextResponse.json(
+      { error: "Could not save your slots. Please try again." },
+      { status: 500 },
+    );
+  }
+}

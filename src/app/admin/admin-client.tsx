@@ -1,25 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-
-interface AccountApplicant {
-  id: string;
-  name: string;
-  avatar: string | null;
-  city: string | null;
-  neighborhood: string | null;
-}
+import { translate, type Lang } from "@/lib/i18n/translations";
 
 interface MembershipRequest {
   id: string;
   joinedAt: string;
   user: { id: string; name: string; avatar: string | null };
-  tontineSession: { id: string; type: string; status: string };
+  tontineSession: { id: string; title: string | null; type: string; status: string };
+  kycVerification: {
+    documentType: string;
+    matchConfidence: number | null;
+    documentImageUrl: string | null;
+    verifiedAt: string | null;
+  } | null;
 }
 
-interface AdminMembership {
+interface AdminSlot {
   id: string;
+  membershipId: string;
   userId: string;
+  beneficiaryName: string;
   name: string;
   avatar: string | null;
   hasPhone: boolean;
@@ -29,10 +30,13 @@ interface AdminMembership {
 
 interface AdminSession {
   id: string;
+  title: string | null;
   type: string;
   status: string;
   startDate: string;
-  memberships: AdminMembership[];
+  maxSlots: number | null;
+  registeredSlots: number;
+  slots: AdminSlot[];
 }
 
 interface SwapRequestRow {
@@ -57,18 +61,22 @@ const TONTINE_LABELS: Record<string, string> = {
   MONTHLY_25: "Monthly Tontine (25th)",
 };
 
-export function AdminClient() {
-  const [accountQueue, setAccountQueue] = useState<AccountApplicant[]>([]);
+export function AdminClient({ lang }: { lang: Lang }) {
+  const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
   const [membershipQueue, setMembershipQueue] = useState<MembershipRequest[]>([]);
   const [sessions, setSessions] = useState<AdminSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const [order, setOrder] = useState<AdminMembership[]>([]);
+  const [order, setOrder] = useState<AdminSlot[]>([]);
   const [ledger, setLedger] = useState<Ledger | null>(null);
   const [swapRequests, setSwapRequests] = useState<SwapRequestRow[]>([]);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [payoutUserId, setPayoutUserId] = useState<string>("");
+  const [payoutSlotId, setPayoutSlotId] = useState<string>("");
   const [payoutResult, setPayoutResult] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
+  const [startingDraw, setStartingDraw] = useState(false);
+  const [contributionSlotId, setContributionSlotId] = useState<string>("");
+  const [contributionResult, setContributionResult] = useState<string | null>(null);
+  const [recordingContribution, setRecordingContribution] = useState(false);
 
   const refreshSessions = useCallback(async (keepSelected?: string) => {
     const body = await fetch("/api/admin/sessions").then((r) => r.json());
@@ -80,16 +88,13 @@ export function AdminClient() {
       list[0];
     if (target) {
       setSelectedSessionId(target.id);
-      setOrder(target.memberships);
+      setOrder(target.slots);
     }
   }, []);
 
   // Initial load. Inlined (rather than calling the refresh*/setSessions
   // helpers above) so each fetch's setState lives directly in a `.then`.
   useEffect(() => {
-    fetch("/api/admin/account-queue")
-      .then((r) => r.json())
-      .then((b) => setAccountQueue(b.users ?? []));
     fetch("/api/admin/membership-queue")
       .then((r) => r.json())
       .then((b) => setMembershipQueue(b.memberships ?? []));
@@ -104,7 +109,7 @@ export function AdminClient() {
         const target = list.find((s) => s.status === "DRAWING" || s.status === "ACTIVE") ?? list[0];
         if (target) {
           setSelectedSessionId(target.id);
-          setOrder(target.memberships);
+          setOrder(target.slots);
         }
       });
   }, []);
@@ -123,21 +128,7 @@ export function AdminClient() {
   if (selectedSessionId && selectedSessionId !== orderForSessionId) {
     setOrderForSessionId(selectedSessionId);
     const s = sessions.find((s) => s.id === selectedSessionId);
-    if (s) setOrder(s.memberships);
-  }
-
-  async function decideAccount(applicant: AccountApplicant, action: "approve" | "reject") {
-    setAccountQueue((q) => q.filter((u) => u.id !== applicant.id));
-    const res = await fetch(`/api/admin/account/${applicant.id}/decide`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
-    });
-    if (!res.ok) {
-      // Put it back and let the admin know the change didn't actually save.
-      setAccountQueue((q) => [...q, applicant]);
-      window.alert("Could not update this account. Please try again.");
-    }
+    if (s) setOrder(s.slots);
   }
 
   async function decideMembership(request: MembershipRequest, action: "approve" | "reject") {
@@ -149,7 +140,7 @@ export function AdminClient() {
     });
     if (!res.ok) {
       setMembershipQueue((q) => [...q, request]);
-      window.alert("Could not update this membership request. Please try again.");
+      window.alert(t("couldNotUpdateMembership"));
     }
   }
 
@@ -178,6 +169,42 @@ export function AdminClient() {
     }
   }
 
+  async function startDrawingPhase() {
+    if (!selectedSessionId) return;
+    setStartingDraw(true);
+    try {
+      const res = await fetch(`/api/admin/sessions/${selectedSessionId}/start-drawing`, {
+        method: "POST",
+      });
+      if (res.ok) await refreshSessions(selectedSessionId);
+    } finally {
+      setStartingDraw(false);
+    }
+  }
+
+  async function recordManualContribution() {
+    if (!selectedSessionId || !contributionSlotId) return;
+    setRecordingContribution(true);
+    setContributionResult(null);
+    try {
+      const res = await fetch("/api/admin/contributions/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ membershipSlotId: contributionSlotId }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        setContributionResult(body.error ?? t("couldNotRecordContribution"));
+        return;
+      }
+      setContributionResult(t("contributionRecorded"));
+      setContributionSlotId("");
+      fetch(`/api/admin/sessions/${selectedSessionId}/ledger`).then((r) => r.json()).then(setLedger);
+    } finally {
+      setRecordingContribution(false);
+    }
+  }
+
   async function decideSwap(id: string, action: "approve" | "reject") {
     setSwapRequests((rows) => rows.filter((r) => r.id !== id));
     await fetch(`/api/admin/swap-requests/${id}/decide`, {
@@ -189,20 +216,24 @@ export function AdminClient() {
   }
 
   async function releasePayout() {
-    if (!selectedSessionId || !payoutUserId) return;
+    if (!selectedSessionId || !payoutSlotId) return;
     setPayoutResult(null);
     const res = await fetch("/api/admin/payouts/release", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tontineSessionId: selectedSessionId, userId: payoutUserId }),
+      body: JSON.stringify({ tontineSessionId: selectedSessionId, membershipSlotId: payoutSlotId }),
     });
     const body = await res.json();
     if (!res.ok) {
-      setPayoutResult(body.error ?? "Failed to release payout");
+      setPayoutResult(body.error ?? t("failedToReleasePayout"));
       return;
     }
     setPayoutResult(
-      `Pot: ${body.pot.toLocaleString("en-US")} F — Fines deducted: ${body.deducted.toLocaleString("en-US")} F — Net payout: ${body.netPayout.toLocaleString("en-US")} F`,
+      t("payoutResultLine", {
+        pot: body.pot.toLocaleString("en-US"),
+        deducted: body.deducted.toLocaleString("en-US"),
+        net: body.netPayout.toLocaleString("en-US"),
+      }),
     );
     if (selectedSessionId) {
       fetch(`/api/admin/sessions/${selectedSessionId}/ledger`).then((r) => r.json()).then(setLedger);
@@ -216,125 +247,94 @@ export function AdminClient() {
       <div>
         <div className="inline-flex items-center gap-2 bg-secondary-fixed-dim/20 text-on-secondary-fixed-variant px-3 py-1 rounded-full font-label-sm text-label-sm mb-2">
           <span className="material-symbols-outlined text-[16px]">shield</span>
-          Présidente Control Center
+          {t("adminControlCenter")}
         </div>
-        <h2 className="font-display-lg text-display-lg text-primary">Admin Dashboard</h2>
+        <h2 className="font-display-lg text-display-lg text-primary">{t("adminDashboard")}</h2>
         <p className="text-on-surface-variant font-body-lg mt-2">
-          Manage tontine cycles, approve members, and oversee financial integrity.
+          {t("adminDashboardSubtitle")}
         </p>
       </div>
-
-      {/* Account approval queue */}
-      <section>
-        <div className="flex justify-between items-end mb-stack-gap-md">
-          <h3 className="font-title-md text-title-md text-primary flex items-center gap-2">
-            <span className="material-symbols-outlined">how_to_reg</span>
-            Pending Approvals
-          </h3>
-          {accountQueue.length > 0 && (
-            <span className="bg-error/10 text-error font-label-sm text-label-sm px-2 py-0.5 rounded-full">
-              {accountQueue.length} Action Required
-            </span>
-          )}
-        </div>
-        {accountQueue.length === 0 ? (
-          <p className="font-label-sm text-label-sm text-on-surface-variant">No pending accounts.</p>
-        ) : (
-          <div className="flex overflow-x-auto gap-stack-gap-md pb-4">
-            {accountQueue.map((u) => (
-              <div
-                key={u.id}
-                className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4 min-w-[280px] border border-outline-variant/30 flex flex-col"
-              >
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-12 h-12 rounded-full bg-tertiary-container text-on-tertiary flex items-center justify-center font-title-md text-title-md overflow-hidden">
-                    {u.avatar ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={u.avatar} alt={u.name} className="w-full h-full object-cover" />
-                    ) : (
-                      u.name.slice(0, 2).toUpperCase()
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-label-md text-label-md text-on-surface">{u.name}</p>
-                    <p className="font-label-sm text-label-sm text-on-surface-variant">
-                      {u.city ?? "—"}
-                      {u.neighborhood ? `, ${u.neighborhood}` : ""}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-2 mt-auto">
-                  <button
-                    onClick={() => decideAccount(u, "reject")}
-                    className="flex-1 bg-surface border border-outline-variant text-on-surface-variant font-label-md text-label-md py-2 rounded-lg hover:bg-surface-container-low active:scale-95 transition-all"
-                  >
-                    Reject
-                  </button>
-                  <button
-                    onClick={() => decideAccount(u, "approve")}
-                    className="flex-1 bg-primary text-on-primary font-label-md text-label-md py-2 rounded-lg hover:opacity-90 active:scale-95 transition-all shadow-sm"
-                  >
-                    Approve
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
 
       {/* Pending tontine-membership requests */}
       <section>
         <div className="flex justify-between items-end mb-stack-gap-md">
           <h3 className="font-title-md text-title-md text-primary flex items-center gap-2">
             <span className="material-symbols-outlined">group_add</span>
-            Pending Membership Requests
+            {t("pendingMembershipRequests")}
           </h3>
           {membershipQueue.length > 0 && (
             <span className="bg-error/10 text-error font-label-sm text-label-sm px-2 py-0.5 rounded-full">
-              {membershipQueue.length} Action Required
+              {membershipQueue.length} {t("actionRequired")}
             </span>
           )}
         </div>
         {membershipQueue.length === 0 ? (
           <p className="font-label-sm text-label-sm text-on-surface-variant">
-            No pending tontine join requests.
+            {t("noPendingRequests")}
           </p>
         ) : (
           <div className="flex flex-col gap-0 border border-outline-variant/30 rounded-lg overflow-hidden">
             {membershipQueue.map((m) => (
               <div
                 key={m.id}
-                className="flex justify-between items-center p-3 bg-surface-container-lowest border-b last:border-b-0 border-outline-variant/30"
+                className="flex flex-col gap-2 p-3 bg-surface-container-lowest border-b last:border-b-0 border-outline-variant/30"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-full bg-tertiary-container text-on-tertiary flex items-center justify-center font-label-md text-label-md overflow-hidden flex-shrink-0">
-                    {m.user.avatar ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={m.user.avatar} alt={m.user.name} className="w-full h-full object-cover" />
-                    ) : (
-                      m.user.name.slice(0, 2).toUpperCase()
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-tertiary-container text-on-tertiary flex items-center justify-center font-label-md text-label-md overflow-hidden flex-shrink-0">
+                      {m.user.avatar ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={m.user.avatar} alt={m.user.name} className="w-full h-full object-cover" />
+                      ) : (
+                        m.user.name.slice(0, 2).toUpperCase()
+                      )}
+                    </div>
+                    <p className="font-label-md text-label-md text-on-surface truncate">
+                      {t("wantsToJoin", {
+                        name: m.user.name,
+                        session:
+                          m.tontineSession.title || TONTINE_LABELS[m.tontineSession.type] || m.tontineSession.type,
+                      })}
+                    </p>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => decideMembership(m, "reject")}
+                      className="px-2 py-1 rounded border border-outline-variant text-on-surface-variant font-label-sm text-label-sm hover:bg-surface"
+                    >
+                      {t("reject")}
+                    </button>
+                    <button
+                      onClick={() => decideMembership(m, "approve")}
+                      className="px-2 py-1 rounded bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90"
+                    >
+                      {t("approve")}
+                    </button>
+                  </div>
+                </div>
+                {m.kycVerification && (
+                  <div className="flex items-center gap-3 pl-12 flex-wrap">
+                    <span className="font-label-sm text-label-sm text-on-surface-variant">
+                      {m.kycVerification.documentType === "CNI" ? t("cameroonianCni") : t("passport")}
+                    </span>
+                    {m.kycVerification.matchConfidence !== null && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#d1fae5] text-[#065f46] font-label-sm text-label-sm">
+                        <span className="material-symbols-outlined text-[14px]">verified_user</span>
+                        {t("faceMatch", { percent: m.kycVerification.matchConfidence.toFixed(0) })}
+                      </span>
+                    )}
+                    {m.kycVerification.documentImageUrl && (
+                      <a
+                        href={m.kycVerification.documentImageUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-label-sm text-label-sm text-primary underline"
+                      >
+                        {t("viewDocument")}
+                      </a>
                     )}
                   </div>
-                  <p className="font-label-md text-label-md text-on-surface truncate">
-                    {m.user.name} wants to join{" "}
-                    {TONTINE_LABELS[m.tontineSession.type] ?? m.tontineSession.type}
-                  </p>
-                </div>
-                <div className="flex gap-2 flex-shrink-0">
-                  <button
-                    onClick={() => decideMembership(m, "reject")}
-                    className="px-2 py-1 rounded border border-outline-variant text-on-surface-variant font-label-sm text-label-sm hover:bg-surface"
-                  >
-                    Reject
-                  </button>
-                  <button
-                    onClick={() => decideMembership(m, "approve")}
-                    className="px-2 py-1 rounded bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90"
-                  >
-                    Approve
-                  </button>
-                </div>
+                )}
               </div>
             ))}
           </div>
@@ -343,8 +343,8 @@ export function AdminClient() {
 
       {/* Session picker */}
       {sessions.length > 0 && (
-        <div className="flex items-center gap-3">
-          <label className="font-label-sm text-label-sm text-on-surface-variant">Session:</label>
+        <div className="flex items-center gap-3 flex-wrap">
+          <label className="font-label-sm text-label-sm text-on-surface-variant">{t("sessionLabel")}</label>
           <select
             value={selectedSessionId ?? ""}
             onChange={(e) => setSelectedSessionId(e.target.value)}
@@ -352,10 +352,22 @@ export function AdminClient() {
           >
             {sessions.map((s) => (
               <option key={s.id} value={s.id}>
-                {TONTINE_LABELS[s.type] ?? s.type} — {s.status}
+                {s.title || TONTINE_LABELS[s.type] || s.type} — {s.status}
+                {s.maxSlots
+                  ? ` (${s.registeredSlots}/${s.maxSlots} ${t("slots")})`
+                  : ` (${s.registeredSlots} ${t("slots")})`}
               </option>
             ))}
           </select>
+          {selectedSession?.status === "DRAFT" && (
+            <button
+              onClick={startDrawingPhase}
+              disabled={startingDraw}
+              className="px-3 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 disabled:opacity-60"
+            >
+              {startingDraw ? t("startingEllipsis") : t("startDrawingPhase")}
+            </button>
+          )}
         </div>
       )}
 
@@ -365,11 +377,11 @@ export function AdminClient() {
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-title-md text-title-md text-primary flex items-center gap-2">
               <span className="material-symbols-outlined">format_list_numbered</span>
-              Payout Order
+              {t("payoutOrder")}
             </h3>
           </div>
           <p className="font-label-sm text-label-sm text-on-surface-variant mb-4">
-            Drag to reorder, or use the arrows, then publish.
+            {t("dragToReorder")}
           </p>
           <div className="flex-grow flex flex-col gap-2 mb-4">
             {order.map((m, index) => (
@@ -389,14 +401,15 @@ export function AdminClient() {
                   {index + 1}
                 </div>
                 <div className="flex-grow min-w-0">
-                  <p className="font-label-md text-label-md text-on-surface truncate">{m.name}</p>
+                  <p className="font-label-md text-label-md text-on-surface truncate">{m.beneficiaryName}</p>
+                  <p className="font-label-sm text-label-sm text-on-surface-variant truncate">{m.name}</p>
                   {!m.hasPhone && (
-                    <p className="font-label-sm text-label-sm text-error">No WhatsApp number on file</p>
+                    <p className="font-label-sm text-label-sm text-error">{t("noWhatsappOnFile")}</p>
                   )}
                 </div>
                 <div className="flex flex-col gap-0.5">
                   <button
-                    aria-label="Move up"
+                    aria-label={t("moveUp")}
                     onClick={() => moveItem(index, index - 1)}
                     className="text-outline hover:text-primary disabled:opacity-30"
                     disabled={index === 0}
@@ -404,7 +417,7 @@ export function AdminClient() {
                     <span className="material-symbols-outlined text-[18px]">keyboard_arrow_up</span>
                   </button>
                   <button
-                    aria-label="Move down"
+                    aria-label={t("moveDown")}
                     onClick={() => moveItem(index, index + 1)}
                     className="text-outline hover:text-primary disabled:opacity-30"
                     disabled={index === order.length - 1}
@@ -420,7 +433,7 @@ export function AdminClient() {
             disabled={publishing || order.length === 0}
             className="w-full bg-primary text-on-primary font-label-md text-label-md py-3 rounded-lg hover:opacity-90 active:scale-95 transition-all shadow-sm mt-auto disabled:opacity-60"
           >
-            {publishing ? "Publishing..." : "Publish Official Ranking"}
+            {publishing ? t("publishingEllipsis") : t("publishOfficialRanking")}
           </button>
         </section>
 
@@ -429,10 +442,10 @@ export function AdminClient() {
           <section className="bg-primary text-on-primary rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4 relative overflow-hidden">
             <h3 className="font-title-md text-title-md flex items-center gap-2 mb-4 relative z-10">
               <span className="material-symbols-outlined">account_balance</span>
-              Financial Ledger
+              {t("financialLedger")}
             </h3>
             <div className="mb-4 relative z-10">
-              <p className="font-label-sm text-label-sm text-primary-fixed-dim">Total Collected Fees</p>
+              <p className="font-label-sm text-label-sm text-primary-fixed-dim">{t("totalCollectedFees")}</p>
               <p className="font-numeric-data text-numeric-data text-white">
                 {(ledger?.totalFees ?? 0).toLocaleString("en-US")} F
               </p>
@@ -440,13 +453,13 @@ export function AdminClient() {
             {ledger?.feeSplit && (
               <div className="bg-on-primary-fixed-variant/50 rounded-lg p-3 mb-4 backdrop-blur-sm relative z-10">
                 <div className="flex justify-between items-center border-b border-primary-fixed-dim/20 pb-2 mb-2">
-                  <span className="font-label-sm text-label-sm text-primary-fixed-dim">President</span>
+                  <span className="font-label-sm text-label-sm text-primary-fixed-dim">{t("presidentLabel")}</span>
                   <span className="font-label-md text-label-md text-white">
                     {ledger.feeSplit.president.toLocaleString("en-US")} F
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="font-label-sm text-label-sm text-primary-fixed-dim">Winner</span>
+                  <span className="font-label-sm text-label-sm text-primary-fixed-dim">{t("winnerLabel")}</span>
                   <span className="font-label-md text-label-md text-white">
                     {ledger.feeSplit.winner.toLocaleString("en-US")} F
                   </span>
@@ -456,7 +469,7 @@ export function AdminClient() {
             <div className="flex justify-between items-center bg-surface-container-lowest text-on-surface rounded-lg p-3 relative z-10 shadow-sm">
               <div className="flex items-center gap-2 text-error">
                 <span className="material-symbols-outlined text-[20px]">warning</span>
-                <span className="font-label-md text-label-md font-bold">Unpaid Fines</span>
+                <span className="font-label-md text-label-md font-bold">{t("unpaidFines")}</span>
               </div>
               <span className="font-numeric-data text-[18px] text-on-surface">
                 {(ledger?.totalUnpaidFines ?? 0).toLocaleString("en-US")} F
@@ -468,10 +481,10 @@ export function AdminClient() {
           <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4 flex-grow flex flex-col">
             <h3 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-4">
               <span className="material-symbols-outlined">swap_horiz</span>
-              Swap Requests
+              {t("swapRequests")}
             </h3>
             {swapRequests.length === 0 ? (
-              <p className="font-label-sm text-label-sm text-on-surface-variant">No pending swap approvals.</p>
+              <p className="font-label-sm text-label-sm text-on-surface-variant">{t("noPendingSwaps")}</p>
             ) : (
               <div className="flex flex-col gap-0 border border-outline-variant/30 rounded-lg overflow-hidden">
                 {swapRequests.map((r) => (
@@ -481,14 +494,14 @@ export function AdminClient() {
                   >
                     <div>
                       <p className="font-label-md text-label-md text-on-surface">
-                        Pos {r.requesterPosition ?? "?"}{" "}
+                        {t("positionAbbrev")} {r.requesterPosition ?? "?"}{" "}
                         <span className="material-symbols-outlined text-[14px] align-middle px-1">
                           arrow_forward
                         </span>{" "}
-                        Pos {r.targetPosition ?? "?"}
+                        {t("positionAbbrev")} {r.targetPosition ?? "?"}
                       </p>
                       <p className="font-label-sm text-label-sm text-on-surface-variant">
-                        {r.requesterName} asks {r.targetName}
+                        {t("userAsksUser", { requester: r.requesterName, target: r.targetName })}
                       </p>
                     </div>
                     <div className="flex gap-2">
@@ -496,13 +509,13 @@ export function AdminClient() {
                         onClick={() => decideSwap(r.id, "reject")}
                         className="px-2 py-1 rounded border border-outline-variant text-on-surface-variant font-label-sm text-label-sm hover:bg-surface"
                       >
-                        Reject
+                        {t("reject")}
                       </button>
                       <button
                         onClick={() => decideSwap(r.id, "approve")}
                         className="px-2 py-1 rounded bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90"
                       >
-                        Approve
+                        {t("approve")}
                       </button>
                     </div>
                   </div>
@@ -516,31 +529,65 @@ export function AdminClient() {
             <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4">
               <h3 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-4">
                 <span className="material-symbols-outlined">payments</span>
-                Release Payout
+                {t("releasePayout")}
               </h3>
               <div className="flex gap-2 mb-3">
                 <select
-                  value={payoutUserId}
-                  onChange={(e) => setPayoutUserId(e.target.value)}
+                  value={payoutSlotId}
+                  onChange={(e) => setPayoutSlotId(e.target.value)}
                   className="flex-1 border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
                 >
-                  <option value="">Select beneficiary…</option>
-                  {selectedSession.memberships.map((m) => (
-                    <option key={m.userId} value={m.userId}>
-                      {m.name}
+                  <option value="">{t("selectBeneficiary")}</option>
+                  {selectedSession.slots.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.beneficiaryName} ({s.name})
                     </option>
                   ))}
                 </select>
                 <button
                   onClick={releasePayout}
-                  disabled={!payoutUserId}
+                  disabled={!payoutSlotId}
                   className="bg-primary text-on-primary font-label-md text-label-md px-4 rounded-lg hover:opacity-90 disabled:opacity-50"
                 >
-                  Release
+                  {t("release")}
                 </button>
               </div>
               {payoutResult && (
                 <p className="font-label-sm text-label-sm text-on-surface-variant">{payoutResult}</p>
+              )}
+            </section>
+          )}
+
+          {/* Manual contribution */}
+          {selectedSession && (
+            <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4">
+              <h3 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-4">
+                <span className="material-symbols-outlined">edit_note</span>
+                {t("recordManualContribution")}
+              </h3>
+              <div className="flex gap-2 mb-3">
+                <select
+                  value={contributionSlotId}
+                  onChange={(e) => setContributionSlotId(e.target.value)}
+                  className="flex-1 border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
+                >
+                  <option value="">{t("selectSlotEllipsis")}</option>
+                  {selectedSession.slots.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.beneficiaryName} ({s.name})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={recordManualContribution}
+                  disabled={!contributionSlotId || recordingContribution}
+                  className="bg-primary text-on-primary font-label-md text-label-md px-4 rounded-lg hover:opacity-90 disabled:opacity-50"
+                >
+                  {recordingContribution ? t("recordingEllipsis") : t("recordPaid")}
+                </button>
+              </div>
+              {contributionResult && (
+                <p className="font-label-sm text-label-sm text-on-surface-variant">{contributionResult}</p>
               )}
             </section>
           )}

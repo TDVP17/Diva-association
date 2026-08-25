@@ -82,8 +82,8 @@ export async function signUpAction(
     }
 
     // Supabase Auth now owns the credential; mirror the account into our own
-    // users table so the rest of the app (role, accountStatus, memberships, etc.)
-    // has something to attach to. A personal/sponsor code, if the user ever
+    // users table so the rest of the app (role, memberships, etc.) has
+    // something to attach to. A personal/sponsor code, if the user ever
     // sets one, is added later — not required to create an account.
     await prisma.user.upsert({
       where: { email },

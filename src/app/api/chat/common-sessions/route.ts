@@ -16,10 +16,11 @@ export async function GET(request: Request) {
   const [mine, theirs] = await Promise.all([
     prisma.membership.findMany({
       where: { userId: session.user.id, tontineSession: { status: { in: ["DRAWING", "ACTIVE"] } } },
-      include: { tontineSession: true },
+      include: { tontineSession: true, slots: { orderBy: { createdAt: "asc" }, take: 1 } },
     }),
     prisma.membership.findMany({
       where: { userId: otherId, tontineSession: { status: { in: ["DRAWING", "ACTIVE"] } } },
+      include: { slots: { orderBy: { createdAt: "asc" }, take: 1 } },
     }),
   ]);
 
@@ -29,11 +30,13 @@ export async function GET(request: Request) {
     .filter((m) => theirBySession.has(m.tontineSessionId))
     .map((m) => {
       const theirMembership = theirBySession.get(m.tontineSessionId)!;
+      const mySlot = m.slots[0];
+      const theirSlot = theirMembership.slots[0];
       return {
         tontineSessionId: m.tontineSessionId,
         tontineType: m.tontineSession.type,
-        myPosition: m.officialPosition ?? m.ballDrawn,
-        theirPosition: theirMembership.officialPosition ?? theirMembership.ballDrawn,
+        myPosition: mySlot?.officialPosition ?? mySlot?.ballDrawn ?? null,
+        theirPosition: theirSlot?.officialPosition ?? theirSlot?.ballDrawn ?? null,
       };
     });
 

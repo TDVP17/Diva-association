@@ -28,6 +28,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ ok: true, status: "REJECTED" });
   }
 
+  // Position swaps are still a membership-level feature (not yet redesigned
+  // for slots — see the schema's PositionSwapRequest note); this swaps each
+  // membership's first slot as a representative stand-in.
   const [requesterMembership, targetMembership] = await Promise.all([
     prisma.membership.findUnique({
       where: {
@@ -36,6 +39,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           tontineSessionId: swapRequest.tontineSessionId,
         },
       },
+      include: { slots: { orderBy: { createdAt: "asc" }, take: 1 } },
     }),
     prisma.membership.findUnique({
       where: {
@@ -44,26 +48,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           tontineSessionId: swapRequest.tontineSessionId,
         },
       },
+      include: { slots: { orderBy: { createdAt: "asc" }, take: 1 } },
     }),
   ]);
-  if (!requesterMembership || !targetMembership) {
-    return NextResponse.json({ error: "One of the memberships no longer exists" }, { status: 404 });
+  const requesterSlot = requesterMembership?.slots[0];
+  const targetSlot = targetMembership?.slots[0];
+  if (!requesterSlot || !targetSlot) {
+    return NextResponse.json({ error: "One of the members has no registered slot" }, { status: 404 });
   }
 
   await prisma.$transaction([
-    prisma.membership.update({
-      where: { id: requesterMembership.id },
-      data: {
-        officialPosition: targetMembership.officialPosition,
-        ballDrawn: targetMembership.ballDrawn,
-      },
+    prisma.membershipSlot.update({
+      where: { id: requesterSlot.id },
+      data: { officialPosition: targetSlot.officialPosition, ballDrawn: targetSlot.ballDrawn },
     }),
-    prisma.membership.update({
-      where: { id: targetMembership.id },
-      data: {
-        officialPosition: requesterMembership.officialPosition,
-        ballDrawn: requesterMembership.ballDrawn,
-      },
+    prisma.membershipSlot.update({
+      where: { id: targetSlot.id },
+      data: { officialPosition: requesterSlot.officialPosition, ballDrawn: requesterSlot.ballDrawn },
     }),
     prisma.positionSwapRequest.update({ where: { id }, data: { status: "APPROVED" } }),
   ]);

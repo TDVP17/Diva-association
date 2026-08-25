@@ -1,13 +1,15 @@
 import Link from "next/link";
+import { LanguageToggle } from "@/components/language-toggle";
+import type { Lang } from "@/lib/i18n/translations";
 
 export function TopAppBar({
   userName,
   userImage,
-  accountApproved,
+  lang,
 }: {
   userName: string;
   userImage: string | null;
-  accountApproved: boolean;
+  lang: Lang;
 }) {
   return (
     <header className="w-full top-0 sticky shadow-sm bg-surface flex items-center justify-between px-container-padding h-16 z-40 shadow-[0px_4px_20px_rgba(30,41,59,0.05)]">
@@ -25,17 +27,7 @@ export function TopAppBar({
       <span className="font-headline-lg-mobile text-headline-lg-mobile font-bold text-primary tracking-tight sm:hidden">
         DIVA
       </span>
-      <span
-        className={accountApproved ? "text-primary" : "text-outline"}
-        title={accountApproved ? "Account Verified" : "Account Pending"}
-      >
-        <span
-          className="material-symbols-outlined text-2xl"
-          style={accountApproved ? { fontVariationSettings: "'FILL' 1" } : undefined}
-        >
-          verified
-        </span>
-      </span>
+      <LanguageToggle currentLang={lang} />
     </header>
   );
 }

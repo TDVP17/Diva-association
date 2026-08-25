@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getContributionTotal } from "@/lib/tontine-engine";
+import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -12,6 +13,7 @@ const TONTINE_LABELS: Record<string, string> = {
 export default async function DashboardPage() {
   const session = await auth();
   const userId = session!.user.id;
+  const t = getTranslator(await getLang());
 
   const [memberships, unpaidFines] = await Promise.all([
     prisma.membership.findMany({
@@ -24,7 +26,7 @@ export default async function DashboardPage() {
       orderBy: { joinedAt: "asc" },
     }),
     prisma.fine.aggregate({
-      where: { userId, status: "UNPAID" },
+      where: { membershipSlot: { membership: { userId } }, status: "UNPAID" },
       _sum: { amount: true },
     }),
   ]);
@@ -34,17 +36,18 @@ export default async function DashboardPage() {
   return (
     <main className="px-container-padding py-stack-gap-lg flex flex-col gap-stack-gap-lg max-w-3xl mx-auto">
       <section>
-        <h2 className="font-title-md text-title-md text-primary mb-stack-gap-md">Your Tontines</h2>
+        <h2 className="font-title-md text-title-md text-primary mb-stack-gap-md">{t("yourTontines")}</h2>
         {memberships.length === 0 ? (
           <div className="bg-white rounded-xl p-6 text-center shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant">
-            <p className="font-body-md text-body-md text-on-surface-variant">
-              You&rsquo;re not part of any active tontine session yet.
-            </p>
+            <p className="font-body-md text-body-md text-on-surface-variant">{t("notInActiveTontine")}</p>
           </div>
         ) : (
           <div className="flex flex-col gap-stack-gap-md">
             {memberships.map((m) => {
-              const { amount, fee } = getContributionTotal(m.tontineSession.type);
+              const { amount, fee } = getContributionTotal({
+                amount: Number(m.tontineSession.amount),
+                fee: Number(m.tontineSession.fee),
+              });
               return (
                 <Link
                   key={m.id}
@@ -53,7 +56,7 @@ export default async function DashboardPage() {
                 >
                   <div>
                     <h3 className="font-label-md text-label-md text-primary uppercase tracking-wide">
-                      {TONTINE_LABELS[m.tontineSession.type]}
+                      {m.tontineSession.title || TONTINE_LABELS[m.tontineSession.type]}
                     </h3>
                     <p className="font-numeric-data text-numeric-data text-on-surface">
                       {amount.toLocaleString("en-US")}{" "}
@@ -74,7 +77,7 @@ export default async function DashboardPage() {
       <section className="grid grid-cols-2 gap-stack-gap-md">
         <div className="bg-white rounded-xl p-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border-l-4 border-error">
           <span className="material-symbols-outlined text-error mb-2">warning</span>
-          <h4 className="font-label-sm text-label-sm text-on-surface-variant mb-1">Unpaid Fines</h4>
+          <h4 className="font-label-sm text-label-sm text-on-surface-variant mb-1">{t("unpaidFines")}</h4>
           <p className="font-numeric-data text-numeric-data text-error">
             {totalFines.toLocaleString("en-US")}{" "}
             <span className="font-body-md text-body-md font-normal">F</span>
@@ -85,8 +88,8 @@ export default async function DashboardPage() {
           className="bg-white rounded-xl p-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] flex flex-col justify-between hover:bg-surface-container-low transition-colors"
         >
           <span className="material-symbols-outlined text-primary mb-2">chat_bubble</span>
-          <h4 className="font-label-sm text-label-sm text-on-surface-variant mb-1">Messages</h4>
-          <p className="font-label-md text-label-md text-on-surface">Open Chat</p>
+          <h4 className="font-label-sm text-label-sm text-on-surface-variant mb-1">{t("messages")}</h4>
+          <p className="font-label-md text-label-md text-on-surface">{t("openChat")}</p>
         </Link>
       </section>
     </main>

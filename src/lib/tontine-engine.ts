@@ -38,13 +38,17 @@ export function getTontineConfig(type: TontineType): TontineConfig {
   return TONTINE_CONFIG[type];
 }
 
-export function getContributionTotal(type: TontineType): {
+/**
+ * Uses the session's own `amount`/`fee` columns (admin-configurable at
+ * creation time), not the `TONTINE_CONFIG` preset — that table is now only
+ * a form-prefill default, not the source of truth for what a member owes.
+ */
+export function getContributionTotal(session: { amount: number; fee: number }): {
   amount: number;
   fee: number;
   total: number;
 } {
-  const { amount, fee } = getTontineConfig(type);
-  return { amount, fee, total: amount + fee };
+  return { amount: session.amount, fee: session.fee, total: session.amount + session.fee };
 }
 
 /**

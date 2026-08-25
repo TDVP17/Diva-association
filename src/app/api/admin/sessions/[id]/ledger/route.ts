@@ -15,11 +15,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const [feesCollected, unpaidFines] = await Promise.all([
     prisma.contribution.aggregate({
-      where: { tontineSessionId: id, status: "PAID" },
+      where: { membershipSlot: { membership: { tontineSessionId: id } }, status: "PAID" },
       _sum: { feePaid: true },
     }),
     prisma.fine.aggregate({
-      where: { tontineSessionId: id, status: "UNPAID" },
+      where: { membershipSlot: { membership: { tontineSessionId: id } }, status: "UNPAID" },
       _sum: { amount: true },
     }),
   ]);

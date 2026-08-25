@@ -54,7 +54,6 @@ async function main() {
       email: SUPER_ADMIN_EMAIL,
       name: "Admin DIVA",
       role: "ADMIN",
-      accountStatus: "APPROVED",
       city: "Douala",
       neighborhood: "Bonapriso",
       phone: "237670000001",
@@ -92,7 +91,7 @@ async function main() {
       prisma.user.upsert({
         where: { email: data.email },
         update: {},
-        create: { ...data, role: "MEMBER", accountStatus: "APPROVED" },
+        create: { ...data, role: "MEMBER" },
       }),
     ),
   );
@@ -104,6 +103,7 @@ async function main() {
   // pre-approved (they're demo data, not real join requests).
   const activeSession = await prisma.tontineSession.create({
     data: {
+      title: "Sunday Cycle — Douala Team",
       type: "HEBDO_SUNDAY",
       amount: 2500,
       fee: 100,
@@ -119,8 +119,10 @@ async function main() {
           userId: user.id,
           tontineSessionId: activeSession.id,
           status: "APPROVED",
-          officialPosition: index + 1,
-          ballDrawn: index + 1,
+          slotCount: 1,
+          slots: {
+            create: [{ beneficiaryName: user.name, officialPosition: index + 1, ballDrawn: index + 1 }],
+          },
         },
       }),
     ),
@@ -129,6 +131,7 @@ async function main() {
   // A monthly session still in the drawing phase — shows the pseudo-draw UI.
   const drawingSession = await prisma.tontineSession.create({
     data: {
+      title: "Monthly Cycle — 28th",
       type: "MONTHLY_28",
       amount: 20000,
       fee: 500,
@@ -140,7 +143,13 @@ async function main() {
   await Promise.all(
     [admin, ...members].map((user) =>
       prisma.membership.create({
-        data: { userId: user.id, tontineSessionId: drawingSession.id, status: "APPROVED" },
+        data: {
+          userId: user.id,
+          tontineSessionId: drawingSession.id,
+          status: "APPROVED",
+          slotCount: 1,
+          slots: { create: [{ beneficiaryName: user.name }] },
+        },
       }),
     ),
   );
