@@ -15,7 +15,13 @@ enum Role {
   ADMIN
 }
 
-enum KycStatus {
+enum AccountStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum MembershipStatus {
   PENDING
   APPROVED
   REJECTED
@@ -61,23 +67,20 @@ enum NotificationType {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
+  id            String        @id @default(cuid())
+  email         String        @unique
   emailVerified DateTime?
   name          String
   avatar        String?
   image         String?
-  role          Role      @default(MEMBER)
-  kycStatus     KycStatus @default(PENDING)
+  role          Role          @default(MEMBER)
+  accountStatus AccountStatus @default(PENDING)
   sponsorCode   String?
   city          String?
   neighborhood  String?
   /// E.164-ish digits-only phone number used for WhatsApp notifications (Evolution API).
   phone         String?
-  cniFrontUrl   String?
-  cniBackUrl    String?
-  selfieUrl     String?
-  createdAt     DateTime  @default(now())
+  createdAt     DateTime      @default(now())
 
   accounts             Account[]
   sessions             Session[]
@@ -152,15 +155,16 @@ model TontineSession {
 }
 
 model Membership {
-  id               String   @id @default(cuid())
+  id               String           @id @default(cuid())
   userId           String
   tontineSessionId String
+  status           MembershipStatus @default(PENDING)
   /// Final payout order (1..N), set by the admin when publishing the official
   /// ranking. Null until published.
   officialPosition Int?
   /// The member's own self-service draw result. Null until they draw.
   ballDrawn        Int?
-  joinedAt         DateTime @default(now())
+  joinedAt         DateTime         @default(now())
 
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   tontineSession TontineSession @relation(fields: [tontineSessionId], references: [id], onDelete: Cascade)
@@ -231,8 +235,6 @@ model ChatMessage {
   receiverId String
   content    String
   createdAt  DateTime @default(now())
-
-
 
   sender   User @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
   receiver User @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)

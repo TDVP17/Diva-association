@@ -15,10 +15,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ use
   }
 
   const { userId } = await params;
-  const user = await prisma.user.update({
-    where: { id: userId },
-    data: { kycStatus: parsed.data.action === "approve" ? "APPROVED" : "REJECTED" },
-  });
 
-  return NextResponse.json({ id: user.id, kycStatus: user.kycStatus });
+  try {
+    const existing = await prisma.user.findUnique({ where: { id: userId } });
+    if (!existing) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { accountStatus: parsed.data.action === "approve" ? "APPROVED" : "REJECTED" },
+    });
+
+    return NextResponse.json({ id: user.id, accountStatus: user.accountStatus });
+  } catch (err) {
+    console.error("[account/decide] unexpected error:", err);
+    return NextResponse.json({ error: "Could not update this account" }, { status: 500 });
+  }
 }

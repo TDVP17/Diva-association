@@ -20,3 +20,20 @@ export function getSupabaseAuthClient(): SupabaseClient {
   }
   return client;
 }
+
+// Service-role client for admin-only Supabase Auth operations (creating/
+// resetting a user's password server-side via `auth.admin.*`) — the anon
+// key above can't call these. Only ever used from trusted server contexts
+// like prisma/seed.ts, never from a request handler reachable by users.
+let adminClient: SupabaseClient | null = null;
+
+export function getSupabaseAdminClient(): SupabaseClient {
+  if (!adminClient) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+    adminClient = createClient(url, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+  return adminClient;
+}

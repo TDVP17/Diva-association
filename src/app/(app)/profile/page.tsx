@@ -1,20 +1,28 @@
 import { auth, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { ProfileForm } from "./profile-form";
 
 export default async function ProfilePage() {
   const session = await auth();
   const user = await prisma.user.findUnique({
     where: { id: session!.user.id },
-    select: { name: true, email: true, avatar: true, image: true, phone: true, city: true, neighborhood: true, kycStatus: true, role: true },
+    select: {
+      name: true,
+      email: true,
+      avatar: true,
+      image: true,
+      phone: true,
+      city: true,
+      neighborhood: true,
+      accountStatus: true,
+      role: true,
+    },
   });
   if (!user) return null;
 
   const rows: Array<[string, string]> = [
     ["Email", user.email],
-    ["Phone", user.phone ?? "Not set"],
-    ["City", user.city ?? "—"],
-    ["Neighborhood", user.neighborhood ?? "—"],
-    ["KYC Status", user.kycStatus],
+    ["Account Status", user.accountStatus],
     ["Role", user.role],
   ];
 
@@ -43,6 +51,8 @@ export default async function ProfilePage() {
           </div>
         ))}
       </div>
+
+      <ProfileForm phone={user.phone} city={user.city} neighborhood={user.neighborhood} />
 
       <form
         action={async () => {

@@ -23,7 +23,7 @@ const devLoginProvider = Credentials({
 // Email/password sign-in. Supabase Auth is the source of truth for
 // credential storage/verification (its own `auth.users` table, never
 // touched by Prisma); on success we look the matching row up in our own
-// `users` table so the resulting session carries role/kycStatus/sponsorCode
+// `users` table so the resulting session carries role/accountStatus/sponsorCode
 // exactly like every other provider. Sign-*up* is handled separately (see
 // src/app/login/actions.ts) since creating an account is a different
 // operation from verifying one — this provider only ever verifies.
@@ -86,18 +86,18 @@ export const {
       if (user?.id) {
         token.id = user.id;
         token.role = user.role;
-        token.kycStatus = user.kycStatus;
+        token.accountStatus = user.accountStatus;
         token.sponsorCode = user.sponsorCode;
       }
 
       if (trigger === "update" && token.id) {
         const dbUser = await prisma.user.findUnique({
           where: { id: token.id },
-          select: { role: true, kycStatus: true, sponsorCode: true },
+          select: { role: true, accountStatus: true, sponsorCode: true },
         });
         if (dbUser) {
           token.role = dbUser.role;
-          token.kycStatus = dbUser.kycStatus;
+          token.accountStatus = dbUser.accountStatus;
           token.sponsorCode = dbUser.sponsorCode;
         }
       }
@@ -107,7 +107,7 @@ export const {
     async session({ session, token }) {
       session.user.id = token.id;
       session.user.role = token.role;
-      session.user.kycStatus = token.kycStatus;
+      session.user.accountStatus = token.accountStatus;
       session.user.sponsorCode = token.sponsorCode;
       return session;
     },

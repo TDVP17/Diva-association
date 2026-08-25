@@ -14,9 +14,6 @@ export async function POST(request: Request) {
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (session.user.kycStatus !== "APPROVED") {
-    return NextResponse.json({ error: "KYC verification required" }, { status: 403 });
-  }
 
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
@@ -30,6 +27,12 @@ export async function POST(request: Request) {
   });
   if (!membership || membership.tontineSession.status !== "ACTIVE") {
     return NextResponse.json({ error: "You are not an active member of this session" }, { status: 404 });
+  }
+  if (membership.status !== "APPROVED") {
+    return NextResponse.json(
+      { error: "Your membership for this session hasn't been approved yet" },
+      { status: 403 },
+    );
   }
 
   const now = new Date();

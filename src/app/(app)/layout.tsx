@@ -12,7 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <TopAppBar
         userName={session.user.name ?? "Member"}
         userImage={session.user.image ?? null}
-        kycApproved={session.user.kycStatus === "APPROVED"}
+        accountApproved={session.user.accountStatus === "APPROVED"}
       />
       <div className="flex-1 pb-24 md:pb-8">{children}</div>
       <BottomNav />

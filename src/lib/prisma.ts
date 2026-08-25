@@ -37,22 +37,32 @@ function isTransientConnectionError(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P1000";
 }
 
-// Every query gets one automatic retry on the specific "pooled connection
+// Every query gets automatic retries on the specific "pooled connection
 // turned out to be dead" error class described above, before giving up and
-// letting the error propagate normally. This is what actually makes the
-// pooler flakiness invisible to callers — pool tuning alone didn't
-// reliably prevent it.
+// letting the error propagate normally. A single retry was enough during
+// initial testing, but this flakiness comes in bursts of varying severity —
+// during a bad burst even 2-3 consecutive attempts can fail, so this backs
+// off across a few attempts rather than giving up after one.
+const RETRY_DELAYS_MS = [200, 500, 1000];
+
 export const prisma = rawPrisma.$extends({
   query: {
     async $allOperations({ model, operation, args, query }) {
-      try {
-        return await query(args);
-      } catch (err) {
-        if (!isTransientConnectionError(err)) throw err;
-        console.warn(`[prisma] transient connection error on ${model}.${operation}, retrying once`);
-        await new Promise((resolve) => setTimeout(resolve, 200));
-        return query(args);
+      let lastErr: unknown;
+      for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+        try {
+          return await query(args);
+        } catch (err) {
+          if (!isTransientConnectionError(err)) throw err;
+          lastErr = err;
+          if (attempt === RETRY_DELAYS_MS.length) break;
+          console.warn(
+            `[prisma] transient connection error on ${model}.${operation}, retrying (attempt ${attempt + 1}/${RETRY_DELAYS_MS.length})`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
+        }
       }
+      throw lastErr;
     },
   },
 });

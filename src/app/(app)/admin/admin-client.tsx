@@ -2,15 +2,19 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-interface KycApplicant {
+interface AccountApplicant {
   id: string;
   name: string;
   avatar: string | null;
   city: string | null;
   neighborhood: string | null;
-  cniFrontUrl: string;
-  cniBackUrl: string;
-  selfieUrl: string;
+}
+
+interface MembershipRequest {
+  id: string;
+  joinedAt: string;
+  user: { id: string; name: string; avatar: string | null };
+  tontineSession: { id: string; type: string; status: string };
 }
 
 interface AdminMembership {
@@ -53,12 +57,9 @@ const TONTINE_LABELS: Record<string, string> = {
   MONTHLY_25: "Monthly Tontine (25th)",
 };
 
-function fileUrl(key: string) {
-  return `/api/files/${key}`;
-}
-
 export function AdminClient() {
-  const [kycQueue, setKycQueue] = useState<KycApplicant[]>([]);
+  const [accountQueue, setAccountQueue] = useState<AccountApplicant[]>([]);
+  const [membershipQueue, setMembershipQueue] = useState<MembershipRequest[]>([]);
   const [sessions, setSessions] = useState<AdminSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [order, setOrder] = useState<AdminMembership[]>([]);
@@ -86,9 +87,12 @@ export function AdminClient() {
   // Initial load. Inlined (rather than calling the refresh*/setSessions
   // helpers above) so each fetch's setState lives directly in a `.then`.
   useEffect(() => {
-    fetch("/api/admin/kyc-queue")
+    fetch("/api/admin/account-queue")
       .then((r) => r.json())
-      .then((b) => setKycQueue(b.users ?? []));
+      .then((b) => setAccountQueue(b.users ?? []));
+    fetch("/api/admin/membership-queue")
+      .then((r) => r.json())
+      .then((b) => setMembershipQueue(b.memberships ?? []));
     fetch("/api/admin/swap-requests")
       .then((r) => r.json())
       .then((b) => setSwapRequests(b.requests ?? []));
@@ -122,13 +126,31 @@ export function AdminClient() {
     if (s) setOrder(s.memberships);
   }
 
-  async function decideKyc(userId: string, action: "approve" | "reject") {
-    setKycQueue((q) => q.filter((u) => u.id !== userId));
-    await fetch(`/api/admin/kyc/${userId}/decide`, {
+  async function decideAccount(applicant: AccountApplicant, action: "approve" | "reject") {
+    setAccountQueue((q) => q.filter((u) => u.id !== applicant.id));
+    const res = await fetch(`/api/admin/account/${applicant.id}/decide`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action }),
     });
+    if (!res.ok) {
+      // Put it back and let the admin know the change didn't actually save.
+      setAccountQueue((q) => [...q, applicant]);
+      window.alert("Could not update this account. Please try again.");
+    }
+  }
+
+  async function decideMembership(request: MembershipRequest, action: "approve" | "reject") {
+    setMembershipQueue((q) => q.filter((m) => m.id !== request.id));
+    const res = await fetch(`/api/admin/membership/${request.id}/decide`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    if (!res.ok) {
+      setMembershipQueue((q) => [...q, request]);
+      window.alert("Could not update this membership request. Please try again.");
+    }
   }
 
   function moveItem(from: number, to: number) {
@@ -202,24 +224,24 @@ export function AdminClient() {
         </p>
       </div>
 
-      {/* KYC queue */}
+      {/* Account approval queue */}
       <section>
         <div className="flex justify-between items-end mb-stack-gap-md">
           <h3 className="font-title-md text-title-md text-primary flex items-center gap-2">
             <span className="material-symbols-outlined">how_to_reg</span>
             Pending Approvals
           </h3>
-          {kycQueue.length > 0 && (
+          {accountQueue.length > 0 && (
             <span className="bg-error/10 text-error font-label-sm text-label-sm px-2 py-0.5 rounded-full">
-              {kycQueue.length} Action Required
+              {accountQueue.length} Action Required
             </span>
           )}
         </div>
-        {kycQueue.length === 0 ? (
-          <p className="font-label-sm text-label-sm text-on-surface-variant">No pending KYC applications.</p>
+        {accountQueue.length === 0 ? (
+          <p className="font-label-sm text-label-sm text-on-surface-variant">No pending accounts.</p>
         ) : (
           <div className="flex overflow-x-auto gap-stack-gap-md pb-4">
-            {kycQueue.map((u) => (
+            {accountQueue.map((u) => (
               <div
                 key={u.id}
                 className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4 min-w-[280px] border border-outline-variant/30 flex flex-col"
@@ -241,28 +263,74 @@ export function AdminClient() {
                     </p>
                   </div>
                 </div>
-                <div className="bg-surface-container-low rounded-lg p-2 mb-4 grid grid-cols-3 gap-1">
-                  {[u.cniFrontUrl, u.cniBackUrl, u.selfieUrl].map((key, i) => (
-                    <a key={i} href={fileUrl(key)} target="_blank" rel="noreferrer">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={fileUrl(key)}
-                        alt={i === 2 ? "Selfie" : `ID ${i === 0 ? "front" : "back"}`}
-                        className="w-full h-16 object-cover rounded"
-                      />
-                    </a>
-                  ))}
-                </div>
                 <div className="flex gap-2 mt-auto">
                   <button
-                    onClick={() => decideKyc(u.id, "reject")}
+                    onClick={() => decideAccount(u, "reject")}
                     className="flex-1 bg-surface border border-outline-variant text-on-surface-variant font-label-md text-label-md py-2 rounded-lg hover:bg-surface-container-low active:scale-95 transition-all"
                   >
                     Reject
                   </button>
                   <button
-                    onClick={() => decideKyc(u.id, "approve")}
+                    onClick={() => decideAccount(u, "approve")}
                     className="flex-1 bg-primary text-on-primary font-label-md text-label-md py-2 rounded-lg hover:opacity-90 active:scale-95 transition-all shadow-sm"
+                  >
+                    Approve
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Pending tontine-membership requests */}
+      <section>
+        <div className="flex justify-between items-end mb-stack-gap-md">
+          <h3 className="font-title-md text-title-md text-primary flex items-center gap-2">
+            <span className="material-symbols-outlined">group_add</span>
+            Pending Membership Requests
+          </h3>
+          {membershipQueue.length > 0 && (
+            <span className="bg-error/10 text-error font-label-sm text-label-sm px-2 py-0.5 rounded-full">
+              {membershipQueue.length} Action Required
+            </span>
+          )}
+        </div>
+        {membershipQueue.length === 0 ? (
+          <p className="font-label-sm text-label-sm text-on-surface-variant">
+            No pending tontine join requests.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-0 border border-outline-variant/30 rounded-lg overflow-hidden">
+            {membershipQueue.map((m) => (
+              <div
+                key={m.id}
+                className="flex justify-between items-center p-3 bg-surface-container-lowest border-b last:border-b-0 border-outline-variant/30"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-full bg-tertiary-container text-on-tertiary flex items-center justify-center font-label-md text-label-md overflow-hidden flex-shrink-0">
+                    {m.user.avatar ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={m.user.avatar} alt={m.user.name} className="w-full h-full object-cover" />
+                    ) : (
+                      m.user.name.slice(0, 2).toUpperCase()
+                    )}
+                  </div>
+                  <p className="font-label-md text-label-md text-on-surface truncate">
+                    {m.user.name} wants to join{" "}
+                    {TONTINE_LABELS[m.tontineSession.type] ?? m.tontineSession.type}
+                  </p>
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => decideMembership(m, "reject")}
+                    className="px-2 py-1 rounded border border-outline-variant text-on-surface-variant font-label-sm text-label-sm hover:bg-surface"
+                  >
+                    Reject
+                  </button>
+                  <button
+                    onClick={() => decideMembership(m, "approve")}
+                    className="px-2 py-1 rounded bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90"
                   >
                     Approve
                   </button>

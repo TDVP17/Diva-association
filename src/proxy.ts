@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import {
-  ADMIN_PATH_PREFIX,
-  KYC_GATED_PATH_PREFIXES,
-  PROTECTED_PATH_PREFIXES,
-} from "@/lib/constants";
+import { ADMIN_PATH_PREFIX, PROTECTED_PATH_PREFIXES } from "@/lib/constants";
 
 function matchesPrefix(pathname: string, prefixes: readonly string[]) {
   return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
@@ -27,14 +23,6 @@ export default auth((req) => {
     const loginUrl = new URL("/login", nextUrl);
     loginUrl.searchParams.set("callbackUrl", path);
     return NextResponse.redirect(loginUrl);
-  }
-
-  if (
-    matchesPrefix(path, KYC_GATED_PATH_PREFIXES) &&
-    session.user.kycStatus !== "APPROVED" &&
-    path !== "/kyc"
-  ) {
-    return NextResponse.redirect(new URL("/kyc", nextUrl));
   }
 
   if (path.startsWith(ADMIN_PATH_PREFIX) && session.user.role !== "ADMIN") {

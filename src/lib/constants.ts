@@ -4,13 +4,9 @@ export const PROTECTED_PATH_PREFIXES = [
   "/dashboard",
   "/sessions",
   "/chat",
-  "/kyc",
   "/admin",
   "/profile",
 ] as const;
-
-// Subset of protected paths that additionally require kycStatus === "APPROVED".
-export const KYC_GATED_PATH_PREFIXES = ["/dashboard", "/sessions", "/chat"] as const;
 
 export const ADMIN_PATH_PREFIX = "/admin";
 

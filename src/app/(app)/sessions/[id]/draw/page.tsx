@@ -10,12 +10,14 @@ export default async function DrawPage({ params }: { params: Promise<{ id: strin
 
   const tontineSession = await prisma.tontineSession.findUnique({
     where: { id },
-    include: { memberships: { select: { userId: true, ballDrawn: true } } },
+    include: { memberships: { select: { userId: true, status: true, ballDrawn: true } } },
   });
   if (!tontineSession) notFound();
 
   const myMembership = tontineSession.memberships.find((m) => m.userId === userId);
-  if (!myMembership) notFound();
+  if (!myMembership || myMembership.status !== "APPROVED") notFound();
+
+  const approvedMemberships = tontineSession.memberships.filter((m) => m.status === "APPROVED");
 
   return (
     <main className="flex-grow flex flex-col items-center justify-center p-container-padding pb-32 min-h-[calc(100vh-64px)]">
@@ -36,7 +38,7 @@ export default async function DrawPage({ params }: { params: Promise<{ id: strin
           Drawing is not currently open for this session.
         </p>
       ) : (
-        <DrawBowl tontineSessionId={id} totalMembers={tontineSession.memberships.length} />
+        <DrawBowl tontineSessionId={id} totalMembers={approvedMemberships.length} />
       )}
     </main>
   );
