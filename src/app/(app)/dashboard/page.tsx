@@ -15,7 +15,11 @@ export default async function DashboardPage() {
 
   const [memberships, unpaidFines] = await Promise.all([
     prisma.membership.findMany({
-      where: { userId, tontineSession: { status: { in: ["DRAWING", "ACTIVE"] } } },
+      where: {
+        userId,
+        status: "APPROVED",
+        tontineSession: { status: { in: ["DRAWING", "ACTIVE"] } },
+      },
       include: { tontineSession: true },
       orderBy: { joinedAt: "asc" },
     }),

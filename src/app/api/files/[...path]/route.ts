@@ -13,8 +13,10 @@ export async function GET(
   }
 
   const { path: segments } = await params;
-  // Every stored file lives under {category}/{ownerId}/{filename} — only the
-  // owner or an admin may read it back.
+  // Every stored file lives under {category}/{ownerId}/{filename}. Avatars
+  // are shown to other members throughout the app (chat, session rosters,
+  // admin queues), so any authenticated user may read those back; every
+  // other category (receipts, etc.) stays owner-or-admin only.
   const [category, ownerId, ...rest] = segments;
   if (!category || !ownerId || rest.length === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -22,7 +24,8 @@ export async function GET(
 
   const isOwner = session.user.id === ownerId;
   const isAdmin = session.user.role === "ADMIN";
-  if (!isOwner && !isAdmin) {
+  const isPublicCategory = category === "avatars";
+  if (!isOwner && !isAdmin && !isPublicCategory) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
