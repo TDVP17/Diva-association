@@ -2,6 +2,7 @@
 
 import { CredentialsForm } from "./credentials-form";
 import { LanguageToggle } from "@/components/language-toggle";
+import { IosInstallBanner } from "@/components/ios-install-banner";
 import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 
 interface DevUser {
@@ -151,6 +152,8 @@ export function LoginContent({
           )}
         </div>
       )}
+
+      <IosInstallBanner lang={lang} />
     </main>
   );
 }

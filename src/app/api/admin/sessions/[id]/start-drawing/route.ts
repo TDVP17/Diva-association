@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
+import { isDrawUnlocked } from "@/lib/tontine-engine";
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin();
@@ -15,6 +16,12 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     }
     if (tontineSession.status !== "DRAFT") {
       return NextResponse.json({ error: "Only a draft cotisation can start its drawing phase" }, { status: 409 });
+    }
+    if (!isDrawUnlocked(tontineSession.startDate)) {
+      return NextResponse.json(
+        { error: "The draw unlocks 24 hours before the cotisation's start date" },
+        { status: 403 },
+      );
     }
 
     await prisma.tontineSession.update({ where: { id }, data: { status: "DRAWING" } });

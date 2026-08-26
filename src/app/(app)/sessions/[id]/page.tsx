@@ -8,6 +8,9 @@ import { PayButton } from "./pay-button";
 import { JoinButton } from "./join-button";
 import { VerificationPollingRefresh } from "./verification-status";
 import { SelectSlotsForm } from "./select-slots-form";
+import { PayoutOrderModal } from "./payout-order-modal";
+import { PayoutTurnPanel } from "./payout-turn-panel";
+import { getDesignatedSlot } from "@/lib/round-robin-lock";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -177,6 +180,18 @@ export default async function SessionDetailPage({
   const mySlots = myMembership.slots;
   const myUndrawnSlots = mySlots.filter((s) => s.ballDrawn === null);
 
+  // "Designated" (zero payout rows yet) gates the initial "submit your
+  // details" prompt; once submitted, the slot drops out of that query
+  // (it now has a row) but the claim itself still needs its own status
+  // panel (awaiting release, then awaiting receipt confirmation) — so the
+  // two are tracked separately rather than re-using one query for both.
+  const designatedSlot = await getDesignatedSlot(id);
+  const myDesignatedSlot = designatedSlot && mySlots.some((s) => s.id === designatedSlot.id) ? designatedSlot : null;
+  const myActivePayoutClaim = await prisma.payout.findFirst({
+    where: { membershipSlotId: { in: mySlots.map((s) => s.id) }, status: { not: "CONFIRMED" } },
+    orderBy: { detailsSubmittedAt: "desc" },
+  });
+
   return (
     <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto pb-32">
       <section className="mb-stack-gap-lg bg-surface rounded-xl p-5 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant">
@@ -212,7 +227,7 @@ export default async function SessionDetailPage({
             />
           </div>
         </div>
-        <div className="mt-4 pt-4 border-t border-surface-variant">
+        <div className="mt-4 pt-4 border-t border-surface-variant flex items-center justify-between flex-wrap gap-2">
           <Link
             href={`/pay/${id}`}
             className="font-label-sm text-label-sm text-primary underline flex items-center gap-1"
@@ -220,17 +235,28 @@ export default async function SessionDetailPage({
             <span className="material-symbols-outlined text-[16px]">share</span>
             {t("shareContributionLink")}
           </Link>
+          <PayoutOrderModal tontineSessionId={id} lang={lang} />
         </div>
       </section>
 
-      {tontineSession.status === "DRAWING" && myUndrawnSlots.length > 0 && (
-        <Link
-          href={`/sessions/${id}/draw`}
-          className="mb-stack-gap-lg flex items-center justify-between bg-primary text-on-primary rounded-xl p-4 shadow-md hover:opacity-90 transition-opacity"
-        >
-          <span className="font-label-md text-label-md">{t("drawYourBall")}</span>
-          <span className="material-symbols-outlined">casino</span>
-        </Link>
+      {(tontineSession.status === "DRAWING" || tontineSession.status === "ACTIVE") &&
+        myUndrawnSlots.length > 0 && (
+          <Link
+            href={`/sessions/${id}/draw`}
+            className="mb-stack-gap-lg flex items-center justify-between bg-primary text-on-primary rounded-xl p-4 shadow-md hover:opacity-90 transition-opacity"
+          >
+            <span className="font-label-md text-label-md">{t("drawYourBall")}</span>
+            <span className="material-symbols-outlined">casino</span>
+          </Link>
+        )}
+
+      {(myActivePayoutClaim || myDesignatedSlot) && (
+        <PayoutTurnPanel
+          membershipSlotId={myActivePayoutClaim?.membershipSlotId ?? myDesignatedSlot!.id}
+          payoutId={myActivePayoutClaim?.id ?? null}
+          status={myActivePayoutClaim?.status ?? null}
+          lang={lang}
+        />
       )}
 
       <section className="mb-stack-gap-lg">
@@ -256,7 +282,8 @@ export default async function SessionDetailPage({
                 <div className="flex-grow min-w-0">
                   <div className="font-label-md text-label-md text-on-surface truncate">{s.beneficiaryName}</div>
                   <div className="font-label-sm text-label-sm text-on-surface-variant">
-                    {t("positionLabel")} {s.officialPosition ?? "—"} · {paid ? t("paid") : `${slotTotal.toLocaleString("en-US")} F ${t("due")}`}
+                    {t("positionLabel")} {s.ballDrawn ?? t("notYetRevealed")} ·{" "}
+                    {paid ? t("paid") : `${slotTotal.toLocaleString("en-US")} F ${t("due")}`}
                   </div>
                 </div>
                 {!paid && <PayButton membershipSlotId={s.id} amountLabel={`${slotTotal.toLocaleString("en-US")} F`} />}
@@ -279,7 +306,7 @@ export default async function SessionDetailPage({
                 className={`flex items-center p-4 ${index < allSlotsFlat.length - 1 ? "border-b border-surface-variant" : ""} ${s.isMine ? "bg-primary/5" : ""}`}
               >
                 <div className="font-label-md text-label-md text-on-surface-variant w-8 text-center mr-2">
-                  {s.officialPosition ?? "—"}
+                  {s.ballDrawn ?? "—"}
                 </div>
                 <div className="w-10 h-10 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center font-label-md text-label-md mr-4 overflow-hidden">
                   {s.member.avatar || s.member.image ? (

@@ -20,19 +20,22 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         where: { id: tontineSessionId },
         include: {
           memberships: {
-            where: { status: "APPROVED" },
-            select: { userId: true, slots: { select: { id: true, beneficiaryName: true, ballDrawn: true } } },
+            where: { status: "APPROVED", userId: session.user.id },
+            select: {
+              userId: true,
+              slots: { select: { id: true, beneficiaryName: true, ballDrawn: true, officialPosition: true } },
+            },
           },
         },
       });
       if (!tontineSession) {
         return { ok: false, status: 404, error: "Session not found" };
       }
-      if (tontineSession.status !== "DRAWING") {
+      if (tontineSession.status !== "DRAWING" && tontineSession.status !== "ACTIVE") {
         return { ok: false, status: 409, error: "This session is not open for drawing" };
       }
 
-      const myMembership = tontineSession.memberships.find((m) => m.userId === session.user.id);
+      const myMembership = tontineSession.memberships[0];
       if (!myMembership) {
         return { ok: false, status: 403, error: "You are not an approved member of this session" };
       }
@@ -40,21 +43,15 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       if (myUndrawnSlots.length === 0) {
         return { ok: false, status: 409, error: "You have already drawn for all your slots" };
       }
-
-      const allSlots = tontineSession.memberships.flatMap((m) => m.slots);
-      const totalSlots = allSlots.length;
-      const claimed = new Set(
-        allSlots.map((s) => s.ballDrawn).filter((n): n is number => n !== null),
-      );
-      const pool = Array.from({ length: totalSlots }, (_, i) => i + 1).filter((n) => !claimed.has(n));
-      if (pool.length < myUndrawnSlots.length) {
-        return { ok: false, status: 409, error: "Not enough balls left to draw" };
+      if (myUndrawnSlots.some((s) => s.officialPosition === null)) {
+        return { ok: false, status: 409, error: "Your position hasn't been assigned yet" };
       }
 
+      // The draw animation is real, but it always reveals the admin's real,
+      // already-assigned officialPosition — nothing here is randomized.
       const drawn: Array<{ slotId: string; beneficiaryName: string; ballDrawn: number }> = [];
       for (const slot of myUndrawnSlots) {
-        const pickIndex = Math.floor(Math.random() * pool.length);
-        const ballDrawn = pool.splice(pickIndex, 1)[0];
+        const ballDrawn = slot.officialPosition!;
         await tx.membershipSlot.update({ where: { id: slot.id }, data: { ballDrawn } });
         drawn.push({ slotId: slot.id, beneficiaryName: slot.beneficiaryName, ballDrawn });
       }

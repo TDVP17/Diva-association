@@ -77,6 +77,11 @@ enum OtpPurpose {
   PASSWORD_CHANGE
 }
 
+enum PaymentMethodType {
+  MOBILE_MONEY
+  CARD
+}
+
 model User {
   id                   String    @id @default(cuid())
   email                String    @unique
@@ -114,8 +119,35 @@ model User {
   kycVerifications             KycVerification[]
   otpChallenges                OtpChallenge[]
   payoutsReleasedAsAdmin       Payout[]              @relation("PayoutReleasedByAdmin")
+  savedPaymentMethods          SavedPaymentMethod[]
 
   @@map("users")
+}
+
+/// A user's saved checkout shortcut — max 4 per user, enforced at the API
+/// layer. Never stores a full card number/CVV (collected only by Kora's
+/// hosted widget, which never touches our server) — CARD rows only carry
+/// what Kora's tokenization callback/webhook returns (brand, last 4, and a
+/// reusable reference token, if their API supports charging it later).
+model SavedPaymentMethod {
+  id            String            @id @default(cuid())
+  userId        String
+  type          PaymentMethodType
+  label         String?
+  /// MOBILE_MONEY only.
+  phone         String?
+  /// CARD only — e.g. "Visa".
+  cardBrand     String?
+  /// CARD only — last 4 digits, never a full PAN.
+  cardLast4     String?
+  /// CARD only — Kora's reusable reference token, if available.
+  koraCardToken String?
+  isDefault     Boolean           @default(false)
+  createdAt     DateTime          @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("saved_payment_methods")
 }
 
 /// Short-lived numeric verification codes gating changes to sensitive
@@ -240,9 +272,15 @@ model MembershipSlot {
   membershipId     String
   beneficiaryName  String
   /// Final payout order (1..N) for this slot, set by the admin when
-  /// publishing the official ranking. Null until published.
+  /// publishing the official ranking. Null until published. Kept hidden
+  /// from members until they individually "draw" (see ballDrawn) — the
+  /// draw animation is real, but always reveals this pre-assigned value.
   officialPosition Int?
-  /// This slot's own self-service draw result. Null until drawn.
+  /// Set the moment this slot's own member has clicked through their draw
+  /// reveal — always equal to officialPosition once set (the draw never
+  /// generates a different number). Doubles as the "publicly visible"
+  /// gate: other members can't see this slot's officialPosition until
+  /// ballDrawn is set. Null until revealed.
   ballDrawn        Int?
   createdAt        DateTime @default(now())
 
@@ -254,27 +292,47 @@ model MembershipSlot {
   @@map("membership_slots")
 }
 
-/// Durable record of a released round-robin payout — one row per session
-/// per cycle. Existence of a row here is the single source of truth for
-/// "has this cycle's designated beneficiary been paid out yet," which the
-/// round-robin pre-pay-ahead lock (src/lib/round-robin-lock.ts) depends on.
+enum PayoutStatus {
+  DETAILS_SUBMITTED
+  RELEASED
+  CONFIRMED
+}
+
+/// The full beneficiary-payout lifecycle — one row per session per cycle,
+/// created the moment a beneficiary submits their payout details (not at
+/// release time). Existence of a row with a non-null `releasedAt` is the
+/// single source of truth for "has this cycle's designated beneficiary
+/// actually been paid out yet," which the round-robin pre-pay-ahead lock
+/// (src/lib/round-robin-lock.ts) depends on.
 model Payout {
-  id                String   @id @default(cuid())
-  tontineSessionId  String
-  membershipSlotId  String
+  id                 String       @id @default(cuid())
+  tontineSessionId   String
+  membershipSlotId   String
   /// The cycle (Contribution.dueDate-style key) this payout closes out.
-  dueDate           DateTime
-  pot               Decimal  @db.Decimal(12, 2)
-  deducted          Decimal  @db.Decimal(12, 2)
-  netPayout         Decimal  @db.Decimal(12, 2)
+  dueDate            DateTime
+  status             PayoutStatus @default(DETAILS_SUBMITTED)
+  /// Beneficiary-submitted, for this payout only — distinct from the
+  /// profile-level User.payoutPhone/phone, which are never used for the
+  /// actual transfer once this flow exists.
+  payoutPhone        String
+  payoutAccountName  String
+  detailsSubmittedAt DateTime     @default(now())
+  /// All null until the admin actually executes the transfer.
+  pot                Decimal?     @db.Decimal(12, 2)
+  deducted           Decimal?     @db.Decimal(12, 2)
+  netPayout          Decimal?     @db.Decimal(12, 2)
   /// Fapshi payout transaction id (POST /payout response.transId).
-  fapshiTransId     String?  @unique
-  releasedByAdminId String
-  releasedAt        DateTime @default(now())
+  fapshiTransId      String?      @unique
+  releasedByAdminId  String?
+  releasedAt         DateTime?
+  memberConfirmedAt  DateTime?
+  /// True if the admin used the "mark confirmed" override instead of the
+  /// beneficiary confirming receipt themselves.
+  confirmedByAdmin   Boolean      @default(false)
 
   tontineSession  TontineSession @relation(fields: [tontineSessionId], references: [id], onDelete: Cascade)
   membershipSlot  MembershipSlot @relation(fields: [membershipSlotId], references: [id], onDelete: Cascade)
-  releasedByAdmin User           @relation("PayoutReleasedByAdmin", fields: [releasedByAdminId], references: [id])
+  releasedByAdmin User?          @relation("PayoutReleasedByAdmin", fields: [releasedByAdminId], references: [id])
 
   @@unique([tontineSessionId, dueDate])
   @@map("payouts")
@@ -318,6 +376,7 @@ model Contribution {
   finePaid          Decimal            @default(0) @db.Decimal(12, 2)
   status            ContributionStatus @default(PENDING)
   fapshiTxRef       String?            @unique
+  koraReference     String?            @unique
   paidAt            DateTime?
   receiptPdfUrl     String?
   /// Set only when an admin records this contribution manually (off-platform
@@ -339,6 +398,8 @@ model Fine {
   dueDate          DateTime
   amount           Decimal    @db.Decimal(12, 2)
   status           FineStatus @default(UNPAID)
+  fapshiTxRef      String?    @unique
+  koraReference    String?    @unique
   createdAt        DateTime   @default(now())
 
   membershipSlot MembershipSlot @relation(fields: [membershipSlotId], references: [id], onDelete: Cascade)

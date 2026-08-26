@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
+import { isDrawUnlocked } from "@/lib/tontine-engine";
 
 const bodySchema = z.object({ order: z.array(z.string().min(1)).min(1) });
 
@@ -21,6 +22,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   });
   if (!tontineSession) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  }
+  if (!isDrawUnlocked(tontineSession.startDate)) {
+    return NextResponse.json(
+      { error: "The draw unlocks 24 hours before the cotisation's start date" },
+      { status: 403 },
+    );
   }
 
   const existingIds = new Set(tontineSession.memberships.flatMap((m) => m.slots.map((s) => s.id)));

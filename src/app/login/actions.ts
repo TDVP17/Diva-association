@@ -33,7 +33,17 @@ export async function signInAction(
   }
 
   try {
-    await signIn("email-password", { email, password, redirectTo: callbackUrl });
+    // The login form's callbackUrl defaults to the member dashboard, with no
+    // way to know in advance whether the signing-in account is an admin —
+    // admins never have a member dashboard to land on, so redirect them
+    // straight to /admin instead, unless a specific non-default page was
+    // being requested (e.g. a deep link that bounced through /login).
+    let redirectTo = callbackUrl;
+    if (callbackUrl === "/dashboard") {
+      const target = await prisma.user.findUnique({ where: { email }, select: { role: true } });
+      if (target?.role === "ADMIN") redirectTo = "/admin";
+    }
+    await signIn("email-password", { email, password, redirectTo });
     return {};
   } catch (err) {
     if (isRedirectSignal(err)) throw err; // successful sign-in — let the redirect happen

@@ -112,8 +112,10 @@ async function main() {
       limitTime: "18:30",
     },
   });
+  // Admin is the platform owner/manager only — never a member or
+  // beneficiary in any cotisation, so it's deliberately excluded here.
   await Promise.all(
-    [admin, ...members].map((user, index) =>
+    members.map((user, index) =>
       prisma.membership.create({
         data: {
           userId: user.id,
@@ -141,7 +143,7 @@ async function main() {
     },
   });
   await Promise.all(
-    [admin, ...members].map((user) =>
+    members.map((user) =>
       prisma.membership.create({
         data: {
           userId: user.id,

@@ -7,25 +7,27 @@ export async function GET(request: Request) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const url = new URL(request.url);
-  const tontineSessionId = url.searchParams.get("tontineSessionId");
-  const membershipSlotId = url.searchParams.get("membershipSlotId");
-  if (!tontineSessionId || !membershipSlotId) {
-    return NextResponse.json({ error: "Missing query params" }, { status: 400 });
+  const payoutClaimId = new URL(request.url).searchParams.get("payoutClaimId");
+  if (!payoutClaimId) {
+    return NextResponse.json({ error: "Missing payoutClaimId" }, { status: 400 });
   }
 
-  const [tontineSession, slot] = await Promise.all([
-    prisma.tontineSession.findUnique({ where: { id: tontineSessionId } }),
-    prisma.membershipSlot.findUnique({
-      where: { id: membershipSlotId },
-      include: { membership: { include: { user: true } } },
-    }),
-  ]);
-  if (!tontineSession || !slot || slot.membership.tontineSessionId !== tontineSessionId) {
-    return NextResponse.json({ error: "Session or slot not found" }, { status: 404 });
+  const claim = await prisma.payout.findUnique({
+    where: { id: payoutClaimId },
+    include: {
+      tontineSession: true,
+      membershipSlot: { include: { membership: { include: { user: true } } } },
+    },
+  });
+  if (!claim) {
+    return NextResponse.json({ error: "Payout claim not found" }, { status: 404 });
+  }
+  if (claim.status !== "DETAILS_SUBMITTED") {
+    return NextResponse.json({ error: "This payout has already been processed" }, { status: 409 });
   }
 
-  const preview = await computePayoutPreview(tontineSession, slot);
+  const slot = claim.membershipSlot;
+  const preview = await computePayoutPreview(claim.tontineSession, slot, claim.dueDate);
 
   return NextResponse.json({
     pot: preview.pot,
@@ -34,6 +36,7 @@ export async function GET(request: Request) {
     dueDate: preview.dueDate.toISOString(),
     beneficiaryName: slot.beneficiaryName,
     memberName: slot.membership.user.name,
-    memberPhone: slot.membership.user.payoutPhone ?? slot.membership.user.phone,
+    payoutPhone: claim.payoutPhone,
+    payoutAccountName: claim.payoutAccountName,
   });
 }

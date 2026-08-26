@@ -16,7 +16,10 @@ export default async function DrawPage({ params }: { params: Promise<{ id: strin
     include: {
       memberships: {
         where: { status: "APPROVED" },
-        select: { userId: true, slots: { select: { id: true, beneficiaryName: true, ballDrawn: true } } },
+        select: {
+          userId: true,
+          slots: { select: { id: true, beneficiaryName: true, ballDrawn: true, officialPosition: true } },
+        },
       },
     },
   });
@@ -28,6 +31,9 @@ export default async function DrawPage({ params }: { params: Promise<{ id: strin
   const allSlots = tontineSession.memberships.flatMap((m) => m.slots);
   const myDrawnSlots = myMembership.slots.filter((s) => s.ballDrawn !== null);
   const myUndrawnCount = myMembership.slots.length - myDrawnSlots.length;
+  const myUndrawnSlots = myMembership.slots.filter((s) => s.ballDrawn === null);
+  const positionsNotYetAssigned = myUndrawnSlots.some((s) => s.officialPosition === null);
+  const sessionOpenForDrawing = tontineSession.status === "DRAWING" || tontineSession.status === "ACTIVE";
 
   return (
     <main className="flex-grow flex flex-col items-center justify-center p-container-padding pb-32 min-h-[calc(100vh-64px)]">
@@ -47,8 +53,10 @@ export default async function DrawPage({ params }: { params: Promise<{ id: strin
             </div>
           ))}
         </div>
-      ) : tontineSession.status !== "DRAWING" ? (
+      ) : !sessionOpenForDrawing ? (
         <p className="font-body-md text-body-md text-on-surface-variant">{t("drawingNotOpen")}</p>
+      ) : positionsNotYetAssigned ? (
+        <p className="font-body-md text-body-md text-on-surface-variant">{t("positionsNotYetAssigned")}</p>
       ) : (
         <DrawBowl tontineSessionId={id} totalSlots={allSlots.length} lang={lang} />
       )}

@@ -10,6 +10,7 @@ import { InlineLocationField } from "./inline-location-field";
 import { InlinePasswordField } from "./inline-password-field";
 import { updatePhoneAction, updateEmailAction } from "./actions";
 import { InstallAppButton } from "@/components/install-app-button";
+import { AndroidApkButton } from "@/components/android-apk-button";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -189,6 +190,7 @@ export default async function ProfilePage() {
       <section className="mb-stack-gap-lg flex flex-col gap-stack-gap-sm">
         <InlinePasswordField lang={lang} />
         <InstallAppButton lang={lang} />
+        <AndroidApkButton lang={lang} />
         <Link
           href="/history"
           className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant hover:bg-surface-container-low transition-colors"

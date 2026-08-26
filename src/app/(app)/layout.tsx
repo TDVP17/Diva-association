@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { getLang } from "@/lib/i18n/get-lang";
 import { TopAppBar } from "@/components/top-app-bar";
 import { BottomNav } from "@/components/bottom-nav";
+import { IosInstallBanner } from "@/components/ios-install-banner";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -14,6 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <TopAppBar userName={session.user.name ?? "Member"} userImage={session.user.image ?? null} lang={lang} />
       <div className="flex-1 pb-24 md:pb-8">{children}</div>
       <BottomNav />
+      <IosInstallBanner lang={lang} />
     </div>
   );
 }

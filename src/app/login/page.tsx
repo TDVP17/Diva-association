@@ -59,7 +59,8 @@ export default async function LoginPage({
     role: u.role,
     signInAction: async () => {
       "use server";
-      await signIn("dev-login", { email: u.email, redirectTo: callbackUrl });
+      const redirectTo = callbackUrl === "/dashboard" && u.role === "ADMIN" ? "/admin" : callbackUrl;
+      await signIn("dev-login", { email: u.email, redirectTo });
     },
   }));
 

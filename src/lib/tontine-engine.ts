@@ -154,3 +154,15 @@ export function computeFine(type: TontineType, now: Date, cutoff: Date): number 
   const periodsLate = Math.ceil(hoursLate / fineIntervalHours);
   return periodsLate * fineAmountPerPeriod;
 }
+
+const DRAW_UNLOCK_LEAD_TIME_MS = 24 * 60 * 60 * 1000;
+
+/** The admin draw interface (starting the drawing phase, assigning positions) unlocks exactly 1 day before startDate. */
+export function isDrawUnlocked(startDate: Date, now: Date = new Date()): boolean {
+  return now.getTime() >= startDate.getTime() - DRAW_UNLOCK_LEAD_TIME_MS;
+}
+
+/** The instant the draw interface unlocks for a given session — used to show a countdown/"unlocks at" label. */
+export function getDrawUnlockTime(startDate: Date): Date {
+  return new Date(startDate.getTime() - DRAW_UNLOCK_LEAD_TIME_MS);
+}

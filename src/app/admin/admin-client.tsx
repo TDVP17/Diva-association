@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { isDrawUnlocked, getDrawUnlockTime } from "@/lib/tontine-engine";
 
 interface MembershipRequest {
   id: string;
@@ -55,6 +56,20 @@ interface Ledger {
   feeSplit: { president: number; winner: number } | null;
 }
 
+interface PayoutClaim {
+  id: string;
+  status: "DETAILS_SUBMITTED" | "RELEASED" | "CONFIRMED";
+  beneficiaryName: string;
+  memberName: string;
+  payoutPhone: string;
+  payoutAccountName: string;
+  netPayout: number | null;
+  detailsSubmittedAt: string;
+  releasedAt: string | null;
+  memberConfirmedAt: string | null;
+  confirmedByAdmin: boolean;
+}
+
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine",
   MONTHLY_28: "Monthly Tontine (28th)",
@@ -70,7 +85,8 @@ export function AdminClient({ lang }: { lang: Lang }) {
   const [ledger, setLedger] = useState<Ledger | null>(null);
   const [swapRequests, setSwapRequests] = useState<SwapRequestRow[]>([]);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [payoutSlotId, setPayoutSlotId] = useState<string>("");
+  const [payoutClaims, setPayoutClaims] = useState<PayoutClaim[]>([]);
+  const [reviewingClaimId, setReviewingClaimId] = useState<string | null>(null);
   const [payoutResult, setPayoutResult] = useState<string | null>(null);
   const [payoutPreview, setPayoutPreview] = useState<{
     pot: number;
@@ -78,9 +94,12 @@ export function AdminClient({ lang }: { lang: Lang }) {
     netPayout: number;
     beneficiaryName: string;
     memberName: string;
+    payoutPhone: string;
+    payoutAccountName: string;
   } | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [releasing, setReleasing] = useState(false);
+  const [confirmingOverrideId, setConfirmingOverrideId] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [startingDraw, setStartingDraw] = useState(false);
   const [contributionSlotId, setContributionSlotId] = useState<string>("");
@@ -139,6 +158,9 @@ export function AdminClient({ lang }: { lang: Lang }) {
     fetch(`/api/admin/sessions/${selectedSessionId}/ledger`)
       .then((r) => r.json())
       .then(setLedger);
+    fetch(`/api/admin/sessions/${selectedSessionId}/payout-claims`)
+      .then((r) => r.json())
+      .then((b) => setPayoutClaims(b.claims ?? []));
   }, [selectedSessionId]);
 
   useEffect(() => {
@@ -246,15 +268,19 @@ export function AdminClient({ lang }: { lang: Lang }) {
     await refreshSessions(selectedSessionId ?? undefined);
   }
 
-  async function loadPayoutPreview() {
-    if (!selectedSessionId || !payoutSlotId) return;
+  async function refreshPayoutClaims() {
+    if (!selectedSessionId) return;
+    const body = await fetch(`/api/admin/sessions/${selectedSessionId}/payout-claims`).then((r) => r.json());
+    setPayoutClaims(body.claims ?? []);
+  }
+
+  async function reviewClaim(claimId: string) {
+    setReviewingClaimId(claimId);
     setLoadingPreview(true);
     setPayoutResult(null);
     setPayoutPreview(null);
     try {
-      const res = await fetch(
-        `/api/admin/payouts/preview?tontineSessionId=${selectedSessionId}&membershipSlotId=${payoutSlotId}`,
-      );
+      const res = await fetch(`/api/admin/payouts/preview?payoutClaimId=${claimId}`);
       const body = await res.json();
       if (!res.ok) {
         setPayoutResult(body.error ?? t("failedToReleasePayout"));
@@ -267,14 +293,14 @@ export function AdminClient({ lang }: { lang: Lang }) {
   }
 
   async function confirmReleasePayout() {
-    if (!selectedSessionId || !payoutSlotId) return;
+    if (!reviewingClaimId) return;
     setReleasing(true);
     setPayoutResult(null);
     try {
       const res = await fetch("/api/admin/payouts/release", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tontineSessionId: selectedSessionId, membershipSlotId: payoutSlotId }),
+        body: JSON.stringify({ payoutClaimId: reviewingClaimId }),
       });
       const body = await res.json();
       if (!res.ok) {
@@ -289,10 +315,21 @@ export function AdminClient({ lang }: { lang: Lang }) {
         }),
       );
       setPayoutPreview(null);
-      setPayoutSlotId("");
+      setReviewingClaimId(null);
+      await refreshPayoutClaims();
       fetch(`/api/admin/sessions/${selectedSessionId}/ledger`).then((r) => r.json()).then(setLedger);
     } finally {
       setReleasing(false);
+    }
+  }
+
+  async function confirmOverride(claimId: string) {
+    setConfirmingOverrideId(claimId);
+    try {
+      const res = await fetch(`/api/admin/payouts/${claimId}/confirm-override`, { method: "POST" });
+      if (res.ok) await refreshPayoutClaims();
+    } finally {
+      setConfirmingOverrideId(null);
     }
   }
 
@@ -361,6 +398,15 @@ export function AdminClient({ lang }: { lang: Lang }) {
   }
 
   const selectedSession = sessions.find((s) => s.id === selectedSessionId) ?? null;
+  const drawUnlocked = selectedSession ? isDrawUnlocked(new Date(selectedSession.startDate)) : false;
+  const drawUnlocksAtLabel = selectedSession
+    ? getDrawUnlockTime(new Date(selectedSession.startDate)).toLocaleString("en-US", {
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
 
   return (
     <main className="px-container-padding pt-stack-gap-lg pb-32 max-w-4xl mx-auto w-full flex flex-col gap-section-margin">
@@ -482,10 +528,15 @@ export function AdminClient({ lang }: { lang: Lang }) {
           {selectedSession?.status === "DRAFT" && (
             <button
               onClick={startDrawingPhase}
-              disabled={startingDraw}
+              disabled={startingDraw || !drawUnlocked}
+              title={drawUnlocked ? undefined : t("drawUnlocksAt", { date: drawUnlocksAtLabel })}
               className="px-3 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 disabled:opacity-60"
             >
-              {startingDraw ? t("startingEllipsis") : t("startDrawingPhase")}
+              {startingDraw
+                ? t("startingEllipsis")
+                : drawUnlocked
+                  ? t("startDrawingPhase")
+                  : t("drawUnlocksAt", { date: drawUnlocksAtLabel })}
             </button>
           )}
         </div>
@@ -550,10 +601,15 @@ export function AdminClient({ lang }: { lang: Lang }) {
           </div>
           <button
             onClick={publishRanking}
-            disabled={publishing || order.length === 0}
+            disabled={publishing || order.length === 0 || !drawUnlocked}
+            title={drawUnlocked ? undefined : t("drawUnlocksAt", { date: drawUnlocksAtLabel })}
             className="w-full bg-primary text-on-primary font-label-md text-label-md py-3 rounded-lg hover:opacity-90 active:scale-95 transition-all shadow-sm mt-auto disabled:opacity-60"
           >
-            {publishing ? t("publishingEllipsis") : t("publishOfficialRanking")}
+            {publishing
+              ? t("publishingEllipsis")
+              : drawUnlocked
+                ? t("publishOfficialRanking")
+                : t("drawUnlocksAt", { date: drawUnlocksAtLabel })}
           </button>
         </section>
 
@@ -644,70 +700,96 @@ export function AdminClient({ lang }: { lang: Lang }) {
             )}
           </section>
 
-          {/* Payout release */}
+          {/* Payout requests */}
           {selectedSession && (
             <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4">
               <h3 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-4">
                 <span className="material-symbols-outlined">payments</span>
-                {t("releasePayout")}
+                {t("payoutRequests")}
               </h3>
-              <div className="flex gap-2 mb-3">
-                <select
-                  value={payoutSlotId}
-                  onChange={(e) => {
-                    setPayoutSlotId(e.target.value);
-                    setPayoutPreview(null);
-                  }}
-                  className="flex-1 border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
-                >
-                  <option value="">{t("selectBeneficiary")}</option>
-                  {selectedSession.slots.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.beneficiaryName} ({s.name})
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={loadPayoutPreview}
-                  disabled={!payoutSlotId || loadingPreview}
-                  className="bg-primary text-on-primary font-label-md text-label-md px-4 rounded-lg hover:opacity-90 disabled:opacity-50"
-                >
-                  {t("release")}
-                </button>
-              </div>
 
-              {payoutPreview && (
-                <div className="bg-surface-container-lowest rounded-lg p-3 mb-3 flex flex-col gap-2">
-                  <h4 className="font-label-md text-label-md text-on-surface">{t("payoutPreviewTitle")}</h4>
-                  <div className="flex justify-between">
-                    <span className="font-label-sm text-label-sm text-on-surface-variant">
-                      {t("beneficiaryOnFileLabel")}
-                    </span>
-                    <span className="font-label-md text-label-md text-on-surface">
-                      {payoutPreview.beneficiaryName} ({payoutPreview.memberName})
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="font-label-sm text-label-sm text-on-surface-variant">
-                      {t("amountToSendLabel")}
-                    </span>
-                    <span className="font-numeric-data text-numeric-data text-primary">
-                      {payoutPreview.netPayout.toLocaleString("en-US")} F
-                    </span>
-                  </div>
-                  <p className="font-label-sm text-label-sm text-error">{t("onFileNotVerifiedNote")}</p>
-                  <button
-                    onClick={confirmReleasePayout}
-                    disabled={releasing}
-                    className="w-full bg-primary text-on-primary font-label-md text-label-md py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50 mt-1"
-                  >
-                    {releasing ? t("recordingEllipsis") : t("confirmAndSend")}
-                  </button>
+              {payoutClaims.length === 0 ? (
+                <p className="font-label-sm text-label-sm text-on-surface-variant">{t("noPayoutRequests")}</p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {payoutClaims.map((c) => (
+                    <div key={c.id} className="bg-surface-container-lowest rounded-lg p-3 flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <div className="min-w-0">
+                          <p className="font-label-md text-label-md text-on-surface truncate">
+                            {c.beneficiaryName} ({c.memberName})
+                          </p>
+                          <p className="font-label-sm text-label-sm text-on-surface-variant truncate">
+                            {c.payoutAccountName} — {c.payoutPhone}
+                          </p>
+                        </div>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-md font-label-sm text-label-sm flex-shrink-0 ml-2 ${
+                            c.status === "CONFIRMED"
+                              ? "bg-[#d1fae5] text-[#065f46]"
+                              : "bg-secondary-container/40 text-on-secondary-container"
+                          }`}
+                        >
+                          {c.status}
+                        </span>
+                      </div>
+
+                      {c.status === "DETAILS_SUBMITTED" && reviewingClaimId !== c.id && (
+                        <button
+                          onClick={() => reviewClaim(c.id)}
+                          disabled={loadingPreview}
+                          className="bg-primary text-on-primary font-label-sm text-label-sm px-3 py-2 rounded-lg hover:opacity-90 disabled:opacity-50"
+                        >
+                          {t("reviewAndExecute")}
+                        </button>
+                      )}
+
+                      {c.status === "RELEASED" && (
+                        <button
+                          onClick={() => confirmOverride(c.id)}
+                          disabled={confirmingOverrideId === c.id}
+                          className="border border-outline-variant text-on-surface-variant font-label-sm text-label-sm px-3 py-2 rounded-lg hover:bg-surface disabled:opacity-50"
+                        >
+                          {t("markAsConfirmed")}
+                        </button>
+                      )}
+
+                      {reviewingClaimId === c.id && payoutPreview && (
+                        <div className="bg-white rounded-lg p-3 flex flex-col gap-2 border border-outline-variant">
+                          <h4 className="font-label-md text-label-md text-on-surface">{t("payoutPreviewTitle")}</h4>
+                          <div className="flex justify-between">
+                            <span className="font-label-sm text-label-sm text-on-surface-variant">
+                              {t("beneficiaryOnFileLabel")}
+                            </span>
+                            <span className="font-label-md text-label-md text-on-surface">
+                              {payoutPreview.beneficiaryName} ({payoutPreview.memberName})
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-label-sm text-label-sm text-on-surface-variant">
+                              {t("amountToSendLabel")}
+                            </span>
+                            <span className="font-numeric-data text-numeric-data text-primary">
+                              {payoutPreview.netPayout.toLocaleString("en-US")} F
+                            </span>
+                          </div>
+                          <p className="font-label-sm text-label-sm text-error">{t("onFileNotVerifiedNote")}</p>
+                          <button
+                            onClick={confirmReleasePayout}
+                            disabled={releasing}
+                            className="w-full bg-primary text-on-primary font-label-md text-label-md py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50 mt-1"
+                          >
+                            {releasing ? t("recordingEllipsis") : t("confirmAndSend")}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
 
               {payoutResult && (
-                <p className="font-label-sm text-label-sm text-on-surface-variant">{payoutResult}</p>
+                <p className="font-label-sm text-label-sm text-on-surface-variant mt-3">{payoutResult}</p>
               )}
             </section>
           )}
