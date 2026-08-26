@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { generateReceiptPdf } from "@/lib/receipt";
 import { saveFile } from "@/lib/storage";
 import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
+import { sendEmailSafe } from "@/lib/email/resend";
 import { paymentSuccessMessage } from "@/lib/whatsapp/templates";
 
 const TONTINE_LABELS: Record<string, string> = {
@@ -15,6 +16,7 @@ type ContributionWithSlot = Contribution & {
   membershipSlot: MembershipSlot & {
     membership: Membership & { user: User; tontineSession: TontineSession };
   };
+  paidByUser: User | null;
 };
 
 /**
@@ -31,8 +33,12 @@ export async function settleContribution(
   const { membership } = contribution.membershipSlot;
   const { user, tontineSession } = membership;
 
+  const paidByName = contribution.paidByUser?.name;
+
   const receiptBytes = await generateReceiptPdf({
     memberName: `${user.name} — ${contribution.membershipSlot.beneficiaryName}`,
+    paidByName,
+    paymentMethod: contribution.recordedByAdminId ? "Recorded by admin" : "Mobile Money (Fapshi)",
     tontineType: tontineSession.type,
     amount: Number(contribution.amountPaid),
     fee: Number(contribution.feePaid),
@@ -65,14 +71,72 @@ export async function settleContribution(
 
   const totalPaid =
     Number(contribution.amountPaid) + Number(contribution.feePaid) + Number(contribution.finePaid);
+  const sessionLabel = tontineSession.title || TONTINE_LABELS[tontineSession.type];
+  const receiptUrl = `${options.origin}/api/files/${receiptKey}`;
+
   await sendWhatsAppMessageSafe(
     user.phone,
     paymentSuccessMessage(
       user.preferredLang === "fr" ? "fr" : "en",
       `${user.name} (${contribution.membershipSlot.beneficiaryName})`,
       totalPaid,
-      tontineSession.title || TONTINE_LABELS[tontineSession.type],
-      `${options.origin}/api/files/${receiptKey}`,
+      sessionLabel,
+      receiptUrl,
     ),
   );
+
+  await sendEmailSafe(
+    user.email,
+    `Payment received — ${sessionLabel}`,
+    paymentSuccessEmailHtml({
+      recipientName: user.name,
+      beneficiaryName: contribution.membershipSlot.beneficiaryName,
+      paidByName,
+      sessionLabel,
+      amount: totalPaid,
+      transRef: contribution.fapshiTxRef ?? contribution.id,
+      receiptUrl,
+    }),
+  );
+
+  // The payer gets their own confirmation too, when they aren't the
+  // beneficiary themselves (relative/friend paying via their own code).
+  if (contribution.paidByUser && contribution.paidByUser.id !== user.id) {
+    await sendEmailSafe(
+      contribution.paidByUser.email,
+      `Payment sent — ${sessionLabel}`,
+      paymentSuccessEmailHtml({
+        recipientName: contribution.paidByUser.name,
+        beneficiaryName: contribution.membershipSlot.beneficiaryName,
+        paidByName: contribution.paidByUser.name,
+        sessionLabel,
+        amount: totalPaid,
+        transRef: contribution.fapshiTxRef ?? contribution.id,
+        receiptUrl,
+      }),
+    );
+  }
+}
+
+function paymentSuccessEmailHtml(data: {
+  recipientName: string;
+  beneficiaryName: string;
+  paidByName?: string;
+  sessionLabel: string;
+  amount: number;
+  transRef: string;
+  receiptUrl: string;
+}): string {
+  const paidByLine = data.paidByName ? `<p><strong>Paid by:</strong> ${data.paidByName}</p>` : "";
+  return `
+    <p>Hello ${data.recipientName},</p>
+    <p>🎉 Your contribution has been received successfully.</p>
+    <p><strong>Contributed for:</strong> ${data.beneficiaryName}</p>
+    ${paidByLine}
+    <p><strong>Contribution:</strong> ${data.sessionLabel}</p>
+    <p><strong>Amount:</strong> ${data.amount.toLocaleString("en-US")} F</p>
+    <p><strong>Transaction ID:</strong> ${data.transRef}</p>
+    <p><a href="${data.receiptUrl}">Download your PDF receipt</a></p>
+    <p>Thank you for your contribution to the community fund.</p>
+  `;
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
+import { logAudit } from "@/lib/audit";
 
 export async function GET() {
   const admin = await requireAdmin();
@@ -89,6 +90,13 @@ export async function POST(request: Request) {
   try {
     const tontineSession = await prisma.tontineSession.create({
       data: { ...parsed.data, status: "DRAFT" },
+    });
+    await logAudit({
+      actorId: admin.user.id,
+      action: "contribution_created",
+      targetType: "TontineSession",
+      targetId: tontineSession.id,
+      tontineSessionId: tontineSession.id,
     });
     return NextResponse.json({ id: tontineSession.id });
   } catch (err) {

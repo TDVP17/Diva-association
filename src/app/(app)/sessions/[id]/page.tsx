@@ -10,6 +10,7 @@ import { VerificationPollingRefresh } from "./verification-status";
 import { SelectSlotsForm } from "./select-slots-form";
 import { PayoutOrderModal } from "./payout-order-modal";
 import { PayoutTurnPanel } from "./payout-turn-panel";
+import { PaymentSuccessBanner } from "./payment-success-banner";
 import { getDesignatedSlot } from "@/lib/round-robin-lock";
 
 const TONTINE_LABELS: Record<string, string> = {
@@ -18,12 +19,40 @@ const TONTINE_LABELS: Record<string, string> = {
   MONTHLY_25: "Monthly Tontine (25th)",
 };
 
+/**
+ * Loads a PAID contribution for the post-payment success banner, scoped to
+ * whoever is allowed to see it — the beneficiary's own membership owner or
+ * (for relative/admin payments) the payer themselves. Never trusts a
+ * ?payment= id alone; always re-derives from the trusted DB row rather than
+ * anything the redirect URL implies, so it can't be spoofed to view someone
+ * else's transaction.
+ */
+async function loadPaidContribution(contributionId: string, requestingUserId: string) {
+  const contribution = await prisma.contribution.findUnique({
+    where: { id: contributionId },
+    include: {
+      membershipSlot: { include: { membership: { include: { user: true, tontineSession: true } } } },
+      paidByUser: true,
+    },
+  });
+  if (!contribution || contribution.status !== "PAID") return null;
+
+  const beneficiaryOwnerId = contribution.membershipSlot.membership.userId;
+  const payerId = contribution.paidByUserId ?? beneficiaryOwnerId;
+  if (requestingUserId !== beneficiaryOwnerId && requestingUserId !== payerId) return null;
+
+  return contribution;
+}
+
 export default async function SessionDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ payment?: string }>;
 }) {
   const { id } = await params;
+  const { payment: paymentId } = await searchParams;
   const session = await auth();
   const userId = session!.user.id;
   const lang = await getLang();
@@ -192,8 +221,39 @@ export default async function SessionDetailPage({
     orderBy: { detailsSubmittedAt: "desc" },
   });
 
+  // Only render for the paid contribution's own payer or beneficiary — a
+  // guessed ?payment= id from someone else must never leak amounts/names.
+  let paidContribution: Awaited<ReturnType<typeof loadPaidContribution>> = null;
+  if (paymentId) {
+    paidContribution = await loadPaidContribution(paymentId, userId);
+  }
+
   return (
     <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto pb-32">
+      {paidContribution && (
+        <PaymentSuccessBanner
+          lang={lang}
+          beneficiaryName={`${paidContribution.membershipSlot.membership.user.name} — ${paidContribution.membershipSlot.beneficiaryName}`}
+          sessionLabel={sessionLabel}
+          amount={
+            Number(paidContribution.amountPaid) + Number(paidContribution.feePaid) + Number(paidContribution.finePaid)
+          }
+          paidByName={paidContribution.paidByUser?.name ?? paidContribution.membershipSlot.membership.user.name}
+          date={(paidContribution.paidAt ?? paidContribution.dueDate).toLocaleDateString("en-GB", {
+            timeZone: "Africa/Douala",
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          })}
+          time={(paidContribution.paidAt ?? paidContribution.dueDate).toLocaleTimeString("en-GB", {
+            timeZone: "Africa/Douala",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+          transRef={paidContribution.fapshiTxRef ?? paidContribution.id}
+          receiptUrl={paidContribution.receiptPdfUrl ? `/api/files/${paidContribution.receiptPdfUrl}` : null}
+        />
+      )}
       <section className="mb-stack-gap-lg bg-surface rounded-xl p-5 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant">
         <div className="flex justify-between items-start mb-4">
           <div>

@@ -17,6 +17,7 @@ export type InitiateSlotPaymentResult =
 export async function initiateSlotPayment(
   membershipSlotId: string,
   origin: string,
+  options?: { paidByUserId?: string },
 ): Promise<InitiateSlotPaymentResult> {
   const slot = await prisma.membershipSlot.findUnique({
     where: { id: membershipSlotId },
@@ -71,11 +72,13 @@ export async function initiateSlotPayment(
       feePaid: fee,
       finePaid: fineAmount,
       status: "PENDING",
+      paidByUserId: options?.paidByUserId,
     },
     update: {
       amountPaid: amount,
       feePaid: fee,
       finePaid: fineAmount,
+      paidByUserId: options?.paidByUserId,
     },
   });
 

@@ -17,6 +17,7 @@ interface Row {
   status: string;
   sessionLabel: string;
   beneficiaryName: string;
+  paidByName: string | null;
 }
 
 const STATUS_CLASS: Record<string, string> = {
@@ -35,7 +36,7 @@ export default async function HistoryPage() {
   const slots = await prisma.membershipSlot.findMany({
     where: { membership: { userId: session.user.id } },
     include: {
-      contributions: { orderBy: { dueDate: "desc" } },
+      contributions: { orderBy: { dueDate: "desc" }, include: { paidByUser: { select: { name: true } } } },
       fines: { orderBy: { dueDate: "desc" } },
       membership: { include: { tontineSession: true } },
     },
@@ -54,6 +55,7 @@ export default async function HistoryPage() {
         status: c.status,
         sessionLabel,
         beneficiaryName: slot.beneficiaryName,
+        paidByName: c.paidByUser?.name ?? null,
       });
     }
     for (const f of slot.fines) {
@@ -65,6 +67,7 @@ export default async function HistoryPage() {
         status: f.status,
         sessionLabel,
         beneficiaryName: slot.beneficiaryName,
+        paidByName: null,
       });
     }
   }
@@ -91,6 +94,7 @@ export default async function HistoryPage() {
                 </p>
                 <p className="font-label-sm text-label-sm text-on-surface-variant">
                   {r.beneficiaryName} · {r.dueDate.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
+                  {r.paidByName && ` · ${t("paidByLabel")} ${r.paidByName}`}
                 </p>
               </div>
               <div className="text-right flex-shrink-0 ml-3">

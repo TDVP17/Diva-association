@@ -24,7 +24,10 @@ export async function POST(request: Request) {
 
   const contribution = await prisma.contribution.findUnique({
     where: { fapshiTxRef: transId },
-    include: { membershipSlot: { include: { membership: { include: { user: true, tontineSession: true } } } } },
+    include: {
+      membershipSlot: { include: { membership: { include: { user: true, tontineSession: true } } } },
+      paidByUser: true,
+    },
   });
   if (!contribution) {
     return NextResponse.json({ error: "Unknown transaction" }, { status: 404 });

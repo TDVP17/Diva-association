@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
+import { ensureMemberCode } from "@/lib/member-code";
+import { logAudit } from "@/lib/audit";
 
 const bodySchema = z.object({ action: z.enum(["approve", "reject"]) });
 
@@ -28,6 +30,19 @@ export async function POST(
     const membership = await prisma.membership.update({
       where: { id: membershipId },
       data: { status: parsed.data.action === "approve" ? "APPROVED" : "REJECTED" },
+    });
+
+    if (parsed.data.action === "approve") {
+      await ensureMemberCode(membership.userId);
+    }
+
+    await logAudit({
+      actorId: admin.user.id,
+      action: parsed.data.action === "approve" ? "member_approved" : "member_rejected",
+      targetType: "Membership",
+      targetId: membership.id,
+      tontineSessionId: membership.tontineSessionId,
+      metadata: { userId: membership.userId },
     });
 
     return NextResponse.json({ id: membership.id, status: membership.status });

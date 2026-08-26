@@ -71,6 +71,28 @@ enum NotificationType {
   FINE_NOTICE
 }
 
+enum NotificationChannel {
+  EMAIL
+  WHATSAPP
+  IN_APP
+}
+
+enum NotificationEventType {
+  CONTRIBUTION_REMINDER
+  FINE_REMINDER
+  FOOD_TURN
+  PAYMENT_SUCCESS
+  ADMIN_BROADCAST
+}
+
+enum NotificationStatus {
+  PENDING
+  SCHEDULED
+  PROCESSING
+  SENT
+  FAILED
+}
+
 enum OtpPurpose {
   EMAIL_CHANGE
   PHONE_CHANGE
@@ -105,17 +127,26 @@ model User {
   preferredLang        String?
   /// Throttles the support-chat auto-reply bot to once per rolling 30 days.
   lastAdminAutoReplyAt DateTime?
+  /// Generated once, the first time any of this user's memberships is
+  /// approved (see src/lib/member-code.ts). Stable across every
+  /// contribution the user is part of; admin can regenerate it. Lets a
+  /// relative/friend look the member up via "Contribute for a Relative"
+  /// without exposing email/phone. Null until their first approval.
+  memberCode           String?   @unique
   createdAt            DateTime  @default(now())
 
   accounts                     Account[]
   sessions                     Session[]
   memberships                  Membership[]
   contributionsRecordedAsAdmin Contribution[]        @relation("ContributionRecordedByAdmin")
+  paymentsMadeForOthers        Contribution[]        @relation("ContributionPaidBy")
   swapRequestsMade             PositionSwapRequest[] @relation("SwapRequester")
   swapRequestsReceived         PositionSwapRequest[] @relation("SwapTarget")
   messagesSent                 ChatMessage[]         @relation("MessageSender")
   messagesReceived             ChatMessage[]         @relation("MessageReceiver")
   notificationLogs             NotificationLog[]
+  notifications                Notification[]
+  auditLogs                    AuditLog[]
   kycVerifications             KycVerification[]
   otpChallenges                OtpChallenge[]
   payoutsReleasedAsAdmin       Payout[]              @relation("PayoutReleasedByAdmin")
@@ -251,6 +282,8 @@ model TontineSession {
   memberships      Membership[]
   swapRequests     PositionSwapRequest[]
   notificationLogs NotificationLog[]
+  notifications    Notification[]
+  auditLogs        AuditLog[]
   kycVerifications KycVerification[]
   payouts          Payout[]
 
@@ -305,6 +338,7 @@ model MembershipSlot {
   contributions Contribution[]
   fines         Fine[]
   payouts       Payout[]
+  foodTurnLogs  FoodTurnLog[]
 
   @@map("membership_slots")
 }
@@ -399,9 +433,16 @@ model Contribution {
   /// Set only when an admin records this contribution manually (off-platform
   /// payment) rather than it being confirmed via the Fapshi webhook.
   recordedByAdminId String?
+  /// Who physically paid — distinct from the slot's owning member. Null
+  /// means self-paid by the slot's own member (the historical default).
+  /// Set when a relative/friend pays via the "Contribute for a Relative"
+  /// flow. Independent of recordedByAdminId, which tracks admin manual
+  /// entries specifically.
+  paidByUserId      String?
 
   membershipSlot  MembershipSlot @relation(fields: [membershipSlotId], references: [id], onDelete: Cascade)
   recordedByAdmin User?          @relation("ContributionRecordedByAdmin", fields: [recordedByAdminId], references: [id])
+  paidByUser      User?          @relation("ContributionPaidBy", fields: [paidByUserId], references: [id])
 
   @@unique([membershipSlotId, dueDate])
   @@map("contributions")
@@ -470,4 +511,74 @@ model NotificationLog {
 
   @@unique([userId, tontineSessionId, dueDate, type])
   @@map("notification_logs")
+}
+
+/// Unified admin-triggered / in-app notification queue. Distinct from
+/// NotificationLog above (which the 3 existing daily WhatsApp crons keep
+/// using untouched, as a proven idempotency ledger) — this model is the new
+/// system for anything admin-triggered (reminders, broadcasts) or shown to
+/// a user in-app, with a real pending/scheduled/sent/failed lifecycle so
+/// bulk sends can be staggered and survive the admin closing their browser.
+model Notification {
+  id               String                @id @default(cuid())
+  tontineSessionId String?
+  userId           String
+  membershipSlotId String?
+  channel          NotificationChannel
+  type             NotificationEventType
+  message          String                @db.Text
+  status           NotificationStatus    @default(PENDING)
+  scheduledAt      DateTime              @default(now())
+  sentAt           DateTime?
+  retryCount       Int                   @default(0)
+  errorMessage     String?
+  /// Set when the recipient opens/dismisses this in their "My
+  /// Notifications" feed. Irrelevant for EMAIL/WHATSAPP rows.
+  readAt           DateTime?
+  createdAt        DateTime              @default(now())
+
+  tontineSession TontineSession? @relation(fields: [tontineSessionId], references: [id], onDelete: Cascade)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([tontineSessionId, status])
+  @@index([status, scheduledAt])
+  @@map("notifications")
+}
+
+/// Idempotency for the automatic "it's your food/payout turn" cron —
+/// mirrors NotificationLog's unique-constraint trick so the same slot never
+/// gets the fun reveal message twice for the same cycle.
+model FoodTurnLog {
+  id               String   @id @default(cuid())
+  membershipSlotId String
+  dueDate          DateTime
+  sentAt           DateTime @default(now())
+
+  membershipSlot MembershipSlot @relation(fields: [membershipSlotId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipSlotId, dueDate])
+  @@map("food_turn_logs")
+}
+
+/// Append-only trail of important admin/member actions. actorId is
+/// nullable (not onDelete: Cascade) so deleting a user account never wipes
+/// the historical record of what they did — see logAudit() in
+/// src/lib/audit.ts, called fire-and-forget from every sensitive route.
+model AuditLog {
+  id               String   @id @default(cuid())
+  actorId          String?
+  action           String
+  targetType       String
+  targetId         String?
+  tontineSessionId String?
+  metadata         Json?
+  createdAt        DateTime @default(now())
+
+  actor          User?           @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  tontineSession TontineSession? @relation(fields: [tontineSessionId], references: [id], onDelete: SetNull)
+
+  @@index([tontineSessionId, createdAt])
+  @@index([actorId, createdAt])
+  @@map("audit_logs")
 }

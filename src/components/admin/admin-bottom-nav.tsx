@@ -6,6 +6,7 @@ import { translate, type Lang } from "@/lib/i18n/translations";
 
 const ITEMS = [
   { href: "/admin", label: "adminNavDashboard", icon: "space_dashboard" },
+  { href: "/admin/notifications", label: "adminNavNotifications", icon: "notifications" },
   { href: "/admin/support", label: "adminNavSupport", icon: "support_agent" },
   { href: "/admin/analytics", label: "adminNavAnalytics", icon: "monitoring" },
   { href: "/admin/settings", label: "adminNavSettings", icon: "settings" },
@@ -25,8 +26,8 @@ export function AdminBottomNav({ lang }: { lang: Lang }) {
             href={item.href}
             className={
               active
-                ? "flex flex-col items-center justify-center text-primary font-bold w-1/4 h-full transition-colors active:scale-90 duration-200"
-                : "flex flex-col items-center justify-center text-on-surface-variant w-1/4 h-full hover:bg-surface-container-low transition-colors active:scale-90 duration-200"
+                ? "flex flex-col items-center justify-center text-primary font-bold flex-1 h-full transition-colors active:scale-90 duration-200"
+                : "flex flex-col items-center justify-center text-on-surface-variant flex-1 h-full hover:bg-surface-container-low transition-colors active:scale-90 duration-200"
             }
           >
             <span

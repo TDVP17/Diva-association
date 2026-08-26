@@ -2,13 +2,17 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
-import { sendEmailSafe } from "@/lib/email/resend";
+import { scheduleNotifications } from "@/lib/notifications/dispatch";
+import { logAudit } from "@/lib/audit";
 
 const bodySchema = z.object({
   subject: z.string().trim().min(1).max(200),
   body: z.string().trim().min(1).max(5000),
 });
 
+// Routes through the Notification queue (5-minute stagger, survives the
+// admin closing their browser) instead of a synchronous send loop — same
+// recipient selection as before, just non-blocking and tracked now.
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -21,26 +25,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const memberships = await prisma.membership.findMany({
     where: { tontineSessionId, status: "APPROVED" },
-    select: { user: { select: { email: true } } },
+    select: { userId: true },
+    distinct: ["userId"],
   });
 
-  const html = parsed.data.body
-    .split("\n")
-    .map((line) => `<p>${escapeHtml(line)}</p>`)
-    .join("");
+  const scheduled = await scheduleNotifications({
+    tontineSessionId,
+    channel: "EMAIL",
+    type: "ADMIN_BROADCAST",
+    recipients: memberships.map((m) => ({ userId: m.userId, message: `${parsed.data.subject}\n\n${parsed.data.body}` })),
+  });
 
-  let sent = 0;
-  for (const m of memberships) {
-    await sendEmailSafe(m.user.email, parsed.data.subject, html);
-    sent += 1;
-  }
+  await logAudit({
+    actorId: admin.user.id,
+    action: "admin_broadcast_scheduled",
+    targetType: "TontineSession",
+    targetId: tontineSessionId,
+    tontineSessionId,
+    metadata: { subject: parsed.data.subject, count: scheduled },
+  });
 
-  return NextResponse.json({ sent, skipped: 0 });
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  return NextResponse.json({ scheduled });
 }

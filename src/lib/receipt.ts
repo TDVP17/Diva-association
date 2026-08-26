@@ -1,3 +1,5 @@
+import { readFile } from "fs/promises";
+import path from "path";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { TontineType } from "@/generated/prisma/enums";
 
@@ -7,12 +9,19 @@ const TONTINE_LABELS: Record<TontineType, string> = {
   MONTHLY_25: "Monthly Tontine (25th)",
 };
 
+const ASSOCIATION_EMAIL = "divaassociation17@gmail.com";
+
 function formatXAF(amount: number): string {
   return `${amount.toLocaleString("en-US")} F`;
 }
 
 export interface ReceiptData {
+  /// The beneficiary — whose contribution this credits.
   memberName: string;
+  /// Who physically paid, only set when it differs from the beneficiary
+  /// (admin manual entry or a relative/friend paying via their own code).
+  paidByName?: string;
+  paymentMethod?: string;
   tontineType: TontineType;
   amount: number;
   fee: number;
@@ -24,7 +33,7 @@ export interface ReceiptData {
 
 export async function generateReceiptPdf(data: ReceiptData): Promise<Buffer> {
   const doc = await PDFDocument.create();
-  const page = doc.addPage([420, 560]);
+  const page = doc.addPage([420, 620]);
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
 
@@ -32,13 +41,24 @@ export async function generateReceiptPdf(data: ReceiptData): Promise<Buffer> {
   const muted = rgb(0.42, 0.5, 0.46);
   const dark = rgb(0.1, 0.11, 0.11);
 
-  let y = 500;
+  let y = 560;
   const left = 40;
 
-  page.drawText("DIVA Associations", { x: left, y, size: 20, font: bold, color: primary });
-  y -= 20;
-  page.drawText("Payment Receipt", { x: left, y, size: 12, font, color: muted });
-  y -= 40;
+  try {
+    const logoBytes = await readFile(path.join(process.cwd(), "public", "icons", "icon-512.png"));
+    const logoImage = await doc.embedPng(logoBytes);
+    const logoSize = 36;
+    page.drawImage(logoImage, { x: left, y: y - logoSize + 8, width: logoSize, height: logoSize });
+    page.drawText("DIVA Associations", { x: left + logoSize + 10, y, size: 20, font: bold, color: primary });
+    page.drawText("Payment Receipt", { x: left + logoSize + 10, y: y - 20, size: 12, font, color: muted });
+  } catch {
+    // Logo optional — the receipt is still valid without it.
+    page.drawText("DIVA Associations", { x: left, y, size: 20, font: bold, color: primary });
+    page.drawText("Payment Receipt", { x: left, y: y - 20, size: 12, font, color: muted });
+  }
+  y -= 44;
+  page.drawText(ASSOCIATION_EMAIL, { x: left, y, size: 9, font, color: muted });
+  y -= 26;
 
   page.drawLine({
     start: { x: left, y },
@@ -64,10 +84,15 @@ export async function generateReceiptPdf(data: ReceiptData): Promise<Buffer> {
     y -= 26;
   };
 
-  row("Member", data.memberName);
+  row("Beneficiary", data.memberName);
+  if (data.paidByName && data.paidByName !== data.memberName) {
+    row("Paid by", data.paidByName);
+  }
   row("Tontine", TONTINE_LABELS[data.tontineType]);
+  row("Payment method", data.paymentMethod ?? "Mobile Money (Fapshi)");
   row("Date", data.paidAt.toLocaleString("en-GB", { timeZone: "Africa/Douala" }));
   row("Transaction Ref", data.transRef);
+  row("Status", "Successful");
   y -= 10;
 
   page.drawLine({

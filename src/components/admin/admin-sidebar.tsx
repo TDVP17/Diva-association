@@ -6,6 +6,7 @@ import { translate, type Lang } from "@/lib/i18n/translations";
 
 const ITEMS = [
   { href: "/admin", label: "adminNavDashboard", icon: "space_dashboard" },
+  { href: "/admin/notifications", label: "adminNavNotifications", icon: "notifications" },
   { href: "/admin/support", label: "adminNavSupport", icon: "support_agent" },
   { href: "/admin/analytics", label: "adminNavAnalytics", icon: "monitoring" },
   { href: "/admin/settings", label: "adminNavSettings", icon: "settings" },

@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/require-admin";
 import { computePayoutPreview } from "@/lib/payout-preview";
 import { sendPayout, FapshiPayoutError } from "@/lib/fapshi-payout";
 import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
+import { logAudit } from "@/lib/audit";
 
 const bodySchema = z.object({ payoutClaimId: z.string().min(1) });
 
@@ -83,6 +84,15 @@ export async function POST(request: Request) {
       (deducted > 0 ? ` after deducting ${deducted.toLocaleString("en-US")} F in outstanding fines.` : `.`) +
       ` Confirm on the app once you've received it.`,
   );
+
+  await logAudit({
+    actorId: admin.user.id,
+    action: "payout_released",
+    targetType: "Payout",
+    targetId: payoutClaimId,
+    tontineSessionId: claim.tontineSessionId,
+    metadata: { netPayout, deducted, membershipSlotId: slot.id },
+  });
 
   return NextResponse.json({ pot, deducted, netPayout, dueDate: claim.dueDate.toISOString() });
 }

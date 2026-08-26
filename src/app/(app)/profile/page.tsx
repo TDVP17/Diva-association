@@ -11,6 +11,7 @@ import { InlinePasswordField } from "./inline-password-field";
 import { updatePhoneAction, updateEmailAction } from "./actions";
 import { InstallAppButton } from "@/components/install-app-button";
 import { AndroidApkButton } from "@/components/android-apk-button";
+import { MemberCodeCard } from "./member-code-card";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -35,7 +36,7 @@ export default async function ProfilePage() {
     REJECTED: t("membershipStatusRejected"),
   };
 
-  const [user, memberships] = await Promise.all([
+  const [user, memberships, unreadNotifications, unpaidFinesAgg] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
       select: {
@@ -47,6 +48,7 @@ export default async function ProfilePage() {
         city: true,
         neighborhood: true,
         sponsorCode: true,
+        memberCode: true,
         role: true,
       },
     }),
@@ -55,7 +57,16 @@ export default async function ProfilePage() {
       include: { tontineSession: true, slots: true },
       orderBy: { joinedAt: "desc" },
     }),
+    prisma.notification.count({
+      where: { userId: session.user.id, status: { in: ["SENT", "FAILED"] }, readAt: null },
+    }),
+    prisma.fine.aggregate({
+      where: { membershipSlot: { membership: { userId: session.user.id } }, status: "UNPAID" },
+      _sum: { amount: true },
+      _count: true,
+    }),
   ]);
+  const unpaidFinesTotal = Number(unpaidFinesAgg._sum.amount ?? 0);
 
   if (!user) {
     return (
@@ -97,6 +108,18 @@ export default async function ProfilePage() {
       <div className="flex flex-col items-center mb-stack-gap-lg">
         <AvatarUpload currentAvatarUrl={user.avatar ?? user.image} userName={user.name} lang={lang} />
         <h1 className="font-title-md text-title-md text-primary mt-3">{user.name}</h1>
+      </div>
+
+      <div className="mb-stack-gap-lg flex flex-col gap-stack-gap-sm">
+        <MemberCodeCard code={user.memberCode} lang={lang} />
+        {unpaidFinesTotal > 0 && (
+          <div className="w-full bg-error-container/40 border border-error/30 rounded-xl p-4 flex items-center gap-3">
+            <span className="material-symbols-outlined text-error">warning</span>
+            <p className="font-label-sm text-label-sm text-on-error-container">
+              {t("unpaidFinesWarning", { amount: unpaidFinesTotal.toLocaleString("en-US") })}
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant overflow-hidden mb-stack-gap-lg">
@@ -191,6 +214,31 @@ export default async function ProfilePage() {
         <InlinePasswordField lang={lang} />
         <InstallAppButton lang={lang} />
         <AndroidApkButton lang={lang} />
+        <Link
+          href="/contribute-for-relative"
+          className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant hover:bg-surface-container-low transition-colors"
+        >
+          <span className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-primary">volunteer_activism</span>
+            <span className="font-label-md text-label-md text-on-surface">{t("contributeForRelativeNav")}</span>
+          </span>
+          <span className="material-symbols-outlined text-outline">chevron_right</span>
+        </Link>
+        <Link
+          href="/notifications"
+          className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant hover:bg-surface-container-low transition-colors"
+        >
+          <span className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-primary">notifications</span>
+            <span className="font-label-md text-label-md text-on-surface">{t("myNotificationsNav")}</span>
+            {unreadNotifications > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-error text-on-error font-label-sm text-label-sm">
+                {unreadNotifications}
+              </span>
+            )}
+          </span>
+          <span className="material-symbols-outlined text-outline">chevron_right</span>
+        </Link>
         <Link
           href="/history"
           className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant hover:bg-surface-container-low transition-colors"

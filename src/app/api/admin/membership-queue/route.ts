@@ -2,13 +2,15 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
 
-export async function GET() {
+export async function GET(request: Request) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const tontineSessionId = new URL(request.url).searchParams.get("tontineSessionId") ?? undefined;
+
   try {
     const memberships = await prisma.membership.findMany({
-      where: { status: "PENDING" },
+      where: { status: "PENDING", ...(tontineSessionId ? { tontineSessionId } : {}) },
       select: {
         id: true,
         joinedAt: true,
