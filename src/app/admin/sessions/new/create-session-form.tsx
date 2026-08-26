@@ -6,9 +6,11 @@ import { TONTINE_CONFIG } from "@/lib/tontine-engine";
 import { translate, type Lang } from "@/lib/i18n/translations";
 
 const TONTINE_LABELS: Record<string, string> = {
-  HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
-  MONTHLY_28: "Monthly Tontine (28th)",
-  MONTHLY_25: "Monthly Tontine (25th)",
+  HEBDO_SUNDAY: "Weekly (every Sunday)",
+  MONTHLY_28: "Monthly (28th)",
+  MONTHLY_25: "Monthly (25th)",
+  BIWEEKLY_SUNDAY: "Every 2 weeks (Sunday)",
+  QUARTERLY_25: "Every 3 months (25th)",
 };
 
 type TontineTypeKey = keyof typeof TONTINE_CONFIG;

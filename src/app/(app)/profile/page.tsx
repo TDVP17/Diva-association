@@ -260,20 +260,6 @@ export default async function ProfilePage() {
           <span className="material-symbols-outlined text-outline">chevron_right</span>
         </Link>
       </section>
-
-      <form
-        action={async () => {
-          "use server";
-          await signOut({ redirectTo: "/login" });
-        }}
-      >
-        <button
-          type="submit"
-          className="w-full py-3 rounded-lg border-2 border-error text-error font-label-md text-label-md hover:bg-error/5 active:scale-95 transition-all"
-        >
-          {t("signOut")}
-        </button>
-      </form>
     </main>
   );
 }

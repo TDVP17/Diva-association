@@ -18,6 +18,8 @@ const TYPE_KEY: Record<string, Parameters<typeof translate>[1]> = {
   FOOD_TURN: "notifTypeFoodTurn",
   PAYMENT_SUCCESS: "notifTypePaymentSuccess",
   ADMIN_BROADCAST: "notifTypeAdminBroadcast",
+  MEMBER_APPROVED: "notifTypeMemberApproved",
+  MEMBER_REJECTED: "notifTypeMemberRejected",
 };
 
 export function NotificationsClient({ lang }: { lang: Lang }) {

@@ -39,6 +39,8 @@ const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine",
   MONTHLY_28: "Monthly Tontine (28th)",
   MONTHLY_25: "Monthly Tontine (25th)",
+  BIWEEKLY_SUNDAY: "Every 2 Weeks",
+  QUARTERLY_25: "Every 3 Months",
 };
 
 export function AdminDashboardClient({ lang }: { lang: Lang }) {
@@ -60,11 +62,16 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
   }, []);
 
   async function decideMembership(request: MembershipRequest, action: "approve" | "reject") {
+    let reason: string | null = null;
+    if (action === "reject") {
+      reason = window.prompt(t("rejectionReasonLabel"), "");
+      if (reason === null) return; // admin cancelled the prompt
+    }
     setMembershipQueue((q) => q.filter((m) => m.id !== request.id));
     const res = await fetch(`/api/admin/membership/${request.id}/decide`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ action, reason: reason || undefined }),
     });
     if (!res.ok) {
       setMembershipQueue((q) => [...q, request]);
@@ -83,7 +90,7 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
         <p className="text-on-surface-variant font-body-lg mt-2">{t("adminDashboardSubtitle")}</p>
       </div>
 
-      <section>
+      <section id="requests-section">
         <div className="flex justify-between items-end mb-stack-gap-md">
           <h3 className="font-title-md text-title-md text-primary flex items-center gap-2">
             <span className="material-symbols-outlined">group_add</span>
@@ -137,6 +144,10 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
                     </button>
                   </div>
                 </div>
+                <p className="font-label-sm text-label-sm text-on-surface-variant pl-12">
+                  {t("submittedOnLabel")}:{" "}
+                  {new Date(m.joinedAt).toLocaleString("en-GB", { timeZone: "Africa/Douala" })}
+                </p>
                 {m.kycVerification && (
                   <div className="flex items-center gap-3 pl-12 flex-wrap">
                     <span className="font-label-sm text-label-sm text-on-surface-variant">
@@ -149,13 +160,14 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
                       </span>
                     )}
                     {m.kycVerification.documentImageUrl && (
-                      <a
-                        href={m.kycVerification.documentImageUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-label-sm text-label-sm text-primary underline"
-                      >
-                        {t("viewDocument")}
+                      <a href={m.kycVerification.documentImageUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={m.kycVerification.documentImageUrl}
+                          alt={t("viewDocument")}
+                          className="w-20 h-14 object-cover rounded-md border border-outline-variant"
+                        />
+                        <span className="font-label-sm text-label-sm text-primary underline">{t("viewDocument")}</span>
                       </a>
                     )}
                   </div>

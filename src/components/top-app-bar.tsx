@@ -1,16 +1,34 @@
 import Link from "next/link";
+import { signOut } from "@/auth";
 import { LanguageToggle } from "@/components/language-toggle";
-import type { Lang } from "@/lib/i18n/translations";
+import { NotificationBell } from "@/components/notification-bell";
+import { TopRightMenu, type TopRightMenuItem } from "@/components/top-right-menu";
+import { translate, type Lang } from "@/lib/i18n/translations";
+import { prisma } from "@/lib/prisma";
 
-export function TopAppBar({
+export async function TopAppBar({
+  userId,
   userName,
   userImage,
   lang,
 }: {
+  userId: string;
   userName: string;
   userImage: string | null;
   lang: Lang;
 }) {
+  const t = (key: Parameters<typeof translate>[1]) => translate(lang, key);
+  const [unreadMessages, unreadNotifications] = await Promise.all([
+    prisma.chatMessage.count({ where: { receiverId: userId, readAt: null } }),
+    prisma.notification.count({ where: { userId, status: { in: ["SENT", "FAILED"] }, readAt: null } }),
+  ]);
+
+  const menuItems: TopRightMenuItem[] = [
+    { href: "/chat", label: t("messages"), icon: "chat_bubble", badge: unreadMessages },
+    { href: "/sessions", label: t("contributionsNavItem"), icon: "account_balance" },
+    { href: "/contribute-for-relative", label: t("contributeForRelativeNav"), icon: "volunteer_activism" },
+  ];
+
   return (
     <header className="w-full top-0 sticky shadow-sm bg-surface flex items-center justify-between px-container-padding h-16 z-40 shadow-[0px_4px_20px_rgba(30,41,59,0.05)]">
       <Link href="/profile" className="flex items-center gap-3 min-w-0">
@@ -31,7 +49,18 @@ export function TopAppBar({
           DIVA
         </span>
       </Link>
-      <LanguageToggle currentLang={lang} />
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <LanguageToggle currentLang={lang} />
+        <NotificationBell lang={lang} unreadCount={unreadNotifications} />
+        <TopRightMenu
+          lang={lang}
+          items={menuItems}
+          onLogout={async () => {
+            "use server";
+            await signOut({ redirectTo: "/login" });
+          }}
+        />
+      </div>
     </header>
   );
 }

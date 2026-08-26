@@ -32,6 +32,20 @@ export const TONTINE_CONFIG: Record<TontineType, TontineConfig> = {
     fineAmountPerPeriod: 5000,
     fineIntervalHours: 24,
   },
+  BIWEEKLY_SUNDAY: {
+    amount: 5000,
+    fee: 150,
+    feeSplit: null,
+    fineAmountPerPeriod: 500,
+    fineIntervalHours: 24,
+  },
+  QUARTERLY_25: {
+    amount: 75000,
+    fee: 1500,
+    feeSplit: null,
+    fineAmountPerPeriod: 7500,
+    fineIntervalHours: 24,
+  },
 };
 
 export function getTontineConfig(type: TontineType): TontineConfig {
@@ -125,9 +139,16 @@ export function getPreviousDueDate(type: TontineType, dueDate: Date): Date {
   return getMostRecentDueDate(type, cursor);
 }
 
+// A known Sunday, used only as a fixed phase reference for BIWEEKLY_SUNDAY
+// — every type here is a calendar-fixed schedule (not anchored to any
+// individual session's startDate), consistent with how HEBDO_SUNDAY/
+// MONTHLY_25/MONTHLY_28 already work.
+const BIWEEKLY_REFERENCE_SUNDAY = Date.UTC(2024, 0, 7);
+const QUARTERLY_MONTHS = [1, 4, 7, 10]; // January, April, July, October
+
 /** Whether `date` (evaluated in Cameroon local time) is a contribution day for `type`. */
 export function isContributionDay(type: TontineType, date: Date): boolean {
-  const { day, weekday } = getCameroonDateParts(date);
+  const { day, month, weekday } = getCameroonDateParts(date);
   switch (type) {
     case "HEBDO_SUNDAY":
       return weekday === 0;
@@ -135,6 +156,14 @@ export function isContributionDay(type: TontineType, date: Date): boolean {
       return day === 28;
     case "MONTHLY_25":
       return day === 25;
+    case "BIWEEKLY_SUNDAY": {
+      if (weekday !== 0) return false;
+      const dueDateUtc = toDueDateKey(date).getTime();
+      const weeksSinceReference = Math.round((dueDateUtc - BIWEEKLY_REFERENCE_SUNDAY) / (7 * 24 * 60 * 60 * 1000));
+      return weeksSinceReference % 2 === 0;
+    }
+    case "QUARTERLY_25":
+      return day === 25 && QUARTERLY_MONTHS.includes(month);
   }
 }
 

@@ -8,6 +8,8 @@ const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
   MONTHLY_28: "Monthly Tontine (28th)",
   MONTHLY_25: "Monthly Tontine (25th)",
+  BIWEEKLY_SUNDAY: "Every 2 Weeks (Sunday)",
+  QUARTERLY_25: "Every 3 Months (25th)",
 };
 
 const STATUS_STYLES: Record<string, string> = {
@@ -107,6 +109,11 @@ export default async function SessionsPage() {
                   </h3>
                   <p className="font-label-sm text-label-sm text-on-surface-variant">
                     {t("startsOn")} {s.startDate.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
+                  </p>
+                  <p className="font-label-sm text-label-sm text-primary mt-0.5">
+                    {t("validatedMembersCount", {
+                      count: String(s.memberships.filter((m) => m.status === "APPROVED").length),
+                    })}
                   </p>
                 </div>
                 <span className="material-symbols-outlined text-outline">chevron_right</span>

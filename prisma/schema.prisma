@@ -13,6 +13,10 @@ datasource db {
 enum Role {
   MEMBER
   ADMIN
+  /// Full admin access plus the global, cross-contribution financial view
+  /// (total fees, fines) that ordinary admins cannot see — see
+  /// requirePresident() in src/lib/require-admin.ts.
+  PRESIDENT
 }
 
 enum MembershipStatus {
@@ -36,6 +40,11 @@ enum TontineType {
   HEBDO_SUNDAY
   MONTHLY_25
   MONTHLY_28
+  /// Every other Sunday, counted from the session's startDate.
+  BIWEEKLY_SUNDAY
+  /// The 25th, every 3 months (Jan/Apr/Jul/Oct-style quarterly cadence
+  /// anchored to the session's startDate month).
+  QUARTERLY_25
 }
 
 enum TontineStatus {
@@ -83,6 +92,8 @@ enum NotificationEventType {
   FOOD_TURN
   PAYMENT_SUCCESS
   ADMIN_BROADCAST
+  MEMBER_APPROVED
+  MEMBER_REJECTED
 }
 
 enum NotificationStatus {
@@ -301,6 +312,9 @@ model Membership {
   /// the member selects it (mandatory one-time step after approval).
   slotCount        Decimal?         @db.Decimal(3, 1)
   joinedAt         DateTime         @default(now())
+  /// Optional, admin-entered when rejecting a join request — shown to the
+  /// member in their rejection notification when present.
+  rejectionReason  String?          @db.Text
 
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   tontineSession  TontineSession   @relation(fields: [tontineSessionId], references: [id], onDelete: Cascade)
@@ -483,15 +497,19 @@ model PositionSwapRequest {
 }
 
 model ChatMessage {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   senderId   String
   receiverId String
   content    String
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
+  /// Set when the receiver opens this conversation thread — powers the
+  /// unread-messages badge in the top-right menu.
+  readAt     DateTime?
 
   sender   User @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
   receiver User @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
 
+  @@index([receiverId, readAt])
   @@map("chat_messages")
 }
 

@@ -108,7 +108,7 @@ interface FineRow {
   dueDate: string;
 }
 
-const TABS = ["overview", "members", "payments", "fines", "notifications", "activity"] as const;
+const TABS = ["overview", "members", "payments", "foodTurn", "fines", "notifications", "activity"] as const;
 type Tab = (typeof TABS)[number];
 
 export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSessionId: string; lang: Lang }) {
@@ -222,11 +222,16 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   const visibleUserResults = !selectedUser && userQuery.trim() ? userResults : [];
 
   async function decideMembership(request: MembershipRequest, action: "approve" | "reject") {
+    let reason: string | null = null;
+    if (action === "reject") {
+      reason = window.prompt(t("rejectionReasonLabel"), "");
+      if (reason === null) return;
+    }
     setMembershipQueue((q) => q.filter((m) => m.id !== request.id));
     const res = await fetch(`/api/admin/membership/${request.id}/decide`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ action, reason: reason || undefined }),
     });
     if (!res.ok) {
       setMembershipQueue((q) => [...q, request]);
@@ -523,6 +528,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     overview: t("overviewTab"),
     members: t("membersTab"),
     payments: t("paymentsTab"),
+    foodTurn: t("foodTurnTab"),
     fines: t("finesTab"),
     notifications: t("notificationsTab"),
     activity: t("activityTab"),
@@ -531,10 +537,12 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     overview: "dashboard",
     members: "group",
     payments: "payments",
+    foodTurn: "restaurant",
     fines: "warning",
     notifications: "notifications",
     activity: "history",
   };
+  const foodTurnActionCount = payoutClaims.filter((c) => c.status !== "CONFIRMED").length;
 
   return (
     <main className="px-container-padding pt-stack-gap-lg pb-32 max-w-4xl mx-auto w-full flex flex-col gap-stack-gap-lg">
@@ -568,14 +576,24 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
           >
             <span className="material-symbols-outlined text-[16px]">{TAB_ICONS[tab]}</span>
             {TAB_LABELS[tab]}
+            {tab === "foodTurn" && foodTurnActionCount > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-error text-on-error font-label-sm text-[10px] leading-none">
+                {foodTurnActionCount}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
       {activeTab === "overview" && (
         <div className="flex flex-col gap-stack-gap-lg">
-          <div className="flex items-center gap-2 flex-wrap">
-            {session.status === "DRAFT" && (
+          <div>
+            <h3 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-3">
+              <span className="material-symbols-outlined">settings</span>
+              {t("settingsTab")}
+            </h3>
+            <div className="flex items-center gap-2 flex-wrap">
+              {session.status === "DRAFT" && (
               <button
                 onClick={startDrawingPhase}
                 disabled={startingDraw || !drawUnlocked}
@@ -618,6 +636,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
               <span className="material-symbols-outlined text-[16px]">delete</span>
               {t("delete")}
             </button>
+            </div>
           </div>
           {deleteError && <p className="font-label-sm text-label-sm text-error">{deleteError}</p>}
 
@@ -931,31 +950,59 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
             )}
           </section>
 
-          {payoutClaims.length > 0 && (
-            <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4">
-              <h3 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-4">
-                <span className="material-symbols-outlined">payments</span>
-                {t("payoutRequests")}
-              </h3>
-              <div className="flex flex-col gap-2">
-                {payoutClaims.map((c) => (
-                  <div key={c.id} className="bg-surface-container-lowest rounded-lg p-3 flex flex-col gap-2">
+        </div>
+      )}
+
+      {activeTab === "foodTurn" && (
+        <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4">
+          <h3 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-4">
+            <span className="material-symbols-outlined">restaurant</span>
+            {t("foodTurnTab")}
+          </h3>
+          {payoutClaims.length === 0 ? (
+            <p className="font-label-sm text-label-sm text-on-surface-variant">{t("noFoodTurnRequests")}</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {payoutClaims.map((c) => {
+                const needsAction = c.status !== "CONFIRMED";
+                return (
+                  <div
+                    key={c.id}
+                    className={
+                      needsAction
+                        ? "rounded-lg p-4 flex flex-col gap-2 border-2 border-error/40 bg-error-container/20"
+                        : "rounded-lg p-3 flex flex-col gap-2 bg-surface-container-lowest"
+                    }
+                  >
+                    {needsAction && (
+                      <div className="flex items-center gap-2 text-error font-label-sm text-label-sm font-bold">
+                        <span className="material-symbols-outlined text-[18px]">warning</span>
+                        {t("foodTurnActionRequired")}
+                      </div>
+                    )}
                     <div className="flex items-center justify-between">
                       <div className="min-w-0">
                         <p className="font-label-md text-label-md text-on-surface truncate">
                           {c.beneficiaryName} ({c.memberName})
                         </p>
                         <p className="font-label-sm text-label-sm text-on-surface-variant truncate">
-                          {c.payoutAccountName} — {c.payoutPhone}
+                          {t("payoutAccountNameLabel")}: {c.payoutAccountName} — {c.payoutPhone}
                         </p>
                       </div>
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-md font-label-sm text-label-sm flex-shrink-0 ml-2 ${
-                          c.status === "CONFIRMED" ? "bg-[#d1fae5] text-[#065f46]" : "bg-secondary-container/40 text-on-secondary-container"
-                        }`}
-                      >
-                        {c.status}
-                      </span>
+                      <div className="text-right flex-shrink-0 ml-2">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-md font-label-sm text-label-sm ${
+                            c.status === "CONFIRMED" ? "bg-[#d1fae5] text-[#065f46]" : "bg-secondary-container/40 text-on-secondary-container"
+                          }`}
+                        >
+                          {c.status}
+                        </span>
+                        {c.status === "CONFIRMED" && (
+                          <p className="font-label-sm text-label-sm text-on-surface-variant mt-0.5">
+                            {t("outstandingZero")}
+                          </p>
+                        )}
+                      </div>
                     </div>
                     {c.status === "DETAILS_SUBMITTED" && reviewingClaimId !== c.id && (
                       <button
@@ -999,12 +1046,12 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                       </div>
                     )}
                   </div>
-                ))}
-              </div>
-              {payoutResult && <p className="font-label-sm text-label-sm text-on-surface-variant mt-3">{payoutResult}</p>}
-            </section>
+                );
+              })}
+            </div>
           )}
-        </div>
+          {payoutResult && <p className="font-label-sm text-label-sm text-on-surface-variant mt-3">{payoutResult}</p>}
+        </section>
       )}
 
       {activeTab === "fines" && (

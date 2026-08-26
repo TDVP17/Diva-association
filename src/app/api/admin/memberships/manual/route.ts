@@ -24,7 +24,7 @@ export async function POST(request: Request) {
 
   if (beneficiaryNames.length !== namedSlots) {
     return NextResponse.json(
-      { error: `Please provide exactly ${namedSlots} beneficiary name(s) for ${slotCount} slot(s)` },
+      { error: `Please provide exactly ${namedSlots} name(s)` },
       { status: 400 },
     );
   }

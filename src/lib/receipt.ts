@@ -7,6 +7,8 @@ const TONTINE_LABELS: Record<TontineType, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
   MONTHLY_28: "Monthly Tontine (28th)",
   MONTHLY_25: "Monthly Tontine (25th)",
+  BIWEEKLY_SUNDAY: "Every 2 Weeks (Sunday)",
+  QUARTERLY_25: "Every 3 Months (25th)",
 };
 
 const ASSOCIATION_EMAIL = "divaassociation17@gmail.com";
@@ -84,7 +86,7 @@ export async function generateReceiptPdf(data: ReceiptData): Promise<Buffer> {
     y -= 26;
   };
 
-  row("Beneficiary", data.memberName);
+  row("Name", data.memberName);
   if (data.paidByName && data.paidByName !== data.memberName) {
     row("Paid by", data.paidByName);
   }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { ADMIN_PATH_PREFIX, PROTECTED_PATH_PREFIXES } from "@/lib/constants";
+import { ADMIN_PATH_PREFIX, PROTECTED_PATH_PREFIXES, isAdminRole } from "@/lib/constants";
 
 function matchesPrefix(pathname: string, prefixes: readonly string[]) {
   return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
@@ -25,7 +25,7 @@ export default auth((req) => {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (path.startsWith(ADMIN_PATH_PREFIX) && session.user.role !== "ADMIN") {
+  if (path.startsWith(ADMIN_PATH_PREFIX) && !isAdminRole(session.user.role)) {
     return NextResponse.redirect(new URL("/dashboard", nextUrl));
   }
 

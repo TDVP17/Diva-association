@@ -79,3 +79,31 @@ describe("getNextDueDate", () => {
     expect(isContributionDay("MONTHLY_25", next)).toBe(true);
   });
 });
+
+describe("new frequency presets", () => {
+  it("QUARTERLY_25 only lands on the 25th of Jan/Apr/Jul/Oct", () => {
+    expect(isContributionDay("QUARTERLY_25", new Date("2026-01-25T12:00:00Z"))).toBe(true);
+    expect(isContributionDay("QUARTERLY_25", new Date("2026-04-25T12:00:00Z"))).toBe(true);
+    expect(isContributionDay("QUARTERLY_25", new Date("2026-02-25T12:00:00Z"))).toBe(false);
+    expect(isContributionDay("QUARTERLY_25", new Date("2026-01-24T12:00:00Z"))).toBe(false);
+  });
+
+  it("BIWEEKLY_SUNDAY only fires every other Sunday, never on a non-Sunday", () => {
+    expect(isContributionDay("BIWEEKLY_SUNDAY", new Date("2026-01-05T12:00:00Z"))).toBe(false); // Monday
+    const sundaysInARow: boolean[] = [];
+    const cursor = new Date("2026-01-04T12:00:00Z"); // a Sunday
+    for (let i = 0; i < 6; i++) {
+      sundaysInARow.push(isContributionDay("BIWEEKLY_SUNDAY", cursor));
+      cursor.setUTCDate(cursor.getUTCDate() + 7);
+    }
+    // Alternates true/false/true/false/... across consecutive Sundays.
+    expect(sundaysInARow[0]).toBe(!sundaysInARow[1]);
+    expect(sundaysInARow[1]).toBe(!sundaysInARow[2]);
+    expect(sundaysInARow[0]).toBe(sundaysInARow[2]);
+  });
+
+  it("getNextDueDate resolves for both new frequencies without throwing", () => {
+    expect(() => getNextDueDate("QUARTERLY_25", new Date("2026-01-01T00:00:00Z"))).not.toThrow();
+    expect(() => getNextDueDate("BIWEEKLY_SUNDAY", new Date("2026-01-01T00:00:00Z"))).not.toThrow();
+  });
+});

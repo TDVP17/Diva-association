@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { readStoredFile } from "@/lib/storage";
 import { mimeTypeFor } from "@/lib/mime";
+import { isAdminRole } from "@/lib/constants";
 
 export async function GET(
   _request: Request,
@@ -23,7 +24,7 @@ export async function GET(
   }
 
   const isOwner = session.user.id === ownerId;
-  const isAdmin = session.user.role === "ADMIN";
+  const isAdmin = isAdminRole(session.user.role);
   const isPublicCategory = category === "avatars";
   if (!isOwner && !isAdmin && !isPublicCategory) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });

@@ -3,11 +3,12 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
+import { isAdminRole } from "@/lib/constants";
 import { ContributionDetailClient } from "./contribution-detail-client";
 
 export default async function ContributionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
-  if (session?.user.role !== "ADMIN") redirect("/dashboard");
+  if (!isAdminRole(session?.user.role)) redirect("/dashboard");
   const lang = await getLang();
   const t = getTranslator(lang);
 

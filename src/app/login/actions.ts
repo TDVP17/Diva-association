@@ -4,6 +4,7 @@ import { AuthError } from "next-auth";
 import { signIn } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getSupabaseAuthClient } from "@/lib/supabase-auth";
+import { isAdminRole } from "@/lib/constants";
 
 export interface AuthFormState {
   error?: string;
@@ -41,7 +42,7 @@ export async function signInAction(
     let redirectTo = callbackUrl;
     if (callbackUrl === "/dashboard") {
       const target = await prisma.user.findUnique({ where: { email }, select: { role: true } });
-      if (target?.role === "ADMIN") redirectTo = "/admin";
+      if (isAdminRole(target?.role)) redirectTo = "/admin";
     }
     await signIn("email-password", { email, password, redirectTo });
     return {};

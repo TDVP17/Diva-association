@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { auth, signOut } from "@/auth";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { AvatarUpload } from "@/app/(app)/profile/avatar-upload";
@@ -54,20 +54,6 @@ export default async function AdminSettingsPage() {
       <section className="mb-stack-gap-lg">
         <InlinePasswordField lang={lang} />
       </section>
-
-      <form
-        action={async () => {
-          "use server";
-          await signOut({ redirectTo: "/login" });
-        }}
-      >
-        <button
-          type="submit"
-          className="w-full py-3 rounded-lg border-2 border-error text-error font-label-md text-label-md hover:bg-error/5 active:scale-95 transition-all"
-        >
-          {t("signOut")}
-        </button>
-      </form>
     </main>
   );
 }

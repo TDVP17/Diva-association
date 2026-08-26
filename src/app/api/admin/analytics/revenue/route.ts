@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/require-admin";
+import { requirePresident } from "@/lib/require-admin";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine",
@@ -9,8 +9,8 @@ const TONTINE_LABELS: Record<string, string> = {
 };
 
 export async function GET() {
-  const admin = await requireAdmin();
-  if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const president = await requirePresident();
+  if (!president) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const sessions = await prisma.tontineSession.findMany({
     select: {

@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { assertJoinable, sumRegisteredSlots } from "@/lib/session-joinability";
 import { createVerificationSession, DiditError } from "@/lib/didit";
+import { isAdminRole } from "@/lib/constants";
 
 const bodySchema = z.object({ documentType: z.enum(["CNI", "PASSPORT"]) });
 
@@ -12,7 +13,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (session.user.role === "ADMIN") {
+  if (isAdminRole(session.user.role)) {
     return NextResponse.json({ error: "Admin accounts cannot join tontine sessions" }, { status: 403 });
   }
 

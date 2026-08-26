@@ -8,6 +8,8 @@ const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
   MONTHLY_28: "Monthly Tontine (28th)",
   MONTHLY_25: "Monthly Tontine (25th)",
+  BIWEEKLY_SUNDAY: "Every 2 Weeks (Sunday)",
+  QUARTERLY_25: "Every 3 Months (25th)",
 };
 
 export default async function DashboardPage() {

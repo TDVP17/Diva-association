@@ -1,5 +1,7 @@
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
+import { requirePresident } from "@/lib/require-admin";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine",
@@ -8,6 +10,8 @@ const TONTINE_LABELS: Record<string, string> = {
 };
 
 export default async function AdminAnalyticsPage() {
+  const president = await requirePresident();
+  if (!president) redirect("/admin");
   const t = getTranslator(await getLang());
 
   const sessions = await prisma.tontineSession.findMany({

@@ -4,21 +4,22 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
 
-const ITEMS = [
+const BASE_ITEMS = [
   { href: "/admin", label: "adminNavDashboard", icon: "space_dashboard" },
   { href: "/admin/notifications", label: "adminNavNotifications", icon: "notifications" },
   { href: "/admin/support", label: "adminNavSupport", icon: "support_agent" },
-  { href: "/admin/analytics", label: "adminNavAnalytics", icon: "monitoring" },
-  { href: "/admin/settings", label: "adminNavSettings", icon: "settings" },
 ] as const;
+const PRESIDENT_ITEM = { href: "/admin/analytics", label: "adminNavAnalytics", icon: "monitoring" } as const;
+const SETTINGS_ITEM = { href: "/admin/settings", label: "adminNavSettings", icon: "settings" } as const;
 
-export function AdminBottomNav({ lang }: { lang: Lang }) {
+export function AdminBottomNav({ lang, isPresident }: { lang: Lang; isPresident: boolean }) {
   const t = (key: Parameters<typeof translate>[1]) => translate(lang, key);
   const pathname = usePathname();
+  const items = [...BASE_ITEMS, ...(isPresident ? [PRESIDENT_ITEM] : []), SETTINGS_ITEM];
 
   return (
     <nav className="fixed bottom-0 w-full z-50 rounded-t-xl border-t border-outline-variant shadow-[0px_-4px_20px_rgba(30,41,59,0.05)] bg-surface flex justify-around items-center h-20 pb-safe px-4 md:hidden">
-      {ITEMS.map((item) => {
+      {items.map((item) => {
         const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
           <Link

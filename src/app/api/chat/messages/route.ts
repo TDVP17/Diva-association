@@ -3,6 +3,7 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { translate } from "@/lib/i18n/translations";
+import { isAdminRole } from "@/lib/constants";
 
 const AUTO_REPLY_THROTTLE_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -60,6 +61,13 @@ export async function GET(request: Request) {
     })),
   ].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
+  // Opening this thread marks every message the other person sent me as
+  // read — powers the unread-messages badge in the top-right menu.
+  await prisma.chatMessage.updateMany({
+    where: { senderId: otherId, receiverId: myId, readAt: null },
+    data: { readAt: new Date() },
+  });
+
   return NextResponse.json({ feed });
 }
 
@@ -95,7 +103,7 @@ export async function POST(request: Request) {
   // A non-admin messaging an admin (the "Admin Support" thread) gets exactly
   // one automated acknowledgement per rolling 30 days — not on every message,
   // so an ongoing conversation doesn't get spammed with the bot reply.
-  if (receiver.role === "ADMIN" && session.user.role !== "ADMIN") {
+  if (isAdminRole(receiver.role) && !isAdminRole(session.user.role)) {
     const sender = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { name: true, preferredLang: true, lastAdminAutoReplyAt: true },

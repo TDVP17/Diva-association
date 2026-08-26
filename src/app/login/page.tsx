@@ -3,6 +3,7 @@ import { signIn } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getLang } from "@/lib/i18n/get-lang";
 import { LoginContent } from "./login-content";
+import { isAdminRole } from "@/lib/constants";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -59,7 +60,7 @@ export default async function LoginPage({
     role: u.role,
     signInAction: async () => {
       "use server";
-      const redirectTo = callbackUrl === "/dashboard" && u.role === "ADMIN" ? "/admin" : callbackUrl;
+      const redirectTo = callbackUrl === "/dashboard" && isAdminRole(u.role) ? "/admin" : callbackUrl;
       await signIn("dev-login", { email: u.email, redirectTo });
     },
   }));

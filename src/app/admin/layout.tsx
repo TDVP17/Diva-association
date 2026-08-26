@@ -5,18 +5,21 @@ import { AdminTopBar } from "@/components/admin/admin-top-bar";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminBottomNav } from "@/components/admin/admin-bottom-nav";
 import { IosInstallBanner } from "@/components/ios-install-banner";
+import { isAdminRole } from "@/lib/constants";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
-  if (session?.user.role !== "ADMIN") redirect("/dashboard");
+  if (!session?.user || !isAdminRole(session.user.role)) redirect("/dashboard");
   const lang = await getLang();
+
+  const isPresident = session.user.role === "PRESIDENT";
 
   return (
     <div className="min-h-screen flex flex-col bg-surface-container-lowest">
-      <AdminTopBar userName={session.user.name ?? "Admin"} lang={lang} />
-      <AdminSidebar lang={lang} />
+      <AdminTopBar userId={session.user.id} userName={session.user.name ?? "Admin"} isPresident={isPresident} lang={lang} />
+      <AdminSidebar lang={lang} isPresident={isPresident} />
       <div className="flex-1 md:pl-60 pb-24 md:pb-8">{children}</div>
-      <AdminBottomNav lang={lang} />
+      <AdminBottomNav lang={lang} isPresident={isPresident} />
       <IosInstallBanner lang={lang} />
     </div>
   );

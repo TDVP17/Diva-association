@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
+import { isAdminRole } from "@/lib/constants";
 import { CreateSessionForm } from "./create-session-form";
 
 export default async function NewCotisationPage() {
   const session = await auth();
-  if (session?.user.role !== "ADMIN") redirect("/dashboard");
+  if (!isAdminRole(session?.user.role)) redirect("/dashboard");
   const lang = await getLang();
   const t = getTranslator(lang);
 

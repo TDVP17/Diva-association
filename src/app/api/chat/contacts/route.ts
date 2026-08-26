@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getSupportAdmin } from "@/lib/chat/support-admin";
+import { isAdminRole } from "@/lib/constants";
 
 interface Contact {
   id: string;
@@ -55,7 +56,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const isAdmin = session.user.role === "ADMIN";
+  const isAdmin = isAdminRole(session.user.role);
 
   let memberIds: string[];
   if (isAdmin) {

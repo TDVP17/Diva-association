@@ -80,6 +80,10 @@ export const {
   // the user explicitly logs out, or after 90 days of inactivity.
   session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 90 },
   jwt: { maxAge: 60 * 60 * 24 * 90 },
+  // Auto-detected on Vercel; explicit here so the Google OAuth callback
+  // (which relies on Auth.js inferring the correct host from the request)
+  // still works correctly behind a reverse proxy or on non-Vercel hosts.
+  trustHost: true,
   pages: {
     signIn: "/login",
     error: "/login",

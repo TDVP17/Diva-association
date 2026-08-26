@@ -4,6 +4,7 @@ import { getLang } from "@/lib/i18n/get-lang";
 import { TopAppBar } from "@/components/top-app-bar";
 import { BottomNav } from "@/components/bottom-nav";
 import { IosInstallBanner } from "@/components/ios-install-banner";
+import { isAdminRole } from "@/lib/constants";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -13,12 +14,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // now that those all exist under /admin (see src/app/admin/support,
   // src/app/admin/settings) — previously left open because admin had no
   // equivalent to reach for chat/profile.
-  if (session.user.role === "ADMIN") redirect("/admin");
+  if (isAdminRole(session.user.role)) redirect("/admin");
   const lang = await getLang();
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <TopAppBar userName={session.user.name ?? "Member"} userImage={session.user.image ?? null} lang={lang} />
+      <TopAppBar
+        userId={session.user.id}
+        userName={session.user.name ?? "Member"}
+        userImage={session.user.image ?? null}
+        lang={lang}
+      />
       <div className="flex-1 pb-24 md:pb-8">{children}</div>
       <BottomNav />
       <IosInstallBanner lang={lang} />
