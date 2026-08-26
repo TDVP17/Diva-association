@@ -5,6 +5,7 @@ import { translate, type Lang } from "@/lib/i18n/translations";
 
 interface PayoutOrderRow {
   position: number | null;
+  estimatedDate: string | null;
   beneficiaryName: string;
   memberName: string;
   status: "pending" | "DETAILS_SUBMITTED" | "RELEASED" | "CONFIRMED";
@@ -79,7 +80,11 @@ export function PayoutOrderModal({ tontineSessionId, lang }: { tontineSessionId:
                       </div>
                       <div className="min-w-0">
                         <p className="font-label-md text-label-md text-on-surface truncate">{r.beneficiaryName}</p>
-                        <p className="font-label-sm text-label-sm text-on-surface-variant truncate">{r.memberName}</p>
+                        <p className="font-label-sm text-label-sm text-on-surface-variant truncate">
+                          {r.memberName}
+                          {r.estimatedDate &&
+                            ` — ~${new Date(r.estimatedDate).toLocaleDateString("en-US", { day: "numeric", month: "short" })}`}
+                        </p>
                       </div>
                     </div>
                     <span

@@ -23,8 +23,6 @@ export async function GET(request: Request) {
     if (now < cutoff) continue; // safety guard in case the cron fires before 18:31
 
     const dueDate = toDueDateKey(now);
-    const fineAmount = computeFine(type, now, cutoff);
-    if (fineAmount <= 0) continue;
 
     const sessions = await prisma.tontineSession.findMany({
       where: { type, status: "ACTIVE" },
@@ -40,6 +38,11 @@ export async function GET(request: Request) {
     });
 
     for (const tontineSession of sessions) {
+      const fineAmount = computeFine(type, now, cutoff, {
+        fineAmountPerPeriod: tontineSession.fineAmountPerPeriod ? Number(tontineSession.fineAmountPerPeriod) : null,
+        fineIntervalHours: tontineSession.fineIntervalHours,
+      });
+      if (fineAmount <= 0) continue;
       let finesIssued = 0;
 
       for (const membership of tontineSession.memberships) {

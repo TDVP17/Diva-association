@@ -25,6 +25,9 @@ export async function initiateSlotPayment(
   if (!slot || slot.membership.status !== "APPROVED" || slot.membership.tontineSession.status !== "ACTIVE") {
     return { ok: false, status: 404, error: "This slot isn't currently accepting contributions" };
   }
+  if (slot.membership.tontineSession.isPaused) {
+    return { ok: false, status: 409, error: "This cotisation is temporarily paused — payments will resume shortly" };
+  }
 
   const { tontineSession } = slot.membership;
   const now = new Date();

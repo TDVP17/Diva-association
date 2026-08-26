@@ -10,11 +10,23 @@ export type JoinabilityResult = { ok: true } | { ok: false; status: number; erro
  * independently even before the start date arrives.
  */
 export function assertJoinable(
-  session: { status: string; startDate: Date; maxSlots: number | null },
+  session: {
+    status: string;
+    startDate: Date;
+    maxSlots: number | null;
+    isPaused?: boolean;
+    lockedAt?: Date | null;
+  },
   registeredSlots: number,
 ): JoinabilityResult {
   if (session.status === "CLOSED") {
     return { ok: false, status: 409, error: "This session is closed and no longer accepting new members" };
+  }
+  if (session.isPaused) {
+    return { ok: false, status: 409, error: "This cotisation is temporarily paused and not accepting new members" };
+  }
+  if (session.lockedAt) {
+    return { ok: false, status: 409, error: "This cotisation is locked and no longer accepting new members" };
   }
   if (new Date() >= session.startDate) {
     return {

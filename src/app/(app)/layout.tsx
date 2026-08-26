@@ -8,6 +8,12 @@ import { IosInstallBanner } from "@/components/ios-install-banner";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
+  // Admin is the platform manager/owner, never a member — always sent to
+  // its own dedicated dashboard/support/settings instead. Safe to enforce
+  // now that those all exist under /admin (see src/app/admin/support,
+  // src/app/admin/settings) — previously left open because admin had no
+  // equivalent to reach for chat/profile.
+  if (session.user.role === "ADMIN") redirect("/admin");
   const lang = await getLang();
 
   return (

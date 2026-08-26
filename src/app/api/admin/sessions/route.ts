@@ -29,10 +29,20 @@ export async function GET() {
       return {
         id: s.id,
         title: s.title,
+        description: s.description,
         type: s.type,
         status: s.status,
+        amount: Number(s.amount),
+        fee: Number(s.fee),
+        fineAmountPerPeriod: s.fineAmountPerPeriod ? Number(s.fineAmountPerPeriod) : null,
+        fineIntervalHours: s.fineIntervalHours,
+        rules: s.rules,
+        limitTime: s.limitTime,
         startDate: s.startDate.toISOString(),
+        drawDate: s.drawDate ? s.drawDate.toISOString() : null,
         maxSlots: s.maxSlots ? Number(s.maxSlots) : null,
+        isPaused: s.isPaused,
+        lockedAt: s.lockedAt ? s.lockedAt.toISOString() : null,
         registeredSlots,
         slots: s.memberships.flatMap((m) =>
           m.slots.map((slot) => ({
@@ -54,13 +64,17 @@ export async function GET() {
 
 const createSessionSchema = z.object({
   title: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(5000).optional(),
   type: z.enum(["HEBDO_SUNDAY", "MONTHLY_25", "MONTHLY_28"]),
   amount: z.coerce.number().positive(),
   fee: z.coerce.number().nonnegative(),
+  fineAmountPerPeriod: z.coerce.number().nonnegative(),
+  fineIntervalHours: z.coerce.number().int().positive(),
   rules: z.string().trim().max(5000).optional(),
   startDate: z.coerce.date(),
   limitTime: z.string().trim().min(1).max(100),
   maxSlots: z.coerce.number().positive().optional(),
+  drawDate: z.coerce.date(),
 });
 
 export async function POST(request: Request) {

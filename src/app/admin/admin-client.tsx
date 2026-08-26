@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { translate, type Lang } from "@/lib/i18n/translations";
-import { isDrawUnlocked, getDrawUnlockTime } from "@/lib/tontine-engine";
+import { getCycleDateForRound } from "@/lib/tontine-engine";
+import type { TontineType } from "@/generated/prisma/enums";
 
 interface MembershipRequest {
   id: string;
@@ -32,10 +34,20 @@ interface AdminSlot {
 interface AdminSession {
   id: string;
   title: string | null;
+  description: string | null;
   type: string;
   status: string;
+  amount: number;
+  fee: number;
+  fineAmountPerPeriod: number | null;
+  fineIntervalHours: number | null;
+  rules: string | null;
+  limitTime: string;
   startDate: string;
+  drawDate: string | null;
   maxSlots: number | null;
+  isPaused: boolean;
+  lockedAt: string | null;
   registeredSlots: number;
   slots: AdminSlot[];
 }
@@ -116,6 +128,27 @@ export function AdminClient({ lang }: { lang: Lang }) {
   const [emailBody, setEmailBody] = useState("");
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailResult, setEmailResult] = useState<string | null>(null);
+
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editFields, setEditFields] = useState<{
+    title: string;
+    description: string;
+    amount: string;
+    fee: string;
+    fineAmountPerPeriod: string;
+    fineIntervalHours: string;
+    rules: string;
+    startDate: string;
+    drawDate: string;
+    limitTime: string;
+    maxSlots: string;
+  } | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [pausing, setPausing] = useState(false);
+  const [locking, setLocking] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const refreshSessions = useCallback(async (keepSelected?: string) => {
     const body = await fetch("/api/admin/sessions").then((r) => r.json());
@@ -397,16 +430,116 @@ export function AdminClient({ lang }: { lang: Lang }) {
     }
   }
 
+  function openEditModal() {
+    if (!selectedSession) return;
+    setEditFields({
+      title: selectedSession.title ?? "",
+      description: selectedSession.description ?? "",
+      amount: String(selectedSession.amount),
+      fee: String(selectedSession.fee),
+      fineAmountPerPeriod: String(selectedSession.fineAmountPerPeriod ?? ""),
+      fineIntervalHours: String(selectedSession.fineIntervalHours ?? ""),
+      rules: selectedSession.rules ?? "",
+      startDate: selectedSession.startDate.slice(0, 10),
+      drawDate: selectedSession.drawDate ? selectedSession.drawDate.slice(0, 10) : "",
+      limitTime: selectedSession.limitTime,
+      maxSlots: selectedSession.maxSlots !== null ? String(selectedSession.maxSlots) : "",
+    });
+    setEditError(null);
+    setShowEditModal(true);
+  }
+
+  async function saveEdit() {
+    if (!selectedSessionId || !editFields) return;
+    setSavingEdit(true);
+    setEditError(null);
+    try {
+      const res = await fetch(`/api/admin/sessions/${selectedSessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: editFields.title,
+          description: editFields.description || undefined,
+          amount: Number(editFields.amount),
+          fee: Number(editFields.fee),
+          fineAmountPerPeriod: Number(editFields.fineAmountPerPeriod),
+          fineIntervalHours: Number(editFields.fineIntervalHours),
+          rules: editFields.rules || undefined,
+          startDate: editFields.startDate,
+          drawDate: editFields.drawDate,
+          limitTime: editFields.limitTime,
+          maxSlots: editFields.maxSlots ? Number(editFields.maxSlots) : null,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        setEditError(body.error ?? t("couldNotUpdateCotisation"));
+        return;
+      }
+      setShowEditModal(false);
+      await refreshSessions(selectedSessionId);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function togglePause() {
+    if (!selectedSessionId || !selectedSession) return;
+    setPausing(true);
+    try {
+      const res = await fetch(`/api/admin/sessions/${selectedSessionId}/pause`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paused: !selectedSession.isPaused }),
+      });
+      if (res.ok) await refreshSessions(selectedSessionId);
+    } finally {
+      setPausing(false);
+    }
+  }
+
+  async function lockSession() {
+    if (!selectedSessionId) return;
+    if (!window.confirm(t("lockConfirmMessage"))) return;
+    setLocking(true);
+    try {
+      const res = await fetch(`/api/admin/sessions/${selectedSessionId}/lock`, { method: "POST" });
+      if (res.ok) await refreshSessions(selectedSessionId);
+      else window.alert(t("couldNotLockCotisation"));
+    } finally {
+      setLocking(false);
+    }
+  }
+
+  async function deleteSession() {
+    if (!selectedSessionId) return;
+    if (!window.confirm(t("deleteConfirmMessage"))) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/admin/sessions/${selectedSessionId}`, { method: "DELETE" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDeleteError(body.error ?? t("couldNotDeleteCotisation"));
+        return;
+      }
+      await refreshSessions();
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const selectedSession = sessions.find((s) => s.id === selectedSessionId) ?? null;
-  const drawUnlocked = selectedSession ? isDrawUnlocked(new Date(selectedSession.startDate)) : false;
-  const drawUnlocksAtLabel = selectedSession
-    ? getDrawUnlockTime(new Date(selectedSession.startDate)).toLocaleString("en-US", {
-        day: "numeric",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "";
+  const drawUnlocked = selectedSession?.drawDate ? new Date() >= new Date(selectedSession.drawDate) : false;
+  const drawUnlocksAtLabel =
+    selectedSession?.drawDate
+      ? new Date(selectedSession.drawDate).toLocaleString("en-US", {
+          day: "numeric",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "";
 
   return (
     <main className="px-container-padding pt-stack-gap-lg pb-32 max-w-4xl mx-auto w-full flex flex-col gap-section-margin">
@@ -508,37 +641,237 @@ export function AdminClient({ lang }: { lang: Lang }) {
       </section>
 
       {/* Session picker */}
-      {sessions.length > 0 && (
-        <div className="flex items-center gap-3 flex-wrap">
-          <label className="font-label-sm text-label-sm text-on-surface-variant">{t("sessionLabel")}</label>
-          <select
-            value={selectedSessionId ?? ""}
-            onChange={(e) => setSelectedSessionId(e.target.value)}
-            className="border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
-          >
-            {sessions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.title || TONTINE_LABELS[s.type] || s.type} — {s.status}
-                {s.maxSlots
-                  ? ` (${s.registeredSlots}/${s.maxSlots} ${t("slots")})`
-                  : ` (${s.registeredSlots} ${t("slots")})`}
-              </option>
-            ))}
-          </select>
-          {selectedSession?.status === "DRAFT" && (
-            <button
-              onClick={startDrawingPhase}
-              disabled={startingDraw || !drawUnlocked}
-              title={drawUnlocked ? undefined : t("drawUnlocksAt", { date: drawUnlocksAtLabel })}
-              className="px-3 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 disabled:opacity-60"
+      <div className="flex items-center gap-3 flex-wrap">
+        {sessions.length > 0 && (
+          <>
+            <label className="font-label-sm text-label-sm text-on-surface-variant">{t("sessionLabel")}</label>
+            <select
+              value={selectedSessionId ?? ""}
+              onChange={(e) => setSelectedSessionId(e.target.value)}
+              className="border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
             >
-              {startingDraw
-                ? t("startingEllipsis")
-                : drawUnlocked
-                  ? t("startDrawingPhase")
-                  : t("drawUnlocksAt", { date: drawUnlocksAtLabel })}
+              {sessions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.title || TONTINE_LABELS[s.type] || s.type} — {s.status}
+                  {s.isPaused ? ` — ${t("pausedBadge")}` : ""}
+                  {s.lockedAt ? ` — ${t("lockedBadge")}` : ""}
+                  {s.maxSlots
+                    ? ` (${s.registeredSlots}/${s.maxSlots} ${t("slots")})`
+                    : ` (${s.registeredSlots} ${t("slots")})`}
+                </option>
+              ))}
+            </select>
+            {selectedSession?.status === "DRAFT" && (
+              <button
+                onClick={startDrawingPhase}
+                disabled={startingDraw || !drawUnlocked}
+                title={drawUnlocked ? undefined : t("drawUnlocksAt", { date: drawUnlocksAtLabel })}
+                className="px-3 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 disabled:opacity-60"
+              >
+                {startingDraw
+                  ? t("startingEllipsis")
+                  : drawUnlocked
+                    ? t("startDrawingPhase")
+                    : t("drawUnlocksAt", { date: drawUnlocksAtLabel })}
+              </button>
+            )}
+            {selectedSession && (
+              <>
+                <button
+                  onClick={openEditModal}
+                  className="px-3 py-2 rounded-lg border border-outline-variant text-on-surface font-label-sm text-label-sm hover:bg-surface flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-[16px]">edit</span>
+                  {t("editCotisation")}
+                </button>
+                <button
+                  onClick={togglePause}
+                  disabled={pausing}
+                  className="px-3 py-2 rounded-lg border border-outline-variant text-on-surface font-label-sm text-label-sm hover:bg-surface disabled:opacity-60 flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-[16px]">
+                    {selectedSession.isPaused ? "play_arrow" : "pause"}
+                  </span>
+                  {selectedSession.isPaused ? t("resume") : t("pause")}
+                </button>
+                {!selectedSession.lockedAt && (
+                  <button
+                    onClick={lockSession}
+                    disabled={locking}
+                    className="px-3 py-2 rounded-lg border border-outline-variant text-on-surface font-label-sm text-label-sm hover:bg-surface disabled:opacity-60 flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">lock</span>
+                    {t("lock")}
+                  </button>
+                )}
+                <button
+                  onClick={deleteSession}
+                  disabled={deleting}
+                  className="px-3 py-2 rounded-lg border border-error/40 text-error font-label-sm text-label-sm hover:bg-error/5 disabled:opacity-60 flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-[16px]">delete</span>
+                  {t("delete")}
+                </button>
+              </>
+            )}
+          </>
+        )}
+        <Link
+          href="/admin/sessions/new"
+          className="px-3 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 flex items-center gap-1 ml-auto"
+        >
+          <span className="material-symbols-outlined text-[16px]">add</span>
+          {t("newCotisation")}
+        </Link>
+      </div>
+      {deleteError && <p className="font-label-sm text-label-sm text-error -mt-2">{deleteError}</p>}
+
+      {showEditModal && editFields && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-lg p-4 w-full max-w-md max-h-[90vh] overflow-y-auto flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-title-md text-title-md text-primary">{t("editCotisation")}</h3>
+              <button onClick={() => setShowEditModal(false)} aria-label={t("cancel")}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div>
+              <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">{t("title")}</label>
+              <input
+                value={editFields.title}
+                onChange={(e) => setEditFields({ ...editFields, title: e.target.value })}
+                className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+              />
+            </div>
+            <div>
+              <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                {t("descriptionLabel")}
+              </label>
+              <textarea
+                rows={2}
+                value={editFields.description}
+                onChange={(e) => setEditFields({ ...editFields, description: e.target.value })}
+                className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                  {t("amountPerSlot")}
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={editFields.amount}
+                  onChange={(e) => setEditFields({ ...editFields, amount: e.target.value })}
+                  className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+                />
+              </div>
+              <div>
+                <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                  {t("feePerSlot")}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={editFields.fee}
+                  onChange={(e) => setEditFields({ ...editFields, fee: e.target.value })}
+                  className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                  {t("fineAmountLabel")}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={editFields.fineAmountPerPeriod}
+                  onChange={(e) => setEditFields({ ...editFields, fineAmountPerPeriod: e.target.value })}
+                  className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+                />
+              </div>
+              <div>
+                <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                  {t("fineIntervalLabel")}
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={editFields.fineIntervalHours}
+                  onChange={(e) => setEditFields({ ...editFields, fineIntervalHours: e.target.value })}
+                  className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                {t("maxSlotCapacity")}
+              </label>
+              <input
+                type="number"
+                min="0.5"
+                step="0.5"
+                value={editFields.maxSlots}
+                onChange={(e) => setEditFields({ ...editFields, maxSlots: e.target.value })}
+                placeholder={t("leaveBlankForNoLimit")}
+                className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+              />
+            </div>
+            <div>
+              <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                {t("startDate")}
+              </label>
+              <input
+                type="date"
+                value={editFields.startDate}
+                onChange={(e) => setEditFields({ ...editFields, startDate: e.target.value })}
+                className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+              />
+            </div>
+            <div>
+              <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                {t("drawDateLabel")}
+              </label>
+              <input
+                type="date"
+                value={editFields.drawDate}
+                onChange={(e) => setEditFields({ ...editFields, drawDate: e.target.value })}
+                className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+              />
+            </div>
+            <div>
+              <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                {t("dailyDeadlineLabel")}
+              </label>
+              <input
+                value={editFields.limitTime}
+                onChange={(e) => setEditFields({ ...editFields, limitTime: e.target.value })}
+                className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+              />
+            </div>
+            <div>
+              <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                {t("rulesOptional")}
+              </label>
+              <textarea
+                rows={3}
+                value={editFields.rules}
+                onChange={(e) => setEditFields({ ...editFields, rules: e.target.value })}
+                className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+              />
+            </div>
+            {editError && <p className="font-label-sm text-label-sm text-error">{editError}</p>}
+            <button
+              onClick={saveEdit}
+              disabled={savingEdit}
+              className="w-full bg-primary text-on-primary font-label-md text-label-md py-3 rounded-lg hover:opacity-90 active:scale-95 transition-all disabled:opacity-60"
+            >
+              {savingEdit ? t("savingEllipsis") : t("saveChanges")}
             </button>
-          )}
+          </div>
         </div>
       )}
 
@@ -573,7 +906,15 @@ export function AdminClient({ lang }: { lang: Lang }) {
                 </div>
                 <div className="flex-grow min-w-0">
                   <p className="font-label-md text-label-md text-on-surface truncate">{m.beneficiaryName}</p>
-                  <p className="font-label-sm text-label-sm text-on-surface-variant truncate">{m.name}</p>
+                  <p className="font-label-sm text-label-sm text-on-surface-variant truncate">
+                    {m.name}
+                    {selectedSession &&
+                      ` — ~${getCycleDateForRound(
+                        selectedSession.type as TontineType,
+                        new Date(selectedSession.startDate),
+                        index + 1,
+                      ).toLocaleDateString("en-US", { day: "numeric", month: "short" })}`}
+                  </p>
                   {!m.hasPhone && (
                     <p className="font-label-sm text-label-sm text-error">{t("noWhatsappOnFile")}</p>
                   )}

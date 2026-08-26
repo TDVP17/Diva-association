@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getCycleDateForRound } from "@/lib/tontine-engine";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -9,6 +10,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const { id: tontineSessionId } = await params;
+
+  const tontineSession = await prisma.tontineSession.findUnique({
+    where: { id: tontineSessionId },
+    select: { type: true, startDate: true },
+  });
+  if (!tontineSession) {
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  }
 
   const slots = await prisma.membershipSlot.findMany({
     where: {
@@ -26,6 +35,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const payout = s.payouts[0] ?? null;
     return {
       position: s.officialPosition,
+      estimatedDate: s.officialPosition
+        ? getCycleDateForRound(tontineSession.type, tontineSession.startDate, s.officialPosition).toISOString()
+        : null,
       beneficiaryName: s.beneficiaryName,
       memberName: s.membership.user.name,
       status: payout?.status ?? "pending",

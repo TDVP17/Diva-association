@@ -215,21 +215,38 @@ model VerificationToken {
 }
 
 model TontineSession {
-  id        String        @id @default(cuid())
-  title     String?
-  type      TontineType
+  id                  String        @id @default(cuid())
+  title               String?
+  description         String?       @db.Text
+  type                TontineType
   /// Per-slot amount.
-  amount    Decimal       @db.Decimal(12, 2)
+  amount              Decimal       @db.Decimal(12, 2)
   /// Per-slot service/platform fee.
-  fee       Decimal       @db.Decimal(12, 2)
-  status    TontineStatus @default(DRAFT)
-  startDate DateTime
-  limitTime String
-  rules     String?       @db.Text
+  fee                 Decimal       @db.Decimal(12, 2)
+  status              TontineStatus @default(DRAFT)
+  startDate           DateTime
+  limitTime           String
+  rules               String?       @db.Text
   /// Maximum total registered slots (sum of Membership.slotCount) this
   /// session accepts. Null = uncapped. Reaching this locks new join
   /// requests the same way passing startDate does.
-  maxSlots  Decimal?      @db.Decimal(5, 1)
+  maxSlots            Decimal?      @db.Decimal(5, 1)
+  /// Per-session fine amount/interval, overriding the global
+  /// TONTINE_CONFIG table (which is now form-prefill-only). Null on old
+  /// rows predating this field — computeFine() falls back to the global
+  /// table in that case.
+  fineAmountPerPeriod Decimal?      @db.Decimal(12, 2)
+  fineIntervalHours   Int?
+  /// Explicit admin-set date the draw/ranking tools unlock on. Null means
+  /// not yet configured — treated as "never unlocked" until the admin
+  /// edits the session to set one.
+  drawDate            DateTime?
+  /// Reversible — blocks new joins + new payments while true. Independent
+  /// of status so it can be toggled at any lifecycle stage.
+  isPaused            Boolean       @default(false)
+  /// Irreversible once set — blocks new joins only (same effect as
+  /// maxSlots/startDate already have); doesn't affect payments in progress.
+  lockedAt            DateTime?
 
   memberships      Membership[]
   swapRequests     PositionSwapRequest[]

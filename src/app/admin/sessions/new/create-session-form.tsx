@@ -17,11 +17,19 @@ export function CreateSessionForm({ lang }: { lang: Lang }) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
   const router = useRouter();
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [type, setType] = useState<TontineTypeKey>("HEBDO_SUNDAY");
   const [amount, setAmount] = useState(String(TONTINE_CONFIG.HEBDO_SUNDAY.amount));
   const [fee, setFee] = useState(String(TONTINE_CONFIG.HEBDO_SUNDAY.fee));
+  const [fineAmountPerPeriod, setFineAmountPerPeriod] = useState(
+    String(TONTINE_CONFIG.HEBDO_SUNDAY.fineAmountPerPeriod),
+  );
+  const [fineIntervalHours, setFineIntervalHours] = useState(
+    String(TONTINE_CONFIG.HEBDO_SUNDAY.fineIntervalHours),
+  );
   const [rules, setRules] = useState("");
   const [startDate, setStartDate] = useState("");
+  const [drawDate, setDrawDate] = useState("");
   const [limitTime, setLimitTime] = useState("18:31");
   const [maxSlots, setMaxSlots] = useState("");
   const [loading, setLoading] = useState(false);
@@ -31,6 +39,17 @@ export function CreateSessionForm({ lang }: { lang: Lang }) {
     setType(next);
     setAmount(String(TONTINE_CONFIG[next].amount));
     setFee(String(TONTINE_CONFIG[next].fee));
+    setFineAmountPerPeriod(String(TONTINE_CONFIG[next].fineAmountPerPeriod));
+    setFineIntervalHours(String(TONTINE_CONFIG[next].fineIntervalHours));
+  }
+
+  function handleStartDateChange(next: string) {
+    setStartDate(next);
+    if (!drawDate && next) {
+      const suggested = new Date(next);
+      suggested.setUTCDate(suggested.getUTCDate() - 1);
+      setDrawDate(suggested.toISOString().slice(0, 10));
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -43,11 +62,15 @@ export function CreateSessionForm({ lang }: { lang: Lang }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
+          description: description || undefined,
           type,
           amount: Number(amount),
           fee: Number(fee),
+          fineAmountPerPeriod: Number(fineAmountPerPeriod),
+          fineIntervalHours: Number(fineIntervalHours),
           rules: rules || undefined,
           startDate,
+          drawDate,
           limitTime,
           maxSlots: maxSlots ? Number(maxSlots) : undefined,
         }),
@@ -77,6 +100,19 @@ export function CreateSessionForm({ lang }: { lang: Lang }) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="e.g. Sunday Cycle — Douala Team"
+          className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+        />
+      </div>
+
+      <div>
+        <label htmlFor="description" className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+          {t("descriptionLabel")}
+        </label>
+        <textarea
+          id="description"
+          rows={2}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
           className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
         />
       </div>
@@ -130,6 +166,43 @@ export function CreateSessionForm({ lang }: { lang: Lang }) {
         </div>
       </div>
 
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label
+            htmlFor="fineAmountPerPeriod"
+            className="font-label-sm text-label-sm text-on-surface-variant block mb-1"
+          >
+            {t("fineAmountLabel")}
+          </label>
+          <input
+            id="fineAmountPerPeriod"
+            type="number"
+            min="0"
+            required
+            value={fineAmountPerPeriod}
+            onChange={(e) => setFineAmountPerPeriod(e.target.value)}
+            className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+          />
+        </div>
+        <div>
+          <label
+            htmlFor="fineIntervalHours"
+            className="font-label-sm text-label-sm text-on-surface-variant block mb-1"
+          >
+            {t("fineIntervalLabel")}
+          </label>
+          <input
+            id="fineIntervalHours"
+            type="number"
+            min="1"
+            required
+            value={fineIntervalHours}
+            onChange={(e) => setFineIntervalHours(e.target.value)}
+            className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+          />
+        </div>
+      </div>
+
       <div>
         <label htmlFor="maxSlots" className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
           {t("maxSlotCapacity")}
@@ -158,12 +231,27 @@ export function CreateSessionForm({ lang }: { lang: Lang }) {
           type="date"
           required
           value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
+          onChange={(e) => handleStartDateChange(e.target.value)}
           className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
         />
         <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">
           {t("startDateHelperText")}
         </p>
+      </div>
+
+      <div>
+        <label htmlFor="drawDate" className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+          {t("drawDateLabel")}
+        </label>
+        <input
+          id="drawDate"
+          type="date"
+          required
+          value={drawDate}
+          onChange={(e) => setDrawDate(e.target.value)}
+          className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+        />
+        <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">{t("drawDateHelperText")}</p>
       </div>
 
       <div>

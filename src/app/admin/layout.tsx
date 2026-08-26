@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getLang } from "@/lib/i18n/get-lang";
 import { AdminTopBar } from "@/components/admin/admin-top-bar";
+import { AdminSidebar } from "@/components/admin/admin-sidebar";
+import { AdminBottomNav } from "@/components/admin/admin-bottom-nav";
 import { IosInstallBanner } from "@/components/ios-install-banner";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -12,7 +14,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="min-h-screen flex flex-col bg-surface-container-lowest">
       <AdminTopBar userName={session.user.name ?? "Admin"} lang={lang} />
-      <div className="flex-1">{children}</div>
+      <AdminSidebar lang={lang} />
+      <div className="flex-1 md:pl-60 pb-24 md:pb-8">{children}</div>
+      <AdminBottomNav lang={lang} />
       <IosInstallBanner lang={lang} />
     </div>
   );

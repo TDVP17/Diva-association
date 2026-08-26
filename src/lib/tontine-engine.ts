@@ -146,23 +146,40 @@ export function getCutoffInstant(date: Date): Date {
   );
 }
 
-/** Outstanding fine for a contribution still unpaid at `now`, relative to its `cutoff`. */
-export function computeFine(type: TontineType, now: Date, cutoff: Date): number {
+/**
+ * Outstanding fine for a contribution still unpaid at `now`, relative to
+ * its `cutoff`. `override` is a session's own fineAmountPerPeriod/
+ * fineIntervalHours (admin-configurable per cotisation) — falls back to
+ * the global TONTINE_CONFIG table when the session predates that field.
+ */
+export function computeFine(
+  type: TontineType,
+  now: Date,
+  cutoff: Date,
+  override?: { fineAmountPerPeriod: number | null; fineIntervalHours: number | null },
+): number {
   const hoursLate = (now.getTime() - cutoff.getTime()) / (1000 * 60 * 60);
   if (hoursLate <= 0) return 0;
-  const { fineAmountPerPeriod, fineIntervalHours } = getTontineConfig(type);
+  const fallback = getTontineConfig(type);
+  const fineAmountPerPeriod = override?.fineAmountPerPeriod ?? fallback.fineAmountPerPeriod;
+  const fineIntervalHours = override?.fineIntervalHours ?? fallback.fineIntervalHours;
   const periodsLate = Math.ceil(hoursLate / fineIntervalHours);
   return periodsLate * fineAmountPerPeriod;
 }
 
-const DRAW_UNLOCK_LEAD_TIME_MS = 24 * 60 * 60 * 1000;
-
-/** The admin draw interface (starting the drawing phase, assigning positions) unlocks exactly 1 day before startDate. */
-export function isDrawUnlocked(startDate: Date, now: Date = new Date()): boolean {
-  return now.getTime() >= startDate.getTime() - DRAW_UNLOCK_LEAD_TIME_MS;
-}
-
-/** The instant the draw interface unlocks for a given session — used to show a countdown/"unlocks at" label. */
-export function getDrawUnlockTime(startDate: Date): Date {
-  return new Date(startDate.getTime() - DRAW_UNLOCK_LEAD_TIME_MS);
+/**
+ * The Nth contribution-cycle date after `startDate` (1-indexed) — purely
+ * for DISPLAY next to a payout position in the ranking tools. Does not
+ * affect how Payout.dueDate actually gets set (still computed live via
+ * getMostRecentDueDate at claim-submission time) — this is an estimate
+ * shown to admins/members before that happens.
+ */
+export function getCycleDateForRound(type: TontineType, startDate: Date, round: number): Date {
+  let cursor = getNextDueDate(type, startDate);
+  for (let i = 1; i < round; i++) {
+    const next = new Date(cursor);
+    next.setUTCDate(next.getUTCDate() + 1);
+    cursor = getNextDueDate(type, next);
+  }
+  return cursor;
 }
