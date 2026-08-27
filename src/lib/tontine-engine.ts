@@ -4,7 +4,7 @@ import { CAMEROON_TIME_ZONE, CUTOFF_HOUR, CUTOFF_MINUTE } from "@/lib/constants"
 export interface TontineConfig {
   amount: number;
   fee: number;
-  /** Only defined where the spec calls out an explicit fee split. */
+  /** President/winner split of the service fee (75%/25%) — applies to every type; kept nullable for a future type that might opt out. */
   feeSplit: { presidentShare: number; winnerShare: number } | null;
   fineAmountPerPeriod: number;
   fineIntervalHours: number;
@@ -21,28 +21,28 @@ export const TONTINE_CONFIG: Record<TontineType, TontineConfig> = {
   MONTHLY_28: {
     amount: 20000,
     fee: 500,
-    feeSplit: null,
+    feeSplit: { presidentShare: 75, winnerShare: 25 },
     fineAmountPerPeriod: 2500,
     fineIntervalHours: 24,
   },
   MONTHLY_25: {
     amount: 30000,
     fee: 750,
-    feeSplit: null,
+    feeSplit: { presidentShare: 75, winnerShare: 25 },
     fineAmountPerPeriod: 5000,
     fineIntervalHours: 24,
   },
   BIWEEKLY_SUNDAY: {
     amount: 5000,
     fee: 150,
-    feeSplit: null,
+    feeSplit: { presidentShare: 75, winnerShare: 25 },
     fineAmountPerPeriod: 500,
     fineIntervalHours: 24,
   },
   QUARTERLY_25: {
     amount: 75000,
     fee: 1500,
-    feeSplit: null,
+    feeSplit: { presidentShare: 75, winnerShare: 25 },
     fineAmountPerPeriod: 7500,
     fineIntervalHours: 24,
   },
@@ -50,6 +50,22 @@ export const TONTINE_CONFIG: Record<TontineType, TontineConfig> = {
 
 export function getTontineConfig(type: TontineType): TontineConfig {
   return TONTINE_CONFIG[type];
+}
+
+/**
+ * Splits a session's total collected service fees between the President and
+ * the round's winner, using the percentages in TontineConfig.feeSplit (e.g.
+ * 75/25). presidentShare/winnerShare are percentages of totalFees, not
+ * amounts to prorate against the fee-per-contribution — winner is derived
+ * by subtraction so the two shares always sum exactly to totalFees, with no
+ * rounding drift.
+ */
+export function computeFeeSplitAmounts(
+  totalFees: number,
+  feeSplit: { presidentShare: number; winnerShare: number },
+): { president: number; winner: number } {
+  const president = Math.round((totalFees * feeSplit.presidentShare) / 100);
+  return { president, winner: totalFees - president };
 }
 
 /**

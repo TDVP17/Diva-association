@@ -5,7 +5,53 @@ import {
   getContributionTotal,
   isContributionDay,
   getNextDueDate,
+  computeFeeSplitAmounts,
+  getTontineConfig,
 } from "@/lib/tontine-engine";
+import type { TontineType } from "@/generated/prisma/enums";
+
+describe("TONTINE_CONFIG.feeSplit", () => {
+  const allTypes: TontineType[] = ["HEBDO_SUNDAY", "MONTHLY_28", "MONTHLY_25", "BIWEEKLY_SUNDAY", "QUARTERLY_25"];
+
+  it("gives every contribution type the same 75/25 President/winner split", () => {
+    for (const type of allTypes) {
+      expect(getTontineConfig(type).feeSplit).toEqual({ presidentShare: 75, winnerShare: 25 });
+    }
+  });
+});
+
+describe("computeFeeSplitAmounts", () => {
+  const split = { presidentShare: 75, winnerShare: 25 };
+
+  it("splits a round total fees 75/25 President/winner", () => {
+    const result = computeFeeSplitAmounts(10000, split);
+    expect(result.president).toBe(7500);
+    expect(result.winner).toBe(2500);
+  });
+
+  it("uses the session's own fee amount, not the global TONTINE_CONFIG.fee preset — regression test for a bug where the split was divided by config.fee instead of by 100", () => {
+    // MONTHLY_28's global preset fee is 500 F, not 100 — a formula that
+    // divided by config.fee (as the old buggy code did) would compute
+    // 75 * totalFees / 500 = 15% here instead of the correct 75%.
+    const result = computeFeeSplitAmounts(2000, split);
+    expect(result.president).toBe(1500); // 75% of 2000
+    expect(result.winner).toBe(500); // 25% of 2000
+  });
+
+  it("president + winner always sum exactly to totalFees — no rounding drift", () => {
+    const totals = [1, 3, 7, 33, 99, 101, 333, 1001, 12345, 999999];
+    for (const totalFees of totals) {
+      const result = computeFeeSplitAmounts(totalFees, split);
+      expect(result.president + result.winner).toBe(totalFees);
+    }
+  });
+
+  it("returns 0/0 for 0 total fees", () => {
+    const result = computeFeeSplitAmounts(0, split);
+    expect(result.president).toBe(0);
+    expect(result.winner).toBe(0);
+  });
+});
 
 describe("computeFine", () => {
   const cutoff = new Date("2026-01-04T17:31:00Z"); // Sunday cutoff instant

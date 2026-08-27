@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { getLang } from "@/lib/i18n/get-lang";
 import { TopAppBar } from "@/components/top-app-bar";
 import { BottomNav } from "@/components/bottom-nav";
+import { MemberSidebar } from "@/components/member-sidebar";
 import { IosInstallBanner } from "@/components/ios-install-banner";
 import { isAdminRole } from "@/lib/constants";
 
@@ -25,8 +26,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         userImage={session.user.image ?? null}
         lang={lang}
       />
-      <div className="flex-1 pb-24 md:pb-8">{children}</div>
-      <BottomNav />
+      <MemberSidebar lang={lang} />
+      <div className="flex-1 pb-24 md:pb-8 md:pl-60">{children}</div>
+      <BottomNav lang={lang} />
       <IosInstallBanner lang={lang} />
     </div>
   );

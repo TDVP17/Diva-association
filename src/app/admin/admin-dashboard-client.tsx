@@ -7,7 +7,7 @@ import { translate, type Lang } from "@/lib/i18n/translations";
 interface MembershipRequest {
   id: string;
   joinedAt: string;
-  user: { id: string; name: string; avatar: string | null };
+  user: { id: string; name: string; avatar: string | null; image: string | null };
   tontineSession: { id: string; title: string | null; type: string; status: string };
   kycVerification: {
     documentType: string;
@@ -114,9 +114,9 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-9 h-9 rounded-full bg-tertiary-container text-on-tertiary flex items-center justify-center font-label-md text-label-md overflow-hidden flex-shrink-0">
-                      {m.user.avatar ? (
+                      {m.user.avatar ?? m.user.image ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={m.user.avatar} alt={m.user.name} className="w-full h-full object-cover" />
+                        <img src={m.user.avatar ?? m.user.image!} alt={m.user.name} className="w-full h-full object-cover" />
                       ) : (
                         m.user.name.slice(0, 2).toUpperCase()
                       )}

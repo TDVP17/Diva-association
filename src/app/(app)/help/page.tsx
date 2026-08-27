@@ -13,7 +13,7 @@ export default async function HelpPage() {
   const t = getTranslator(await getLang());
 
   return (
-    <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto">
+    <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-4xl mx-auto w-full">
       <h1 className="font-title-md text-title-md text-primary mb-stack-gap-md">{t("helpCenterTitle")}</h1>
 
       <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant overflow-hidden mb-stack-gap-lg">

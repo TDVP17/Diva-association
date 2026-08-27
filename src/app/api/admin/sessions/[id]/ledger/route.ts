@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
-import { getTontineConfig } from "@/lib/tontine-engine";
+import { getTontineConfig, computeFeeSplitAmounts } from "@/lib/tontine-engine";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin();
@@ -28,12 +28,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const totalUnpaidFines = Number(unpaidFines._sum.amount ?? 0);
   const config = getTontineConfig(tontineSession.type);
 
-  const feeSplit = config.feeSplit
-    ? {
-        president: Math.round((totalFees * config.feeSplit.presidentShare) / config.fee),
-        winner: Math.round((totalFees * config.feeSplit.winnerShare) / config.fee),
-      }
-    : null;
+  const feeSplit = config.feeSplit ? computeFeeSplitAmounts(totalFees, config.feeSplit) : null;
 
   return NextResponse.json({ totalFees, totalUnpaidFines, feeSplit });
 }

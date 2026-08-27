@@ -45,7 +45,7 @@ export default async function PublicPayPage({
           <LanguageToggle currentLang={lang} />
         </div>
         <div className="text-center mb-stack-gap-lg">
-          <span className="font-headline-lg text-headline-lg text-primary tracking-tight">DIVA</span>
+          <span className="font-headline-lg text-headline-lg text-primary tracking-tight">DIVA Association</span>
           <h1 className="font-title-md text-title-md text-on-surface mt-2">{t("contributeForMember")}</h1>
           <p className="font-body-md text-body-md text-on-surface-variant mt-1">{sessionLabel}</p>
         </div>

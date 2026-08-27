@@ -76,7 +76,7 @@ function subjectFor(type: string): string {
     case "FOOD_TURN":
       return "It's your turn! 🎉";
     default:
-      return "DIVA Associations";
+      return "DIVA Association";
   }
 }
 

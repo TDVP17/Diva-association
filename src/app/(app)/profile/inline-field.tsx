@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import type { ProfileFormState } from "./actions";
+import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 
 type OtpPurpose = "EMAIL_CHANGE" | "PHONE_CHANGE";
 
@@ -69,11 +70,10 @@ export function InlineField({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ purpose, pendingValue: newValue.trim() }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? t("otpInvalid"));
+      await parseJsonOrThrow(res, t("otpInvalid"));
       setStep("otp");
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("otpInvalid"));
+      setError(friendlyErrorMessage(err, t("otpInvalid")));
     } finally {
       setSending(false);
     }
@@ -89,11 +89,10 @@ export function InlineField({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ purpose, code }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? t("otpInvalid"));
+      await parseJsonOrThrow(res, t("otpInvalid"));
       setStep("verified");
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("otpInvalid"));
+      setError(friendlyErrorMessage(err, t("otpInvalid")));
     } finally {
       setVerifying(false);
     }

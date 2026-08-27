@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { translate, type Lang } from "@/lib/i18n/translations";
 
 const ITEMS = [
-  { href: "/dashboard", label: "Home", icon: "home" },
-  { href: "/sessions", label: "Sessions", icon: "account_balance" },
-  { href: "/chat", label: "Chat", icon: "chat_bubble" },
-  { href: "/profile", label: "Profile", icon: "person" },
+  { href: "/dashboard", label: "navHome", icon: "home" },
+  { href: "/sessions", label: "contributionsNavItem", icon: "account_balance" },
+  { href: "/chat", label: "messages", icon: "chat_bubble" },
+  { href: "/profile", label: "navProfile", icon: "person" },
 ] as const;
 
-export function BottomNav() {
+export function BottomNav({ lang }: { lang: Lang }) {
+  const t = (key: Parameters<typeof translate>[1]) => translate(lang, key);
   const pathname = usePathname();
 
   return (
@@ -33,7 +35,7 @@ export function BottomNav() {
             >
               {item.icon}
             </span>
-            <span className="font-label-sm text-label-sm">{item.label}</span>
+            <span className="font-label-sm text-label-sm">{t(item.label)}</span>
           </Link>
         );
       })}

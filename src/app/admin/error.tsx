@@ -2,7 +2,7 @@
 
 import { FriendlyError } from "@/components/friendly-error";
 
-export default function ProfileError({
+export default function AdminSegmentError({
   error,
   reset,
 }: {

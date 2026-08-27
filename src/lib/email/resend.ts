@@ -2,7 +2,7 @@
 // style of src/lib/whatsapp/evolution.ts for consistency.
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY ?? "";
-const RESEND_FROM = process.env.RESEND_FROM ?? "DIVA Associations <notifications@diva-associations.cm>";
+const RESEND_FROM = process.env.RESEND_FROM ?? "DIVA Association <notifications@diva-associations.cm>";
 
 export class ResendError extends Error {
   constructor(

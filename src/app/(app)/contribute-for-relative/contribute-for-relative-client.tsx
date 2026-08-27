@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { PaymentConfirmDialog } from "@/components/payment-confirm-dialog";
+import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 
 interface FoundMember {
   memberCode: string;
@@ -29,6 +31,7 @@ export function ContributeForRelativeClient({ lang }: { lang: Lang }) {
   const [member, setMember] = useState<FoundMember | null>(null);
   const [slots, setSlots] = useState<FundableSlot[]>([]);
   const [payingSlotId, setPayingSlotId] = useState<string | null>(null);
+  const [confirmSlotId, setConfirmSlotId] = useState<string | null>(null);
   const [payError, setPayError] = useState<string | null>(null);
 
   async function findMember() {
@@ -72,12 +75,12 @@ export function ContributeForRelativeClient({ lang }: { lang: Lang }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ membershipSlotId: slotId }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? t("paymentInitiationFailed"));
+      const body = await parseJsonOrThrow<{ paymentUrl: string }>(res, t("paymentInitiationFailed"));
       window.location.assign(body.paymentUrl);
     } catch (err) {
-      setPayError(err instanceof Error ? err.message : t("paymentInitiationFailed"));
+      setPayError(friendlyErrorMessage(err, t("paymentInitiationFailed")));
       setPayingSlotId(null);
+      setConfirmSlotId(null);
     }
   }
 
@@ -160,7 +163,7 @@ export function ContributeForRelativeClient({ lang }: { lang: Lang }) {
                   </p>
                 </div>
                 <button
-                  onClick={() => payForSlot(s.slotId)}
+                  onClick={() => setConfirmSlotId(s.slotId)}
                   disabled={s.alreadyPaid || payingSlotId === s.slotId}
                   className="flex-shrink-0 px-3 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 disabled:opacity-50 disabled:bg-surface-variant disabled:text-on-surface-variant"
                 >
@@ -176,6 +179,14 @@ export function ContributeForRelativeClient({ lang }: { lang: Lang }) {
         )}
       </div>
       {payError && <p className="font-label-sm text-label-sm text-error">{payError}</p>}
+      {confirmSlotId && (
+        <PaymentConfirmDialog
+          lang={lang}
+          membershipSlotId={confirmSlotId}
+          onConfirm={() => payForSlot(confirmSlotId)}
+          onClose={() => setConfirmSlotId(null)}
+        />
+      )}
     </div>
   );
 }

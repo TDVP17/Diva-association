@@ -84,7 +84,7 @@ export default async function SessionDetailPage({
 
     if (latestVerification?.status === "PENDING") {
       return (
-        <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto">
+        <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-5xl mx-auto w-full">
           <VerificationPollingRefresh />
           <section className="bg-surface rounded-xl p-6 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant text-center flex flex-col items-center gap-2">
             <span className="material-symbols-outlined text-primary text-4xl">hourglass_top</span>
@@ -99,7 +99,7 @@ export default async function SessionDetailPage({
 
     if (latestVerification?.status === "FAILED") {
       return (
-        <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto">
+        <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-5xl mx-auto w-full">
           <section className="bg-surface rounded-xl p-6 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant text-center flex flex-col items-center gap-3">
             <span className="material-symbols-outlined text-error text-4xl">gpp_bad</span>
             <h1 className="font-title-md text-title-md text-error">{t("verificationFailed")}</h1>
@@ -115,7 +115,7 @@ export default async function SessionDetailPage({
     }
 
     return (
-      <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto">
+      <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-5xl mx-auto w-full">
         <section className="bg-surface rounded-xl p-6 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant text-center flex flex-col items-center gap-3">
           <span className="material-symbols-outlined text-primary text-4xl">groups</span>
           <h1 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">
@@ -134,7 +134,7 @@ export default async function SessionDetailPage({
 
   if (myMembership.status === "PENDING") {
     return (
-      <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto">
+      <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-5xl mx-auto w-full">
         <section className="bg-surface rounded-xl p-6 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant text-center flex flex-col items-center gap-2">
           <span className="material-symbols-outlined text-primary text-4xl">hourglass_top</span>
           <h1 className="font-title-md text-title-md text-primary">{t("approvalPending")}</h1>
@@ -148,7 +148,7 @@ export default async function SessionDetailPage({
 
   if (myMembership.status === "REJECTED") {
     return (
-      <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto">
+      <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-5xl mx-auto w-full">
         <section className="bg-surface rounded-xl p-6 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant text-center flex flex-col items-center gap-3">
           <span className="material-symbols-outlined text-error text-4xl">cancel</span>
           <h1 className="font-title-md text-title-md text-error">{t("requestRejectedTitle")}</h1>
@@ -166,7 +166,7 @@ export default async function SessionDetailPage({
   // APPROVED but hasn't picked slots yet — mandatory one-time step.
   if (myMembership.slotCount === null) {
     return (
-      <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto">
+      <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-5xl mx-auto w-full">
         <section className="bg-surface rounded-xl p-6 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant text-center flex flex-col items-center gap-3 mb-stack-gap-lg">
           <span className="material-symbols-outlined text-primary text-4xl">confirmation_number</span>
           <h1 className="font-title-md text-title-md text-primary">{t("selectYourSlots")}</h1>
@@ -231,7 +231,7 @@ export default async function SessionDetailPage({
   }
 
   return (
-    <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto pb-32">
+    <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-5xl mx-auto w-full pb-32">
       {paidContribution && (
         <PaymentSuccessBanner
           lang={lang}
@@ -240,6 +240,7 @@ export default async function SessionDetailPage({
           amount={
             Number(paidContribution.amountPaid) + Number(paidContribution.feePaid) + Number(paidContribution.finePaid)
           }
+          paymentFee={Number(paidContribution.providerFeeAmount ?? 0)}
           paidByName={paidContribution.paidByUser?.name ?? paidContribution.membershipSlot.membership.user.name}
           date={(paidContribution.paidAt ?? paidContribution.dueDate).toLocaleDateString("en-GB", {
             timeZone: "Africa/Douala",
@@ -321,7 +322,8 @@ export default async function SessionDetailPage({
         />
       )}
 
-      <section className="mb-stack-gap-lg">
+      <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
+      <section className="mb-stack-gap-lg lg:mb-0">
         <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md px-1 flex items-center gap-2">
           {t("yourSlots")}
           {Number(myMembership.slotCount) % 1 !== 0 && (
@@ -348,7 +350,13 @@ export default async function SessionDetailPage({
                     {paid ? t("paid") : `${slotTotal.toLocaleString("en-US")} F ${t("due")}`}
                   </div>
                 </div>
-                {!paid && <PayButton membershipSlotId={s.id} amountLabel={`${slotTotal.toLocaleString("en-US")} F`} />}
+                {!paid && (
+                  <PayButton
+                    membershipSlotId={s.id}
+                    amountLabel={`${slotTotal.toLocaleString("en-US")} F`}
+                    lang={lang}
+                  />
+                )}
               </div>
             );
           })}
@@ -410,6 +418,7 @@ export default async function SessionDetailPage({
           })}
         </div>
       </section>
+      </div>
 
       {tontineSession.rules && (
         <section className="mt-stack-gap-lg">

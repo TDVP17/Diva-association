@@ -57,7 +57,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       });
     } catch (err) {
       if (err instanceof DiditError) {
-        return NextResponse.json({ error: err.message }, { status: 502 });
+        // Never forward Didit's raw error text to the user (e.g. "Didit
+        // session creation failed") — log it for diagnosis, show a plain
+        // bilingual message instead.
+        console.error("[sessions/kyc] Didit error:", err.status, err.message);
+        return NextResponse.json(
+          { error: "Verification could not start. Please try again." },
+          { status: 502 },
+        );
       }
       throw err;
     }

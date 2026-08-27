@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 
 export function KycModal({
   tontineSessionId,
@@ -26,12 +27,11 @@ export function KycModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ documentType }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? t("couldNotStartVerification"));
+      const body = await parseJsonOrThrow<{ verificationUrl?: string }>(res, t("couldNotStartVerification"));
       if (!body.verificationUrl) throw new Error(t("couldNotStartVerification"));
       window.location.href = body.verificationUrl;
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("couldNotStartVerification"));
+      setError(friendlyErrorMessage(err, t("couldNotStartVerification")));
       setSubmitting(false);
     }
   }

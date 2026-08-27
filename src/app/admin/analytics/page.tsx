@@ -1,57 +1,15 @@
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { requirePresident } from "@/lib/require-admin";
-
-const TONTINE_LABELS: Record<string, string> = {
-  HEBDO_SUNDAY: "Weekly Tontine",
-  MONTHLY_28: "Monthly Tontine (28th)",
-  MONTHLY_25: "Monthly Tontine (25th)",
-};
+import { getRevenueAnalytics } from "@/lib/analytics";
 
 export default async function AdminAnalyticsPage() {
   const president = await requirePresident();
   if (!president) redirect("/admin");
   const t = getTranslator(await getLang());
 
-  const sessions = await prisma.tontineSession.findMany({
-    select: {
-      id: true,
-      title: true,
-      type: true,
-      memberships: {
-        select: {
-          slots: {
-            select: {
-              contributions: { where: { status: "PAID" }, select: { feePaid: true } },
-              fines: { where: { status: { in: ["PAID", "DEDUCTED"] } }, select: { amount: true } },
-            },
-          },
-        },
-      },
-    },
-    orderBy: { startDate: "desc" },
-  });
-
-  const perSession = sessions.map((s) => {
-    const slots = s.memberships.flatMap((m) => m.slots);
-    const fees = slots.reduce(
-      (sum, slot) => sum + slot.contributions.reduce((a, c) => a + Number(c.feePaid), 0),
-      0,
-    );
-    const fines = slots.reduce((sum, slot) => sum + slot.fines.reduce((a, f) => a + Number(f.amount), 0), 0);
-    return {
-      id: s.id,
-      title: s.title || TONTINE_LABELS[s.type] || s.type,
-      fees,
-      fines,
-      total: fees + fines,
-    };
-  });
-
-  const totalFees = perSession.reduce((sum, s) => sum + s.fees, 0);
-  const totalFines = perSession.reduce((sum, s) => sum + s.fines, 0);
-  const totalRevenue = totalFees + totalFines;
+  const { totalFees, totalFines, totalGrossReceived, totalPresidentFeeShare, totalUnpaidFines, totalSuccessfulPayments, totalPendingPayments, sessions: perSession } =
+    await getRevenueAnalytics();
 
   return (
     <main className="px-container-padding pt-stack-gap-lg pb-32 max-w-4xl mx-auto w-full flex flex-col gap-section-margin">
@@ -60,11 +18,23 @@ export default async function AdminAnalyticsPage() {
         <p className="text-on-surface-variant font-body-lg mt-2">{t("revenueAnalyticsSubtitle")}</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-stack-gap-md">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-stack-gap-md">
+        <div className="bg-primary text-on-primary rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4">
+          <p className="font-label-sm text-label-sm text-primary-fixed-dim">{t("totalMoneyReceived")}</p>
+          <p className="font-numeric-data text-numeric-data text-white mt-1">
+            {totalGrossReceived.toLocaleString("en-US")} F
+          </p>
+        </div>
         <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
           <p className="font-label-sm text-label-sm text-on-surface-variant">{t("totalServiceFees")}</p>
           <p className="font-numeric-data text-numeric-data text-on-surface mt-1">
             {totalFees.toLocaleString("en-US")} F
+          </p>
+        </div>
+        <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
+          <p className="font-label-sm text-label-sm text-on-surface-variant">{t("presidentFeeShareLabel")}</p>
+          <p className="font-numeric-data text-numeric-data text-on-surface mt-1">
+            {totalPresidentFeeShare.toLocaleString("en-US")} F
           </p>
         </div>
         <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
@@ -73,11 +43,19 @@ export default async function AdminAnalyticsPage() {
             {totalFines.toLocaleString("en-US")} F
           </p>
         </div>
-        <div className="bg-primary text-on-primary rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4">
-          <p className="font-label-sm text-label-sm text-primary-fixed-dim">{t("totalAdminRevenue")}</p>
-          <p className="font-numeric-data text-numeric-data text-white mt-1">
-            {totalRevenue.toLocaleString("en-US")} F
+        <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
+          <p className="font-label-sm text-label-sm text-on-surface-variant">{t("unpaidFines")}</p>
+          <p className="font-numeric-data text-numeric-data text-error mt-1">
+            {totalUnpaidFines.toLocaleString("en-US")} F
           </p>
+        </div>
+        <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
+          <p className="font-label-sm text-label-sm text-on-surface-variant">{t("successfulPaymentsLabel")}</p>
+          <p className="font-numeric-data text-numeric-data text-on-surface mt-1">{totalSuccessfulPayments}</p>
+        </div>
+        <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
+          <p className="font-label-sm text-label-sm text-on-surface-variant">{t("pendingPaymentsLabel")}</p>
+          <p className="font-numeric-data text-numeric-data text-on-surface mt-1">{totalPendingPayments}</p>
         </div>
       </div>
 
@@ -87,31 +65,37 @@ export default async function AdminAnalyticsPage() {
           <p className="font-label-sm text-label-sm text-on-surface-variant">{t("noRevenueYet")}</p>
         ) : (
           <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant overflow-x-auto">
-            <table className="w-full text-left min-w-[480px]">
+            <table className="w-full text-left min-w-[640px]">
               <thead>
                 <tr className="border-b border-surface-variant">
                   <th className="p-3 font-label-sm text-label-sm text-on-surface-variant">{t("title")}</th>
+                  <th className="p-3 font-label-sm text-label-sm text-on-surface-variant">{t("totalMoneyReceived")}</th>
                   <th className="p-3 font-label-sm text-label-sm text-on-surface-variant">{t("totalServiceFees")}</th>
+                  <th className="p-3 font-label-sm text-label-sm text-on-surface-variant">{t("presidentFeeShareLabel")}</th>
                   <th className="p-3 font-label-sm text-label-sm text-on-surface-variant">
                     {t("totalFinesCollected")}
                   </th>
-                  <th className="p-3 font-label-sm text-label-sm text-on-surface-variant">
-                    {t("totalAdminRevenue")}
-                  </th>
+                  <th className="p-3 font-label-sm text-label-sm text-on-surface-variant">{t("unpaidFines")}</th>
                 </tr>
               </thead>
               <tbody>
                 {perSession.map((s) => (
                   <tr key={s.id} className="border-b last:border-b-0 border-surface-variant">
                     <td className="p-3 font-label-md text-label-md text-on-surface">{s.title}</td>
+                    <td className="p-3 font-numeric-data text-[14px] text-primary">
+                      {s.grossReceived.toLocaleString("en-US")} F
+                    </td>
                     <td className="p-3 font-numeric-data text-[14px] text-on-surface">
                       {s.fees.toLocaleString("en-US")} F
                     </td>
                     <td className="p-3 font-numeric-data text-[14px] text-on-surface">
+                      {s.presidentFeeShare.toLocaleString("en-US")} F
+                    </td>
+                    <td className="p-3 font-numeric-data text-[14px] text-on-surface">
                       {s.fines.toLocaleString("en-US")} F
                     </td>
-                    <td className="p-3 font-numeric-data text-[14px] text-primary">
-                      {s.total.toLocaleString("en-US")} F
+                    <td className="p-3 font-numeric-data text-[14px] text-error">
+                      {s.unpaidFines.toLocaleString("en-US")} F
                     </td>
                   </tr>
                 ))}

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 
 type PayoutStatus = "DETAILS_SUBMITTED" | "RELEASED" | "CONFIRMED" | null;
 
@@ -35,11 +36,10 @@ export function PayoutTurnPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ membershipSlotId, phone: phone.trim(), accountName: accountName.trim() }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? t("couldNotSubmitPayoutDetails"));
+      await parseJsonOrThrow(res, t("couldNotSubmitPayoutDetails"));
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("couldNotSubmitPayoutDetails"));
+      setError(friendlyErrorMessage(err, t("couldNotSubmitPayoutDetails")));
       setSubmitting(false);
     }
   }
@@ -50,11 +50,10 @@ export function PayoutTurnPanel({
     setError(null);
     try {
       const res = await fetch(`/api/payments/payout-claims/${payoutId}/confirm`, { method: "POST" });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? t("couldNotSubmitPayoutDetails"));
+      await parseJsonOrThrow(res, t("couldNotSubmitPayoutDetails"));
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("couldNotSubmitPayoutDetails"));
+      setError(friendlyErrorMessage(err, t("couldNotSubmitPayoutDetails")));
       setConfirming(false);
     }
   }

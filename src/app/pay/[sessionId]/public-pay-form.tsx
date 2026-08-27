@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { PaymentConfirmDialog } from "@/components/payment-confirm-dialog";
+import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 
 interface UnpaidSlot {
   id: string;
@@ -18,6 +20,7 @@ export function PublicPayForm({
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
   const [slots] = useState(initialUnpaidSlots);
   const [selectedSlotId, setSelectedSlotId] = useState("");
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,12 +34,12 @@ export function PublicPayForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ membershipSlotId: selectedSlotId }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? t("paymentInitiationFailed"));
+      const body = await parseJsonOrThrow<{ paymentUrl: string }>(res, t("paymentInitiationFailed"));
       window.location.href = body.paymentUrl;
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("paymentInitiationFailed"));
+      setError(friendlyErrorMessage(err, t("paymentInitiationFailed")));
       setLoading(false);
+      setShowConfirm(false);
     }
   }
 
@@ -72,13 +75,21 @@ export function PublicPayForm({
       </div>
       {error && <p className="font-label-sm text-label-sm text-error">{error}</p>}
       <button
-        onClick={handlePay}
+        onClick={() => setShowConfirm(true)}
         disabled={!selectedSlotId || loading}
         className="w-full py-3 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
       >
         <span className="material-symbols-outlined">payments</span>
         {loading ? t("redirectingToFapshi") : t("payViaFapshi")}
       </button>
+      {showConfirm && (
+        <PaymentConfirmDialog
+          lang={lang}
+          membershipSlotId={selectedSlotId}
+          onConfirm={handlePay}
+          onClose={() => setShowConfirm(false)}
+        />
+      )}
     </div>
   );
 }

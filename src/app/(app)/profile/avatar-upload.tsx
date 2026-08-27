@@ -6,6 +6,7 @@ import Cropper, { type Area } from "react-easy-crop";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { getCroppedImageBlob } from "./crop-image";
 import { AvatarViewer } from "./avatar-viewer";
+import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 
 export function AvatarUpload({
   currentAvatarUrl,
@@ -47,13 +48,12 @@ export function AvatarUpload({
       const formData = new FormData();
       formData.append("avatar", blob, "avatar.jpg");
       const res = await fetch("/api/profile/avatar", { method: "POST", body: formData });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Upload failed");
+      const body = await parseJsonOrThrow<{ avatarUrl: string }>(res, t("somethingWentWrong"));
       setAvatarUrl(body.avatarUrl);
       router.refresh();
       setCropSrc(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      setError(friendlyErrorMessage(err, t("somethingWentWrong")));
     } finally {
       setUploading(false);
     }

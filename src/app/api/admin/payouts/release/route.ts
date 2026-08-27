@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       phone: claim.payoutPhone,
       name: claim.payoutAccountName,
       externalId: `${claim.tontineSessionId}:${slot.id}:${claim.dueDate.toISOString()}`,
-      message: "DIVA Associations tontine payout",
+      message: "DIVA Association tontine payout",
     });
   } catch (err) {
     if (err instanceof FapshiPayoutError) {
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
 
   await sendWhatsAppMessageSafe(
     user.phone,
-    `🎉 Payout released — DIVA Associations\n\n` +
+    `🎉 Payout released — DIVA Association\n\n` +
       `Congratulations ${user.name} (${slot.beneficiaryName})! Your payout of ${netPayout.toLocaleString("en-US")} F has been released` +
       (deducted > 0 ? ` after deducting ${deducted.toLocaleString("en-US")} F in outstanding fines.` : `.`) +
       ` Confirm on the app once you've received it.`,

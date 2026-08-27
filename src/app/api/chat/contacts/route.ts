@@ -10,31 +10,39 @@ interface Contact {
   avatar: string | null;
   lastMessageAt: string | null;
   lastMessagePreview: string | null;
+  unreadCount: number;
 }
 
 async function withLastMessage(userId: string, otherIds: string[]): Promise<Contact[]> {
   if (otherIds.length === 0) return [];
 
-  const users = await prisma.user.findMany({
-    where: { id: { in: otherIds } },
-    select: { id: true, name: true, avatar: true, image: true },
-  });
-
-  const lastMessages = await prisma.chatMessage.findMany({
-    where: {
-      OR: [
-        { senderId: userId, receiverId: { in: otherIds } },
-        { receiverId: userId, senderId: { in: otherIds } },
-      ],
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const [users, lastMessages, unreadByPartner] = await Promise.all([
+    prisma.user.findMany({
+      where: { id: { in: otherIds } },
+      select: { id: true, name: true, avatar: true, image: true },
+    }),
+    prisma.chatMessage.findMany({
+      where: {
+        OR: [
+          { senderId: userId, receiverId: { in: otherIds } },
+          { receiverId: userId, senderId: { in: otherIds } },
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.chatMessage.groupBy({
+      by: ["senderId"],
+      where: { receiverId: userId, senderId: { in: otherIds }, readAt: null },
+      _count: { _all: true },
+    }),
+  ]);
 
   const lastByPartner = new Map<string, (typeof lastMessages)[number]>();
   for (const msg of lastMessages) {
     const partnerId = msg.senderId === userId ? msg.receiverId : msg.senderId;
     if (!lastByPartner.has(partnerId)) lastByPartner.set(partnerId, msg);
   }
+  const unreadCountByPartner = new Map(unreadByPartner.map((row) => [row.senderId, row._count._all]));
 
   return users
     .map((u) => {
@@ -45,6 +53,7 @@ async function withLastMessage(userId: string, otherIds: string[]): Promise<Cont
         avatar: u.avatar ?? u.image,
         lastMessageAt: last?.createdAt.toISOString() ?? null,
         lastMessagePreview: last?.content ?? null,
+        unreadCount: unreadCountByPartner.get(u.id) ?? 0,
       };
     })
     .sort((a, b) => (b.lastMessageAt ?? "").localeCompare(a.lastMessageAt ?? ""));
@@ -93,6 +102,7 @@ export async function GET() {
       avatar: adminUser.avatar ?? adminUser.image,
       lastMessageAt: null,
       lastMessagePreview: null,
+      unreadCount: 0,
     };
   }
 

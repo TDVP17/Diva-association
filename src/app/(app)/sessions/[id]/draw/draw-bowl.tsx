@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 
 const FLOAT_CLASSES = [
   "top-[20%] left-[25%] w-14 h-14 animate-[float_4s_ease-in-out_infinite]",
@@ -50,14 +51,13 @@ export function DrawBowl({
     setError(null);
     try {
       const res = await fetch(`/api/sessions/${tontineSessionId}/draw`, { method: "POST" });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? t("drawFailed"));
+      const body = await parseJsonOrThrow<{ drawn: DrawnSlot[] }>(res, t("drawFailed"));
       setTimeout(() => {
         setResults(body.drawn);
         setDrawing(false);
       }, 600);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("drawFailed"));
+      setError(friendlyErrorMessage(err, t("drawFailed")));
       setDrawing(false);
     }
   }

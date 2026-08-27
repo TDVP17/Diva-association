@@ -68,8 +68,10 @@ export function LoginContent({
 
         <div className="flex flex-col items-center gap-2 mb-stack-gap-lg relative z-10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/icon-512.png" alt="DIVA Associations" className="w-16 h-16 rounded-2xl shadow-sm" />
-          <div className="font-headline-lg text-headline-lg text-primary tracking-tight">DIVA</div>
+          <img src="/icons/icon-512.png" alt="DIVA Association" className="w-16 h-16 rounded-2xl shadow-sm" />
+          <div className="font-headline-lg text-headline-lg text-primary tracking-tight text-center">
+            DIVA Association
+          </div>
         </div>
 
         <div className="text-center mb-section-margin relative z-10">

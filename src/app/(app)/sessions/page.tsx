@@ -47,7 +47,7 @@ export default async function SessionsPage() {
   );
 
   return (
-    <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto flex flex-col gap-section-margin">
+    <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-6xl mx-auto w-full flex flex-col gap-section-margin">
       <section>
         <h2 className="sticky top-16 z-30 bg-background py-2 -mx-container-padding px-container-padding font-title-md text-title-md text-primary mb-stack-gap-md shadow-[0px_4px_20px_rgba(30,41,59,0.05)]">
           {t("mySessions")}
@@ -57,7 +57,7 @@ export default async function SessionsPage() {
             <p className="font-body-md text-body-md text-on-surface-variant">{t("notJoinedYet")}</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-stack-gap-md">
+          <div className="flex flex-col gap-stack-gap-md lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-stack-gap-md">
             {memberships.map((m) => (
               <Link
                 key={m.id}
@@ -96,7 +96,7 @@ export default async function SessionsPage() {
             <p className="font-body-md text-body-md text-on-surface-variant">{t("noOpenCotisations")}</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-stack-gap-md">
+          <div className="flex flex-col gap-stack-gap-md lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-stack-gap-md">
             {browsable.map((s) => (
               <Link
                 key={s.id}

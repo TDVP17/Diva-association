@@ -74,7 +74,7 @@ export default async function HistoryPage() {
   rows.sort((a, b) => b.dueDate.getTime() - a.dueDate.getTime());
 
   return (
-    <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto">
+    <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-4xl mx-auto w-full">
       <h1 className="font-title-md text-title-md text-primary mb-stack-gap-md">{t("transactionHistory")}</h1>
 
       {rows.length === 0 ? (

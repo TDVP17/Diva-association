@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 
 const SLOT_OPTIONS = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 
@@ -42,8 +43,7 @@ export function SelectSlotsForm({ tontineSessionId, lang }: { tontineSessionId: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slotCount, beneficiaryNames: trimmedNames }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? t("couldNotSaveSlots"));
+      const body = await parseJsonOrThrow<{ beneficiaryNames?: string[] }>(res, t("couldNotSaveSlots"));
 
       const finalNames: string[] = body.beneficiaryNames ?? trimmedNames;
       const changes = trimmedNames
@@ -56,7 +56,7 @@ export function SelectSlotsForm({ tontineSessionId, lang }: { tontineSessionId: 
         router.refresh();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("couldNotSaveSlots"));
+      setError(friendlyErrorMessage(err, t("couldNotSaveSlots")));
       setSubmitting(false);
     }
   }

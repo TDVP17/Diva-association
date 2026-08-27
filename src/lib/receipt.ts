@@ -28,6 +28,9 @@ export interface ReceiptData {
   amount: number;
   fee: number;
   fine: number;
+  /// Total payment-gateway processing fee (e.g. Fapshi's combined 3.3%) —
+  /// the total only, never the internal gateway/president split.
+  paymentFee?: number;
   total: number;
   transRef: string;
   paidAt: Date;
@@ -51,11 +54,11 @@ export async function generateReceiptPdf(data: ReceiptData): Promise<Buffer> {
     const logoImage = await doc.embedPng(logoBytes);
     const logoSize = 36;
     page.drawImage(logoImage, { x: left, y: y - logoSize + 8, width: logoSize, height: logoSize });
-    page.drawText("DIVA Associations", { x: left + logoSize + 10, y, size: 20, font: bold, color: primary });
+    page.drawText("DIVA Association", { x: left + logoSize + 10, y, size: 20, font: bold, color: primary });
     page.drawText("Payment Receipt", { x: left + logoSize + 10, y: y - 20, size: 12, font, color: muted });
   } catch {
     // Logo optional — the receipt is still valid without it.
-    page.drawText("DIVA Associations", { x: left, y, size: 20, font: bold, color: primary });
+    page.drawText("DIVA Association", { x: left, y, size: 20, font: bold, color: primary });
     page.drawText("Payment Receipt", { x: left, y: y - 20, size: 12, font, color: muted });
   }
   y -= 44;
@@ -108,8 +111,9 @@ export async function generateReceiptPdf(data: ReceiptData): Promise<Buffer> {
   row("Contribution", formatXAF(data.amount));
   row("Fee", formatXAF(data.fee));
   if (data.fine > 0) row("Late fine", formatXAF(data.fine));
+  if (data.paymentFee) row("Payment fee", formatXAF(data.paymentFee));
   y -= 10;
-  row("Total Paid", formatXAF(data.total), { emphasize: true });
+  row("Total Deducted", formatXAF(data.total), { emphasize: true });
 
   y -= 30;
   page.drawText("Thank you for your contribution to the community fund.", {

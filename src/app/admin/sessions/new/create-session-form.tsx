@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { TONTINE_CONFIG } from "@/lib/tontine-engine";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly (every Sunday)",
@@ -77,12 +78,11 @@ export function CreateSessionForm({ lang }: { lang: Lang }) {
           maxSlots: maxSlots ? Number(maxSlots) : undefined,
         }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? t("couldNotCreateCotisation"));
+      await parseJsonOrThrow(res, t("couldNotCreateCotisation"));
       router.push("/admin");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("couldNotCreateCotisation"));
+      setError(friendlyErrorMessage(err, t("couldNotCreateCotisation")));
       setLoading(false);
     }
   }

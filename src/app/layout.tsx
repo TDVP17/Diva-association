@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "DIVA Associations",
+  title: "DIVA Association",
   description: "Automated management for traditional tontines.",
   manifest: "/manifest.json",
   icons: {

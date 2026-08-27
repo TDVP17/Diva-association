@@ -1,4 +1,4 @@
-// Prisma schema for DIVA Associations
+// Prisma schema for DIVA Association
 // Learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
@@ -113,6 +113,16 @@ enum OtpPurpose {
 enum PaymentMethodType {
   MOBILE_MONEY
   CARD
+}
+
+/// The payment gateway that processed a Contribution — see
+/// src/lib/payment-fees.ts for each provider's fee structure. KORAPAY is
+/// modeled here so the fee-splitting logic is ready for it, even though no
+/// live Korapay checkout integration exists yet (Fapshi is the only
+/// gateway currently wired into a real payment flow).
+enum PaymentProvider {
+  FAPSHI
+  KORAPAY
 }
 
 model User {
@@ -431,28 +441,43 @@ model KycVerification {
 }
 
 model Contribution {
-  id                String             @id @default(cuid())
-  membershipSlotId  String
+  id                      String             @id @default(cuid())
+  membershipSlotId        String
   /// Calendar date (Cameroon-local) of the contribution cycle this row belongs
   /// to — each Sunday for HEBDO_SUNDAY, the 25th/28th for the monthly types.
-  dueDate           DateTime
-  amountPaid        Decimal            @db.Decimal(12, 2)
-  feePaid           Decimal            @db.Decimal(12, 2)
-  finePaid          Decimal            @default(0) @db.Decimal(12, 2)
-  status            ContributionStatus @default(PENDING)
-  fapshiTxRef       String?            @unique
-  koraReference     String?            @unique
-  paidAt            DateTime?
-  receiptPdfUrl     String?
+  dueDate                 DateTime
+  amountPaid              Decimal            @db.Decimal(12, 2)
+  feePaid                 Decimal            @db.Decimal(12, 2)
+  finePaid                Decimal            @default(0) @db.Decimal(12, 2)
+  status                  ContributionStatus @default(PENDING)
+  fapshiTxRef             String?            @unique
+  koraReference           String?            @unique
+  paidAt                  DateTime?
+  receiptPdfUrl           String?
   /// Set only when an admin records this contribution manually (off-platform
   /// payment) rather than it being confirmed via the Fapshi webhook.
-  recordedByAdminId String?
+  recordedByAdminId       String?
   /// Who physically paid — distinct from the slot's owning member. Null
   /// means self-paid by the slot's own member (the historical default).
   /// Set when a relative/friend pays via the "Contribute for a Relative"
   /// flow. Independent of recordedByAdminId, which tracks admin manual
   /// entries specifically.
-  paidByUserId      String?
+  paidByUserId            String?
+  /// Which payment gateway processed this transaction. Null for
+  /// admin-recorded (manual, off-platform) payments — there's no gateway
+  /// fee to compute when no gateway was involved.
+  paymentProvider         PaymentProvider?
+  /// Total payment-processing fee charged to the payer on top of
+  /// amountPaid+feePaid+finePaid (e.g. 3.3% for Fapshi). Null when
+  /// paymentProvider is null. Never shown to ordinary users broken down —
+  /// only the total is shown at confirmation (see src/lib/payment-fees.ts).
+  providerFeeAmount       Decimal?           @db.Decimal(12, 2)
+  /// The gateway's own cut of providerFeeAmount (e.g. Fapshi's 3.0%).
+  /// President-only visibility, enforced server-side.
+  providerShareAmount     Decimal?           @db.Decimal(12, 2)
+  /// The President's cut of providerFeeAmount (e.g. Fapshi's 0.3%).
+  /// President-only visibility, enforced server-side.
+  presidentFeeShareAmount Decimal?           @db.Decimal(12, 2)
 
   membershipSlot  MembershipSlot @relation(fields: [membershipSlotId], references: [id], onDelete: Cascade)
   recordedByAdmin User?          @relation("ContributionRecordedByAdmin", fields: [recordedByAdminId], references: [id])

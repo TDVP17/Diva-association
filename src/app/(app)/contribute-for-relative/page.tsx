@@ -10,7 +10,7 @@ export default async function ContributeForRelativePage() {
   const t = getTranslator(lang);
 
   return (
-    <main className="px-container-padding py-stack-gap-lg max-w-md mx-auto">
+    <main className="px-container-padding py-stack-gap-lg max-w-md lg:max-w-lg mx-auto w-full">
       <h1 className="font-title-md text-title-md text-primary mb-stack-gap-md">
         {t("contributeForRelativeNav")}
       </h1>

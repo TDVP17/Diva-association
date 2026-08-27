@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { changePasswordAction, type ProfileFormState } from "./actions";
+import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 
 function SaveButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
@@ -50,11 +51,10 @@ export function InlinePasswordField({ lang }: { lang: Lang }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ purpose: "PASSWORD_CHANGE" }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? t("otpInvalid"));
+      await parseJsonOrThrow(res, t("otpInvalid"));
       setCodeSent(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("otpInvalid"));
+      setError(friendlyErrorMessage(err, t("otpInvalid")));
     } finally {
       setSending(false);
     }
@@ -70,11 +70,10 @@ export function InlinePasswordField({ lang }: { lang: Lang }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ purpose: "PASSWORD_CHANGE", code }),
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? t("otpInvalid"));
+      await parseJsonOrThrow(res, t("otpInvalid"));
       setStep("verified");
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("otpInvalid"));
+      setError(friendlyErrorMessage(err, t("otpInvalid")));
     } finally {
       setVerifying(false);
     }

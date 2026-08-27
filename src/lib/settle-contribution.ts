@@ -35,6 +35,8 @@ export async function settleContribution(
 
   const paidByName = contribution.paidByUser?.name;
 
+  const paymentFee = Number(contribution.providerFeeAmount ?? 0);
+
   const receiptBytes = await generateReceiptPdf({
     memberName: `${user.name} — ${contribution.membershipSlot.beneficiaryName}`,
     paidByName,
@@ -43,7 +45,8 @@ export async function settleContribution(
     amount: Number(contribution.amountPaid),
     fee: Number(contribution.feePaid),
     fine: Number(contribution.finePaid),
-    total: Number(contribution.amountPaid) + Number(contribution.feePaid) + Number(contribution.finePaid),
+    paymentFee: paymentFee > 0 ? paymentFee : undefined,
+    total: Number(contribution.amountPaid) + Number(contribution.feePaid) + Number(contribution.finePaid) + paymentFee,
     transRef: contribution.fapshiTxRef ?? contribution.id,
     paidAt: options.paidAt,
   });
@@ -70,7 +73,7 @@ export async function settleContribution(
   ]);
 
   const totalPaid =
-    Number(contribution.amountPaid) + Number(contribution.feePaid) + Number(contribution.finePaid);
+    Number(contribution.amountPaid) + Number(contribution.feePaid) + Number(contribution.finePaid) + paymentFee;
   const sessionLabel = tontineSession.title || TONTINE_LABELS[tontineSession.type];
   const receiptUrl = `${options.origin}/api/files/${receiptKey}`;
 
