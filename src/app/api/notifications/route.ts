@@ -29,6 +29,7 @@ export async function GET() {
       contributionLabel: n.tontineSession
         ? n.tontineSession.title || TONTINE_LABELS[n.tontineSession.type]
         : null,
+      actionUrl: n.actionUrl,
       sentAt: (n.sentAt ?? n.scheduledAt).toISOString(),
       readAt: n.readAt ? n.readAt.toISOString() : null,
     })),

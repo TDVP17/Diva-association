@@ -5,6 +5,7 @@ import { AdminTopBar } from "@/components/admin/admin-top-bar";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminBottomNav } from "@/components/admin/admin-bottom-nav";
 import { IosInstallBanner } from "@/components/ios-install-banner";
+import { NotificationBadgeSync } from "@/components/notification-badge-sync";
 import { isAdminRole } from "@/lib/constants";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -21,6 +22,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <div className="flex-1 md:pl-60 pb-24 md:pb-8">{children}</div>
       <AdminBottomNav lang={lang} isPresident={isPresident} />
       <IosInstallBanner lang={lang} />
+      <NotificationBadgeSync />
     </div>
   );
 }

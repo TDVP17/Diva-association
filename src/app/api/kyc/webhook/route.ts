@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionDecision } from "@/lib/didit";
 import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
+import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 
 const MAX_TIMESTAMP_SKEW_SECONDS = 300;
 
@@ -95,6 +96,20 @@ export async function POST(request: Request) {
         user?.phone ?? null,
         `Your identity verification was successful. Your request to join the cotisation is now awaiting admin approval.`,
       );
+
+      const admins = await prisma.user.findMany({
+        where: { role: { in: ["ADMIN", "PRESIDENT"] } },
+        select: { id: true },
+      });
+      await scheduleInAppNotifications({
+        tontineSessionId: record.tontineSessionId,
+        type: "NEW_MEMBERSHIP_REQUEST",
+        recipients: admins.map((a) => ({
+          userId: a.id,
+          message: `${user?.name ?? "A member"} requested to join a cotisation.`,
+          actionUrl: "/admin/membership-requests",
+        })),
+      });
     } else {
       await prisma.kycVerification.update({ where: { id: record.id }, data: { status: "FAILED" } });
     }

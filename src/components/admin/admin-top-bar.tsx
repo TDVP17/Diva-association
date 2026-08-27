@@ -24,9 +24,9 @@ export async function AdminTopBar({
 
   const menuItems: TopRightMenuItem[] = [
     { href: "/admin/support", label: t("messages"), icon: "chat_bubble", badge: unreadMessages },
-    { href: "/admin", label: t("contributionsNavItem"), icon: "account_balance" },
+    { href: "/admin/contributions", label: t("contributionsNavItem"), icon: "account_balance" },
     { href: "/admin/sessions/new", label: t("addContributionNav"), icon: "add_circle" },
-    { href: "/admin#requests-section", label: t("joinRequestsNav"), icon: "group_add" },
+    { href: "/admin/membership-requests", label: t("joinRequestsNav"), icon: "group_add" },
     { href: "/admin/food-requests", label: t("foodRequestsNav"), icon: "restaurant" },
   ];
 

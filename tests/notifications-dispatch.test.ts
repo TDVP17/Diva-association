@@ -68,4 +68,18 @@ describe("scheduleNotifications", () => {
       message: "hi",
     });
   });
+
+  it("carries actionUrl onto a row when provided, and leaves it undefined when omitted", async () => {
+    await scheduleNotifications({
+      channel: "IN_APP",
+      type: "SWAP_REQUEST_CREATED",
+      recipients: [
+        { userId: "u1", message: "hi", actionUrl: "/chat" },
+        { userId: "u2", message: "hi" },
+      ],
+    });
+    const { data } = createMany.mock.calls[0][0];
+    expect(data[0].actionUrl).toBe("/chat");
+    expect(data[1].actionUrl).toBeUndefined();
+  });
 });

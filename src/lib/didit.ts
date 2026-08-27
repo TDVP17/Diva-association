@@ -61,6 +61,15 @@ function authHeaders(): Record<string, string> {
 export async function createVerificationSession(
   params: CreateSessionParams,
 ): Promise<CreateSessionResult> {
+  if (!DIDIT_API_KEY || !DIDIT_WORKFLOW_ID) {
+    // Every request below still gets sent (Didit will reject it), but this
+    // log makes the real cause visible immediately in server logs instead
+    // of requiring a guess from Didit's generic rejection response.
+    console.error(
+      "[didit] DIDIT_API_KEY or DIDIT_WORKFLOW_ID is not configured in this environment — verification requests will fail",
+    );
+  }
+
   const res = await fetch(`${DIDIT_BASE_URL}/v3/session/`, {
     method: "POST",
     headers: authHeaders(),

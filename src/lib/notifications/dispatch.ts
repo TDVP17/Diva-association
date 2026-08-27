@@ -6,6 +6,8 @@ const STAGGER_MS = 5 * 60 * 1000;
 export interface NotificationRecipient {
   userId: string;
   message: string;
+  /** Where tapping this notification in the feed should navigate to, e.g. "/chat". */
+  actionUrl?: string;
 }
 
 /**
@@ -34,10 +36,40 @@ export async function scheduleNotifications(params: {
       channel: params.channel,
       type: params.type,
       message: r.message,
+      actionUrl: r.actionUrl,
       status: "SCHEDULED" as const,
       scheduledAt: new Date(now + index * STAGGER_MS),
     })),
   });
 
   return params.recipients.length;
+}
+
+/**
+ * IN_APP notifications have nothing for the process-notifications cron to
+ * "send" — the row itself is the message. This schedules them the normal
+ * way, then immediately flips the just-created rows to SENT so they show
+ * up in the recipients' notification feed right away instead of waiting on
+ * the cron. Mirrors the pattern first used in the membership approve/reject
+ * route, now shared so every IN_APP trigger site behaves consistently.
+ */
+export async function scheduleInAppNotifications(params: {
+  tontineSessionId?: string;
+  type: NotificationEventType;
+  recipients: NotificationRecipient[];
+}): Promise<number> {
+  const count = await scheduleNotifications({ ...params, channel: "IN_APP" });
+  if (count === 0) return 0;
+
+  await prisma.notification.updateMany({
+    where: {
+      userId: { in: params.recipients.map((r) => r.userId) },
+      tontineSessionId: params.tontineSessionId,
+      type: params.type,
+      status: "SCHEDULED",
+    },
+    data: { status: "SENT", sentAt: new Date() },
+  });
+
+  return count;
 }

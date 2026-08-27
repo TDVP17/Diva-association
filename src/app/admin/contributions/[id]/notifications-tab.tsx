@@ -1,17 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { translate, type Lang } from "@/lib/i18n/translations";
-
-interface SwapRequestRow {
-  id: string;
-  requesterName: string;
-  targetName: string;
-  tontineSessionId: string;
-  tontineType: string;
-  requesterPosition: number | null;
-  targetPosition: number | null;
-}
 
 interface NotificationRow {
   id: string;
@@ -34,13 +25,9 @@ const STATUS_CLASS: Record<string, string> = {
 
 export function NotificationsTab({
   tontineSessionId,
-  swapRequests,
-  onDecideSwap,
   lang,
 }: {
   tontineSessionId: string;
-  swapRequests: SwapRequestRow[];
-  onDecideSwap: (id: string, action: "approve" | "reject") => void;
   lang: Lang;
 }) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
@@ -216,40 +203,16 @@ export function NotificationsTab({
         )}
       </section>
 
-      <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4 flex-grow flex flex-col">
-        <h3 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-4">
+      <Link
+        href="/admin/swap-requests"
+        className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4 flex items-center justify-between gap-2 hover:border-primary border border-transparent transition-colors"
+      >
+        <span className="font-title-md text-title-md text-primary flex items-center gap-2">
           <span className="material-symbols-outlined">swap_horiz</span>
-          {t("swapRequests")}
-        </h3>
-        {swapRequests.length === 0 ? (
-          <p className="font-label-sm text-label-sm text-on-surface-variant">{t("noPendingSwaps")}</p>
-        ) : (
-          <div className="flex flex-col gap-0 border border-outline-variant/30 rounded-lg overflow-hidden">
-            {swapRequests.map((r) => (
-              <div key={r.id} className="flex justify-between items-center p-3 bg-surface-container-lowest border-b last:border-b-0 border-outline-variant/30">
-                <div>
-                  <p className="font-label-md text-label-md text-on-surface">
-                    {t("positionAbbrev")} {r.requesterPosition ?? "?"}{" "}
-                    <span className="material-symbols-outlined text-[14px] align-middle px-1">arrow_forward</span>{" "}
-                    {t("positionAbbrev")} {r.targetPosition ?? "?"}
-                  </p>
-                  <p className="font-label-sm text-label-sm text-on-surface-variant">
-                    {t("userAsksUser", { requester: r.requesterName, target: r.targetName })}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => onDecideSwap(r.id, "reject")} className="px-2 py-1 rounded border border-outline-variant text-on-surface-variant font-label-sm text-label-sm hover:bg-surface">
-                    {t("reject")}
-                  </button>
-                  <button onClick={() => onDecideSwap(r.id, "approve")} className="px-2 py-1 rounded bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90">
-                    {t("approve")}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+          {t("positionChangeRequestsCard")}
+        </span>
+        <span className="material-symbols-outlined text-outline">chevron_right</span>
+      </Link>
     </div>
   );
 }

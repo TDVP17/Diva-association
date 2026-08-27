@@ -7,6 +7,7 @@ import { translate, type Lang } from "@/lib/i18n/translations";
 import { getCroppedImageBlob } from "./crop-image";
 import { AvatarViewer } from "./avatar-viewer";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
+import { compressImage } from "@/lib/compress-image";
 
 export function AvatarUpload({
   currentAvatarUrl,
@@ -45,8 +46,9 @@ export function AvatarUpload({
     setError(null);
     try {
       const blob = await getCroppedImageBlob(cropSrc, croppedAreaPixels);
+      const compressed = await compressImage(blob);
       const formData = new FormData();
-      formData.append("avatar", blob, "avatar.jpg");
+      formData.append("avatar", compressed, "avatar.jpg");
       const res = await fetch("/api/profile/avatar", { method: "POST", body: formData });
       const body = await parseJsonOrThrow<{ avatarUrl: string }>(res, t("somethingWentWrong"));
       setAvatarUrl(body.avatarUrl);
@@ -76,7 +78,7 @@ export function AvatarUpload({
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          aria-label="Change profile picture"
+          aria-label={t("changeProfilePicture")}
           className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-60"
         >
           <span className="material-symbols-outlined text-[18px]">photo_camera</span>

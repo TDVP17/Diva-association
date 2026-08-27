@@ -94,6 +94,18 @@ enum NotificationEventType {
   ADMIN_BROADCAST
   MEMBER_APPROVED
   MEMBER_REJECTED
+  /// A member requested a position exchange — sent to the target member.
+  SWAP_REQUEST_CREATED
+  /// The target accepted — sent to every ADMIN/PRESIDENT user.
+  SWAP_REQUEST_PENDING_ADMIN
+  /// Admin approved the exchange — sent to both requester and target.
+  SWAP_REQUEST_APPROVED
+  /// Admin rejected the exchange — sent to both requester and target.
+  SWAP_REQUEST_REJECTED
+  /// A new membership join request was created — sent to every ADMIN/PRESIDENT user.
+  NEW_MEMBERSHIP_REQUEST
+  /// Admin started a cotisation's drawing phase — sent to its approved members.
+  DRAW_LAUNCHED
 }
 
 enum NotificationStatus {
@@ -172,6 +184,7 @@ model User {
   otpChallenges                OtpChallenge[]
   payoutsReleasedAsAdmin       Payout[]              @relation("PayoutReleasedByAdmin")
   savedPaymentMethods          SavedPaymentMethod[]
+  transactionArchives          TransactionArchive[]
 
   @@map("users")
 }
@@ -505,6 +518,14 @@ model Fine {
   @@map("fines")
 }
 
+/// DB-level constraint not expressible here: a partial unique index on
+/// (tontineSessionId, LEAST(requesterId, targetId), GREATEST(requesterId,
+/// targetId)) WHERE status IN ('PENDING_MEMBERSHIP', 'PENDING_ADMIN') — an
+/// unordered-pair index so A-requests-B and B-requests-A collide on the
+/// same key. See the hand-written migrations
+/// 20260827160100_swap_request_unique_pending_index and
+/// 20260827160200_swap_request_symmetric_pending_index. Don't let a future
+/// `prisma migrate diff` drop it; Prisma has no syntax to declare it here.
 model PositionSwapRequest {
   id               String     @id @default(cuid())
   requesterId      String
@@ -579,6 +600,11 @@ model Notification {
   /// Notifications" feed. Irrelevant for EMAIL/WHATSAPP rows.
   readAt           DateTime?
   createdAt        DateTime              @default(now())
+  /// Client-side navigation target when the recipient taps this
+  /// notification in their feed (e.g. "/chat", "/admin/swap-requests").
+  /// Null for rows created before this field existed, or for types with no
+  /// obvious single destination.
+  actionUrl        String?
 
   tontineSession TontineSession? @relation(fields: [tontineSessionId], references: [id], onDelete: Cascade)
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -587,6 +613,26 @@ model Notification {
   @@index([tontineSessionId, status])
   @@index([status, scheduledAt])
   @@map("notifications")
+}
+
+/// One row per member per fully-elapsed calendar year with any Contribution
+/// or Fine history — a PDF snapshot of that year's transactions, generated
+/// by a daily cron once the year has closed. periodStart/periodEnd are
+/// always Jan 1 / Dec 31 (UTC) of the same calendar year. The underlying
+/// Contribution/Fine rows are never deleted — this is purely a snapshot +
+/// a display-time filter on the active history list.
+model TransactionArchive {
+  id          String   @id @default(cuid())
+  userId      String
+  periodStart DateTime
+  periodEnd   DateTime
+  pdfUrl      String
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, periodStart])
+  @@map("transaction_archives")
 }
 
 /// Idempotency for the automatic "it's your food/payout turn" cron —

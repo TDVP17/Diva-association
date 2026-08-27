@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
+import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin();
@@ -24,6 +25,21 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     }
 
     await prisma.tontineSession.update({ where: { id }, data: { status: "DRAWING" } });
+
+    const approvedMembers = await prisma.membership.findMany({
+      where: { tontineSessionId: id, status: "APPROVED" },
+      select: { userId: true },
+    });
+    await scheduleInAppNotifications({
+      tontineSessionId: id,
+      type: "DRAW_LAUNCHED",
+      recipients: approvedMembers.map((m) => ({
+        userId: m.userId,
+        message: "The draw has started — come pick your number!",
+        actionUrl: `/sessions/${id}/draw`,
+      })),
+    });
+
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[start-drawing] unexpected error:", err);

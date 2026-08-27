@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
+import { TutorialVideoPlayer } from "@/components/tutorial-video-player";
 
 const FAQ_KEYS = [
   ["helpQ1", "helpA1"],
@@ -10,11 +11,20 @@ const FAQ_KEYS = [
 ] as const;
 
 export default async function HelpPage() {
-  const t = getTranslator(await getLang());
+  const lang = await getLang();
+  const t = getTranslator(lang);
 
   return (
     <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-4xl mx-auto w-full">
       <h1 className="font-title-md text-title-md text-primary mb-stack-gap-md">{t("helpCenterTitle")}</h1>
+
+      <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4 mb-stack-gap-lg">
+        <h2 className="font-label-md text-label-md text-on-surface mb-3 flex items-center gap-2">
+          <span className="material-symbols-outlined text-primary text-[20px]">play_circle</span>
+          {t("howDivaAssociationWorks")}
+        </h2>
+        <TutorialVideoPlayer lang={lang} />
+      </div>
 
       <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant overflow-hidden mb-stack-gap-lg">
         {FAQ_KEYS.map(([qKey, aKey], i) => (

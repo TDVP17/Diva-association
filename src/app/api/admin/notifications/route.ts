@@ -46,6 +46,7 @@ export async function GET(request: Request) {
         : null,
       channel: n.channel,
       type: n.type,
+      actionUrl: n.actionUrl,
       status: n.status,
       scheduledAt: n.scheduledAt.toISOString(),
       sentAt: n.sentAt ? n.sentAt.toISOString() : null,

@@ -5,6 +5,7 @@ import { signIn } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getSupabaseAuthClient } from "@/lib/supabase-auth";
 import { isAdminRole } from "@/lib/constants";
+import { ensureMemberCode } from "@/lib/member-code";
 
 export interface AuthFormState {
   error?: string;
@@ -96,11 +97,15 @@ export async function signUpAction(
     // users table so the rest of the app (role, memberships, etc.) has
     // something to attach to. A personal/sponsor code, if the user ever
     // sets one, is added later — not required to create an account.
-    await prisma.user.upsert({
+    const user = await prisma.user.upsert({
       where: { email },
       update: {},
       create: { email, name: fullName },
     });
+    // Every member gets their unique code right away, not just once their
+    // first membership is approved — ensureMemberCode() is idempotent, so
+    // this is a no-op for an existing user who already has one.
+    await ensureMemberCode(user.id);
 
     if (!data.session) {
       // Email confirmation is required before the account can sign in.

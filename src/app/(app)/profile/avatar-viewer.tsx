@@ -33,7 +33,7 @@ export function AvatarViewer({
           <button
             onClick={() => setOpen(false)}
             className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors"
-            aria-label="Close"
+            aria-label={t("close")}
           >
             <span className="material-symbols-outlined">close</span>
           </button>

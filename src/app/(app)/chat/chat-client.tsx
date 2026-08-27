@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
+import { formatMessageDate } from "@/lib/format-message-date";
 
 interface Contact {
   id: string;
@@ -62,6 +64,7 @@ export function ChatClient({
   const [commonSessions, setCommonSessions] = useState<CommonSession[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const feedEndRef = useRef<HTMLDivElement>(null);
 
   const refreshContacts = useCallback(() => {
@@ -76,8 +79,13 @@ export function ChatClient({
   }, [refreshContacts]);
 
   const loadFeed = useCallback(async (otherId: string) => {
-    const res = await fetch(`/api/chat/messages?with=${otherId}`);
-    if (res.ok) setFeed((await res.json()).feed);
+    try {
+      const res = await fetch(`/api/chat/messages?with=${otherId}`);
+      if (res.ok) setFeed((await res.json()).feed);
+    } catch {
+      // Background poll — a transient network hiccup here shouldn't
+      // interrupt the conversation view; the next 4s tick will retry.
+    }
   }, []);
 
   useEffect(() => {
@@ -103,6 +111,7 @@ export function ChatClient({
   async function sendMessage() {
     if (!active || !input.trim() || sending) return;
     setSending(true);
+    setSendError(null);
     const content = input.trim();
     setInput("");
     try {
@@ -111,7 +120,11 @@ export function ChatClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ receiverId: active.id, content }),
       });
-      if (res.ok) await loadFeed(active.id);
+      await parseJsonOrThrow(res, t("somethingWentWrong"));
+      await loadFeed(active.id);
+    } catch (err) {
+      setSendError(friendlyErrorMessage(err, t("somethingWentWrong")));
+      setInput(content); // don't lose what the user typed
     } finally {
       setSending(false);
     }
@@ -189,7 +202,7 @@ export function ChatClient({
                     {item.content}
                   </div>
                   <span className="font-label-sm text-label-sm text-outline mt-1 mx-1">
-                    {new Date(item.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                    {formatMessageDate(new Date(item.createdAt), lang)}
                   </span>
                 </div>
               );
@@ -247,6 +260,7 @@ export function ChatClient({
               </button>
             </div>
           )}
+          {sendError && <p className="font-label-sm text-label-sm text-error mb-2 px-1">{sendError}</p>}
           <div className="flex items-end gap-2">
             <div className="flex-1 bg-surface-container-low rounded-2xl border border-surface-container overflow-hidden focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
               <textarea
@@ -329,7 +343,7 @@ export function ChatClient({
                   </h3>
                   {contact.lastMessageAt && (
                     <span className="font-label-sm text-label-sm text-outline flex-shrink-0 ml-2">
-                      {new Date(contact.lastMessageAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                      {formatMessageDate(new Date(contact.lastMessageAt), lang)}
                     </span>
                   )}
                 </div>

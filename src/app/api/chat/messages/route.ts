@@ -103,32 +103,38 @@ export async function POST(request: Request) {
   // A non-admin messaging an admin (the "Admin Support" thread) gets exactly
   // one automated acknowledgement per rolling 30 days — not on every message,
   // so an ongoing conversation doesn't get spammed with the bot reply.
-  if (isAdminRole(receiver.role) && !isAdminRole(session.user.role)) {
-    const sender = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { name: true, preferredLang: true, lastAdminAutoReplyAt: true },
-    });
-    const dueForAutoReply =
-      sender &&
-      (!sender.lastAdminAutoReplyAt ||
-        Date.now() - sender.lastAdminAutoReplyAt.getTime() > AUTO_REPLY_THROTTLE_MS);
-    if (sender && dueForAutoReply) {
-      await prisma.$transaction([
-        prisma.chatMessage.create({
-          data: {
-            senderId: receiver.id,
-            receiverId: session.user.id,
-            content: translate(sender.preferredLang === "fr" ? "fr" : "en", "autoReplySupport", {
-              name: sender.name,
-            }),
-          },
-        }),
-        prisma.user.update({
-          where: { id: session.user.id },
-          data: { lastAdminAutoReplyAt: new Date() },
-        }),
-      ]);
+  // Wrapped defensively: the sender's real message above is already saved,
+  // so a failure in this best-effort side effect must never fail the request.
+  try {
+    if (isAdminRole(receiver.role) && !isAdminRole(session.user.role)) {
+      const sender = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { name: true, preferredLang: true, lastAdminAutoReplyAt: true },
+      });
+      const dueForAutoReply =
+        sender &&
+        (!sender.lastAdminAutoReplyAt ||
+          Date.now() - sender.lastAdminAutoReplyAt.getTime() > AUTO_REPLY_THROTTLE_MS);
+      if (sender && dueForAutoReply) {
+        await prisma.$transaction([
+          prisma.chatMessage.create({
+            data: {
+              senderId: receiver.id,
+              receiverId: session.user.id,
+              content: translate(sender.preferredLang === "fr" ? "fr" : "en", "autoReplySupport", {
+                name: sender.name,
+              }),
+            },
+          }),
+          prisma.user.update({
+            where: { id: session.user.id },
+            data: { lastAdminAutoReplyAt: new Date() },
+          }),
+        ]);
+      }
     }
+  } catch (err) {
+    console.error("[chat/messages] auto-reply side effect failed:", err);
   }
 
   return NextResponse.json({

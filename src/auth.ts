@@ -4,6 +4,7 @@ import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { getSupabaseAuthClient } from "@/lib/supabase-auth";
+import { ensureMemberCode } from "@/lib/member-code";
 
 // Local-only "log in as any seeded user" provider — lets you click through
 // the app without setting up real Google OAuth credentials. Excluded from
@@ -87,6 +88,15 @@ export const {
   pages: {
     signIn: "/login",
     error: "/login",
+  },
+  events: {
+    // Fires once, only for a brand-new account created via the Prisma
+    // adapter (i.e. a first-time Google sign-in) — the email/password
+    // sign-up flow creates its User row directly and calls
+    // ensureMemberCode() itself (see src/app/login/actions.ts).
+    async createUser({ user }) {
+      if (user.id) await ensureMemberCode(user.id);
+    },
   },
   callbacks: {
     async jwt({ token, user, trigger }) {

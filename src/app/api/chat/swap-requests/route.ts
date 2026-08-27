@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@/generated/prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 
 const createSchema = z.object({
   targetId: z.string().min(1),
@@ -56,9 +58,35 @@ export async function POST(request: Request) {
     );
   }
 
-  const swapRequest = await prisma.positionSwapRequest.create({
-    data: { requesterId: session.user.id, targetId, tontineSessionId },
-    include: { tontineSession: true },
+  let swapRequest;
+  try {
+    swapRequest = await prisma.positionSwapRequest.create({
+      data: { requesterId: session.user.id, targetId, tontineSessionId },
+      include: { tontineSession: true },
+    });
+  } catch (err) {
+    // Backstop for the DB's own partial unique index (position_swap_requests_pending_pair_idx)
+    // — catches the race the pre-check above can't: two concurrent requests
+    // between the same pair.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return NextResponse.json(
+        { error: "There is already a pending swap request between you two" },
+        { status: 409 },
+      );
+    }
+    throw err;
+  }
+
+  await scheduleInAppNotifications({
+    tontineSessionId,
+    type: "SWAP_REQUEST_CREATED",
+    recipients: [
+      {
+        userId: targetId,
+        message: `${session.user.name ?? "A member"} wants to exchange positions with you.`,
+        actionUrl: "/chat",
+      },
+    ],
   });
 
   return NextResponse.json({

@@ -8,6 +8,7 @@ import { getCycleDateForRound } from "@/lib/tontine-engine";
 import type { TontineType } from "@/generated/prisma/enums";
 import { NotificationsTab } from "./notifications-tab";
 import { ActivityTab } from "./activity-tab";
+import { MemberArchivesToggle } from "@/components/admin/member-archives-toggle";
 
 interface MembershipRequest {
   id: string;
@@ -55,16 +56,6 @@ interface AdminSession {
   lockedAt: string | null;
   registeredSlots: number;
   slots: AdminSlot[];
-}
-
-interface SwapRequestRow {
-  id: string;
-  requesterName: string;
-  targetName: string;
-  tontineSessionId: string;
-  tontineType: string;
-  requesterPosition: number | null;
-  targetPosition: number | null;
 }
 
 interface Ledger {
@@ -118,7 +109,6 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   const [session, setSession] = useState<AdminSession | null>(null);
   const [order, setOrder] = useState<AdminSlot[]>([]);
   const [ledger, setLedger] = useState<Ledger | null>(null);
-  const [swapRequests, setSwapRequests] = useState<SwapRequestRow[]>([]);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [payoutClaims, setPayoutClaims] = useState<PayoutClaim[]>([]);
   const [reviewingClaimId, setReviewingClaimId] = useState<string | null>(null);
@@ -196,9 +186,6 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     fetch(`/api/admin/sessions/${tontineSessionId}/payout-claims`)
       .then((r) => r.json())
       .then((b) => setPayoutClaims(b.claims ?? []));
-    fetch(`/api/admin/swap-requests`)
-      .then((r) => r.json())
-      .then((b) => setSwapRequests((b.requests ?? []).filter((r: SwapRequestRow) => r.tontineSessionId === tontineSessionId)));
     fetch(`/api/admin/membership-queue?tontineSessionId=${tontineSessionId}`)
       .then((r) => r.json())
       .then((b) => setMembershipQueue(b.memberships ?? []));
@@ -300,16 +287,6 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     } finally {
       setRecordingContribution(false);
     }
-  }
-
-  async function decideSwap(id: string, action: "approve" | "reject") {
-    setSwapRequests((rows) => rows.filter((r) => r.id !== id));
-    await fetch(`/api/admin/swap-requests/${id}/decide`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
-    });
-    await refreshSession();
   }
 
   async function refreshPayoutClaims() {
@@ -795,6 +772,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                       {s.name}
                       {s.memberCode && ` · ${s.memberCode}`}
                     </p>
+                    <MemberArchivesToggle userId={s.userId} lang={lang} />
                   </div>
                   <span
                     className={`inline-flex items-center px-2 py-1 rounded-md font-label-sm text-label-sm flex-shrink-0 ml-2 ${
@@ -1092,12 +1070,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
       )}
 
       {activeTab === "notifications" && (
-        <NotificationsTab
-          tontineSessionId={tontineSessionId}
-          swapRequests={swapRequests}
-          onDecideSwap={decideSwap}
-          lang={lang}
-        />
+        <NotificationsTab tontineSessionId={tontineSessionId} lang={lang} />
       )}
 
       {activeTab === "activity" && <ActivityTab tontineSessionId={tontineSessionId} lang={lang} />}

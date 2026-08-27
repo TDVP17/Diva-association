@@ -69,11 +69,18 @@ export async function GET() {
 
   let memberIds: string[];
   if (isAdmin) {
-    const members = await prisma.user.findMany({
-      where: { role: "MEMBER" },
-      select: { id: true },
+    // Only users who have actually exchanged a message with this admin —
+    // not every registered member. Derived from real ChatMessage rows, not
+    // a role filter, so the list only grows as real conversations happen.
+    const messages = await prisma.chatMessage.findMany({
+      where: { OR: [{ senderId: session.user.id }, { receiverId: session.user.id }] },
+      select: { senderId: true, receiverId: true },
     });
-    memberIds = members.map((m) => m.id);
+    const partnerIds = new Set<string>();
+    for (const m of messages) {
+      partnerIds.add(m.senderId === session.user.id ? m.receiverId : m.senderId);
+    }
+    memberIds = [...partnerIds];
   } else {
     const myMemberships = await prisma.membership.findMany({
       where: { userId: session.user.id },
