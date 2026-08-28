@@ -12,6 +12,8 @@
       "path": "/api/crons/check-penalties",
       "schedule": "31 17 * * *"
     },
+
+    
     {
       "path": "/api/crons/process-notifications",
       "schedule": "* * * * *"
