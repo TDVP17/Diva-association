@@ -1,0 +1,23 @@
+name: Process notification queue
+
+# Vercel's Hobby plan only allows daily Cron Jobs, but the notification
+# queue (src/lib/notifications/dispatch.ts) stages recipients 5 minutes
+# apart and needs frequent draining to stay near-real-time. This workflow
+# replaces the old every-minute Vercel cron entry at no cost, on a 5-minute
+# schedule (matching the queue's own stagger interval — GitHub Actions
+# schedules aren't guaranteed to the minute anyway, so this is the natural
+# granularity). Requires a repository secret named CRON_SECRET with the
+# same value as the CRON_SECRET environment variable set on Vercel.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  process-notifications:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the process-notifications endpoint
+        run: |
+          curl -sf -X GET "https://diva-association.vercel.app/api/crons/process-notifications" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
