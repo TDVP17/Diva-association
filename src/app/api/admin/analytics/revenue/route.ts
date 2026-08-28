@@ -9,3 +9,5 @@ export async function GET() {
   const analytics = await getRevenueAnalytics();
   return NextResponse.json(analytics);
 }
+
+

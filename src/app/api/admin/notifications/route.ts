@@ -8,6 +8,8 @@ const TONTINE_LABELS: Record<string, string> = {
   MONTHLY_25: "Monthly Tontine (25th)",
 };
 
+
+
 const PAGE_SIZE = 50;
 
 export async function GET(request: Request) {

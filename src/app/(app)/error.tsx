@@ -4,6 +4,7 @@ import { FriendlyError } from "@/components/friendly-error";
 
 export default function AppSegmentError({
   error,
+
   reset,
 }: {
   error: Error & { digest?: string };
@@ -11,3 +12,6 @@ export default function AppSegmentError({
 }) {
   return <FriendlyError error={error} reset={reset} />;
 }
+
+
+
