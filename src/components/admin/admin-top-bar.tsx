@@ -49,6 +49,7 @@ export async function AdminTopBar({
         <TopRightMenu
           lang={lang}
           items={menuItems}
+          dark
           onLogout={async () => {
             "use server";
             await signOut({ redirectTo: "/login" });

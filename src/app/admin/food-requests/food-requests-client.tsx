@@ -29,8 +29,8 @@ export function FoodRequestsClient({ lang }: { lang: Lang }) {
   return (
     <main className="px-container-padding pt-stack-gap-lg pb-32 max-w-3xl mx-auto w-full flex flex-col gap-stack-gap-lg">
       <div>
-        <h2 className="font-display-lg text-display-lg text-primary flex items-center gap-2">
-          <span className="material-symbols-outlined text-[32px]">restaurant</span>
+        <h2 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary flex items-center gap-2">
+          <span className="material-symbols-outlined text-[28px] md:text-[32px]">restaurant</span>
           {t("foodTurnTab")}
         </h2>
         <p className="text-on-surface-variant font-body-lg mt-2">{t("foodRequestsSubtitle")}</p>

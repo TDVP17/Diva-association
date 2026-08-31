@@ -14,7 +14,9 @@ export default async function AdminContributionsPage() {
     <main className="px-container-padding pt-stack-gap-lg pb-32 max-w-4xl mx-auto w-full">
       <div className="flex justify-between items-end mb-section-margin gap-3 flex-wrap">
         <div>
-          <h2 className="font-display-lg text-display-lg text-primary mb-2">{t("myCotisationsCard")}</h2>
+          <h2 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary mb-2">
+            {t("myCotisationsCard")}
+          </h2>
           <p className="text-on-surface-variant font-body-lg">{t("myCotisationsCardBody")}</p>
         </div>
         <Link

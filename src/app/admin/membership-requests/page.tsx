@@ -11,7 +11,9 @@ export default async function AdminMembershipRequestsPage() {
 
   return (
     <main className="px-container-padding pt-stack-gap-lg pb-32 max-w-3xl mx-auto w-full">
-      <h2 className="font-display-lg text-display-lg text-primary mb-2">{t("cotisationMembershipRequestsCard")}</h2>
+      <h2 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary mb-2">
+        {t("cotisationMembershipRequestsCard")}
+      </h2>
       <p className="text-on-surface-variant font-body-lg mb-section-margin">
         {t("cotisationMembershipRequestsCardBody")}
       </p>

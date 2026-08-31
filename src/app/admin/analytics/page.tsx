@@ -14,7 +14,9 @@ export default async function AdminAnalyticsPage() {
   return (
     <main className="px-container-padding pt-stack-gap-lg pb-32 max-w-4xl mx-auto w-full flex flex-col gap-section-margin">
       <div>
-        <h2 className="font-display-lg text-display-lg text-primary">{t("revenueAnalytics")}</h2>
+        <h2 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary">
+          {t("revenueAnalytics")}
+        </h2>
         <p className="text-on-surface-variant font-body-lg mt-2">{t("revenueAnalyticsSubtitle")}</p>
       </div>
 

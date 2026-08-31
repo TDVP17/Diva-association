@@ -530,7 +530,9 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
         </Link>
         <div className="flex items-start justify-between gap-2 flex-wrap">
           <div>
-            <h2 className="font-display-lg text-display-lg text-primary">{sessionLabel}</h2>
+            <h2 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary">
+              {sessionLabel}
+            </h2>
             {session.isPaused && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-secondary-container/40 text-on-secondary-container font-label-sm text-label-sm mt-1">
                 {t("pausedBadge")}

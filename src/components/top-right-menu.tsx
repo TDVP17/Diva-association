@@ -15,10 +15,13 @@ export function TopRightMenu({
   lang,
   items,
   onLogout,
+  dark,
 }: {
   lang: Lang;
   items: TopRightMenuItem[];
   onLogout: () => Promise<void>;
+  /** Use on a dark/primary-colored background (e.g. the admin top bar). */
+  dark?: boolean;
 }) {
   const t = (key: Parameters<typeof translate>[1]) => translate(lang, key);
   const [open, setOpen] = useState(false);
@@ -39,9 +42,13 @@ export function TopRightMenu({
         onClick={() => setOpen((o) => !o)}
         aria-label={t("openMenu")}
         aria-expanded={open}
-        className="relative w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-low transition-colors"
+        className={
+          dark
+            ? "relative w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors"
+            : "relative w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-low transition-colors"
+        }
       >
-        <span className="material-symbols-outlined text-on-surface">menu</span>
+        <span className={`material-symbols-outlined ${dark ? "text-on-primary" : "text-on-surface"}`}>menu</span>
       </button>
 
       {open && (
