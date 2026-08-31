@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import type { TontineType } from "@/generated/prisma/enums";
-import { isContributionDay, toDueDateKey } from "@/lib/tontine-engine";
+import { isContributionDay, toDueDateKey, ALL_TONTINE_TYPES } from "@/lib/tontine-engine";
 import { getDesignatedSlot } from "@/lib/round-robin-lock";
 import { translate } from "@/lib/i18n/translations";
 import { scheduleNotifications } from "@/lib/notifications/dispatch";
 import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
 import { sendEmailSafe } from "@/lib/email/resend";
-
-const ALL_TONTINE_TYPES: TontineType[] = ["HEBDO_SUNDAY", "MONTHLY_25", "MONTHLY_28"];
 
 /**
  * Notifies whoever's turn it is to receive the "food"/payout this cycle —
@@ -62,6 +59,7 @@ export async function GET(request: Request) {
             message,
             messageKey: "foodTurnMessage",
             messageVars: { name: membership.user.name },
+            actionUrl: `/sessions/${tontineSession.id}`,
           },
         ],
       });

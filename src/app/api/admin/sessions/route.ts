@@ -3,6 +3,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
 import { logAudit } from "@/lib/audit";
+import { ALL_TONTINE_TYPES } from "@/lib/tontine-engine";
+import type { TontineType } from "@/generated/prisma/enums";
 
 export async function GET() {
   const admin = await requireAdmin();
@@ -37,7 +39,6 @@ export async function GET() {
         fee: Number(s.fee),
         fineAmountPerPeriod: s.fineAmountPerPeriod ? Number(s.fineAmountPerPeriod) : null,
         fineIntervalHours: s.fineIntervalHours,
-        rules: s.rules,
         limitTime: s.limitTime,
         startDate: s.startDate.toISOString(),
         drawDate: s.drawDate ? s.drawDate.toISOString() : null,
@@ -66,12 +67,11 @@ export async function GET() {
 const createSessionSchema = z.object({
   title: z.string().trim().min(1).max(200),
   description: z.string().trim().max(5000).optional(),
-  type: z.enum(["HEBDO_SUNDAY", "MONTHLY_25", "MONTHLY_28"]),
+  type: z.enum(ALL_TONTINE_TYPES as [TontineType, ...TontineType[]]),
   amount: z.coerce.number().positive(),
   fee: z.coerce.number().nonnegative(),
   fineAmountPerPeriod: z.coerce.number().nonnegative(),
   fineIntervalHours: z.coerce.number().int().positive(),
-  rules: z.string().trim().max(5000).optional(),
   startDate: z.coerce.date(),
   limitTime: z.string().trim().min(1).max(100),
   maxSlots: z.coerce.number().positive().optional(),

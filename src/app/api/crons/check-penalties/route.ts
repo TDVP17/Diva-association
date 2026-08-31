@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { TontineType } from "@/generated/prisma/enums";
-import { computeFine, getCutoffInstant, isContributionDay, toDueDateKey } from "@/lib/tontine-engine";
+import { computeFine, getCutoffInstant, isContributionDay, toDueDateKey, ALL_TONTINE_TYPES } from "@/lib/tontine-engine";
 import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
 import { fineNoticeMessage } from "@/lib/whatsapp/templates";
-
-const ALL_TONTINE_TYPES: TontineType[] = ["HEBDO_SUNDAY", "MONTHLY_25", "MONTHLY_28"];
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");

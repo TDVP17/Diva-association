@@ -1,9 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { TontineSession } from "@/generated/prisma/client";
-import type { TontineType } from "@/generated/prisma/enums";
-import { isContributionDay, toDueDateKey } from "@/lib/tontine-engine";
-
-const ALL_TONTINE_TYPES: TontineType[] = ["HEBDO_SUNDAY", "MONTHLY_25", "MONTHLY_28"];
+import { isContributionDay, toDueDateKey, ALL_TONTINE_TYPES } from "@/lib/tontine-engine";
 
 /** Active sessions whose type has a contribution due today (Cameroon local time). */
 export async function getActiveSessionsDueToday(

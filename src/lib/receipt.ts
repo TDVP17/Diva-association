@@ -2,14 +2,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { TontineType } from "@/generated/prisma/enums";
-
-const TONTINE_LABELS: Record<TontineType, string> = {
-  HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
-  MONTHLY_28: "Monthly Tontine (28th)",
-  MONTHLY_25: "Monthly Tontine (25th)",
-  BIWEEKLY_SUNDAY: "Every 2 Weeks (Sunday)",
-  QUARTERLY_25: "Every 3 Months (25th)",
-};
+import { TONTINE_TYPE_LABELS as TONTINE_LABELS } from "@/lib/tontine-labels";
 
 const ASSOCIATION_EMAIL = "divaassociation17@gmail.com";
 

@@ -3,22 +3,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { TONTINE_CONFIG } from "@/lib/tontine-engine";
+import { getFrequencyOptionGroups } from "@/lib/tontine-labels";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
-
-const TONTINE_LABELS: Record<string, string> = {
-  HEBDO_SUNDAY: "Weekly (every Sunday)",
-  MONTHLY_28: "Monthly (28th)",
-  MONTHLY_25: "Monthly (25th)",
-  BIWEEKLY_SUNDAY: "Every 2 weeks (Sunday)",
-  QUARTERLY_25: "Every 3 months (25th)",
-};
 
 type TontineTypeKey = keyof typeof TONTINE_CONFIG;
 
 export function CreateSessionForm({ lang }: { lang: Lang }) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
   const router = useRouter();
+  const frequencyGroups = getFrequencyOptionGroups(lang);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState<TontineTypeKey>("HEBDO_SUNDAY");
@@ -30,7 +24,6 @@ export function CreateSessionForm({ lang }: { lang: Lang }) {
   const [fineIntervalHours, setFineIntervalHours] = useState(
     String(TONTINE_CONFIG.HEBDO_SUNDAY.fineIntervalHours),
   );
-  const [rules, setRules] = useState("");
   const [startDate, setStartDate] = useState("");
   const [drawDate, setDrawDate] = useState("");
   const [limitTime, setLimitTime] = useState("18:31");
@@ -71,7 +64,6 @@ export function CreateSessionForm({ lang }: { lang: Lang }) {
           fee: Number(fee),
           fineAmountPerPeriod: Number(fineAmountPerPeriod),
           fineIntervalHours: Number(fineIntervalHours),
-          rules: rules || undefined,
           startDate,
           drawDate,
           limitTime,
@@ -129,10 +121,14 @@ export function CreateSessionForm({ lang }: { lang: Lang }) {
           onChange={(e) => handleTypeChange(e.target.value as TontineTypeKey)}
           className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
         >
-          {Object.keys(TONTINE_CONFIG).map((key) => (
-            <option key={key} value={key}>
-              {TONTINE_LABELS[key]}
-            </option>
+          {frequencyGroups.map((group) => (
+            <optgroup key={group.group} label={group.group}>
+              {group.options.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
       </div>
@@ -265,19 +261,6 @@ export function CreateSessionForm({ lang }: { lang: Lang }) {
           required
           value={limitTime}
           onChange={(e) => setLimitTime(e.target.value)}
-          className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
-        />
-      </div>
-
-      <div>
-        <label htmlFor="rules" className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
-          {t("rulesOptional")}
-        </label>
-        <textarea
-          id="rules"
-          rows={4}
-          value={rules}
-          onChange={(e) => setRules(e.target.value)}
           className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
         />
       </div>

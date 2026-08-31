@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 
-const SLOT_OPTIONS = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
+const SLOT_OPTIONS = [1, 2, 3, 4, 5];
 
 export function SelectSlotsForm({ tontineSessionId, lang }: { tontineSessionId: string; lang: Lang }) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
@@ -16,14 +16,11 @@ export function SelectSlotsForm({ tontineSessionId, lang }: { tontineSessionId: 
   const [error, setError] = useState<string | null>(null);
   const [adjustedNotice, setAdjustedNotice] = useState<string | null>(null);
 
-  const namedSlots = Math.floor(slotCount);
-
   function handleSlotCountChange(next: number) {
     setSlotCount(next);
-    const nextNamed = Math.floor(next);
     setNames((current) => {
-      const copy = current.slice(0, nextNamed);
-      while (copy.length < nextNamed) copy.push("");
+      const copy = current.slice(0, next);
+      while (copy.length < next) copy.push("");
       return copy;
     });
   }
@@ -96,11 +93,6 @@ export function SelectSlotsForm({ tontineSessionId, lang }: { tontineSessionId: 
             </option>
           ))}
         </select>
-        {slotCount % 1 !== 0 && (
-          <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">
-            {namedSlots} {t("namedSlotsBillingNote")}
-          </p>
-        )}
       </div>
 
       {names.map((name, i) => (

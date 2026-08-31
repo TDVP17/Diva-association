@@ -10,14 +10,42 @@ export interface TontineConfig {
   fineIntervalHours: number;
 }
 
+const WEEKLY_DEFAULT: TontineConfig = {
+  amount: 2500,
+  fee: 100,
+  feeSplit: { presidentShare: 75, winnerShare: 25 },
+  fineAmountPerPeriod: 500,
+  fineIntervalHours: 24,
+};
+const BIWEEKLY_DEFAULT: TontineConfig = {
+  amount: 5000,
+  fee: 150,
+  feeSplit: { presidentShare: 75, winnerShare: 25 },
+  fineAmountPerPeriod: 500,
+  fineIntervalHours: 24,
+};
+const MONTHLY_DEFAULT: TontineConfig = {
+  amount: 25000,
+  fee: 600,
+  feeSplit: { presidentShare: 75, winnerShare: 25 },
+  fineAmountPerPeriod: 3500,
+  fineIntervalHours: 24,
+};
+
+/** Defaults only pre-fill the creation form — a session's own amount/fee/fine columns are the source of truth afterward. */
 export const TONTINE_CONFIG: Record<TontineType, TontineConfig> = {
-  HEBDO_SUNDAY: {
-    amount: 2500,
-    fee: 100,
-    feeSplit: { presidentShare: 75, winnerShare: 25 },
-    fineAmountPerPeriod: 500,
-    fineIntervalHours: 24,
-  },
+  HEBDO_SUNDAY: WEEKLY_DEFAULT,
+  EVERY_MONDAY: WEEKLY_DEFAULT,
+  EVERY_TUESDAY: WEEKLY_DEFAULT,
+  EVERY_WEDNESDAY: WEEKLY_DEFAULT,
+  EVERY_THURSDAY: WEEKLY_DEFAULT,
+  EVERY_FRIDAY: WEEKLY_DEFAULT,
+  EVERY_SATURDAY: WEEKLY_DEFAULT,
+  MONTHLY_1: MONTHLY_DEFAULT,
+  MONTHLY_5: MONTHLY_DEFAULT,
+  MONTHLY_10: MONTHLY_DEFAULT,
+  MONTHLY_15: MONTHLY_DEFAULT,
+  MONTHLY_20: MONTHLY_DEFAULT,
   MONTHLY_28: {
     amount: 20000,
     fee: 500,
@@ -32,13 +60,13 @@ export const TONTINE_CONFIG: Record<TontineType, TontineConfig> = {
     fineAmountPerPeriod: 5000,
     fineIntervalHours: 24,
   },
-  BIWEEKLY_SUNDAY: {
-    amount: 5000,
-    fee: 150,
-    feeSplit: { presidentShare: 75, winnerShare: 25 },
-    fineAmountPerPeriod: 500,
-    fineIntervalHours: 24,
-  },
+  BIWEEKLY_SUNDAY: BIWEEKLY_DEFAULT,
+  BIWEEKLY_MONDAY: BIWEEKLY_DEFAULT,
+  BIWEEKLY_TUESDAY: BIWEEKLY_DEFAULT,
+  BIWEEKLY_WEDNESDAY: BIWEEKLY_DEFAULT,
+  BIWEEKLY_THURSDAY: BIWEEKLY_DEFAULT,
+  BIWEEKLY_FRIDAY: BIWEEKLY_DEFAULT,
+  BIWEEKLY_SATURDAY: BIWEEKLY_DEFAULT,
   QUARTERLY_25: {
     amount: 75000,
     fee: 1500,
@@ -47,6 +75,9 @@ export const TONTINE_CONFIG: Record<TontineType, TontineConfig> = {
     fineIntervalHours: 24,
   },
 };
+
+/** Every TontineType, for crons that must sweep across all frequencies (reminders, penalties, food-turn assignment). */
+export const ALL_TONTINE_TYPES = Object.keys(TONTINE_CONFIG) as TontineType[];
 
 export function getTontineConfig(type: TontineType): TontineConfig {
   return TONTINE_CONFIG[type];
@@ -155,31 +186,65 @@ export function getPreviousDueDate(type: TontineType, dueDate: Date): Date {
   return getMostRecentDueDate(type, cursor);
 }
 
-// A known Sunday, used only as a fixed phase reference for BIWEEKLY_SUNDAY
-// — every type here is a calendar-fixed schedule (not anchored to any
+// A known Sunday, used only as a fixed phase reference for every BIWEEKLY_*
+// type — every type here is a calendar-fixed schedule (not anchored to any
 // individual session's startDate), consistent with how HEBDO_SUNDAY/
-// MONTHLY_25/MONTHLY_28 already work.
+// MONTHLY_25/MONTHLY_28 already work. Reusing one Sunday-based reference
+// for a Monday/Tuesday/etc cadence still alternates weeks correctly — the
+// weekday match is checked first, so this constant only ever has to settle
+// which of two same-weekday dates 7 days apart counts as the "on" week.
 const BIWEEKLY_REFERENCE_SUNDAY = Date.UTC(2024, 0, 7);
 const QUARTERLY_MONTHS = [1, 4, 7, 10]; // January, April, July, October
+
+type ScheduleDescriptor =
+  | { kind: "weekly"; weekday: number }
+  | { kind: "biweekly"; weekday: number }
+  | { kind: "monthly"; day: number }
+  | { kind: "quarterly"; day: number; months: number[] };
+
+/** 0 = Sunday … 6 = Saturday, matching getCameroonDateParts()'s weekday numbering. */
+const SCHEDULE: Record<TontineType, ScheduleDescriptor> = {
+  HEBDO_SUNDAY: { kind: "weekly", weekday: 0 },
+  EVERY_MONDAY: { kind: "weekly", weekday: 1 },
+  EVERY_TUESDAY: { kind: "weekly", weekday: 2 },
+  EVERY_WEDNESDAY: { kind: "weekly", weekday: 3 },
+  EVERY_THURSDAY: { kind: "weekly", weekday: 4 },
+  EVERY_FRIDAY: { kind: "weekly", weekday: 5 },
+  EVERY_SATURDAY: { kind: "weekly", weekday: 6 },
+  MONTHLY_1: { kind: "monthly", day: 1 },
+  MONTHLY_5: { kind: "monthly", day: 5 },
+  MONTHLY_10: { kind: "monthly", day: 10 },
+  MONTHLY_15: { kind: "monthly", day: 15 },
+  MONTHLY_20: { kind: "monthly", day: 20 },
+  MONTHLY_25: { kind: "monthly", day: 25 },
+  MONTHLY_28: { kind: "monthly", day: 28 },
+  BIWEEKLY_SUNDAY: { kind: "biweekly", weekday: 0 },
+  BIWEEKLY_MONDAY: { kind: "biweekly", weekday: 1 },
+  BIWEEKLY_TUESDAY: { kind: "biweekly", weekday: 2 },
+  BIWEEKLY_WEDNESDAY: { kind: "biweekly", weekday: 3 },
+  BIWEEKLY_THURSDAY: { kind: "biweekly", weekday: 4 },
+  BIWEEKLY_FRIDAY: { kind: "biweekly", weekday: 5 },
+  BIWEEKLY_SATURDAY: { kind: "biweekly", weekday: 6 },
+  QUARTERLY_25: { kind: "quarterly", day: 25, months: QUARTERLY_MONTHS },
+};
 
 /** Whether `date` (evaluated in Cameroon local time) is a contribution day for `type`. */
 export function isContributionDay(type: TontineType, date: Date): boolean {
   const { day, month, weekday } = getCameroonDateParts(date);
-  switch (type) {
-    case "HEBDO_SUNDAY":
-      return weekday === 0;
-    case "MONTHLY_28":
-      return day === 28;
-    case "MONTHLY_25":
-      return day === 25;
-    case "BIWEEKLY_SUNDAY": {
-      if (weekday !== 0) return false;
+  const schedule = SCHEDULE[type];
+  switch (schedule.kind) {
+    case "weekly":
+      return weekday === schedule.weekday;
+    case "biweekly": {
+      if (weekday !== schedule.weekday) return false;
       const dueDateUtc = toDueDateKey(date).getTime();
       const weeksSinceReference = Math.round((dueDateUtc - BIWEEKLY_REFERENCE_SUNDAY) / (7 * 24 * 60 * 60 * 1000));
       return weeksSinceReference % 2 === 0;
     }
-    case "QUARTERLY_25":
-      return day === 25 && QUARTERLY_MONTHS.includes(month);
+    case "monthly":
+      return day === schedule.day;
+    case "quarterly":
+      return day === schedule.day && schedule.months.includes(month);
   }
 }
 

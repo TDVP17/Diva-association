@@ -47,7 +47,6 @@ interface AdminSession {
   fee: number;
   fineAmountPerPeriod: number | null;
   fineIntervalHours: number | null;
-  rules: string | null;
   limitTime: string;
   startDate: string;
   drawDate: string | null;
@@ -149,7 +148,6 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     fee: string;
     fineAmountPerPeriod: string;
     fineIntervalHours: string;
-    rules: string;
     startDate: string;
     drawDate: string;
     limitTime: string;
@@ -274,7 +272,8 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
       });
       const body = await res.json();
       if (!res.ok) {
-        setContributionResult(body.error ?? t("couldNotRecordContribution"));
+        if (body?.error) console.error("[recordContribution] server error:", body.error);
+        setContributionResult(t("couldNotRecordContribution"));
         return;
       }
       setContributionResult(t("contributionRecorded"));
@@ -303,7 +302,8 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
       const res = await fetch(`/api/admin/payouts/preview?payoutClaimId=${claimId}`);
       const body = await res.json();
       if (!res.ok) {
-        setPayoutResult(body.error ?? t("failedToReleasePayout"));
+        if (body?.error) console.error("[reviewClaim] server error:", body.error);
+        setPayoutResult(t("failedToReleasePayout"));
         return;
       }
       setPayoutPreview(body);
@@ -324,7 +324,8 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
       });
       const body = await res.json();
       if (!res.ok) {
-        setPayoutResult(body.error ?? t("failedToReleasePayout"));
+        if (body?.error) console.error("[confirmReleasePayout] server error:", body.error);
+        setPayoutResult(t("failedToReleasePayout"));
         return;
       }
       setPayoutResult(
@@ -355,10 +356,9 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
 
   function handleAddSlotCountChange(next: number) {
     setAddSlotCount(next);
-    const nextNamed = Math.floor(next);
     setAddNames((current) => {
-      const copy = current.slice(0, nextNamed);
-      while (copy.length < nextNamed) copy.push("");
+      const copy = current.slice(0, next);
+      while (copy.length < next) copy.push("");
       return copy;
     });
   }
@@ -380,7 +380,8 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
       });
       const body = await res.json();
       if (!res.ok) {
-        setAddMemberResult(body.error ?? t("couldNotAddMember"));
+        if (body?.error) console.error("[addMember] server error:", body.error);
+        setAddMemberResult(t("couldNotAddMember"));
         return;
       }
       setAddMemberResult(t("memberAddedSuccessfully"));
@@ -403,7 +404,6 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
       fee: String(session.fee),
       fineAmountPerPeriod: String(session.fineAmountPerPeriod ?? ""),
       fineIntervalHours: String(session.fineIntervalHours ?? ""),
-      rules: session.rules ?? "",
       startDate: session.startDate.slice(0, 10),
       drawDate: session.drawDate ? session.drawDate.slice(0, 10) : "",
       limitTime: session.limitTime,
@@ -428,7 +428,6 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
           fee: Number(editFields.fee),
           fineAmountPerPeriod: Number(editFields.fineAmountPerPeriod),
           fineIntervalHours: Number(editFields.fineIntervalHours),
-          rules: editFields.rules || undefined,
           startDate: editFields.startDate,
           drawDate: editFields.drawDate,
           limitTime: editFields.limitTime,
@@ -437,7 +436,8 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
       });
       const body = await res.json();
       if (!res.ok) {
-        setEditError(body.error ?? t("couldNotUpdateCotisation"));
+        if (body?.error) console.error("[saveEdit] server error:", body.error);
+        setEditError(t("couldNotUpdateCotisation"));
         return;
       }
       setShowEditModal(false);
@@ -482,7 +482,8 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
       const res = await fetch(`/api/admin/sessions/${tontineSessionId}`, { method: "DELETE" });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setDeleteError(body.error ?? t("couldNotDeleteCotisation"));
+        if (body?.error) console.error("[deleteSession] server error:", body.error);
+        setDeleteError(t("couldNotDeleteCotisation"));
         return;
       }
       router.push("/admin");
@@ -832,7 +833,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                   onChange={(e) => handleAddSlotCountChange(Number(e.target.value))}
                   className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
                 >
-                  {[1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5].map((opt) => (
+                  {[1, 2, 3, 4, 5].map((opt) => (
                     <option key={opt} value={opt}>
                       {opt} {opt !== 1 ? t("slots") : t("slot")}
                     </option>
@@ -1182,15 +1183,6 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
               <input
                 value={editFields.limitTime}
                 onChange={(e) => setEditFields({ ...editFields, limitTime: e.target.value })}
-                className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
-              />
-            </div>
-            <div>
-              <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">{t("rulesOptional")}</label>
-              <textarea
-                rows={3}
-                value={editFields.rules}
-                onChange={(e) => setEditFields({ ...editFields, rules: e.target.value })}
                 className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
               />
             </div>

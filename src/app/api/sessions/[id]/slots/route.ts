@@ -5,8 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { resolveUniqueSlotNames } from "@/lib/slot-naming";
 
 const bodySchema = z.object({
-  slotCount: z.coerce.number().min(0.5).max(20),
-  beneficiaryNames: z.array(z.string().trim().min(1).max(100)).min(1).max(40),
+  slotCount: z.coerce.number().int().min(1).max(5),
+  beneficiaryNames: z.array(z.string().trim().min(1).max(100)).min(1).max(5),
 });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -22,11 +22,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const { id: tontineSessionId } = await params;
   const { slotCount, beneficiaryNames } = parsed.data;
-  const namedSlots = Math.floor(slotCount);
 
-  if (beneficiaryNames.length !== namedSlots) {
+  if (beneficiaryNames.length !== slotCount) {
     return NextResponse.json(
-      { error: `Please provide exactly ${namedSlots} name(s)` },
+      { error: `Please provide exactly ${slotCount} name(s)` },
       { status: 400 },
     );
   }
