@@ -28,6 +28,7 @@ export async function AdminTopBar({
     { href: "/admin/sessions/new", label: t("addContributionNav"), icon: "add_circle" },
     { href: "/admin/membership-requests", label: t("joinRequestsNav"), icon: "group_add" },
     { href: "/admin/food-requests", label: t("foodRequestsNav"), icon: "restaurant" },
+    { href: "/admin/users", label: t("allUsersCard"), icon: "group" },
   ];
 
   return (

@@ -1,17 +1,17 @@
 /**
- * A curated, user-safe error message — either our own API's `error` field
- * or a caller-supplied fallback string. Never wraps a raw browser/network
- * exception (a failed fetch, a non-JSON response body, an unexpected
- * runtime error), so it's always safe to render directly to a user.
+ * A curated, user-safe error message — always the caller-supplied,
+ * already-translated `fallback` string. Never wraps a raw browser/network
+ * exception, and never surfaces the API's own `error` field directly
+ * either: every API route's `error` text is hardcoded English, so showing
+ * it verbatim would break the app's language switch for anyone using it in
+ * French. The server's real message is still logged for debugging.
  */
 export class ApiError extends Error {}
 
 /**
- * Parses a fetch Response into its JSON body, throwing an ApiError with a
- * safe message either way: the API's own curated `error` field on a
- * non-OK response, or `fallback` if the response wasn't OK, or wasn't
- * valid JSON at all (e.g. a proxy's raw HTML 502 page) — that raw body is
- * never surfaced to the user, only logged.
+ * Parses a fetch Response into its JSON body, throwing an ApiError with
+ * `fallback` on any non-OK response or invalid JSON body (e.g. a proxy's
+ * raw HTML 502 page) — the server's own message is logged, never shown.
  */
 export async function parseJsonOrThrow<T = Record<string, unknown>>(res: Response, fallback: string): Promise<T> {
   let body: unknown;
@@ -22,8 +22,9 @@ export async function parseJsonOrThrow<T = Record<string, unknown>>(res: Respons
     throw new ApiError(fallback);
   }
   if (!res.ok) {
-    const message = typeof body === "object" && body && "error" in body && typeof body.error === "string" ? body.error : fallback;
-    throw new ApiError(message);
+    const serverMessage = typeof body === "object" && body && "error" in body && typeof body.error === "string" ? body.error : null;
+    if (serverMessage) console.error("[parseJsonOrThrow] server error:", serverMessage);
+    throw new ApiError(fallback);
   }
   return body as T;
 }

@@ -67,7 +67,8 @@ export function NotificationsTab({
       });
       const body = await res.json();
       if (!res.ok) {
-        setReminderResult(body.error ?? t("couldNotScheduleReminders"));
+        if (body?.error) console.error("[sendReminders] server error:", body.error);
+        setReminderResult(t("couldNotScheduleReminders"));
         return;
       }
       setReminderResult(t("remindersScheduled", { count: String(body.scheduled) }));
@@ -89,7 +90,8 @@ export function NotificationsTab({
       });
       const body = await res.json();
       if (!res.ok) {
-        setEmailResult(body.error ?? t("couldNotAddMember"));
+        if (body?.error) console.error("[sendMassEmail] server error:", body.error);
+        setEmailResult(t("couldNotSendBroadcastEmail"));
         return;
       }
       setEmailResult(t("emailSentSummary", { count: String(body.scheduled ?? body.sent ?? 0) }));

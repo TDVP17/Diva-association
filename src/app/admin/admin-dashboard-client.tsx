@@ -66,7 +66,7 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
         {t("createAndPublishNewCotisation")}
       </Link>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-stack-gap-md">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-stack-gap-md">
         <DashboardCard
           href="/admin/membership-requests"
           icon="group_add"
@@ -87,6 +87,13 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
           title={t("positionChangeRequestsCard")}
           body={t("positionChangeRequestsCardBody")}
           count={swapCount}
+        />
+        <DashboardCard
+          href="/admin/users"
+          icon="group"
+          title={t("allUsersCard")}
+          body={t("allUsersCardBody")}
+          count={null}
         />
       </div>
     </main>
