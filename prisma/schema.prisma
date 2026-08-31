@@ -25,9 +25,10 @@ enum MembershipStatus {
   REJECTED
 }
 
+/// CNI (Cameroonian national ID card) is the only accepted identity
+/// document — passport verification was removed entirely.
 enum KycDocumentType {
   CNI
-  PASSPORT
 }
 
 enum KycVerificationStatus {
@@ -36,12 +37,36 @@ enum KycVerificationStatus {
   FAILED
 }
 
+/// Every weekly/biweekly value follows the same shape as the original
+/// HEBDO_SUNDAY/BIWEEKLY_SUNDAY, just generalized to every weekday, so
+/// admins aren't limited to Sunday-only cycles. Every monthly value follows
+/// MONTHLY_25/MONTHLY_28's shape for a curated set of common days. See
+/// isContributionDay() in src/lib/tontine-engine.ts for the single lookup
+/// table all of these are derived from.
 enum TontineType {
   HEBDO_SUNDAY
+  EVERY_MONDAY
+  EVERY_TUESDAY
+  EVERY_WEDNESDAY
+  EVERY_THURSDAY
+  EVERY_FRIDAY
+  EVERY_SATURDAY
+  MONTHLY_1
+  MONTHLY_5
+  MONTHLY_10
+  MONTHLY_15
+  MONTHLY_20
   MONTHLY_25
   MONTHLY_28
-  /// Every other Sunday, counted from the session's startDate.
+  /// Every other Sunday — a fixed calendar-wide cadence (not anchored to
+  /// any individual session's startDate), same for every BIWEEKLY_* value.
   BIWEEKLY_SUNDAY
+  BIWEEKLY_MONDAY
+  BIWEEKLY_TUESDAY
+  BIWEEKLY_WEDNESDAY
+  BIWEEKLY_THURSDAY
+  BIWEEKLY_FRIDAY
+  BIWEEKLY_SATURDAY
   /// The 25th, every 3 months (Jan/Apr/Jul/Oct-style quarterly cadence
   /// anchored to the session's startDate month).
   QUARTERLY_25
@@ -124,17 +149,15 @@ enum OtpPurpose {
 
 enum PaymentMethodType {
   MOBILE_MONEY
-  CARD
 }
 
 /// The payment gateway that processed a Contribution — see
-/// src/lib/payment-fees.ts for each provider's fee structure. KORAPAY is
-/// modeled here so the fee-splitting logic is ready for it, even though no
-/// live Korapay checkout integration exists yet (Fapshi is the only
-/// gateway currently wired into a real payment flow).
+/// src/lib/payment-fees.ts for its fee structure. Fapshi (Mobile
+/// Money/Orange Money) is the platform's sole payment gateway — Kora
+/// (card payments) was removed entirely, never having been wired into a
+/// live checkout flow.
 enum PaymentProvider {
   FAPSHI
-  KORAPAY
 }
 
 model User {
@@ -145,7 +168,6 @@ model User {
   avatar               String?
   image                String?
   role                 Role      @default(MEMBER)
-  sponsorCode          String?
   city                 String?
   neighborhood         String?
   /// Captured from the browser's Geolocation API via the "Enable
@@ -194,26 +216,16 @@ model User {
   @@map("users")
 }
 
-/// A user's saved checkout shortcut — max 4 per user, enforced at the API
-/// layer. Never stores a full card number/CVV (collected only by Kora's
-/// hosted widget, which never touches our server) — CARD rows only carry
-/// what Kora's tokenization callback/webhook returns (brand, last 4, and a
-/// reusable reference token, if their API supports charging it later).
+/// A user's saved Mobile Money number shortcut — max 4 per user, enforced
+/// at the API layer.
 model SavedPaymentMethod {
-  id            String            @id @default(cuid())
-  userId        String
-  type          PaymentMethodType
-  label         String?
-  /// MOBILE_MONEY only.
-  phone         String?
-  /// CARD only — e.g. "Visa".
-  cardBrand     String?
-  /// CARD only — last 4 digits, never a full PAN.
-  cardLast4     String?
-  /// CARD only — Kora's reusable reference token, if available.
-  koraCardToken String?
-  isDefault     Boolean           @default(false)
-  createdAt     DateTime          @default(now())
+  id        String            @id @default(cuid())
+  userId    String
+  type      PaymentMethodType
+  label     String?
+  phone     String?
+  isDefault Boolean           @default(false)
+  createdAt DateTime          @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -296,7 +308,6 @@ model TontineSession {
   status              TontineStatus @default(DRAFT)
   startDate           DateTime
   limitTime           String
-  rules               String?       @db.Text
   /// Maximum total registered slots (sum of Membership.slotCount) this
   /// session accepts. Null = uncapped. Reaching this locks new join
   /// requests the same way passing startDate does.
@@ -334,11 +345,11 @@ model Membership {
   userId           String
   tontineSessionId String
   status           MembershipStatus @default(PENDING)
-  /// Billing multiplier chosen post-approval (e.g. 1.5, 2.5). Only the
-  /// whole-number part gets named, positioned MembershipSlot rows — the
-  /// fractional remainder just adds to what's owed each cycle. Null until
-  /// the member selects it (mandatory one-time step after approval).
-  slotCount        Decimal?         @db.Decimal(3, 1)
+  /// How many named, positioned MembershipSlot rows this membership gets —
+  /// a whole number from 1 to 5 (enforced at the API layer; fractional/
+  /// half-slot billing was removed). Null until the member selects it
+  /// (mandatory one-time step after approval).
+  slotCount        Int?
   joinedAt         DateTime         @default(now())
   /// Optional, admin-entered when rejecting a join request — shown to the
   /// member in their rejection notification when present.
@@ -353,12 +364,11 @@ model Membership {
   @@map("memberships")
 }
 
-/// One row per named, positioned slot — Math.floor(Membership.slotCount)
-/// rows per membership, created together when the member selects their
-/// slots. Each slot has its own draw position and its own fully
-/// independent contribution/payment history (a third party can pay for
-/// one named slot while a sibling slot under the same membership stays
-/// unpaid).
+/// One row per named, positioned slot — Membership.slotCount rows per
+/// membership, created together when the member selects their slots. Each
+/// slot has its own draw position and its own fully independent
+/// contribution/payment history (a third party can pay for one named slot
+/// while a sibling slot under the same membership stays unpaid).
 model MembershipSlot {
   id               String   @id @default(cuid())
   membershipId     String
@@ -480,7 +490,6 @@ model Contribution {
   finePaid                Decimal            @default(0) @db.Decimal(12, 2)
   status                  ContributionStatus @default(PENDING)
   fapshiTxRef             String?            @unique
-  koraReference           String?            @unique
   paidAt                  DateTime?
   receiptPdfUrl           String?
   /// Set only when an admin records this contribution manually (off-platform
@@ -525,7 +534,6 @@ model Fine {
   amount           Decimal    @db.Decimal(12, 2)
   status           FineStatus @default(UNPAID)
   fapshiTxRef      String?    @unique
-  koraReference    String?    @unique
   createdAt        DateTime   @default(now())
 
   membershipSlot MembershipSlot @relation(fields: [membershipSlotId], references: [id], onDelete: Cascade)
@@ -696,4 +704,17 @@ model AuditLog {
   @@index([tontineSessionId, createdAt])
   @@index([actorId, createdAt])
   @@map("audit_logs")
+}
+
+/// Singleton row (id is always "singleton") holding the association's
+/// general rules — replaces the old per-cotisation `rules` field. Shown at
+/// /reglement-general (linked from the member Profile tab) and editable by
+/// any admin from /admin/settings.
+model AssociationRules {
+  id               String   @id @default("singleton")
+  content          String   @db.Text
+  updatedAt        DateTime @updatedAt
+  updatedByAdminId String?
+
+  @@map("association_rules")
 }

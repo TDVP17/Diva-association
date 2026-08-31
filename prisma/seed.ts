@@ -57,7 +57,6 @@ async function main() {
       city: "Douala",
       neighborhood: "Bonapriso",
       phone: "237670000001",
-      sponsorCode: "FOUNDER",
     },
   });
 
