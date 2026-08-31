@@ -12,6 +12,7 @@ interface MembershipRequest {
     documentType: string;
     matchConfidence: number | null;
     documentImageUrl: string | null;
+    selfieImageUrl: string | null;
     verifiedAt: string | null;
   } | null;
 }
@@ -122,6 +123,17 @@ export function AdminMembershipRequestsClient({ lang }: { lang: Lang }) {
                     className="w-20 h-14 object-cover rounded-md border border-outline-variant"
                   />
                   <span className="font-label-sm text-label-sm text-primary underline">{t("viewDocument")}</span>
+                </a>
+              )}
+              {m.kycVerification.selfieImageUrl && (
+                <a href={m.kycVerification.selfieImageUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={m.kycVerification.selfieImageUrl}
+                    alt={t("viewSelfie")}
+                    className="w-14 h-14 object-cover rounded-full border border-outline-variant"
+                  />
+                  <span className="font-label-sm text-label-sm text-primary underline">{t("viewSelfie")}</span>
                 </a>
               )}
             </div>

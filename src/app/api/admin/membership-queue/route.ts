@@ -17,7 +17,13 @@ export async function GET(request: Request) {
         user: { select: { id: true, name: true, avatar: true, image: true } },
         tontineSession: { select: { id: true, title: true, type: true, status: true } },
         kycVerification: {
-          select: { documentType: true, matchConfidence: true, documentImageUrl: true, verifiedAt: true },
+          select: {
+            documentType: true,
+            matchConfidence: true,
+            documentImageUrl: true,
+            selfieImageUrl: true,
+            verifiedAt: true,
+          },
         },
       },
       orderBy: { joinedAt: "asc" },

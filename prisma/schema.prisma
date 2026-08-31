@@ -428,10 +428,14 @@ model Payout {
 
 /// One row per KYC (Didit) verification attempt. Created when a member
 /// starts identity verification to join a specific tontine — before a
-/// Membership exists — and linked to the resulting Membership only once
-/// Didit's automated check passes. A user can have multiple rows across
-/// retries (e.g. after a FAILED attempt); `membershipId` stays null until
-/// a VERIFIED result actually creates/attaches a Membership.
+/// Membership exists — and linked to the resulting Membership once the
+/// member submits their documents. An admin reviews documentImageUrl +
+/// selfieImageUrl by hand (see /admin/membership-requests) and the
+/// decide route sets status to VERIFIED/FAILED to match their decision.
+/// diditSessionId/matchConfidence are legacy from the previous automated
+/// Didit integration (removed — per-verification cost wasn't viable for
+/// this association) and are now unused/nullable rather than deleted, so
+/// old rows stay intact.
 model KycVerification {
   id               String                @id @default(cuid())
   userId           String
@@ -439,9 +443,12 @@ model KycVerification {
   membershipId     String?               @unique
   documentType     KycDocumentType
   status           KycVerificationStatus @default(PENDING)
-  diditSessionId   String                @unique
+  diditSessionId   String?               @unique
   matchConfidence  Decimal?              @db.Decimal(5, 2)
   documentImageUrl String?
+  /// Selfie photo submitted alongside the document, for the admin to
+  /// visually compare during manual review.
+  selfieImageUrl   String?
   createdAt        DateTime              @default(now())
   verifiedAt       DateTime?
 

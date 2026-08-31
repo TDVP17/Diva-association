@@ -48,3 +48,6 @@ stitch_diva_associations_financial_interface.zip
 
 # unexplained duplicate zip found under public/ — never publish this
 /public/logo
+
+.vercel
+.env*

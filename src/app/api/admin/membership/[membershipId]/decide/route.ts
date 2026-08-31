@@ -48,6 +48,11 @@ export async function POST(
       await ensureMemberCode(membership.userId);
     }
 
+    await prisma.kycVerification.updateMany({
+      where: { membershipId: membership.id },
+      data: { status: approved ? "VERIFIED" : "FAILED", verifiedAt: new Date() },
+    });
+
     const lang = existing.user.preferredLang === "fr" ? "fr" : "en";
     const message = approved
       ? translate(lang, "memberApprovedMessage")
