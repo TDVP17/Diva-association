@@ -62,7 +62,17 @@ export async function POST(
       tontineSessionId: membership.tontineSessionId,
       channel: "IN_APP",
       type: approved ? "MEMBER_APPROVED" : "MEMBER_REJECTED",
-      recipients: [{ userId: membership.userId, message }],
+      recipients: [
+        {
+          userId: membership.userId,
+          message,
+          messageKey: approved ? "memberApprovedMessage" : "memberRejectedMessage",
+          messageVars: approved || !parsed.data.reason ? undefined : { reason: parsed.data.reason },
+          // Approved members land back on the session to pick up onboarding
+          // (select slots, etc); rejected members have nowhere useful to go.
+          actionUrl: approved ? `/sessions/${membership.tontineSessionId}` : undefined,
+        },
+      ],
     });
     // IN_APP has nothing for the cron to "send" — flip straight to SENT so
     // it appears in the member's notification feed right away.

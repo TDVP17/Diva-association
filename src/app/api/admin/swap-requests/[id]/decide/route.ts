@@ -102,6 +102,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           nextStatus === "APPROVED"
             ? "Your position exchange request was approved."
             : "Your position exchange request was rejected.",
+        messageKey: nextStatus === "APPROVED" ? "swapApprovedRequesterMessage" : "swapRejectedRequesterMessage",
         actionUrl: "/chat",
       },
       {
@@ -110,6 +111,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           nextStatus === "APPROVED"
             ? "A position exchange you accepted was approved."
             : "A position exchange you accepted was rejected.",
+        messageKey: nextStatus === "APPROVED" ? "swapApprovedTargetMessage" : "swapRejectedTargetMessage",
         actionUrl: "/chat",
       },
     ],

@@ -36,6 +36,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       recipients: approvedMembers.map((m) => ({
         userId: m.userId,
         message: "The draw has started — come pick your number!",
+        messageKey: "drawStartedMessage",
         actionUrl: `/sessions/${id}/draw`,
       })),
     });

@@ -84,6 +84,8 @@ export async function POST(request: Request) {
       {
         userId: targetId,
         message: `${session.user.name ?? "A member"} wants to exchange positions with you.`,
+        messageKey: "swapRequestedMessage",
+        messageVars: { name: session.user.name ?? "A member" },
         actionUrl: "/chat",
       },
     ],

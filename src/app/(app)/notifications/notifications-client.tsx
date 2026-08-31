@@ -3,11 +3,14 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { renderNotificationMessage } from "@/lib/notifications/render-message";
 
 interface NotificationRow {
   id: string;
   type: string;
   message: string;
+  messageKey: string | null;
+  messageVars: unknown;
   contributionLabel: string | null;
   actionUrl: string | null;
   sentAt: string;
@@ -44,6 +47,22 @@ export function NotificationsClient({ lang }: { lang: Lang }) {
   async function markRead(id: string) {
     setNotifications((current) => (current ? current.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n)) : current));
     await fetch(`/api/notifications/${id}/read`, { method: "POST" });
+    // Refreshes the server-rendered header bell badge so the unread count
+    // drops instantly instead of waiting for the next full navigation.
+    router.refresh();
+  }
+
+  async function dismiss(id: string) {
+    setNotifications((current) => (current ? current.filter((n) => n.id !== id) : current));
+    await fetch(`/api/notifications/${id}`, { method: "DELETE" });
+    router.refresh();
+  }
+
+  async function clearAll() {
+    if (!window.confirm(t("confirmClearAllNotifications"))) return;
+    setNotifications([]);
+    await fetch("/api/notifications", { method: "DELETE" });
+    router.refresh();
   }
 
   function handleClick(n: NotificationRow) {
@@ -65,26 +84,47 @@ export function NotificationsClient({ lang }: { lang: Lang }) {
 
   return (
     <div className="flex flex-col gap-2">
-      {notifications.map((n) => (
+      <div className="flex justify-end">
         <button
+          onClick={clearAll}
+          className="font-label-sm text-label-sm text-on-surface-variant hover:text-error transition-colors px-2 py-1"
+        >
+          {t("clearAllNotifications")}
+        </button>
+      </div>
+      {notifications.map((n) => (
+        <div
           key={n.id}
-          onClick={() => handleClick(n)}
-          className={`text-left bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border p-4 flex flex-col gap-1 transition-colors ${
+          className={`relative bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border p-4 flex flex-col gap-1 transition-colors ${
             n.readAt ? "border-surface-variant" : "border-primary bg-primary/5"
           }`}
         >
-          <div className="flex items-center justify-between gap-2">
-            <span className="font-label-md text-label-md text-primary">{t(TYPE_KEY[n.type] ?? "notifTypeAdminBroadcast")}</span>
-            {!n.readAt && <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />}
-          </div>
-          {n.contributionLabel && (
-            <p className="font-label-sm text-label-sm text-on-surface-variant">{n.contributionLabel}</p>
-          )}
-          <p className="font-body-md text-body-md text-on-surface whitespace-pre-wrap">{n.message}</p>
-          <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">
-            {new Date(n.sentAt).toLocaleString("en-GB", { timeZone: "Africa/Douala" })}
-          </p>
-        </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              dismiss(n.id);
+            }}
+            aria-label={t("dismissNotification")}
+            className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-low hover:text-error transition-colors"
+          >
+            <span className="material-symbols-outlined text-[16px]">close</span>
+          </button>
+          <button onClick={() => handleClick(n)} className="text-left flex flex-col gap-1 pr-6">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-label-md text-label-md text-primary">{t(TYPE_KEY[n.type] ?? "notifTypeAdminBroadcast")}</span>
+              {!n.readAt && <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />}
+            </div>
+            {n.contributionLabel && (
+              <p className="font-label-sm text-label-sm text-on-surface-variant">{n.contributionLabel}</p>
+            )}
+            <p className="font-body-md text-body-md text-on-surface whitespace-pre-wrap">
+              {renderNotificationMessage(n, lang)}
+            </p>
+            <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">
+              {new Date(n.sentAt).toLocaleString("en-GB", { timeZone: "Africa/Douala" })}
+            </p>
+          </button>
+        </div>
       ))}
     </div>
   );

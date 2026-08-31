@@ -56,7 +56,14 @@ export async function GET(request: Request) {
         tontineSessionId: tontineSession.id,
         channel: "IN_APP",
         type: "FOOD_TURN",
-        recipients: [{ userId: membership.userId, message }],
+        recipients: [
+          {
+            userId: membership.userId,
+            message,
+            messageKey: "foodTurnMessage",
+            messageVars: { name: membership.user.name },
+          },
+        ],
       });
       // IN_APP rows created via scheduleNotifications default to SCHEDULED,
       // but there's nothing for the cron to "send" for IN_APP — flip it

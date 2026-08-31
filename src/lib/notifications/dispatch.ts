@@ -8,6 +8,14 @@ export interface NotificationRecipient {
   message: string;
   /** Where tapping this notification in the feed should navigate to, e.g. "/chat". */
   actionUrl?: string;
+  /**
+   * i18n key (see src/lib/i18n/translations.ts) letting IN_APP rows render
+   * in whichever language is currently selected, instead of being stuck in
+   * whatever language `message` was rendered in at creation time. Ignored
+   * for EMAIL/WHATSAPP, which always send the pre-rendered `message`.
+   */
+  messageKey?: string;
+  messageVars?: Record<string, string>;
 }
 
 /**
@@ -36,6 +44,8 @@ export async function scheduleNotifications(params: {
       channel: params.channel,
       type: params.type,
       message: r.message,
+      messageKey: r.messageKey,
+      messageVars: r.messageVars,
       actionUrl: r.actionUrl,
       status: "SCHEDULED" as const,
       scheduledAt: new Date(now + index * STAGGER_MS),

@@ -26,6 +26,8 @@ export async function GET() {
       id: n.id,
       type: n.type,
       message: n.message,
+      messageKey: n.messageKey,
+      messageVars: n.messageVars,
       contributionLabel: n.tontineSession
         ? n.tontineSession.title || TONTINE_LABELS[n.tontineSession.type]
         : null,
@@ -34,4 +36,15 @@ export async function GET() {
       readAt: n.readAt ? n.readAt.toISOString() : null,
     })),
   });
+}
+
+/** Bulk-delete: clears every notification in the current user's feed. */
+export async function DELETE() {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  await prisma.notification.deleteMany({ where: { userId: session.user.id } });
+  return NextResponse.json({ ok: true });
 }

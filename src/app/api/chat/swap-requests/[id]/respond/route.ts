@@ -57,6 +57,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       recipients: admins.map((a) => ({
         userId: a.id,
         message: "A position exchange has been accepted and is awaiting your approval.",
+        messageKey: "swapAcceptedPendingAdminMessage",
         actionUrl: "/admin/swap-requests",
       })),
     });
