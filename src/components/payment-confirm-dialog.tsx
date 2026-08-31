@@ -19,11 +19,14 @@ interface Quote {
 export function PaymentConfirmDialog({
   lang,
   membershipSlotId,
+  fineId,
   onConfirm,
   onClose,
 }: {
   lang: Lang;
-  membershipSlotId: string;
+  /** Exactly one of membershipSlotId/fineId must be set. */
+  membershipSlotId?: string;
+  fineId?: string;
   onConfirm: () => void;
   onClose: () => void;
 }) {
@@ -34,11 +37,14 @@ export function PaymentConfirmDialog({
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/payments/quote", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ membershipSlotId }),
-    })
+    const request = fineId
+      ? fetch(`/api/fines/${fineId}/quote`)
+      : fetch("/api/payments/quote", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ membershipSlotId }),
+        });
+    request
       .then(async (res) => {
         const body = await parseJsonOrThrow<Quote>(res, t("couldNotCalculateTotal"));
         if (!cancelled) setQuote(body);
@@ -50,7 +56,7 @@ export function PaymentConfirmDialog({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [membershipSlotId]);
+  }, [membershipSlotId, fineId]);
 
   return (
     <div
