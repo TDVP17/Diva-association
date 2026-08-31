@@ -21,6 +21,10 @@ export async function updateProfileAction(
 
   const city = String(formData.get("city") ?? "").trim();
   const neighborhood = String(formData.get("neighborhood") ?? "").trim();
+  const rawLat = String(formData.get("latitude") ?? "").trim();
+  const rawLng = String(formData.get("longitude") ?? "").trim();
+  const latitude = rawLat ? Number(rawLat) : null;
+  const longitude = rawLng ? Number(rawLng) : null;
 
   try {
     await prisma.user.update({
@@ -28,6 +32,8 @@ export async function updateProfileAction(
       data: {
         city: city || null,
         neighborhood: neighborhood || null,
+        latitude: latitude !== null && Number.isFinite(latitude) ? latitude : undefined,
+        longitude: longitude !== null && Number.isFinite(longitude) ? longitude : undefined,
       },
     });
     return { success: "Profile updated." };

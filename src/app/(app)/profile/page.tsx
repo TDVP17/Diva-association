@@ -111,7 +111,7 @@ export default async function ProfilePage() {
       </div>
 
       <div className="mb-stack-gap-lg flex flex-col gap-stack-gap-sm">
-        <MemberCodeCard code={user.memberCode} lang={lang} />
+        <MemberCodeCard code={user.memberCode} sponsorCode={user.sponsorCode} lang={lang} />
         {unpaidFinesTotal > 0 && (
           <div className="w-full bg-error-container/40 border border-error/30 rounded-xl p-4 flex items-center gap-3">
             <span className="material-symbols-outlined text-error">warning</span>
@@ -142,10 +142,6 @@ export default async function ProfilePage() {
           inputType="tel"
         />
         <InlineLocationField city={user.city} neighborhood={user.neighborhood} lang={lang} />
-        <div className="flex justify-between items-center px-4 py-3 border-t border-surface-variant">
-          <span className="font-label-sm text-label-sm text-on-surface-variant">{t("sponsorCodeLabel")}</span>
-          <span className="font-label-md text-label-md text-on-surface">{user.sponsorCode ?? t("notSet")}</span>
-        </div>
         <div className="flex justify-between items-center px-4 py-3 border-t border-surface-variant">
           <span className="font-label-sm text-label-sm text-on-surface-variant">{t("roleLabel")}</span>
           <span className="font-label-md text-label-md text-on-surface">{user.role}</span>
