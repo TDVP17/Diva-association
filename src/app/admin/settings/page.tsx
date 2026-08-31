@@ -6,6 +6,8 @@ import { AvatarUpload } from "@/app/(app)/profile/avatar-upload";
 import { InlineField } from "@/app/(app)/profile/inline-field";
 import { InlinePasswordField } from "@/app/(app)/profile/inline-password-field";
 import { updatePhoneAction, updateEmailAction } from "@/app/(app)/profile/actions";
+import { getAssociationRules } from "@/lib/association-rules";
+import { GeneralRulesEditor } from "./general-rules-editor";
 
 export default async function AdminSettingsPage() {
   const session = await auth();
@@ -18,6 +20,8 @@ export default async function AdminSettingsPage() {
     select: { name: true, email: true, avatar: true, image: true, phone: true, role: true },
   });
   if (!user) redirect("/login");
+
+  const generalRules = await getAssociationRules();
 
   return (
     <main className="px-container-padding pt-stack-gap-lg pb-32 max-w-md mx-auto w-full">
@@ -53,6 +57,11 @@ export default async function AdminSettingsPage() {
 
       <section className="mb-stack-gap-lg">
         <InlinePasswordField lang={lang} />
+      </section>
+
+      <section className="mb-stack-gap-lg bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
+        <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md">{t("editGeneralRules")}</h2>
+        <GeneralRulesEditor initialContent={generalRules} lang={lang} />
       </section>
     </main>
   );
