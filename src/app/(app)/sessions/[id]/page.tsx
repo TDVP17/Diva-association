@@ -11,7 +11,7 @@ import { SelectSlotsForm } from "./select-slots-form";
 import { PayoutOrderModal } from "./payout-order-modal";
 import { PayoutTurnPanel } from "./payout-turn-panel";
 import { PaymentSuccessBanner } from "./payment-success-banner";
-import { getDesignatedSlot } from "@/lib/round-robin-lock";
+import { getDesignatedSlot, assertPriorCyclePaidOut } from "@/lib/round-robin-lock";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -208,7 +208,9 @@ export default async function SessionDetailPage({
   );
   const paidCount = allSlotsFlat.filter((s) => contributionBySlot.get(s.id)?.status === "PAID").length;
 
-  const mySlots = myMembership.slots;
+  const mySlots = [...myMembership.slots].sort((a, b) =>
+    a.beneficiaryName.localeCompare(b.beneficiaryName, "fr", { sensitivity: "base" }),
+  );
   const myUndrawnSlots = mySlots.filter((s) => s.ballDrawn === null);
 
   // "Designated" (zero payout rows yet) gates the initial "submit your
@@ -218,6 +220,19 @@ export default async function SessionDetailPage({
   // two are tracked separately rather than re-using one query for both.
   const designatedSlot = await getDesignatedSlot(id);
   const myDesignatedSlot = designatedSlot && mySlots.some((s) => s.id === designatedSlot.id) ? designatedSlot : null;
+
+  // Same read-only guard initiateSlotPayment() enforces server-side — shown
+  // here so the Pay button is disabled up front instead of only failing
+  // after the member taps it and opens the confirm dialog. designatedSlot
+  // above is exactly who assertPriorCyclePaidOut would report as still
+  // owed a payout, so it's reused instead of querying it again.
+  const roundLock = await assertPriorCyclePaidOut(
+    tontineSession.id,
+    tontineSession.type,
+    dueDate,
+    tontineSession.startDate,
+  );
+  const currentBeneficiaryName = roundLock.ok ? null : designatedSlot?.beneficiaryName;
   const myActivePayoutClaim = await prisma.payout.findFirst({
     where: { membershipSlotId: { in: mySlots.map((s) => s.id) }, status: { not: "CONFIRMED" } },
     orderBy: { detailsSubmittedAt: "desc" },
@@ -263,9 +278,7 @@ export default async function SessionDetailPage({
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary-container/20 text-on-secondary-container font-label-sm text-label-sm uppercase tracking-wider mb-2">
               {tontineSession.status}
             </span>
-            <h1 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">
-              {sessionLabel}
-            </h1>
+            <h1 className="text-xl md:text-2xl font-bold text-on-surface">{sessionLabel}</h1>
             <p className="font-body-md text-body-md text-on-surface-variant flex items-center gap-1 mt-1">
               <span className="material-symbols-outlined text-sm">schedule</span>
               {t("deadlineLabel")}: {tontineSession.limitTime}
@@ -290,14 +303,7 @@ export default async function SessionDetailPage({
             />
           </div>
         </div>
-        <div className="mt-4 pt-4 border-t border-surface-variant flex items-center justify-between flex-wrap gap-2">
-          <Link
-            href={`/pay/${id}`}
-            className="font-label-sm text-label-sm text-primary underline flex items-center gap-1"
-          >
-            <span className="material-symbols-outlined text-[16px]">share</span>
-            {t("shareContributionLink")}
-          </Link>
+        <div className="mt-4 pt-4 border-t border-surface-variant flex items-center justify-end flex-wrap gap-2">
           <PayoutOrderModal tontineSessionId={id} lang={lang} />
         </div>
       </section>
@@ -326,11 +332,6 @@ export default async function SessionDetailPage({
       <section className="mb-stack-gap-lg lg:mb-0">
         <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md px-1 flex items-center gap-2">
           {t("yourSlots")}
-          {Number(myMembership.slotCount) % 1 !== 0 && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-secondary-container/30 text-on-secondary-container font-label-sm text-label-sm">
-              {t("halfSlotBadge")}
-            </span>
-          )}
         </h2>
         <div className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant overflow-hidden">
           {mySlots.map((s, index) => {
@@ -355,6 +356,11 @@ export default async function SessionDetailPage({
                     membershipSlotId={s.id}
                     amountLabel={`${slotTotal.toLocaleString("en-US")} F`}
                     lang={lang}
+                    lockedReason={
+                      !roundLock.ok && currentBeneficiaryName
+                        ? t("paymentsLockedUntilPayout", { name: currentBeneficiaryName })
+                        : undefined
+                    }
                   />
                 )}
               </div>
@@ -419,17 +425,6 @@ export default async function SessionDetailPage({
         </div>
       </section>
       </div>
-
-      {tontineSession.rules && (
-        <section className="mt-stack-gap-lg">
-          <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md px-1">{t("rulesTitle")}</h2>
-          <div className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
-            <p className="font-body-md text-body-md text-on-surface-variant whitespace-pre-wrap">
-              {tontineSession.rules}
-            </p>
-          </div>
-        </section>
-      )}
     </main>
   );
 }

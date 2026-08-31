@@ -46,10 +46,10 @@ export function PayoutOrderModal({ tontineSessionId, lang }: { tontineSessionId:
     <>
       <button
         onClick={openModal}
-        className="font-label-sm text-label-sm text-primary underline flex items-center gap-1"
+        className="font-label-sm text-label-sm text-primary underline flex items-center gap-1.5"
       >
-        <span className="material-symbols-outlined text-[16px]">format_list_numbered</span>
-        {t("viewPayoutOrder")}
+        <span className="material-symbols-outlined text-[18px] leading-none flex-shrink-0">format_list_numbered</span>
+        <span className="leading-none">{t("viewPayoutOrder")}</span>
       </button>
 
       {open && (

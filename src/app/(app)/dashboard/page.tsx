@@ -22,7 +22,13 @@ export default async function DashboardPage() {
       where: {
         userId,
         status: "APPROVED",
-        tontineSession: { status: { in: ["DRAWING", "ACTIVE"] } },
+        // Excludes only CLOSED — a DRAFT cotisation the member's already
+        // been approved into (drawing hasn't started yet) still belongs on
+        // the dashboard, it just isn't collecting contributions yet. This
+        // used to require DRAWING/ACTIVE specifically, which is what made
+        // an approved DRAFT membership vanish from the dashboard while
+        // still showing up on the Cotisations page.
+        tontineSession: { status: { not: "CLOSED" } },
       },
       include: { tontineSession: true },
       orderBy: { joinedAt: "asc" },
@@ -79,14 +85,17 @@ export default async function DashboardPage() {
       </section>
 
       <section className="grid grid-cols-2 gap-stack-gap-md">
-        <div className="bg-white rounded-xl p-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border-l-4 border-error">
+        <Link
+          href="/fines"
+          className="bg-white rounded-xl p-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border-l-4 border-error hover:bg-surface-container-low transition-colors"
+        >
           <span className="material-symbols-outlined text-error mb-2">warning</span>
           <h4 className="font-label-sm text-label-sm text-on-surface-variant mb-1">{t("unpaidFines")}</h4>
           <p className="font-numeric-data text-numeric-data text-error">
             {totalFines.toLocaleString("en-US")}{" "}
             <span className="font-body-md text-body-md font-normal">F</span>
           </p>
-        </div>
+        </Link>
         <Link
           href="/chat"
           className="bg-white rounded-xl p-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] flex flex-col justify-between hover:bg-surface-container-low transition-colors"
