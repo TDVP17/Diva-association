@@ -22,7 +22,14 @@ interface FundableSlot {
   alreadyPaid: boolean;
 }
 
-export function ContributeForRelativeClient({ lang }: { lang: Lang }) {
+/**
+ * Enter a member's personal code → see every active cotisation cycle they
+ * still owe → pay one via Fapshi. Shared by the authenticated "Contribute
+ * for a Relative" page (payEndpoint records paidByUserId) and the public,
+ * no-account /pay entry point (payEndpoint is anonymous) — same flow,
+ * different endpoint depending on whether the payer is signed in.
+ */
+export function MemberCodePayFlow({ lang, payEndpoint }: { lang: Lang; payEndpoint: string }) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
 
   const [code, setCode] = useState("");
@@ -43,7 +50,8 @@ export function ContributeForRelativeClient({ lang }: { lang: Lang }) {
       const lookupRes = await fetch(`/api/members/lookup-code?code=${encodeURIComponent(trimmed)}`);
       const lookupBody = await lookupRes.json();
       if (!lookupRes.ok) {
-        setSearchError(lookupBody.error ?? t("noMemberFoundWithCode"));
+        if (lookupBody?.error) console.error("[findMember] server error:", lookupBody.error);
+        setSearchError(t("noMemberFoundWithCode"));
         return;
       }
       setMember(lookupBody);
@@ -70,7 +78,7 @@ export function ContributeForRelativeClient({ lang }: { lang: Lang }) {
     setPayingSlotId(slotId);
     setPayError(null);
     try {
-      const res = await fetch("/api/payments/relative/initiate", {
+      const res = await fetch(payEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ membershipSlotId: slotId }),

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
-import { ContributeForRelativeClient } from "./contribute-for-relative-client";
+import { MemberCodePayFlow } from "@/components/member-code-pay-flow";
 
 export default async function ContributeForRelativePage() {
   const session = await auth();
@@ -14,7 +14,7 @@ export default async function ContributeForRelativePage() {
       <h1 className="font-title-md text-title-md text-primary mb-stack-gap-md">
         {t("contributeForRelativeNav")}
       </h1>
-      <ContributeForRelativeClient lang={lang} />
+      <MemberCodePayFlow lang={lang} payEndpoint="/api/payments/relative/initiate" />
     </main>
   );
 }

@@ -47,7 +47,6 @@ export default async function ProfilePage() {
         phone: true,
         city: true,
         neighborhood: true,
-        sponsorCode: true,
         memberCode: true,
         role: true,
       },
@@ -111,7 +110,7 @@ export default async function ProfilePage() {
       </div>
 
       <div className="mb-stack-gap-lg flex flex-col gap-stack-gap-sm">
-        <MemberCodeCard code={user.memberCode} sponsorCode={user.sponsorCode} lang={lang} />
+        <MemberCodeCard code={user.memberCode} lang={lang} />
         {unpaidFinesTotal > 0 && (
           <div className="w-full bg-error-container/40 border border-error/30 rounded-xl p-4 flex items-center gap-3">
             <span className="material-symbols-outlined text-error">warning</span>
@@ -242,6 +241,16 @@ export default async function ProfilePage() {
           <span className="flex items-center gap-3">
             <span className="material-symbols-outlined text-primary">receipt_long</span>
             <span className="font-label-md text-label-md text-on-surface">{t("transactionHistory")}</span>
+          </span>
+          <span className="material-symbols-outlined text-outline">chevron_right</span>
+        </Link>
+        <Link
+          href="/reglement-general"
+          className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant hover:bg-surface-container-low transition-colors"
+        >
+          <span className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-primary">gavel</span>
+            <span className="font-label-md text-label-md text-on-surface">{t("generalRulesNav")}</span>
           </span>
           <span className="material-symbols-outlined text-outline">chevron_right</span>
         </Link>
