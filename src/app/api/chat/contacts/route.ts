@@ -82,13 +82,17 @@ export async function GET() {
     }
     memberIds = [...partnerIds];
   } else {
+    // Only members who share at least one ACTIVE cotisation — an approved
+    // membership in a session that's actually collecting contributions
+    // (DRAWING or ACTIVE). A shared DRAFT/CLOSED session, or a pending/
+    // rejected membership, doesn't unlock messaging with that person.
     const myMemberships = await prisma.membership.findMany({
-      where: { userId: session.user.id },
+      where: { userId: session.user.id, status: "APPROVED", tontineSession: { status: { in: ["DRAWING", "ACTIVE"] } } },
       select: { tontineSessionId: true },
     });
     const sessionIds = myMemberships.map((m) => m.tontineSessionId);
     const coMemberships = await prisma.membership.findMany({
-      where: { tontineSessionId: { in: sessionIds }, userId: { not: session.user.id } },
+      where: { tontineSessionId: { in: sessionIds }, userId: { not: session.user.id }, status: "APPROVED" },
       select: { userId: true },
       distinct: ["userId"],
     });

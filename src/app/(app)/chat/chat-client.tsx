@@ -63,6 +63,7 @@ export function ChatClient({
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [commonSessions, setCommonSessions] = useState<CommonSession[]>([]);
   const [input, setInput] = useState("");
+  const [search, setSearch] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const feedEndRef = useRef<HTMLDivElement>(null);
@@ -81,7 +82,7 @@ export function ChatClient({
   const loadFeed = useCallback(async (otherId: string) => {
     try {
       const res = await fetch(`/api/chat/messages?with=${otherId}`);
-      if (res.ok) setFeed((await res.json()).feed);
+      if (res.ok) setFeed((await res.json()).feed ?? []);
     } catch {
       // Background poll — a transient network hiccup here shouldn't
       // interrupt the conversation view; the next 4s tick will retry.
@@ -91,9 +92,12 @@ export function ChatClient({
   useEffect(() => {
     if (!active) return;
     fetch(`/api/chat/messages?with=${active.id}`)
-      .then((r) => r.json())
-      .then((body) => setFeed(body.feed))
-      .then(() => refreshContacts()); // opening a thread marks it read server-side — sync the badge
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body) => {
+        setFeed(body?.feed ?? []);
+        refreshContacts(); // opening a thread marks it read server-side — sync the badge
+      })
+      .catch(() => setFeed([]));
     fetch(`/api/chat/common-sessions?with=${active.id}`)
       .then((r) => r.json())
       .then((body) => setCommonSessions(body.sessions ?? []))
@@ -150,7 +154,10 @@ export function ChatClient({
     if (res.ok && active) await loadFeed(active.id);
   }
 
-  const list = tab === "members" ? (contacts?.members ?? []) : contacts?.admin ? [contacts.admin] : [];
+  const baseList = tab === "members" ? (contacts?.members ?? []) : contacts?.admin ? [contacts.admin] : [];
+  const list = search.trim()
+    ? baseList.filter((c) => c.name.toLowerCase().includes(search.trim().toLowerCase()))
+    : baseList;
   const primarySwap = commonSessions[0];
 
   const swapStatusLabel: Record<"PENDING_MEMBERSHIP" | "PENDING_ADMIN" | "APPROVED" | "REJECTED", string> = {
@@ -165,8 +172,10 @@ export function ChatClient({
       // Bottom offset accounts for the mobile BottomNav (h-20, fixed) that
       // still renders behind this view — without it the sticky input bar
       // would be hidden underneath the nav on phones. Desktop has no
-      // BottomNav (md:hidden), so no offset is needed there.
-      <div className="flex flex-col h-[calc(100vh-64px-80px)] md:h-[calc(100vh-64px)] bg-background">
+      // BottomNav (md:hidden), so no offset is needed there. Uses dvh (not
+      // vh) so the fixed header/input bar don't drift when a mobile
+      // browser's address bar shows/hides and changes the visual viewport.
+      <div className="flex flex-col h-[calc(100dvh-64px-80px)] md:h-[calc(100dvh-64px)] bg-background">
         <div className="flex items-center gap-3 px-4 py-3 bg-white shadow-sm border-b border-surface-container z-10 sticky top-0 flex-shrink-0">
           <button
             className="p-2 -ml-2 text-primary hover:bg-surface-container-low rounded-full transition-colors"
@@ -312,10 +321,24 @@ export function ChatClient({
         </div>
       )}
 
+      <div className="relative mb-4">
+        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">
+          search
+        </span>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={t("searchMembersPlaceholder")}
+          className="w-full bg-white border border-surface-container rounded-lg pl-10 pr-3 py-2.5 font-body-md text-body-md text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+        />
+      </div>
+
       <div className="flex flex-col gap-2 lg:grid lg:grid-cols-2 lg:gap-3">
         {list.length === 0 && (
           <div className="bg-white rounded-xl p-6 text-center shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant lg:col-span-2">
-            <p className="font-body-md text-body-md text-on-surface-variant">{t("noConversationsYet")}</p>
+            <p className="font-body-md text-body-md text-on-surface-variant">
+              {search.trim() && baseList.length > 0 ? t("noSearchResults") : t("noConversationsYet")}
+            </p>
           </div>
         )}
         {list.map((contact) => {
