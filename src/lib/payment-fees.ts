@@ -1,11 +1,10 @@
 import type { PaymentProvider } from "@/generated/prisma/enums";
 
 /**
- * Payment-gateway processing fees, charged to the payer on top of the
+ * Fapshi's payment-processing fee, charged to the payer on top of the
  * contribution amount they already owe. Confirmed business rule:
  *
- *   Fapshi:  3.3% total  = 3.0% Fapshi + 0.3% President
- *   Korapay: 5.0% total  = 4.0% Korapay + 1.0% President
+ *   Fapshi: 3.3% total = 3.0% Fapshi + 0.3% President
  *
  * The internal split (which slice goes to the gateway vs the President)
  * is never shown to ordinary users — only the combined total fee and the
@@ -14,7 +13,6 @@ import type { PaymentProvider } from "@/generated/prisma/enums";
  */
 export const PROVIDER_FEE_CONFIG: Record<PaymentProvider, { totalRate: number; presidentRate: number }> = {
   FAPSHI: { totalRate: 0.033, presidentRate: 0.003 },
-  KORAPAY: { totalRate: 0.05, presidentRate: 0.01 },
 };
 
 export interface ProviderFeeBreakdown {

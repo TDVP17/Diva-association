@@ -10,24 +10,14 @@ describe("computeProviderFee", () => {
     expect(result.totalCharged).toBe(10330);
   });
 
-  it("Korapay: charges 5% total, split 4% gateway / 1% president", () => {
-    const result = computeProviderFee("KORAPAY", 10000);
-    expect(result.providerFeeAmount).toBe(500);
-    expect(result.providerShareAmount).toBe(400);
-    expect(result.presidentFeeShareAmount).toBe(100);
-    expect(result.totalCharged).toBe(10500);
-  });
-
   it("the gateway share and president share always sum exactly to the total fee — no rounding drift", () => {
-    // Amounts deliberately chosen so 3.0%/0.3%/4%/1% each round to fractional
+    // Amounts deliberately chosen so 3.0%/0.3% each round to fractional
     // francs on their own — the two shares must still sum exactly.
     const amounts = [1, 7, 33, 99, 101, 333, 1001, 2500, 12345, 999999];
-    for (const provider of ["FAPSHI", "KORAPAY"] as const) {
-      for (const amount of amounts) {
-        const result = computeProviderFee(provider, amount);
-        expect(result.providerShareAmount + result.presidentFeeShareAmount).toBe(result.providerFeeAmount);
-        expect(result.baseAmount + result.providerFeeAmount).toBe(result.totalCharged);
-      }
+    for (const amount of amounts) {
+      const result = computeProviderFee("FAPSHI", amount);
+      expect(result.providerShareAmount + result.presidentFeeShareAmount).toBe(result.providerFeeAmount);
+      expect(result.baseAmount + result.providerFeeAmount).toBe(result.totalCharged);
     }
   });
 
@@ -48,8 +38,7 @@ describe("computeProviderFee", () => {
     expect(result.totalCharged).toBe(0);
   });
 
-  it("matches the confirmed business rates exactly", () => {
+  it("matches the confirmed business rate exactly", () => {
     expect(PROVIDER_FEE_CONFIG.FAPSHI).toEqual({ totalRate: 0.033, presidentRate: 0.003 });
-    expect(PROVIDER_FEE_CONFIG.KORAPAY).toEqual({ totalRate: 0.05, presidentRate: 0.01 });
   });
 });
