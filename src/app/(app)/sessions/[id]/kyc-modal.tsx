@@ -15,33 +15,28 @@ export function KycModal({
   lang: Lang;
 }) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
-  const [documentType, setDocumentType] = useState<"CNI" | "PASSPORT">("CNI");
   const [documentFrontFile, setDocumentFrontFile] = useState<File | null>(null);
   const [documentBackFile, setDocumentBackFile] = useState<File | null>(null);
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isCni = documentType === "CNI";
-  const canSubmit = documentFrontFile && selfieFile && (!isCni || documentBackFile);
+  const canSubmit = documentFrontFile && documentBackFile && selfieFile;
 
   async function handleSubmit() {
-    if (!canSubmit || !documentFrontFile || !selfieFile) return;
+    if (!canSubmit) return;
     setSubmitting(true);
     setError(null);
     try {
-      const [compressedFront, compressedSelfie, compressedBack] = await Promise.all([
+      const [compressedFront, compressedBack, compressedSelfie] = await Promise.all([
         compressImage(documentFrontFile),
+        compressImage(documentBackFile),
         compressImage(selfieFile),
-        documentBackFile ? compressImage(documentBackFile) : Promise.resolve(null),
       ]);
       const formData = new FormData();
-      formData.append("documentType", documentType);
       formData.append("documentImage", compressedFront, "document-front.jpg");
+      formData.append("documentBackImage", compressedBack, "document-back.jpg");
       formData.append("selfieImage", compressedSelfie, "selfie.jpg");
-      if (compressedBack) {
-        formData.append("documentBackImage", compressedBack, "document-back.jpg");
-      }
 
       const res = await fetch(`/api/sessions/${tontineSessionId}/kyc`, {
         method: "POST",
@@ -66,61 +61,28 @@ export function KycModal({
           {t("identityVerificationBody")}
         </p>
 
-        <fieldset className="mb-stack-gap-md">
-          <legend className="font-label-sm text-label-sm text-on-surface-variant mb-2">
-            {t("documentTypeLabel")}
-          </legend>
-          <div className="flex gap-3">
-            <label className="flex items-center gap-2 font-label-md text-label-md text-on-surface">
-              <input
-                type="radio"
-                name="documentType"
-                checked={documentType === "CNI"}
-                onChange={() => setDocumentType("CNI")}
-              />
-              {t("cameroonianCni")}
-            </label>
-            <label className="flex items-center gap-2 font-label-md text-label-md text-on-surface">
-              <input
-                type="radio"
-                name="documentType"
-                checked={documentType === "PASSPORT"}
-                onChange={() => {
-                  setDocumentType("PASSPORT");
-                  setDocumentBackFile(null);
-                }}
-              />
-              {t("passport")}
-            </label>
-          </div>
-        </fieldset>
-
-        {isCni && (
-          <p className="font-label-sm text-label-sm text-error mb-stack-gap-sm flex items-start gap-1.5">
-            <span className="material-symbols-outlined text-[16px] flex-shrink-0 mt-0.5">info</span>
-            {t("cniCountryWarning")}
-          </p>
-        )}
+        <p className="font-label-sm text-label-sm text-error mb-stack-gap-md flex items-start gap-1.5">
+          <span className="material-symbols-outlined text-[16px] flex-shrink-0 mt-0.5">info</span>
+          {t("cniCountryWarning")}
+        </p>
 
         <div className="flex flex-col gap-stack-gap-sm mb-stack-gap-md">
           <PhotoPicker
-            label={isCni ? t("documentFrontPhotoLabel") : t("passportPhotoLabel")}
+            label={t("documentFrontPhotoLabel")}
             file={documentFrontFile}
             onChange={setDocumentFrontFile}
             captureMode="environment"
             chooseLabel={t("choosePhotoAction")}
             selectedLabel={t("photoSelectedLabel")}
           />
-          {isCni && (
-            <PhotoPicker
-              label={t("documentBackPhotoLabel")}
-              file={documentBackFile}
-              onChange={setDocumentBackFile}
-              captureMode="environment"
-              chooseLabel={t("choosePhotoAction")}
-              selectedLabel={t("photoSelectedLabel")}
-            />
-          )}
+          <PhotoPicker
+            label={t("documentBackPhotoLabel")}
+            file={documentBackFile}
+            onChange={setDocumentBackFile}
+            captureMode="environment"
+            chooseLabel={t("choosePhotoAction")}
+            selectedLabel={t("photoSelectedLabel")}
+          />
           <PhotoPicker
             label={t("selfiePhotoLabel")}
             file={selfieFile}

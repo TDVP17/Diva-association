@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       select: {
         id: true,
         joinedAt: true,
-        user: { select: { id: true, name: true, avatar: true, image: true } },
+        user: { select: { id: true, name: true, avatar: true, image: true, latitude: true, longitude: true, city: true, neighborhood: true } },
         tontineSession: { select: { id: true, title: true, type: true, status: true } },
         kycVerification: {
           select: {
@@ -33,6 +33,11 @@ export async function GET(request: Request) {
     return NextResponse.json({
       memberships: memberships.map((m) => ({
         ...m,
+        user: {
+          ...m.user,
+          latitude: m.user.latitude !== null ? Number(m.user.latitude) : null,
+          longitude: m.user.longitude !== null ? Number(m.user.longitude) : null,
+        },
         kycVerification: m.kycVerification
           ? {
               ...m.kycVerification,

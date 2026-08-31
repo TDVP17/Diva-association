@@ -29,7 +29,7 @@ export async function POST(
   try {
     const existing = await prisma.membership.findUnique({
       where: { id: membershipId },
-      include: { user: { select: { preferredLang: true } } },
+      include: { user: true, kycVerification: true },
     });
     if (!existing) {
       return NextResponse.json({ error: "Membership request not found" }, { status: 404 });
@@ -81,13 +81,46 @@ export async function POST(
       data: { status: "SENT", sentAt: new Date() },
     });
 
+    // On approval, snapshot everything about this member as it stood at
+    // the moment of approval — profile, identity documents, and the full
+    // verification record — so admin record-keeping/auditing has a
+    // permanent copy independent of whatever the member edits on their
+    // profile afterward (city, phone, avatar, etc. can all change later).
     await logAudit({
       actorId: admin.user.id,
       action: approved ? "member_approved" : "member_rejected",
       targetType: "Membership",
       targetId: membership.id,
       tontineSessionId: membership.tontineSessionId,
-      metadata: { userId: membership.userId, reason: parsed.data.reason ?? null },
+      metadata: {
+        userId: membership.userId,
+        reason: parsed.data.reason ?? null,
+        ...(approved
+          ? {
+              profileSnapshot: {
+                name: existing.user.name,
+                email: existing.user.email,
+                phone: existing.user.phone,
+                city: existing.user.city,
+                neighborhood: existing.user.neighborhood,
+                latitude: existing.user.latitude ? Number(existing.user.latitude) : null,
+                longitude: existing.user.longitude ? Number(existing.user.longitude) : null,
+                avatar: existing.user.avatar,
+                memberCode: existing.user.memberCode,
+                accountCreatedAt: existing.user.createdAt.toISOString(),
+              },
+              kycSnapshot: existing.kycVerification
+                ? {
+                    documentType: existing.kycVerification.documentType,
+                    documentImageUrl: existing.kycVerification.documentImageUrl,
+                    documentBackImageUrl: existing.kycVerification.documentBackImageUrl,
+                    selfieImageUrl: existing.kycVerification.selfieImageUrl,
+                    submittedAt: existing.kycVerification.createdAt.toISOString(),
+                  }
+                : null,
+            }
+          : {}),
+      },
     });
 
     return NextResponse.json({ id: membership.id, status: membership.status });

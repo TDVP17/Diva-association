@@ -6,7 +6,16 @@ import { translate, type Lang } from "@/lib/i18n/translations";
 interface MembershipRequest {
   id: string;
   joinedAt: string;
-  user: { id: string; name: string; avatar: string | null; image: string | null };
+  user: {
+    id: string;
+    name: string;
+    avatar: string | null;
+    image: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    city: string | null;
+    neighborhood: string | null;
+  };
   tontineSession: { id: string; title: string | null; type: string; status: string };
   kycVerification: {
     documentType: string;
@@ -29,6 +38,7 @@ const TONTINE_LABELS: Record<string, string> = {
 export function AdminMembershipRequestsClient({ lang }: { lang: Lang }) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
   const [membershipQueue, setMembershipQueue] = useState<MembershipRequest[] | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<MembershipRequest | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/membership-queue")
@@ -36,12 +46,7 @@ export function AdminMembershipRequestsClient({ lang }: { lang: Lang }) {
       .then((b) => setMembershipQueue(b.memberships ?? []));
   }, []);
 
-  async function decideMembership(request: MembershipRequest, action: "approve" | "reject") {
-    let reason: string | null = null;
-    if (action === "reject") {
-      reason = window.prompt(t("rejectionReasonLabel"), "");
-      if (reason === null) return; // admin cancelled the prompt
-    }
+  async function decideMembership(request: MembershipRequest, action: "approve" | "reject", reason?: string) {
     setMembershipQueue((q) => (q ? q.filter((m) => m.id !== request.id) : q));
     const res = await fetch(`/api/admin/membership/${request.id}/decide`, {
       method: "POST",
@@ -88,7 +93,7 @@ export function AdminMembershipRequestsClient({ lang }: { lang: Lang }) {
             </div>
             <div className="flex gap-2 flex-shrink-0">
               <button
-                onClick={() => decideMembership(m, "reject")}
+                onClick={() => setRejectTarget(m)}
                 className="px-2 py-1 rounded border border-outline-variant text-on-surface-variant font-label-sm text-label-sm hover:bg-surface"
               >
                 {t("reject")}
@@ -104,61 +109,188 @@ export function AdminMembershipRequestsClient({ lang }: { lang: Lang }) {
           <p className="font-label-sm text-label-sm text-on-surface-variant pl-12">
             {t("submittedOnLabel")}: {new Date(m.joinedAt).toLocaleString("en-GB", { timeZone: "Africa/Douala" })}
           </p>
-          {m.kycVerification && (
-            <div className="flex items-center gap-3 pl-12 flex-wrap">
-              <span className="font-label-sm text-label-sm text-on-surface-variant">
-                {m.kycVerification.documentType === "CNI" ? t("cameroonianCni") : t("passport")}
-              </span>
-              {m.kycVerification.matchConfidence !== null && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#d1fae5] text-[#065f46] font-label-sm text-label-sm">
-                  <span className="material-symbols-outlined text-[14px]">verified_user</span>
-                  {t("faceMatch", { percent: m.kycVerification.matchConfidence.toFixed(0) })}
-                </span>
-              )}
-              {m.kycVerification.documentImageUrl && (
-                <a href={m.kycVerification.documentImageUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={m.kycVerification.documentImageUrl}
-                    alt={t(m.kycVerification.documentBackImageUrl ? "viewDocumentFront" : "viewDocument")}
-                    className="w-20 h-14 object-cover rounded-md border border-outline-variant"
-                  />
-                  <span className="font-label-sm text-label-sm text-primary underline">
-                    {t(m.kycVerification.documentBackImageUrl ? "viewDocumentFront" : "viewDocument")}
-                  </span>
-                </a>
-              )}
-              {m.kycVerification.documentBackImageUrl && (
+          {(m.user.latitude !== null && m.user.longitude !== null) || m.user.city ? (
+            <p className="font-label-sm text-label-sm text-on-surface-variant pl-12 flex items-center gap-1 flex-wrap">
+              <span className="material-symbols-outlined text-[16px] flex-shrink-0">location_on</span>
+              {[m.user.city, m.user.neighborhood].filter(Boolean).join(", ") || t("gpsLocationLabel")}
+              {m.user.latitude !== null && m.user.longitude !== null && (
                 <a
-                  href={m.kycVerification.documentBackImageUrl}
+                  href={`https://www.openstreetmap.org/?mlat=${m.user.latitude}&mlon=${m.user.longitude}#map=16/${m.user.latitude}/${m.user.longitude}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-2"
+                  className="text-primary underline"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={m.kycVerification.documentBackImageUrl}
-                    alt={t("viewDocumentBack")}
-                    className="w-20 h-14 object-cover rounded-md border border-outline-variant"
-                  />
-                  <span className="font-label-sm text-label-sm text-primary underline">{t("viewDocumentBack")}</span>
+                  {t("viewOnMap")}
                 </a>
               )}
-              {m.kycVerification.selfieImageUrl && (
-                <a href={m.kycVerification.selfieImageUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={m.kycVerification.selfieImageUrl}
-                    alt={t("viewSelfie")}
-                    className="w-14 h-14 object-cover rounded-full border border-outline-variant"
-                  />
-                  <span className="font-label-sm text-label-sm text-primary underline">{t("viewSelfie")}</span>
-                </a>
-              )}
+            </p>
+          ) : null}
+          {m.kycVerification && (
+            <div className="pl-12">
+              <p className="font-label-sm text-label-sm text-on-surface-variant mb-1.5">
+                {t("cameroonianCni")} · {t("compareFacesInstruction")}
+              </p>
+              <div className="grid grid-cols-3 gap-2 max-w-sm">
+                {m.kycVerification.documentImageUrl && (
+                  <a
+                    href={m.kycVerification.documentImageUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex flex-col gap-1"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={m.kycVerification.documentImageUrl}
+                      alt={t("viewDocumentFront")}
+                      className="w-full aspect-[4/3] object-cover rounded-lg border border-outline-variant"
+                    />
+                    <span className="font-label-sm text-[11px] text-primary text-center underline">
+                      {t("viewDocumentFront")}
+                    </span>
+                  </a>
+                )}
+                {m.kycVerification.documentBackImageUrl && (
+                  <a
+                    href={m.kycVerification.documentBackImageUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex flex-col gap-1"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={m.kycVerification.documentBackImageUrl}
+                      alt={t("viewDocumentBack")}
+                      className="w-full aspect-[4/3] object-cover rounded-lg border border-outline-variant"
+                    />
+                    <span className="font-label-sm text-[11px] text-primary text-center underline">
+                      {t("viewDocumentBack")}
+                    </span>
+                  </a>
+                )}
+                {m.kycVerification.selfieImageUrl && (
+                  <a
+                    href={m.kycVerification.selfieImageUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex flex-col gap-1"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={m.kycVerification.selfieImageUrl}
+                      alt={t("viewSelfie")}
+                      className="w-full aspect-[4/3] object-cover rounded-lg border border-outline-variant"
+                    />
+                    <span className="font-label-sm text-[11px] text-primary text-center underline">
+                      {t("viewSelfie")}
+                    </span>
+                  </a>
+                )}
+              </div>
             </div>
           )}
         </div>
       ))}
+      {rejectTarget && (
+        <RejectReasonDialog
+          lang={lang}
+          onCancel={() => setRejectTarget(null)}
+          onConfirm={(reason) => {
+            decideMembership(rejectTarget, "reject", reason);
+            setRejectTarget(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+type RejectPreset = "nonCameroonianCni" | "faceMismatch" | "other";
+
+function RejectReasonDialog({
+  lang,
+  onCancel,
+  onConfirm,
+}: {
+  lang: Lang;
+  onCancel: () => void;
+  onConfirm: (reason: string) => void;
+}) {
+  const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
+  const [preset, setPreset] = useState<RejectPreset>("nonCameroonianCni");
+  const [customReason, setCustomReason] = useState("");
+
+  const presetText: Record<Exclude<RejectPreset, "other">, string> = {
+    nonCameroonianCni: t("rejectReasonNonCameroonianCni"),
+    faceMismatch: t("rejectReasonFaceMismatch"),
+  };
+
+  function handleConfirm() {
+    const reason = preset === "other" ? customReason.trim() : presetText[preset];
+    if (!reason) return;
+    onConfirm(reason);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-container-padding bg-black/50" onClick={onCancel}>
+      <div className="w-full max-w-sm bg-white rounded-2xl p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md">{t("rejectionReasonLabel")}</h2>
+        <div className="flex flex-col gap-2 mb-stack-gap-md">
+          <label className="flex items-start gap-2 font-label-md text-label-md text-on-surface">
+            <input
+              type="radio"
+              name="rejectPreset"
+              checked={preset === "nonCameroonianCni"}
+              onChange={() => setPreset("nonCameroonianCni")}
+              className="mt-1"
+            />
+            {presetText.nonCameroonianCni}
+          </label>
+          <label className="flex items-start gap-2 font-label-md text-label-md text-on-surface">
+            <input
+              type="radio"
+              name="rejectPreset"
+              checked={preset === "faceMismatch"}
+              onChange={() => setPreset("faceMismatch")}
+              className="mt-1"
+            />
+            {presetText.faceMismatch}
+          </label>
+          <label className="flex items-start gap-2 font-label-md text-label-md text-on-surface">
+            <input
+              type="radio"
+              name="rejectPreset"
+              checked={preset === "other"}
+              onChange={() => setPreset("other")}
+              className="mt-1"
+            />
+            {t("rejectReasonOther")}
+          </label>
+          {preset === "other" && (
+            <textarea
+              value={customReason}
+              onChange={(e) => setCustomReason(e.target.value)}
+              rows={3}
+              placeholder={t("rejectionReasonLabel")}
+              className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+            />
+          )}
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2.5 rounded-lg border border-outline-variant text-on-surface-variant font-label-md text-label-md hover:bg-surface-container-low transition-all"
+          >
+            {t("cancel")}
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={preset === "other" && !customReason.trim()}
+            className="flex-1 py-2.5 rounded-lg bg-error text-on-error font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-60"
+          >
+            {t("reject")}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

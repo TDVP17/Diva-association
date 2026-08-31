@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { assertJoinable, sumRegisteredSlots } from "@/lib/session-joinability";
@@ -13,8 +12,6 @@ const ALLOWED_TYPES: Record<string, string> = {
   "image/webp": ".webp",
 };
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB — ID photos can be a bit larger than an avatar
-
-const bodySchema = z.object({ documentType: z.enum(["CNI", "PASSPORT"]) });
 
 function readImageFile(formData: FormData, field: string): File | null {
   const file = formData.get(field);
@@ -45,27 +42,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    const parsed = bodySchema.safeParse({ documentType: formData.get("documentType") });
-    if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-    }
-
     const documentFrontFile = readImageFile(formData, "documentImage");
     const documentBackFile = readImageFile(formData, "documentBackImage");
     const selfieFile = readImageFile(formData, "selfieImage");
-    const isCni = parsed.data.documentType === "CNI";
-    if (!documentFrontFile || !selfieFile || (isCni && !documentBackFile)) {
+    if (!documentFrontFile || !documentBackFile || !selfieFile) {
       return NextResponse.json(
-        {
-          error: isCni
-            ? "Please provide the front and back of your CNI, and a selfie"
-            : "Please provide your passport photo page and a selfie",
-        },
+        { error: "Please provide the front and back of your CNI, and a selfie" },
         { status: 400 },
       );
     }
-    const filesToValidate = [documentFrontFile, selfieFile, ...(documentBackFile ? [documentBackFile] : [])];
-    for (const file of filesToValidate) {
+    for (const file of [documentFrontFile, documentBackFile, selfieFile]) {
       if (!ALLOWED_TYPES[file.type]) {
         return NextResponse.json(
           { error: "Please upload JPEG, PNG, or WebP images" },
@@ -102,19 +88,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const stamp = Date.now();
     const documentFrontKey = `kyc-documents/${session.user.id}/${stamp}-document-front${ALLOWED_TYPES[documentFrontFile.type]}`;
+    const documentBackKey = `kyc-documents/${session.user.id}/${stamp}-document-back${ALLOWED_TYPES[documentBackFile.type]}`;
     const selfieKey = `kyc-documents/${session.user.id}/${stamp}-selfie${ALLOWED_TYPES[selfieFile.type]}`;
-    const documentBackKey = documentBackFile
-      ? `kyc-documents/${session.user.id}/${stamp}-document-back${ALLOWED_TYPES[documentBackFile.type]}`
-      : null;
 
-    const uploads = [
+    await Promise.all([
       saveFile(documentFrontKey, Buffer.from(await documentFrontFile.arrayBuffer())),
+      saveFile(documentBackKey, Buffer.from(await documentBackFile.arrayBuffer())),
       saveFile(selfieKey, Buffer.from(await selfieFile.arrayBuffer())),
-      ...(documentBackFile && documentBackKey
-        ? [saveFile(documentBackKey, Buffer.from(await documentBackFile.arrayBuffer()))]
-        : []),
-    ];
-    await Promise.all(uploads);
+    ]);
 
     const membership = await prisma.membership.upsert({
       where: { userId_tontineSessionId: { userId: session.user.id, tontineSessionId } },
@@ -127,10 +108,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         userId: session.user.id,
         tontineSessionId,
         membershipId: membership.id,
-        documentType: parsed.data.documentType,
+        documentType: "CNI",
         status: "PENDING",
         documentImageUrl: `/api/files/${documentFrontKey}`,
-        documentBackImageUrl: documentBackKey ? `/api/files/${documentBackKey}` : null,
+        documentBackImageUrl: `/api/files/${documentBackKey}`,
         selfieImageUrl: `/api/files/${selfieKey}`,
       },
     });
