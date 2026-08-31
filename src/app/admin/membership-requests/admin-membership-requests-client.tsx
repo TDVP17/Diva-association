@@ -12,6 +12,7 @@ interface MembershipRequest {
     documentType: string;
     matchConfidence: number | null;
     documentImageUrl: string | null;
+    documentBackImageUrl: string | null;
     selfieImageUrl: string | null;
     verifiedAt: string | null;
   } | null;
@@ -119,10 +120,28 @@ export function AdminMembershipRequestsClient({ lang }: { lang: Lang }) {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={m.kycVerification.documentImageUrl}
-                    alt={t("viewDocument")}
+                    alt={t(m.kycVerification.documentBackImageUrl ? "viewDocumentFront" : "viewDocument")}
                     className="w-20 h-14 object-cover rounded-md border border-outline-variant"
                   />
-                  <span className="font-label-sm text-label-sm text-primary underline">{t("viewDocument")}</span>
+                  <span className="font-label-sm text-label-sm text-primary underline">
+                    {t(m.kycVerification.documentBackImageUrl ? "viewDocumentFront" : "viewDocument")}
+                  </span>
+                </a>
+              )}
+              {m.kycVerification.documentBackImageUrl && (
+                <a
+                  href={m.kycVerification.documentBackImageUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-2"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={m.kycVerification.documentBackImageUrl}
+                    alt={t("viewDocumentBack")}
+                    className="w-20 h-14 object-cover rounded-md border border-outline-variant"
+                  />
+                  <span className="font-label-sm text-label-sm text-primary underline">{t("viewDocumentBack")}</span>
                 </a>
               )}
               {m.kycVerification.selfieImageUrl && (

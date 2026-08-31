@@ -148,6 +148,11 @@ model User {
   sponsorCode          String?
   city                 String?
   neighborhood         String?
+  /// Captured from the browser's Geolocation API via the "Enable
+  /// Geolocation" button on the profile page — city/neighborhood above stay
+  /// free-text and editable regardless of whether these are set.
+  latitude             Decimal?  @db.Decimal(9, 6)
+  longitude            Decimal?  @db.Decimal(9, 6)
   /// E.164-ish digits-only phone number used for WhatsApp notifications (Evolution API).
   phone                String?
   /// Optional separate mobile-money number for admin payouts, when it
@@ -437,20 +442,24 @@ model Payout {
 /// this association) and are now unused/nullable rather than deleted, so
 /// old rows stay intact.
 model KycVerification {
-  id               String                @id @default(cuid())
-  userId           String
-  tontineSessionId String
-  membershipId     String?               @unique
-  documentType     KycDocumentType
-  status           KycVerificationStatus @default(PENDING)
-  diditSessionId   String?               @unique
-  matchConfidence  Decimal?              @db.Decimal(5, 2)
-  documentImageUrl String?
+  id                   String                @id @default(cuid())
+  userId               String
+  tontineSessionId     String
+  membershipId         String?               @unique
+  documentType         KycDocumentType
+  status               KycVerificationStatus @default(PENDING)
+  diditSessionId       String?               @unique
+  matchConfidence      Decimal?              @db.Decimal(5, 2)
+  /// Front side of a CNI, or the passport's photo page.
+  documentImageUrl     String?
+  /// Back side of a CNI. Always null for PASSPORT — passports only need
+  /// the one photo page.
+  documentBackImageUrl String?
   /// Selfie photo submitted alongside the document, for the admin to
   /// visually compare during manual review.
-  selfieImageUrl   String?
-  createdAt        DateTime              @default(now())
-  verifiedAt       DateTime?
+  selfieImageUrl       String?
+  createdAt            DateTime              @default(now())
+  verifiedAt           DateTime?
 
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   tontineSession TontineSession @relation(fields: [tontineSessionId], references: [id], onDelete: Cascade)
@@ -597,7 +606,17 @@ model Notification {
   membershipSlotId String?
   channel          NotificationChannel
   type             NotificationEventType
+  /// Rendered fallback text (recipient's language at creation time) — used
+  /// for EMAIL/WHATSAPP delivery as-is, and as the IN_APP display fallback
+  /// when messageKey is null (rows created before it existed, or freeform
+  /// admin-authored text like ADMIN_BROADCAST that has no translation key).
   message          String                @db.Text
+  /// i18n key + interpolation vars for IN_APP rows — lets the feed render
+  /// in whichever language is CURRENTLY selected (see translate() in
+  /// src/lib/i18n/translations.ts), instead of being stuck in whatever
+  /// language `message` was rendered in at creation time.
+  messageKey       String?
+  messageVars      Json?
   status           NotificationStatus    @default(PENDING)
   scheduledAt      DateTime              @default(now())
   sentAt           DateTime?

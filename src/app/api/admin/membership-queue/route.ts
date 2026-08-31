@@ -21,6 +21,7 @@ export async function GET(request: Request) {
             documentType: true,
             matchConfidence: true,
             documentImageUrl: true,
+            documentBackImageUrl: true,
             selfieImageUrl: true,
             verifiedAt: true,
           },

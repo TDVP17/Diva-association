@@ -50,15 +50,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    const documentFile = readImageFile(formData, "documentImage");
+    const documentFrontFile = readImageFile(formData, "documentImage");
+    const documentBackFile = readImageFile(formData, "documentBackImage");
     const selfieFile = readImageFile(formData, "selfieImage");
-    if (!documentFile || !selfieFile) {
+    const isCni = parsed.data.documentType === "CNI";
+    if (!documentFrontFile || !selfieFile || (isCni && !documentBackFile)) {
       return NextResponse.json(
-        { error: "Please provide both your ID document photo and a selfie" },
+        {
+          error: isCni
+            ? "Please provide the front and back of your CNI, and a selfie"
+            : "Please provide your passport photo page and a selfie",
+        },
         { status: 400 },
       );
     }
-    for (const file of [documentFile, selfieFile]) {
+    const filesToValidate = [documentFrontFile, selfieFile, ...(documentBackFile ? [documentBackFile] : [])];
+    for (const file of filesToValidate) {
       if (!ALLOWED_TYPES[file.type]) {
         return NextResponse.json(
           { error: "Please upload JPEG, PNG, or WebP images" },
@@ -93,12 +100,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ status: existingMembership.status });
     }
 
-    const documentBuffer = Buffer.from(await documentFile.arrayBuffer());
-    const selfieBuffer = Buffer.from(await selfieFile.arrayBuffer());
     const stamp = Date.now();
-    const documentKey = `kyc-documents/${session.user.id}/${stamp}-document${ALLOWED_TYPES[documentFile.type]}`;
+    const documentFrontKey = `kyc-documents/${session.user.id}/${stamp}-document-front${ALLOWED_TYPES[documentFrontFile.type]}`;
     const selfieKey = `kyc-documents/${session.user.id}/${stamp}-selfie${ALLOWED_TYPES[selfieFile.type]}`;
-    await Promise.all([saveFile(documentKey, documentBuffer), saveFile(selfieKey, selfieBuffer)]);
+    const documentBackKey = documentBackFile
+      ? `kyc-documents/${session.user.id}/${stamp}-document-back${ALLOWED_TYPES[documentBackFile.type]}`
+      : null;
+
+    const uploads = [
+      saveFile(documentFrontKey, Buffer.from(await documentFrontFile.arrayBuffer())),
+      saveFile(selfieKey, Buffer.from(await selfieFile.arrayBuffer())),
+      ...(documentBackFile && documentBackKey
+        ? [saveFile(documentBackKey, Buffer.from(await documentBackFile.arrayBuffer()))]
+        : []),
+    ];
+    await Promise.all(uploads);
 
     const membership = await prisma.membership.upsert({
       where: { userId_tontineSessionId: { userId: session.user.id, tontineSessionId } },
@@ -113,7 +129,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         membershipId: membership.id,
         documentType: parsed.data.documentType,
         status: "PENDING",
-        documentImageUrl: `/api/files/${documentKey}`,
+        documentImageUrl: `/api/files/${documentFrontKey}`,
+        documentBackImageUrl: documentBackKey ? `/api/files/${documentBackKey}` : null,
         selfieImageUrl: `/api/files/${selfieKey}`,
       },
     });
@@ -128,6 +145,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       recipients: admins.map((a) => ({
         userId: a.id,
         message: `${session.user.name ?? "A member"} requested to join a cotisation.`,
+        messageKey: "newMembershipRequestMessage",
+        messageVars: { name: session.user.name ?? "A member" },
         actionUrl: "/admin/membership-requests",
       })),
     });
