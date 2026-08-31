@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getLang } from "@/lib/i18n/get-lang";
 import { TopAppBar } from "@/components/top-app-bar";
+import { BackBar } from "@/components/back-bar";
 import { BottomNav } from "@/components/bottom-nav";
 import { MemberSidebar } from "@/components/member-sidebar";
 import { IosInstallBanner } from "@/components/ios-install-banner";
@@ -40,7 +41,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         lang={lang}
       />
       <MemberSidebar lang={lang} />
-      <div className="flex-1 pb-24 md:pb-8 md:pl-60">{children}</div>
+      <div className="flex-1 pb-24 md:pb-8 md:pl-60">
+        <BackBar lang={lang} area="member" />
+        {children}
+      </div>
       <BottomNav lang={lang} />
       <IosInstallBanner lang={lang} />
       <TutorialPopup lang={lang} />
