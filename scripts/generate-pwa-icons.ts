@@ -102,10 +102,19 @@ async function main() {
   // this one stays opaque on the brand color instead of transparent.
   await squareIcon(180, 0.1, BRAND_BG, "apple-touch-icon.png", "opaque");
 
-  // Maskable icons: brand-color background, larger safe-zone padding (~20%)
-  // so the mark survives Android's circular/rounded-square masking.
-  await squareIcon(192, 0.22, BRAND_BG, "icon-maskable-192.png", "opaque");
-  await squareIcon(512, 0.22, BRAND_BG, "icon-maskable-512.png", "opaque");
+  // Maskable icons: brand-color background, padded so the mark survives
+  // Android's circular/squircle/rounded-square masking. Android's spec
+  // requires all visible content to stay within a centered circle of 66%
+  // of the icon's diameter (33% radius) — the mark here is a wide
+  // rectangle (D + arrow, not a square glyph), so after being squared up
+  // its CORNERS sit noticeably further from center than its edges do;
+  // 0.22 (a flat ~20%) was verified (by compositing an actual circular
+  // mask over the output and inspecting it) to still clip the arrow tip
+  // and part of the "D". 0.45 keeps the full mark's bounding-box corners
+  // inside the 33%-radius safe zone with a small margin — re-verify with
+  // the same circular-mask composite check if the source logo changes.
+  await squareIcon(192, 0.45, BRAND_BG, "icon-maskable-192.png", "opaque");
+  await squareIcon(512, 0.45, BRAND_BG, "icon-maskable-512.png", "opaque");
 
   console.log(`Icons written to ${OUT_DIR}`);
 }
