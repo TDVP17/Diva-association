@@ -35,6 +35,7 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
   const [membershipCount, setMembershipCount] = useState<number | null>(null);
   const [contributionsCount, setContributionsCount] = useState<number | null>(null);
   const [swapCount, setSwapCount] = useState<number | null>(null);
+  const [paymentIssueCount, setPaymentIssueCount] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/membership-queue")
@@ -46,6 +47,9 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
     fetch("/api/admin/swap-requests")
       .then((r) => r.json())
       .then((b) => setSwapCount((b.requests ?? []).length));
+    fetch("/api/admin/payment-issues")
+      .then((r) => r.json())
+      .then((b) => setPaymentIssueCount((b.issues ?? []).filter((i: { status: string }) => i.status !== "REFUNDED").length));
   }, []);
 
   return (
@@ -94,6 +98,13 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
           title={t("allUsersCard")}
           body={t("allUsersCardBody")}
           count={null}
+        />
+        <DashboardCard
+          href="/admin/payment-issues"
+          icon="shield_person"
+          title={t("paymentIssuesCard")}
+          body={t("paymentIssuesCardBody")}
+          count={paymentIssueCount}
         />
       </div>
     </main>

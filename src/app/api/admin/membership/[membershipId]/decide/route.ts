@@ -88,10 +88,14 @@ export async function POST(
     // profile afterward (city, phone, avatar, etc. can all change later).
     await logAudit({
       actorId: admin.user.id,
+      actorRole: admin.user.role,
       action: approved ? "member_approved" : "member_rejected",
       targetType: "Membership",
       targetId: membership.id,
       tontineSessionId: membership.tontineSessionId,
+      request,
+      payloadBefore: { status: existing.status },
+      payloadAfter: { status: membership.status },
       metadata: {
         userId: membership.userId,
         reason: parsed.data.reason ?? null,

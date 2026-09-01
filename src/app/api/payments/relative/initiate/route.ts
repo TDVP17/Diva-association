@@ -4,12 +4,12 @@ import { auth } from "@/auth";
 import { initiateSlotPayment } from "@/lib/initiate-slot-payment";
 import { logAudit } from "@/lib/audit";
 
-const bodySchema = z.object({ membershipSlotId: z.string().min(1) });
+const bodySchema = z.object({ membershipSlotId: z.string().min(1), phone: z.string().min(1) });
 
 // Authenticated counterpart to the public /api/payments/public/pay-slot
-// link-share flow — this one requires login (per spec: "a person must have
-// an account before using this feature") and records paidByUserId so the
-// payer/beneficiary distinction shows up in receipts/history.
+// entry point (per spec: "a person must have an account before using this
+// feature") — records paidByUserId so the payer/beneficiary distinction
+// shows up in receipts/history.
 export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user) {
@@ -22,8 +22,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const origin = new URL(request.url).origin;
-    const result = await initiateSlotPayment(parsed.data.membershipSlotId, origin, {
+    const result = await initiateSlotPayment(parsed.data.membershipSlotId, parsed.data.phone, {
       paidByUserId: session.user.id,
     });
     if (!result.ok) {
@@ -32,12 +31,14 @@ export async function POST(request: Request) {
 
     await logAudit({
       actorId: session.user.id,
+      actorRole: session.user.role,
       action: "relative_payment_initiated",
       targetType: "MembershipSlot",
       targetId: parsed.data.membershipSlotId,
+      request,
     });
 
-    return NextResponse.json({ paymentUrl: result.paymentUrl });
+    return NextResponse.json({ transId: result.transId });
   } catch (err) {
     console.error("[payments/relative/initiate] unexpected error:", err);
     return NextResponse.json({ error: "Payment initiation failed" }, { status: 500 });

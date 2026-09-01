@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
 import { sendEmailSafe } from "@/lib/email/resend";
 import { translate } from "@/lib/i18n/translations";
+import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -36,4 +37,18 @@ export async function settleFine(fine: FineWithSlot): Promise<void> {
 
   await sendWhatsAppMessageSafe(user.phone, message);
   await sendEmailSafe(user.email, translate(lang, "finePaidEmailSubject"), `<p>${message}</p>`);
+
+  await scheduleInAppNotifications({
+    tontineSessionId: tontineSession.id,
+    type: "PAYMENT_SUCCESS",
+    recipients: [
+      {
+        userId: user.id,
+        message,
+        messageKey: "paymentSuccessNotifMessage",
+        messageVars: { amount: amount.toLocaleString("en-US"), session: sessionLabel },
+        actionUrl: "/fines",
+      },
+    ],
+  });
 }

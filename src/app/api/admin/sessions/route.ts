@@ -93,10 +93,13 @@ export async function POST(request: Request) {
     });
     await logAudit({
       actorId: admin.user.id,
+      actorRole: admin.user.role,
       action: "contribution_created",
       targetType: "TontineSession",
       targetId: tontineSession.id,
       tontineSessionId: tontineSession.id,
+      payloadAfter: JSON.parse(JSON.stringify(parsed.data)),
+      request,
     });
     return NextResponse.json({ id: tontineSession.id });
   } catch (err) {

@@ -87,11 +87,13 @@ export async function POST(request: Request) {
 
   await logAudit({
     actorId: admin.user.id,
+    actorRole: admin.user.role,
     action: "payout_released",
     targetType: "Payout",
     targetId: payoutClaimId,
     tontineSessionId: claim.tontineSessionId,
     metadata: { netPayout, deducted, membershipSlotId: slot.id },
+    request,
   });
 
   return NextResponse.json({ pot, deducted, netPayout, dueDate: claim.dueDate.toISOString() });

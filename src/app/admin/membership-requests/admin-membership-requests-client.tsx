@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { LoadingSpinner } from "@/components/loading-spinner";
 
 interface MembershipRequest {
   id: string;
@@ -60,7 +62,7 @@ export function AdminMembershipRequestsClient({ lang }: { lang: Lang }) {
   }
 
   if (!membershipQueue) {
-    return <p className="font-label-sm text-label-sm text-on-surface-variant">…</p>;
+    return <LoadingSpinner fullPage />;
   }
 
   if (membershipQueue.length === 0) {
@@ -92,6 +94,13 @@ export function AdminMembershipRequestsClient({ lang }: { lang: Lang }) {
               </p>
             </div>
             <div className="flex gap-2 flex-shrink-0">
+              <Link
+                href={`/admin/support?with=${encodeURIComponent(m.user.id)}&name=${encodeURIComponent(m.user.name)}`}
+                className="px-2 py-1 rounded border border-outline-variant text-on-surface-variant font-label-sm text-label-sm hover:bg-surface flex items-center gap-1"
+              >
+                <span className="material-symbols-outlined text-[16px]">chat_bubble</span>
+                {t("messageApplicant")}
+              </Link>
               <button
                 onClick={() => setRejectTarget(m)}
                 className="px-2 py-1 rounded border border-outline-variant text-on-surface-variant font-label-sm text-label-sm hover:bg-surface"

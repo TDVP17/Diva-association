@@ -96,14 +96,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const { id } = await params;
   try {
-    await prisma.tontineSession.update({ where: { id }, data: parsed.data });
+    const before = await prisma.tontineSession.findUnique({ where: { id } });
+    const after = await prisma.tontineSession.update({ where: { id }, data: parsed.data });
     await logAudit({
       actorId: admin.user.id,
+      actorRole: admin.user.role,
       action: "contribution_updated",
       targetType: "TontineSession",
       targetId: id,
       tontineSessionId: id,
       metadata: JSON.parse(JSON.stringify(parsed.data)),
+      payloadBefore: before ? JSON.parse(JSON.stringify(before)) : undefined,
+      payloadAfter: JSON.parse(JSON.stringify(after)),
+      request,
     });
     return NextResponse.json({ ok: true });
   } catch (err) {
@@ -112,7 +117,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
@@ -130,8 +135,17 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   }
 
   try {
+    const before = await prisma.tontineSession.findUnique({ where: { id } });
     await prisma.tontineSession.delete({ where: { id } });
-    await logAudit({ actorId: admin.user.id, action: "contribution_deleted", targetType: "TontineSession", targetId: id });
+    await logAudit({
+      actorId: admin.user.id,
+      actorRole: admin.user.role,
+      action: "contribution_deleted",
+      targetType: "TontineSession",
+      targetId: id,
+      payloadBefore: before ? JSON.parse(JSON.stringify(before)) : undefined,
+      request,
+    });
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[admin/sessions DELETE] unexpected error:", err);

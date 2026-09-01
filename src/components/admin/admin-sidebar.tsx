@@ -8,6 +8,8 @@ const BASE_ITEMS = [
   { href: "/admin", label: "adminNavDashboard", icon: "space_dashboard" },
   { href: "/admin/notifications", label: "adminNavNotifications", icon: "notifications" },
   { href: "/admin/support", label: "adminNavSupport", icon: "support_agent" },
+  { href: "/admin/payment-issues", label: "paymentIssuesCard", icon: "shield_person" },
+  { href: "/admin/audit-logs", label: "auditLogsNavTitle", icon: "history_edu" },
 ] as const;
 const PRESIDENT_ITEM = { href: "/admin/analytics", label: "adminNavAnalytics", icon: "monitoring" } as const;
 const SETTINGS_ITEM = { href: "/admin/settings", label: "adminNavSettings", icon: "settings" } as const;

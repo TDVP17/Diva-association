@@ -5,6 +5,7 @@ import { saveFile } from "@/lib/storage";
 import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
 import { sendEmailSafe } from "@/lib/email/resend";
 import { paymentSuccessMessage } from "@/lib/whatsapp/templates";
+import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -101,6 +102,20 @@ export async function settleContribution(
       receiptUrl,
     }),
   );
+
+  await scheduleInAppNotifications({
+    tontineSessionId: membership.tontineSessionId,
+    type: "PAYMENT_SUCCESS",
+    recipients: [
+      {
+        userId: user.id,
+        message: `Your payment of ${totalPaid.toLocaleString("en-US")} F for ${sessionLabel} was received. Thank you!`,
+        messageKey: "paymentSuccessNotifMessage",
+        messageVars: { amount: totalPaid.toLocaleString("en-US"), session: sessionLabel },
+        actionUrl: `/sessions/${membership.tontineSessionId}`,
+      },
+    ],
+  });
 
   // The payer gets their own confirmation too, when they aren't the
   // beneficiary themselves (relative/friend paying via their own code).

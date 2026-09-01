@@ -65,7 +65,7 @@ export default async function SessionDetailPage({
     include: {
       memberships: {
         include: {
-          user: { select: { id: true, name: true, avatar: true, image: true } },
+          user: { select: { id: true, name: true, avatar: true, image: true, phone: true } },
           slots: { orderBy: [{ officialPosition: "asc" }, { ballDrawn: "asc" }, { createdAt: "asc" }] },
         },
       },
@@ -191,6 +191,12 @@ export default async function SessionDetailPage({
     amount: Number(tontineSession.amount),
     fee: Number(tontineSession.fee),
   });
+  const paymentDescription = `${t("paymentDescriptionPrefix")}: ${sessionLabel} — ${dueDate.toLocaleDateString("en-GB", {
+    timeZone: "Africa/Douala",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })}`;
 
   const allSlotIds = approvedMemberships.flatMap((m) => m.slots.map((s) => s.id));
   const [contributions, fines] = allSlotIds.length
@@ -355,6 +361,8 @@ export default async function SessionDetailPage({
                   <PayButton
                     membershipSlotId={s.id}
                     amountLabel={`${slotTotal.toLocaleString("en-US")} F`}
+                    description={paymentDescription}
+                    defaultPhone={myMembership.user.phone}
                     lang={lang}
                     lockedReason={
                       !roundLock.ok && currentBeneficiaryName

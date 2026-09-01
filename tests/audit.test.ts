@@ -25,11 +25,18 @@ describe("logAudit", () => {
     expect(create).toHaveBeenCalledWith({
       data: {
         actorId: "admin-1",
+        actorRole: null,
         action: "contribution_created",
         targetType: "TontineSession",
         targetId: "session-1",
         tontineSessionId: "session-1",
         metadata: undefined,
+        payloadBefore: undefined,
+        payloadAfter: undefined,
+        ipAddress: null,
+        userAgent: null,
+        status: "SUCCESS",
+        failureReason: null,
       },
     });
   });
@@ -40,6 +47,17 @@ describe("logAudit", () => {
     const { data } = create.mock.calls[0][0];
     expect(data.actorId).toBeNull();
     expect(data.tontineSessionId).toBeNull();
+  });
+
+  it("extracts ipAddress/userAgent from a passed Request", async () => {
+    create.mockResolvedValue({});
+    const request = new Request("https://example.com", {
+      headers: { "x-forwarded-for": "197.234.221.45, 10.0.0.1", "user-agent": "Mozilla/5.0" },
+    });
+    await logAudit({ action: "2fa_verified", targetType: "SecuritySettings", request });
+    const { data } = create.mock.calls[0][0];
+    expect(data.ipAddress).toBe("197.234.221.45");
+    expect(data.userAgent).toBe("Mozilla/5.0");
   });
 
   it("never throws even if the database write fails — audit logging must not break the caller", async () => {

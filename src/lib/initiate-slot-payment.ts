@@ -1,12 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { getContributionTotal, getNextDueDate } from "@/lib/tontine-engine";
-import { initiatePayment, FapshiError } from "@/lib/fapshi";
+import { initiateDirectPayment, normalizeCameroonPhone, FapshiError } from "@/lib/fapshi";
 import { assertPriorCyclePaidOut } from "@/lib/round-robin-lock";
 import { computeProviderFee } from "@/lib/payment-fees";
 import type { PaymentProvider } from "@/generated/prisma/enums";
 
 export type InitiateSlotPaymentResult =
-  | { ok: true; paymentUrl: string; transId: string }
+  | { ok: true; transId: string }
   | { ok: false; status: number; error: string };
 
 export interface SlotPaymentQuote {
@@ -26,12 +26,24 @@ export type SlotPaymentQuoteResult =
   | { ok: true; quote: SlotPaymentQuote }
   | { ok: false; status: number; error: string };
 
+// A PENDING row with a live fapshiTxRef younger than this is treated as "a
+// payment is already in flight" and blocks a second concurrent attempt —
+// see the race-condition guard in initiateSlotPayment(). Long enough to
+// cover someone actually completing the USSD prompt, short enough that an
+// abandoned attempt doesn't lock the slot out for good.
+const IN_FLIGHT_WINDOW_MS = 10 * 60 * 1000;
+
+function isPaymentInFlight(existing: { status: string; fapshiTxRef: string | null; updatedAt: Date } | null): boolean {
+  if (!existing || existing.status !== "PENDING" || !existing.fapshiTxRef) return false;
+  return Date.now() - existing.updatedAt.getTime() < IN_FLIGHT_WINDOW_MS;
+}
+
 /**
  * Read-only preview of what a slot payment will cost, including the
- * payment-gateway fee — powers the pre-redirect "Amount / Payment fee /
- * Total" confirmation screen. Deliberately skips assertPriorCyclePaidOut
- * (no side effects to avoid, and the real initiateSlotPayment call still
- * enforces it authoritatively) so this stays a cheap, non-mutating preview.
+ * payment-gateway fee — powers the pre-confirmation "Amount / Payment fee /
+ * Total" screen. Deliberately skips assertPriorCyclePaidOut (no side
+ * effects to avoid, and the real initiateSlotPayment call still enforces it
+ * authoritatively) so this stays a cheap, non-mutating preview.
  */
 export async function getSlotPaymentQuote(
   membershipSlotId: string,
@@ -87,17 +99,25 @@ export async function getSlotPaymentQuote(
 }
 
 /**
- * Shared logic behind both the authenticated self-pay route and the public
- * (no-login) third-party pay route — the only difference between the two
- * callers is whether an ownership check happens before this runs. Each slot
- * has its own fully independent Contribution history, so a slot is what's
- * paid for here, not a membership/user.
+ * Shared logic behind the authenticated self-pay, authenticated
+ * relative-pay, and public (no-login) third-party pay routes — the only
+ * difference between the callers is whether an ownership check happens
+ * before this runs. Each slot has its own fully independent Contribution
+ * history, so a slot is what's paid for here, not a membership/user.
+ *
+ * Requires the payer's own Mobile Money/Orange Money phone — Fapshi's
+ * direct-pay API pushes the USSD prompt straight to it, no redirect.
  */
 export async function initiateSlotPayment(
   membershipSlotId: string,
-  origin: string,
+  phone: string,
   options?: { paidByUserId?: string },
 ): Promise<InitiateSlotPaymentResult> {
+  const normalizedPhone = normalizeCameroonPhone(phone);
+  if (!normalizedPhone) {
+    return { ok: false, status: 400, error: "Please enter a valid Mobile Money / Orange Money number" };
+  }
+
   const slot = await prisma.membershipSlot.findUnique({
     where: { id: membershipSlotId },
     include: { membership: { include: { tontineSession: true } } },
@@ -128,13 +148,6 @@ export async function initiateSlotPayment(
     fee: Number(tontineSession.fee),
   });
 
-  const existing = await prisma.contribution.findUnique({
-    where: { membershipSlotId_dueDate: { membershipSlotId, dueDate } },
-  });
-  if (existing?.status === "PAID") {
-    return { ok: false, status: 409, error: "This slot is already paid for this cycle" };
-  }
-
   const outstandingFine = await prisma.fine.findUnique({
     where: { membershipSlotId_dueDate: { membershipSlotId, dueDate } },
   });
@@ -145,52 +158,103 @@ export async function initiateSlotPayment(
   const provider: PaymentProvider = "FAPSHI";
   const providerFee = computeProviderFee(provider, baseTotal);
 
-  const contribution = await prisma.contribution.upsert({
-    where: { membershipSlotId_dueDate: { membershipSlotId, dueDate } },
-    create: {
-      membershipSlotId,
-      dueDate,
-      amountPaid: amount,
-      feePaid: fee,
-      finePaid: fineAmount,
-      status: "PENDING",
-      paidByUserId: options?.paidByUserId,
-      paymentProvider: provider,
-      providerFeeAmount: providerFee.providerFeeAmount,
-      providerShareAmount: providerFee.providerShareAmount,
-      presidentFeeShareAmount: providerFee.presidentFeeShareAmount,
-    },
-    update: {
-      amountPaid: amount,
-      feePaid: fee,
-      finePaid: fineAmount,
-      paidByUserId: options?.paidByUserId,
-      paymentProvider: provider,
-      providerFeeAmount: providerFee.providerFeeAmount,
-      providerShareAmount: providerFee.providerShareAmount,
-      presidentFeeShareAmount: providerFee.presidentFeeShareAmount,
-    },
-  });
+  // Row-locks the slot for the duration of this check-and-claim so two
+  // concurrent payment attempts for the same slot+cycle (e.g. the member
+  // and a relative tapping Pay at the same moment) can't both proceed —
+  // the second transaction blocks here until the first commits, then sees
+  // the freshly-claimed PENDING row and is rejected below. The slow Fapshi
+  // HTTP call happens after this transaction commits, never while the lock
+  // is held.
+  let contribution: { id: string };
+  try {
+    contribution = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM membership_slots WHERE id = ${membershipSlotId} FOR UPDATE`;
+
+      const existing = await tx.contribution.findUnique({
+        where: { membershipSlotId_dueDate: { membershipSlotId, dueDate } },
+      });
+      if (existing?.status === "PAID") {
+        throw new AlreadyPaidError();
+      }
+      if (isPaymentInFlight(existing)) {
+        throw new PaymentInProgressError();
+      }
+
+      const data = {
+        amountPaid: amount,
+        feePaid: fee,
+        finePaid: fineAmount,
+        status: "PENDING" as const,
+        payerPhone: normalizedPhone,
+        failureReason: null,
+        paidByUserId: options?.paidByUserId,
+        paymentProvider: provider,
+        providerFeeAmount: providerFee.providerFeeAmount,
+        providerShareAmount: providerFee.providerShareAmount,
+        presidentFeeShareAmount: providerFee.presidentFeeShareAmount,
+      };
+
+      return existing
+        ? await tx.contribution.update({ where: { id: existing.id }, data })
+        : await tx.contribution.create({ data: { membershipSlotId, dueDate, ...data } });
+    });
+  } catch (err) {
+    if (err instanceof AlreadyPaidError) {
+      return { ok: false, status: 409, error: "This slot is already paid for this cycle" };
+    }
+    if (err instanceof PaymentInProgressError) {
+      return {
+        ok: false,
+        status: 409,
+        error: "A payment is already in progress for this slot — please wait a moment before trying again",
+      };
+    }
+    throw err;
+  }
 
   try {
-    const result = await initiatePayment({
+    const result = await initiateDirectPayment({
       amount: providerFee.totalCharged,
+      phone: normalizedPhone,
       userId: slot.membership.userId,
       externalId: contribution.id,
-      redirectUrl: `${origin}/sessions/${tontineSession.id}?payment=${contribution.id}`,
       message: `DIVA tontine contribution — ${slot.beneficiaryName} (${tontineSession.type})`,
     });
 
+    await prisma.$transaction([
+      prisma.contribution.update({
+        where: { id: contribution.id },
+        data: { fapshiTxRef: result.transId },
+      }),
+      // Durable per-attempt ledger row, independent of the mutable
+      // fapshiTxRef above — lets a later webhook still recognize a
+      // superseded transId that ends up succeeding anyway (double-payment
+      // detection/refund, see process-fapshi-transaction.ts).
+      prisma.paymentAttempt.create({
+        data: {
+          transId: result.transId,
+          contributionId: contribution.id,
+          payerPhone: normalizedPhone,
+          amount: providerFee.totalCharged,
+        },
+      }),
+    ]);
+
+    return { ok: true, transId: result.transId };
+  } catch (error) {
     await prisma.contribution.update({
       where: { id: contribution.id },
-      data: { fapshiTxRef: result.transId },
+      data: {
+        status: "FAILED",
+        failureReason: error instanceof FapshiError ? error.message : "Payment initiation failed",
+      },
     });
-
-    return { ok: true, paymentUrl: result.link, transId: result.transId };
-  } catch (error) {
     if (error instanceof FapshiError) {
       return { ok: false, status: 502, error: error.message };
     }
     return { ok: false, status: 500, error: "Payment initiation failed" };
   }
 }
+
+class AlreadyPaidError extends Error {}
+class PaymentInProgressError extends Error {}

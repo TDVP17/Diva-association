@@ -83,11 +83,13 @@ export async function POST(request: Request) {
 
     await logAudit({
       actorId: admin.user.id,
+      actorRole: admin.user.role,
       action: "admin_recorded_payment",
       targetType: "Contribution",
       targetId: contribution.id,
       tontineSessionId: slot.membership.tontineSessionId,
       metadata: { membershipSlotId, amount: Number(contribution.amountPaid) + Number(contribution.feePaid) },
+      request,
     });
 
     return NextResponse.json({ ok: true });

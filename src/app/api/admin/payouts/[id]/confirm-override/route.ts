@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
 import { logAudit } from "@/lib/audit";
 
-export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
@@ -23,10 +23,12 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
   await logAudit({
     actorId: admin.user.id,
+    actorRole: admin.user.role,
     action: "payout_confirmed_by_admin_override",
     targetType: "Payout",
     targetId: id,
     tontineSessionId: claim.tontineSessionId,
+    request,
   });
 
   return NextResponse.json({ ok: true });

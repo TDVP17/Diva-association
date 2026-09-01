@@ -1,10 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { initiatePayment, FapshiError } from "@/lib/fapshi";
+import { initiateDirectPayment, normalizeCameroonPhone, FapshiError } from "@/lib/fapshi";
 import { computeProviderFee } from "@/lib/payment-fees";
 import type { PaymentProvider } from "@/generated/prisma/enums";
 
 export type InitiateFinePaymentResult =
-  | { ok: true; paymentUrl: string; transId: string }
+  | { ok: true; transId: string }
   | { ok: false; status: number; error: string };
 
 export interface FinePaymentQuote {
@@ -18,7 +18,10 @@ export type FinePaymentQuoteResult =
   | { ok: true; quote: FinePaymentQuote }
   | { ok: false; status: number; error: string };
 
-async function loadOwnedUnpaidFine(fineId: string, userId: string) {
+// Same in-flight window used for slot payments — see initiate-slot-payment.ts.
+const IN_FLIGHT_WINDOW_MS = 10 * 60 * 1000;
+
+async function loadOwnedPayableFine(fineId: string, userId: string) {
   const fine = await prisma.fine.findUnique({
     where: { id: fineId },
     include: { membershipSlot: { include: { membership: { include: { tontineSession: true } } } } },
@@ -34,12 +37,12 @@ async function loadOwnedUnpaidFine(fineId: string, userId: string) {
  * only ever looks at the fine matching today's dueDate).
  */
 export async function getFinePaymentQuote(fineId: string, userId: string): Promise<FinePaymentQuoteResult> {
-  const fine = await loadOwnedUnpaidFine(fineId, userId);
+  const fine = await loadOwnedPayableFine(fineId, userId);
   if (!fine) {
     return { ok: false, status: 404, error: "Fine not found" };
   }
-  if (fine.status !== "UNPAID") {
-    return { ok: false, status: 409, error: "This fine has already been paid" };
+  if (fine.status === "PAID" || fine.status === "DEDUCTED") {
+    return { ok: false, status: 409, error: "This fine has already been settled" };
   }
 
   const provider: PaymentProvider = "FAPSHI";
@@ -57,39 +60,97 @@ export async function getFinePaymentQuote(fineId: string, userId: string): Promi
   };
 }
 
+/** Requires the payer's own Mobile Money/Orange Money phone — see initiateSlotPayment(). */
 export async function initiateFinePayment(
   fineId: string,
+  phone: string,
   userId: string,
-  origin: string,
 ): Promise<InitiateFinePaymentResult> {
-  const fine = await loadOwnedUnpaidFine(fineId, userId);
+  const normalizedPhone = normalizeCameroonPhone(phone);
+  if (!normalizedPhone) {
+    return { ok: false, status: 400, error: "Please enter a valid Mobile Money / Orange Money number" };
+  }
+
+  const fine = await loadOwnedPayableFine(fineId, userId);
   if (!fine) {
     return { ok: false, status: 404, error: "Fine not found" };
-  }
-  if (fine.status !== "UNPAID") {
-    return { ok: false, status: 409, error: "This fine has already been paid" };
   }
 
   const provider: PaymentProvider = "FAPSHI";
   const providerFee = computeProviderFee(provider, Number(fine.amount));
-  const tontineSessionId = fine.membershipSlot.membership.tontineSessionId;
+
+  let claimed: { id: string };
+  try {
+    claimed = await prisma.$transaction(async (tx) => {
+      const [current] = await tx.$queryRaw<
+        { id: string; status: string; fapshiTxRef: string | null; updatedAt: Date }[]
+      >`SELECT id, status, "fapshiTxRef", "updatedAt" FROM fines WHERE id = ${fineId} FOR UPDATE`;
+
+      if (!current || current.status === "PAID" || current.status === "DEDUCTED") {
+        throw new AlreadySettledError();
+      }
+      if (
+        current.status === "PENDING" &&
+        current.fapshiTxRef &&
+        Date.now() - new Date(current.updatedAt).getTime() < IN_FLIGHT_WINDOW_MS
+      ) {
+        throw new PaymentInProgressError();
+      }
+
+      return tx.fine.update({
+        where: { id: fineId },
+        data: { payerPhone: normalizedPhone, failureReason: null },
+      });
+    });
+  } catch (err) {
+    if (err instanceof AlreadySettledError) {
+      return { ok: false, status: 409, error: "This fine has already been settled" };
+    }
+    if (err instanceof PaymentInProgressError) {
+      return {
+        ok: false,
+        status: 409,
+        error: "A payment is already in progress for this fine — please wait a moment before trying again",
+      };
+    }
+    throw err;
+  }
 
   try {
-    const result = await initiatePayment({
+    const result = await initiateDirectPayment({
       amount: providerFee.totalCharged,
+      phone: normalizedPhone,
       userId,
       externalId: fine.id,
-      redirectUrl: `${origin}/sessions/${tontineSessionId}?finePayment=${fine.id}`,
       message: `DIVA late-payment fine — ${fine.membershipSlot.beneficiaryName}`,
     });
 
-    await prisma.fine.update({ where: { id: fine.id }, data: { fapshiTxRef: result.transId } });
+    await prisma.$transaction([
+      prisma.fine.update({ where: { id: claimed.id }, data: { fapshiTxRef: result.transId } }),
+      prisma.paymentAttempt.create({
+        data: {
+          transId: result.transId,
+          fineId: claimed.id,
+          payerPhone: normalizedPhone,
+          amount: providerFee.totalCharged,
+        },
+      }),
+    ]);
 
-    return { ok: true, paymentUrl: result.link, transId: result.transId };
+    return { ok: true, transId: result.transId };
   } catch (error) {
+    await prisma.fine.update({
+      where: { id: claimed.id },
+      data: {
+        failureReason: error instanceof FapshiError ? error.message : "Payment initiation failed",
+      },
+    });
     if (error instanceof FapshiError) {
       return { ok: false, status: 502, error: error.message };
     }
     return { ok: false, status: 500, error: "Payment initiation failed" };
   }
 }
+
+class AlreadySettledError extends Error {}
+class PaymentInProgressError extends Error {}

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { PaymentConfirmDialog } from "@/components/payment-confirm-dialog";
-import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 
 interface FoundMember {
   memberCode: string;
@@ -37,9 +36,13 @@ export function MemberCodePayFlow({ lang, payEndpoint }: { lang: Lang; payEndpoi
   const [searchError, setSearchError] = useState<string | null>(null);
   const [member, setMember] = useState<FoundMember | null>(null);
   const [slots, setSlots] = useState<FundableSlot[]>([]);
-  const [payingSlotId, setPayingSlotId] = useState<string | null>(null);
   const [confirmSlotId, setConfirmSlotId] = useState<string | null>(null);
-  const [payError, setPayError] = useState<string | null>(null);
+
+  async function fetchSlots(memberCode: string) {
+    const membershipsRes = await fetch(`/api/members/${encodeURIComponent(memberCode)}/memberships`);
+    const membershipsBody = await membershipsRes.json();
+    setSlots(membershipsRes.ok ? (membershipsBody.slots ?? []) : []);
+  }
 
   async function findMember() {
     const trimmed = code.trim();
@@ -55,10 +58,7 @@ export function MemberCodePayFlow({ lang, payEndpoint }: { lang: Lang; payEndpoi
         return;
       }
       setMember(lookupBody);
-
-      const membershipsRes = await fetch(`/api/members/${encodeURIComponent(lookupBody.memberCode)}/memberships`);
-      const membershipsBody = await membershipsRes.json();
-      setSlots(membershipsRes.ok ? (membershipsBody.slots ?? []) : []);
+      await fetchSlots(lookupBody.memberCode);
     } catch {
       setSearchError(t("noMemberFoundWithCode"));
     } finally {
@@ -71,26 +71,9 @@ export function MemberCodePayFlow({ lang, payEndpoint }: { lang: Lang; payEndpoi
     setSlots([]);
     setCode("");
     setSearchError(null);
-    setPayError(null);
   }
 
-  async function payForSlot(slotId: string) {
-    setPayingSlotId(slotId);
-    setPayError(null);
-    try {
-      const res = await fetch(payEndpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ membershipSlotId: slotId }),
-      });
-      const body = await parseJsonOrThrow<{ paymentUrl: string }>(res, t("paymentInitiationFailed"));
-      window.location.assign(body.paymentUrl);
-    } catch (err) {
-      setPayError(friendlyErrorMessage(err, t("paymentInitiationFailed")));
-      setPayingSlotId(null);
-      setConfirmSlotId(null);
-    }
-  }
+  const confirmSlot = slots.find((s) => s.slotId === confirmSlotId);
 
   if (!member) {
     return (
@@ -172,26 +155,26 @@ export function MemberCodePayFlow({ lang, payEndpoint }: { lang: Lang; payEndpoi
                 </div>
                 <button
                   onClick={() => setConfirmSlotId(s.slotId)}
-                  disabled={s.alreadyPaid || payingSlotId === s.slotId}
+                  disabled={s.alreadyPaid}
                   className="flex-shrink-0 px-3 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 disabled:opacity-50 disabled:bg-surface-variant disabled:text-on-surface-variant"
                 >
-                  {s.alreadyPaid
-                    ? t("alreadyContributed")
-                    : payingSlotId === s.slotId
-                      ? t("redirectingToFapshi")
-                      : t("payViaFapshi")}
+                  {s.alreadyPaid ? t("alreadyContributed") : t("payViaFapshi")}
                 </button>
               </div>
             ))}
           </div>
         )}
       </div>
-      {payError && <p className="font-label-sm text-label-sm text-error">{payError}</p>}
-      {confirmSlotId && (
+      {confirmSlot && (
         <PaymentConfirmDialog
           lang={lang}
-          membershipSlotId={confirmSlotId}
-          onConfirm={() => payForSlot(confirmSlotId)}
+          membershipSlotId={confirmSlot.slotId}
+          payEndpoint={payEndpoint}
+          description={`${t("paymentDescriptionPrefix")}: ${confirmSlot.tontineSessionTitle}`}
+          onSettled={() => {
+            setConfirmSlotId(null);
+            fetchSlots(member.memberCode);
+          }}
           onClose={() => setConfirmSlotId(null)}
         />
       )}

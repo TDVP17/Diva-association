@@ -6,6 +6,7 @@ import { initiateSlotPayment } from "@/lib/initiate-slot-payment";
 
 const bodySchema = z.object({
   membershipSlotId: z.string().min(1),
+  phone: z.string().min(1),
 });
 
 export async function POST(request: Request) {
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
-  const { membershipSlotId } = parsed.data;
+  const { membershipSlotId, phone } = parsed.data;
 
   try {
     const slot = await prisma.membershipSlot.findUnique({
@@ -29,12 +30,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "You don't own this slot" }, { status: 403 });
     }
 
-    const origin = new URL(request.url).origin;
-    const result = await initiateSlotPayment(membershipSlotId, origin);
+    const result = await initiateSlotPayment(membershipSlotId, phone);
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
-    return NextResponse.json({ paymentUrl: result.paymentUrl, transId: result.transId });
+    return NextResponse.json({ transId: result.transId });
   } catch (err) {
     console.error("[fapshi/initiate] unexpected error:", err);
     return NextResponse.json({ error: "Payment initiation failed" }, { status: 500 });

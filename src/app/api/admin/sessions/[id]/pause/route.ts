@@ -16,13 +16,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const { id } = await params;
+  const before = await prisma.tontineSession.findUnique({ where: { id }, select: { isPaused: true } });
   await prisma.tontineSession.update({ where: { id }, data: { isPaused: parsed.data.paused } });
   await logAudit({
     actorId: admin.user.id,
+    actorRole: admin.user.role,
     action: parsed.data.paused ? "contribution_paused" : "contribution_resumed",
     targetType: "TontineSession",
     targetId: id,
     tontineSessionId: id,
+    payloadBefore: before ? { isPaused: before.isPaused } : undefined,
+    payloadAfter: { isPaused: parsed.data.paused },
+    request,
   });
   return NextResponse.json({ ok: true });
 }

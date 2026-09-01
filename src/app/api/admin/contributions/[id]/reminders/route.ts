@@ -89,11 +89,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   await logAudit({
     actorId: admin.user.id,
+    actorRole: admin.user.role,
     action: "reminder_scheduled",
     targetType: "TontineSession",
     targetId: tontineSessionId,
     tontineSessionId,
     metadata: { type: parsed.data.type, channel: parsed.data.channel, count: scheduled },
+    request,
   });
 
   return NextResponse.json({ scheduled });

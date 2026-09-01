@@ -68,12 +68,44 @@ export function ChatClient({
   const [sendError, setSendError] = useState<string | null>(null);
   const feedEndRef = useRef<HTMLDivElement>(null);
 
+  // Deep link from elsewhere in the admin area (e.g. "Message" on a pending
+  // membership request) — opens a conversation with that member even if
+  // admin has never messaged them before, so no prior contact-list entry
+  // is required. name is only a display fallback for the header; once the
+  // real contacts list loads, the matching entry (with avatar/unread
+  // count) takes over if present. Only applies if nothing is already
+  // active, so it never overrides a conversation the user picked manually.
+  const applyDeepLinkedContact = useCallback(
+    (data: { members: Contact[]; admin: Contact | null }) => {
+      const withId = searchParams.get("with");
+      if (!withId) return;
+      const known = [...data.members, ...(data.admin ? [data.admin] : [])].find((c) => c.id === withId);
+      setActive(
+        (current) =>
+          current ??
+          known ?? {
+            id: withId,
+            name: searchParams.get("name") ?? t("chatMemberFallbackName"),
+            avatar: null,
+            lastMessageAt: null,
+            lastMessagePreview: null,
+            unreadCount: 0,
+          },
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [searchParams],
+  );
+
   const refreshContacts = useCallback(() => {
     fetch("/api/chat/contacts")
       .then((r) => r.json())
-      .then(setContacts)
+      .then((data) => {
+        setContacts(data);
+        applyDeepLinkedContact(data);
+      })
       .catch(() => setContacts({ members: [], admin: null }));
-  }, []);
+  }, [applyDeepLinkedContact]);
 
   useEffect(() => {
     refreshContacts();

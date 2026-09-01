@@ -83,12 +83,18 @@ enum ContributionStatus {
   PAID
   LATE
   PENDING
+  /// A payment attempt was made and Fapshi reported FAILED/EXPIRED — never
+  /// blocks retrying (only PAID does); see failureReason for why.
+  FAILED
 }
 
 enum FineStatus {
   UNPAID
   PAID
   DEDUCTED
+  /// A payment attempt was made and Fapshi reported FAILED/EXPIRED — still
+  /// payable again, same as UNPAID; see failureReason for why.
+  FAILED
 }
 
 enum SwapStatus {
@@ -116,6 +122,8 @@ enum NotificationEventType {
   FINE_REMINDER
   FOOD_TURN
   PAYMENT_SUCCESS
+  /// A Fapshi payment attempt came back FAILED/EXPIRED — sent to the payer.
+  PAYMENT_FAILED
   ADMIN_BROADCAST
   MEMBER_APPROVED
   MEMBER_REJECTED
@@ -131,6 +139,9 @@ enum NotificationEventType {
   NEW_MEMBERSHIP_REQUEST
   /// Admin started a cotisation's drawing phase — sent to its approved members.
   DRAW_LAUNCHED
+  /// An automated duplicate-payment refund failed 3 times and needs manual
+  /// review — sent to every ADMIN/PRESIDENT user.
+  PAYMENT_REFUND_ESCALATED
 }
 
 enum NotificationStatus {
@@ -158,6 +169,59 @@ enum PaymentMethodType {
 /// live checkout flow.
 enum PaymentProvider {
   FAPSHI
+}
+
+/// Lifecycle of one Fapshi transaction attempt, tracked independently of the
+/// mutable Contribution.fapshiTxRef/Fine.fapshiTxRef fields (which only ever
+/// hold the CURRENT/latest attempt) so a superseded-but-later-successful
+/// transaction can still be recognized and refunded instead of silently lost.
+enum PaymentAttemptStatus {
+  PENDING
+  SUCCESSFUL
+  FAILED
+  EXPIRED
+  /// This transId reached SUCCESSFUL on Fapshi's side, but the target slot's
+  /// cycle was already marked PAID by a different transaction — the classic
+  /// double-payment race (e.g. a member and a relative paying the same slot
+  /// at once). Queued for an automated refund.
+  DUPLICATE_PAID
+  /// A refund payout call to Fapshi is in flight right now.
+  REFUND_INITIATED
+  REFUNDED
+  /// Automated refund failed 3 times — needs an admin to refund manually.
+  REFUND_FAILED_MANUAL_REVIEW
+}
+
+/// One row per Fapshi transId ever generated for a Contribution or Fine —
+/// the durable ledger behind the duplicate-payment/automated-refund system.
+/// Doubles as the refund retry queue (nextRefundAttemptAt/refundAttempts)
+/// so no separate Redis/BullMQ infrastructure is needed.
+model PaymentAttempt {
+  id                 String               @id @default(cuid())
+  transId            String               @unique
+  contributionId     String?
+  fineId             String?
+  payerPhone         String
+  amount             Decimal              @db.Decimal(12, 2)
+  status             PaymentAttemptStatus @default(PENDING)
+  refundReason       String?
+  refundTransId      String?
+  refundedAt         DateTime?
+  refundAttempts     Int                  @default(0)
+  /// When the refund retry cron should next pick this row up — set with
+  /// exponential backoff after each failed attempt.
+  nextRefundAttemptAt DateTime?
+  lastRefundError    String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  contribution Contribution? @relation(fields: [contributionId], references: [id], onDelete: SetNull)
+  fine         Fine?         @relation(fields: [fineId], references: [id], onDelete: SetNull)
+
+  @@index([contributionId])
+  @@index([fineId])
+  @@index([status, nextRefundAttemptAt])
+  @@map("payment_attempts")
 }
 
 model User {
@@ -490,8 +554,21 @@ model Contribution {
   finePaid                Decimal            @default(0) @db.Decimal(12, 2)
   status                  ContributionStatus @default(PENDING)
   fapshiTxRef             String?            @unique
+  /// Mobile Money / Orange Money number the USSD prompt was sent to for
+  /// this attempt — captured explicitly at checkout, distinct from the
+  /// beneficiary's own profile phone when a relative/friend pays instead.
+  payerPhone              String?
+  /// Set when a Fapshi attempt comes back FAILED/EXPIRED — Fapshi's own
+  /// `reason` field when present, otherwise a generic note. Cleared on the
+  /// next attempt. Never blocks retrying (only status = PAID does).
+  failureReason           String?
   paidAt                  DateTime?
   receiptPdfUrl           String?
+  createdAt               DateTime           @default(now())
+  /// Bumped on every payment attempt — used to tell a fresh in-flight
+  /// attempt apart from an abandoned one when guarding against a second
+  /// concurrent payment for the same slot+cycle.
+  updatedAt               DateTime           @updatedAt
   /// Set only when an admin records this contribution manually (off-platform
   /// payment) rather than it being confirmed via the Fapshi webhook.
   recordedByAdminId       String?
@@ -520,6 +597,7 @@ model Contribution {
   membershipSlot  MembershipSlot @relation(fields: [membershipSlotId], references: [id], onDelete: Cascade)
   recordedByAdmin User?          @relation("ContributionRecordedByAdmin", fields: [recordedByAdminId], references: [id])
   paidByUser      User?          @relation("ContributionPaidBy", fields: [paidByUserId], references: [id])
+  paymentAttempts PaymentAttempt[]
 
   @@unique([membershipSlotId, dueDate])
   @@map("contributions")
@@ -534,9 +612,17 @@ model Fine {
   amount           Decimal    @db.Decimal(12, 2)
   status           FineStatus @default(UNPAID)
   fapshiTxRef      String?    @unique
+  /// Mobile Money / Orange Money number the USSD prompt was sent to for
+  /// this attempt — see Contribution.payerPhone for the same idea.
+  payerPhone       String?
+  /// Set when a Fapshi attempt comes back FAILED/EXPIRED — see
+  /// Contribution.failureReason.
+  failureReason    String?
   createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
-  membershipSlot MembershipSlot @relation(fields: [membershipSlotId], references: [id], onDelete: Cascade)
+  membershipSlot  MembershipSlot   @relation(fields: [membershipSlotId], references: [id], onDelete: Cascade)
+  paymentAttempts PaymentAttempt[]
 
   @@unique([membershipSlotId, dueDate])
   @@map("fines")
@@ -688,21 +774,51 @@ model FoodTurnLog {
 /// nullable (not onDelete: Cascade) so deleting a user account never wipes
 /// the historical record of what they did — see logAudit() in
 /// src/lib/audit.ts, called fire-and-forget from every sensitive route.
+enum AuditLogStatus {
+  SUCCESS
+  FAILED
+  BLOCKED
+}
+
+/// Append-only security/activity trail. Immutable at the DB level — see the
+/// audit_logs_no_update/audit_logs_no_delete triggers added in
+/// 20260902120000_audit_log_hardening/migration.sql, which reject any
+/// UPDATE/DELETE regardless of which role or connection issues it. Written
+/// exclusively through src/lib/audit.ts's logAudit(), a fire-and-forget
+/// helper that never throws or blocks the operation it's recording.
 model AuditLog {
-  id               String   @id @default(cuid())
+  id               String         @id @default(cuid())
   actorId          String?
+  /// Snapshot of the actor's role AT THE TIME of the action — a user's role
+  /// can change later, so this must never be looked up live from `actor`.
+  actorRole        Role?
   action           String
+  /// Target entity type — e.g. "User", "TontineSession", "Contribution".
   targetType       String
   targetId         String?
   tontineSessionId String?
+  /// Free-form context that doesn't fit the before/after snapshot shape
+  /// (e.g. a broadcast's subject line, a reminder's recipient count).
   metadata         Json?
-  createdAt        DateTime @default(now())
+  /// State of the target resource before this action, when applicable
+  /// (e.g. a member's profile/KYC snapshot at approval time).
+  payloadBefore    Json?
+  /// State of the target resource after this action, when applicable.
+  payloadAfter     Json?
+  ipAddress        String?
+  userAgent        String?
+  status           AuditLogStatus @default(SUCCESS)
+  /// Why the action failed or was blocked — set only when status != SUCCESS.
+  failureReason    String?
+  createdAt        DateTime       @default(now())
 
   actor          User?           @relation(fields: [actorId], references: [id], onDelete: SetNull)
   tontineSession TontineSession? @relation(fields: [tontineSessionId], references: [id], onDelete: SetNull)
 
   @@index([tontineSessionId, createdAt])
   @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@index([status, createdAt])
   @@map("audit_logs")
 }
 

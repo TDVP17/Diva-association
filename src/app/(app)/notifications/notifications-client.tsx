@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { renderNotificationMessage } from "@/lib/notifications/render-message";
+import { LoadingSpinner } from "@/components/loading-spinner";
 
 interface NotificationRow {
   id: string;
@@ -22,6 +23,7 @@ const TYPE_KEY: Record<string, Parameters<typeof translate>[1]> = {
   FINE_REMINDER: "notifTypeFineReminder",
   FOOD_TURN: "notifTypeFoodTurn",
   PAYMENT_SUCCESS: "notifTypePaymentSuccess",
+  PAYMENT_FAILED: "notifTypePaymentFailed",
   ADMIN_BROADCAST: "notifTypeAdminBroadcast",
   MEMBER_APPROVED: "notifTypeMemberApproved",
   MEMBER_REJECTED: "notifTypeMemberRejected",
@@ -31,6 +33,7 @@ const TYPE_KEY: Record<string, Parameters<typeof translate>[1]> = {
   SWAP_REQUEST_REJECTED: "notifTypeSwapRequestRejected",
   NEW_MEMBERSHIP_REQUEST: "notifTypeNewMembershipRequest",
   DRAW_LAUNCHED: "notifTypeDrawLaunched",
+  PAYMENT_REFUND_ESCALATED: "notifTypePaymentRefundEscalated",
 };
 
 export function NotificationsClient({ lang }: { lang: Lang }) {
@@ -71,7 +74,7 @@ export function NotificationsClient({ lang }: { lang: Lang }) {
   }
 
   if (!notifications) {
-    return <p className="font-label-sm text-label-sm text-on-surface-variant">…</p>;
+    return <LoadingSpinner fullPage />;
   }
 
   if (notifications.length === 0) {

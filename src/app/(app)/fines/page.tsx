@@ -18,11 +18,15 @@ export default async function FinesPage() {
   const lang = await getLang();
   const t = getTranslator(lang);
 
-  const fines = await prisma.fine.findMany({
-    where: { membershipSlot: { membership: { userId: session.user.id } }, status: "UNPAID" },
-    include: { membershipSlot: { include: { membership: { include: { tontineSession: true } } } } },
-    orderBy: { dueDate: "desc" },
-  });
+  const [fines, user] = await Promise.all([
+    prisma.fine.findMany({
+      // FAILED (a previous Fapshi attempt didn't go through) is still payable — same as UNPAID.
+      where: { membershipSlot: { membership: { userId: session.user.id } }, status: { in: ["UNPAID", "FAILED"] } },
+      include: { membershipSlot: { include: { membership: { include: { tontineSession: true } } } } },
+      orderBy: { dueDate: "desc" },
+    }),
+    prisma.user.findUnique({ where: { id: session.user.id }, select: { phone: true } }),
+  ]);
 
   const total = fines.reduce((sum, f) => sum + Number(f.amount), 0);
 
@@ -42,6 +46,7 @@ export default async function FinesPage() {
           {fines.map((f) => {
             const tontineSession = f.membershipSlot.membership.tontineSession;
             const sessionLabel = tontineSession.title || TONTINE_LABELS[tontineSession.type] || tontineSession.type;
+            const dueDateLabel = f.dueDate.toLocaleDateString("en-GB", { timeZone: "Africa/Douala" });
             return (
               <div
                 key={f.id}
@@ -51,15 +56,18 @@ export default async function FinesPage() {
                   <p className="font-label-md text-label-md text-on-surface truncate">{sessionLabel}</p>
                   <p className="font-label-sm text-label-sm text-on-surface-variant truncate">
                     {f.membershipSlot.beneficiaryName} ·{" "}
-                    {t("fineReasonLatePayment", {
-                      date: f.dueDate.toLocaleDateString("en-GB", { timeZone: "Africa/Douala" }),
-                    })}
+                    {t("fineReasonLatePayment", { date: dueDateLabel })}
                   </p>
                   <p className="font-numeric-data text-[18px] text-error mt-1">
                     {Number(f.amount).toLocaleString("en-US")} F
                   </p>
                 </div>
-                <FinePayButton fineId={f.id} lang={lang} />
+                <FinePayButton
+                  fineId={f.id}
+                  description={`${t("paymentDescriptionPrefix")}: ${sessionLabel} — ${dueDateLabel}`}
+                  defaultPhone={user?.phone}
+                  lang={lang}
+                />
               </div>
             );
           })}
