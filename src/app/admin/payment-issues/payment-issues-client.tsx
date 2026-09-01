@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 import { LoadingSpinner } from "@/components/loading-spinner";
+import { formatXAF } from "@/lib/format-currency";
 
 interface PaymentIssue {
   id: string;
@@ -98,7 +99,7 @@ export function PaymentIssuesClient({ lang }: { lang: Lang }) {
             </div>
             <div className="grid grid-cols-2 gap-x-3 gap-y-1 font-label-sm text-label-sm">
               <span className="text-on-surface-variant">{t("paymentIssueAmountLabel")}</span>
-              <span className="text-on-surface">{issue.amount.toLocaleString("en-US")} F</span>
+              <span className="text-on-surface">{formatXAF(issue.amount)}</span>
               <span className="text-on-surface-variant">{t("paymentIssuePayerLabel")}</span>
               <span className="text-on-surface">{issue.payerPhone}</span>
               <span className="text-on-surface-variant">{t("paymentIssueAttemptsLabel")}</span>

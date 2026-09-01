@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { requirePresident } from "@/lib/require-admin";
 import { getRevenueAnalytics } from "@/lib/analytics";
+import { formatXAF } from "@/lib/format-currency";
 
 export default async function AdminAnalyticsPage() {
   const president = await requirePresident();
@@ -24,31 +25,31 @@ export default async function AdminAnalyticsPage() {
         <div className="bg-primary text-on-primary rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4">
           <p className="font-label-sm text-label-sm text-primary-fixed-dim">{t("totalMoneyReceived")}</p>
           <p className="font-numeric-data text-numeric-data text-white mt-1">
-            {totalGrossReceived.toLocaleString("en-US")} F
+            {formatXAF(totalGrossReceived)}
           </p>
         </div>
         <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
           <p className="font-label-sm text-label-sm text-on-surface-variant">{t("totalServiceFees")}</p>
           <p className="font-numeric-data text-numeric-data text-on-surface mt-1">
-            {totalFees.toLocaleString("en-US")} F
+            {formatXAF(totalFees)}
           </p>
         </div>
         <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
           <p className="font-label-sm text-label-sm text-on-surface-variant">{t("presidentFeeShareLabel")}</p>
           <p className="font-numeric-data text-numeric-data text-on-surface mt-1">
-            {totalPresidentFeeShare.toLocaleString("en-US")} F
+            {formatXAF(totalPresidentFeeShare)}
           </p>
         </div>
         <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
           <p className="font-label-sm text-label-sm text-on-surface-variant">{t("totalFinesCollected")}</p>
           <p className="font-numeric-data text-numeric-data text-on-surface mt-1">
-            {totalFines.toLocaleString("en-US")} F
+            {formatXAF(totalFines)}
           </p>
         </div>
         <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
           <p className="font-label-sm text-label-sm text-on-surface-variant">{t("unpaidFines")}</p>
           <p className="font-numeric-data text-numeric-data text-error mt-1">
-            {totalUnpaidFines.toLocaleString("en-US")} F
+            {formatXAF(totalUnpaidFines)}
           </p>
         </div>
         <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
@@ -85,19 +86,19 @@ export default async function AdminAnalyticsPage() {
                   <tr key={s.id} className="border-b last:border-b-0 border-surface-variant">
                     <td className="p-3 font-label-md text-label-md text-on-surface">{s.title}</td>
                     <td className="p-3 font-numeric-data text-[14px] text-primary">
-                      {s.grossReceived.toLocaleString("en-US")} F
+                      {formatXAF(s.grossReceived)}
                     </td>
                     <td className="p-3 font-numeric-data text-[14px] text-on-surface">
-                      {s.fees.toLocaleString("en-US")} F
+                      {formatXAF(s.fees)}
                     </td>
                     <td className="p-3 font-numeric-data text-[14px] text-on-surface">
-                      {s.presidentFeeShare.toLocaleString("en-US")} F
+                      {formatXAF(s.presidentFeeShare)}
                     </td>
                     <td className="p-3 font-numeric-data text-[14px] text-on-surface">
-                      {s.fines.toLocaleString("en-US")} F
+                      {formatXAF(s.fines)}
                     </td>
                     <td className="p-3 font-numeric-data text-[14px] text-error">
-                      {s.unpaidFines.toLocaleString("en-US")} F
+                      {formatXAF(s.unpaidFines)}
                     </td>
                   </tr>
                 ))}

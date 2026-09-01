@@ -4,6 +4,7 @@ import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
 import { sendEmailSafe } from "@/lib/email/resend";
 import { translate } from "@/lib/i18n/translations";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
+import { formatXAF } from "@/lib/format-currency";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -31,7 +32,7 @@ export async function settleFine(fine: FineWithSlot): Promise<void> {
   const amount = Number(fine.amount);
 
   const message = translate(lang, "finePaidMessage", {
-    amount: amount.toLocaleString("en-US"),
+    amount: formatXAF(amount),
     session: sessionLabel,
   });
 
@@ -46,7 +47,7 @@ export async function settleFine(fine: FineWithSlot): Promise<void> {
         userId: user.id,
         message,
         messageKey: "paymentSuccessNotifMessage",
-        messageVars: { amount: amount.toLocaleString("en-US"), session: sessionLabel },
+        messageVars: { amount: formatXAF(amount), session: sessionLabel },
         actionUrl: "/fines",
       },
     ],

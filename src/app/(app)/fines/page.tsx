@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { FinePayButton } from "./fine-pay-button";
+import { formatXAF } from "@/lib/format-currency";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -34,7 +35,7 @@ export default async function FinesPage() {
     <main className="px-container-padding py-stack-gap-lg max-w-md mx-auto w-full">
       <h1 className="text-xl md:text-2xl font-bold text-on-surface mb-1">{t("unpaidFines")}</h1>
       <p className="font-numeric-data text-numeric-data text-error mb-stack-gap-lg">
-        {total.toLocaleString("en-US")} <span className="font-body-md text-body-md font-normal">F</span>
+        {formatXAF(total)}
       </p>
 
       {fines.length === 0 ? (
@@ -59,7 +60,7 @@ export default async function FinesPage() {
                     {t("fineReasonLatePayment", { date: dueDateLabel })}
                   </p>
                   <p className="font-numeric-data text-[18px] text-error mt-1">
-                    {Number(f.amount).toLocaleString("en-US")} F
+                    {formatXAF(Number(f.amount))}
                   </p>
                 </div>
                 <FinePayButton

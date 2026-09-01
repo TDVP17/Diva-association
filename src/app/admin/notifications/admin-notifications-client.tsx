@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { NOTIFICATION_TYPE_KEY, NOTIFICATION_STATUS_KEY } from "@/lib/notifications/type-labels";
+import { LoadingSpinner } from "@/components/loading-spinner";
 
 interface NotificationRow {
   id: string;
@@ -36,6 +38,9 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
   const [channel, setChannel] = useState("");
   const [status, setStatus] = useState("");
   const [member, setMember] = useState("");
+  const [loadError, setLoadError] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -44,16 +49,33 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
     if (status) params.set("status", status);
     if (member.trim()) params.set("member", member.trim());
 
+    let cancelled = false;
     const handle = setTimeout(() => {
+      setLoading(true);
+      setLoadError(false);
       fetch(`/api/admin/notifications?${params.toString()}`)
-        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) throw new Error(`Request failed with status ${r.status}`);
+          return r.json();
+        })
         .then((b) => {
+          if (cancelled) return;
           setNotifications(b.notifications ?? []);
           setContributions(b.contributions ?? []);
+        })
+        .catch((err) => {
+          console.error("[admin-notifications] failed to load:", err);
+          if (!cancelled) setLoadError(true);
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
         });
     }, 200);
-    return () => clearTimeout(handle);
-  }, [tontineSessionId, channel, status, member]);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [tontineSessionId, channel, status, member, reloadToken]);
 
   return (
     <main className="px-container-padding pt-stack-gap-lg pb-32 max-w-4xl mx-auto w-full flex flex-col gap-stack-gap-lg">
@@ -106,7 +128,19 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
         />
       </div>
 
-      {notifications.length === 0 ? (
+      {loadError ? (
+        <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-5 text-center flex flex-col items-center gap-stack-gap-sm">
+          <p className="font-body-md text-body-md text-error">{t("couldNotLoadNotifications")}</p>
+          <button
+            onClick={() => setReloadToken((n) => n + 1)}
+            className="px-4 py-2 rounded-lg border border-outline-variant text-primary font-label-md text-label-md hover:bg-surface-container-low transition-colors"
+          >
+            {t("tryAgain")}
+          </button>
+        </div>
+      ) : loading ? (
+        <LoadingSpinner />
+      ) : notifications.length === 0 ? (
         <p className="font-label-sm text-label-sm text-on-surface-variant">{t("noneYet")}</p>
       ) : (
         <div className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-outline-variant/30 overflow-hidden">
@@ -121,12 +155,13 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
                 </p>
                 <p className="font-label-sm text-label-sm text-on-surface-variant truncate">
                   {n.contributionLabel ? `${n.contributionLabel} — ` : ""}
-                  {n.type} — {new Date(n.sentAt ?? n.scheduledAt).toLocaleString("en-GB", { timeZone: "Africa/Douala" })}
+                  {NOTIFICATION_TYPE_KEY[n.type] ? t(NOTIFICATION_TYPE_KEY[n.type]) : n.type} —{" "}
+                  {new Date(n.sentAt ?? n.scheduledAt).toLocaleString("en-GB", { timeZone: "Africa/Douala" })}
                   {n.errorMessage && ` — ${n.errorMessage}`}
                 </p>
               </div>
               <span className={`inline-flex items-center px-2 py-0.5 rounded-md font-label-sm text-label-sm flex-shrink-0 ml-2 ${STATUS_CLASS[n.status]}`}>
-                {n.status}
+                {NOTIFICATION_STATUS_KEY[n.status] ? t(NOTIFICATION_STATUS_KEY[n.status]) : n.status}
               </span>
             </div>
           ))}

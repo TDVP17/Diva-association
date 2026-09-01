@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { assertJoinable, sumRegisteredSlots } from "@/lib/session-joinability";
@@ -21,7 +22,8 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default async function SessionsPage() {
   const session = await auth();
-  const userId = session!.user.id;
+  if (!session?.user) redirect("/login");
+  const userId = session.user.id;
   const t = getTranslator(await getLang());
 
   const memberships = await prisma.membership.findMany({
@@ -53,7 +55,8 @@ export default async function SessionsPage() {
           {t("mySessions")}
         </h2>
         {memberships.length === 0 ? (
-          <div className="bg-white rounded-xl p-6 text-center shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant">
+          <div className="bg-white rounded-xl p-8 text-center shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant flex flex-col items-center gap-stack-gap-sm">
+            <span className="material-symbols-outlined text-outline text-[40px]">group_add</span>
             <p className="font-body-md text-body-md text-on-surface-variant">{t("notJoinedYet")}</p>
           </div>
         ) : (
@@ -92,7 +95,8 @@ export default async function SessionsPage() {
       <section>
         <h2 className="font-title-md text-title-md text-primary mb-stack-gap-md">{t("openCotisations")}</h2>
         {browsable.length === 0 ? (
-          <div className="bg-white rounded-xl p-6 text-center shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant">
+          <div className="bg-white rounded-xl p-8 text-center shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant flex flex-col items-center gap-stack-gap-sm">
+            <span className="material-symbols-outlined text-outline text-[40px]">event_busy</span>
             <p className="font-body-md text-body-md text-on-surface-variant">{t("noOpenCotisations")}</p>
           </div>
         ) : (

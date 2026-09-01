@@ -7,6 +7,7 @@ import { getUnpaidSlots } from "@/lib/notify";
 import { translate } from "@/lib/i18n/translations";
 import { scheduleNotifications } from "@/lib/notifications/dispatch";
 import { logAudit } from "@/lib/audit";
+import { formatXAF } from "@/lib/format-currency";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine",
@@ -19,10 +20,6 @@ const bodySchema = z.object({
   channel: z.enum(["EMAIL", "WHATSAPP"]),
   memberIds: z.array(z.string().min(1)).optional(),
 });
-
-function formatXAF(amount: number): string {
-  return `${amount.toLocaleString("en-US")} F`;
-}
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin();

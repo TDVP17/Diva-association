@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getContributionTotal, getNextDueDate } from "@/lib/tontine-engine";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
+import { formatXAF } from "@/lib/format-currency";
 import { PayButton } from "./pay-button";
 import { JoinButton } from "./join-button";
 import { VerificationPollingRefresh } from "./verification-status";
@@ -56,7 +57,8 @@ export default async function SessionDetailPage({
   const { id } = await params;
   const { payment: paymentId } = await searchParams;
   const session = await auth();
-  const userId = session!.user.id;
+  if (!session?.user) redirect("/login");
+  const userId = session.user.id;
   const lang = await getLang();
   const t = getTranslator(lang);
 
@@ -354,13 +356,13 @@ export default async function SessionDetailPage({
                   <div className="font-label-md text-label-md text-on-surface truncate">{s.beneficiaryName}</div>
                   <div className="font-label-sm text-label-sm text-on-surface-variant">
                     {t("positionLabel")} {s.ballDrawn ?? t("notYetRevealed")} ·{" "}
-                    {paid ? t("paid") : `${slotTotal.toLocaleString("en-US")} F ${t("due")}`}
+                    {paid ? t("paid") : `${formatXAF(slotTotal)} ${t("due")}`}
                   </div>
                 </div>
                 {!paid && (
                   <PayButton
                     membershipSlotId={s.id}
-                    amountLabel={`${slotTotal.toLocaleString("en-US")} F`}
+                    amountLabel={formatXAF(slotTotal)}
                     description={paymentDescription}
                     defaultPhone={myMembership.user.phone}
                     lang={lang}
@@ -423,7 +425,7 @@ export default async function SessionDetailPage({
                   </span>
                   {f && (
                     <div className="font-label-sm text-label-sm text-error mt-1">
-                      +{Number(f.amount).toLocaleString("en-US")} F {t("fineSuffix")}
+                      +{formatXAF(Number(f.amount))} {t("fineSuffix")}
                     </div>
                   )}
                 </div>

@@ -6,6 +6,7 @@ import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
 import { sendEmailSafe } from "@/lib/email/resend";
 import { paymentSuccessMessage } from "@/lib/whatsapp/templates";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
+import { formatXAF } from "@/lib/format-currency";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -109,9 +110,9 @@ export async function settleContribution(
     recipients: [
       {
         userId: user.id,
-        message: `Your payment of ${totalPaid.toLocaleString("en-US")} F for ${sessionLabel} was received. Thank you!`,
+        message: `Your payment of ${formatXAF(totalPaid)} for ${sessionLabel} was received. Thank you!`,
         messageKey: "paymentSuccessNotifMessage",
-        messageVars: { amount: totalPaid.toLocaleString("en-US"), session: sessionLabel },
+        messageVars: { amount: formatXAF(totalPaid), session: sessionLabel },
         actionUrl: `/sessions/${membership.tontineSessionId}`,
       },
     ],
@@ -152,7 +153,7 @@ function paymentSuccessEmailHtml(data: {
     <p><strong>Contributed for:</strong> ${data.beneficiaryName}</p>
     ${paidByLine}
     <p><strong>Contribution:</strong> ${data.sessionLabel}</p>
-    <p><strong>Amount:</strong> ${data.amount.toLocaleString("en-US")} F</p>
+    <p><strong>Amount:</strong> ${formatXAF(data.amount)}</p>
     <p><strong>Transaction ID:</strong> ${data.transRef}</p>
     <p><a href="${data.receiptUrl}">Download your PDF receipt</a></p>
     <p>Thank you for your contribution to the community fund.</p>

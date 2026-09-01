@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { LoadingSpinner } from "@/components/loading-spinner";
+import { formatXAF } from "@/lib/format-currency";
 
 interface ContributionCard {
   id: string;
@@ -57,9 +58,9 @@ export function AdminContributionsClient({ lang }: { lang: Lang }) {
           </div>
           <div className="grid grid-cols-2 gap-2">
             <Stat label={t("membersLabel")} value={`${c.paidMembers}/${c.totalMembers}`} />
-            <Stat label={t("receivedLabel")} value={`${c.receivedAmount.toLocaleString("en-US")} F`} />
-            <Stat label={t("outstandingLabel")} value={`${c.outstandingAmount.toLocaleString("en-US")} F`} />
-            <Stat label={t("finesOutstandingLabel")} value={`${c.finesOutstanding.toLocaleString("en-US")} F`} />
+            <Stat label={t("receivedLabel")} value={formatXAF(c.receivedAmount)} />
+            <Stat label={t("outstandingLabel")} value={formatXAF(c.outstandingAmount)} />
+            <Stat label={t("finesOutstandingLabel")} value={formatXAF(c.finesOutstanding)} />
           </div>
         </Link>
       ))}

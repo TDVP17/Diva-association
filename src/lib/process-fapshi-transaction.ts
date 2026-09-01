@@ -4,6 +4,7 @@ import { settleContribution } from "@/lib/settle-contribution";
 import { settleFine } from "@/lib/settle-fine";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { triggerAutomatedRefund } from "@/lib/trigger-fapshi-refund";
+import { formatXAF } from "@/lib/format-currency";
 import type { PaymentAttempt } from "@/generated/prisma/client";
 
 const TONTINE_LABELS: Record<string, string> = {
@@ -249,9 +250,9 @@ async function handleFailedOrExpired(transId: string, verified: PaymentStatusRes
       recipients: [
         {
           userId: membership.userId,
-          message: `Your ${amount.toLocaleString("en-US")} F payment for ${sessionLabel} did not go through. Please try again.`,
+          message: `Your ${formatXAF(amount)} payment for ${sessionLabel} did not go through. Please try again.`,
           messageKey: "paymentFailedNotifMessage",
-          messageVars: { amount: amount.toLocaleString("en-US"), session: sessionLabel },
+          messageVars: { amount: formatXAF(amount), session: sessionLabel },
           actionUrl: `/sessions/${membership.tontineSessionId}`,
         },
       ],
@@ -275,9 +276,9 @@ async function handleFailedOrExpired(transId: string, verified: PaymentStatusRes
       recipients: [
         {
           userId: membership.userId,
-          message: `Your ${Number(fine.amount).toLocaleString("en-US")} F fine payment for ${sessionLabel} did not go through. Please try again.`,
+          message: `Your ${formatXAF(Number(fine.amount))} fine payment for ${sessionLabel} did not go through. Please try again.`,
           messageKey: "paymentFailedNotifMessage",
-          messageVars: { amount: Number(fine.amount).toLocaleString("en-US"), session: sessionLabel },
+          messageVars: { amount: formatXAF(Number(fine.amount)), session: sessionLabel },
           actionUrl: "/fines",
         },
       ],

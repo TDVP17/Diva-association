@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 import { formatMessageDate } from "@/lib/format-message-date";
+import { LoadingSpinner } from "@/components/loading-spinner";
 
 interface Contact {
   id: string;
@@ -366,14 +368,25 @@ export function ChatClient({
       </div>
 
       <div className="flex flex-col gap-2 lg:grid lg:grid-cols-2 lg:gap-3">
-        {list.length === 0 && (
-          <div className="bg-white rounded-xl p-6 text-center shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant lg:col-span-2">
+        {contacts === null ? (
+          <LoadingSpinner className="lg:col-span-2" />
+        ) : list.length === 0 ? (
+          <div className="bg-white rounded-xl p-8 text-center shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant lg:col-span-2 flex flex-col items-center gap-stack-gap-sm">
+            <span className="material-symbols-outlined text-outline text-[40px]">forum</span>
             <p className="font-body-md text-body-md text-on-surface-variant">
               {search.trim() && baseList.length > 0 ? t("noSearchResults") : t("noConversationsYet")}
             </p>
+            {!search.trim() && baseList.length === 0 && (
+              <Link
+                href="/sessions"
+                className="mt-1 px-4 py-2 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all"
+              >
+                {t("browseCotisations")}
+              </Link>
+            )}
           </div>
-        )}
-        {list.map((contact) => {
+        ) : (
+          list.map((contact) => {
           const unread = contact.unreadCount > 0;
           return (
             <button
@@ -417,7 +430,8 @@ export function ChatClient({
               </div>
             </button>
           );
-        })}
+          })
+        )}
       </div>
     </main>
   );

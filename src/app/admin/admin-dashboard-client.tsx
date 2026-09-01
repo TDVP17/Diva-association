@@ -9,10 +9,13 @@ interface DashboardCardProps {
   icon: string;
   title: string;
   body: string;
+  /** Pending items needing admin action — shown as a red alert badge. */
   count: number | null;
+  /** A neutral informational total (e.g. total registered users) — shown as a calm inline stat, never the red alert badge, since it isn't something needing action. */
+  stat?: number | null;
 }
 
-function DashboardCard({ href, icon, title, body, count }: DashboardCardProps) {
+function DashboardCard({ href, icon, title, body, count, stat }: DashboardCardProps) {
   return (
     <Link
       href={href}
@@ -23,7 +26,12 @@ function DashboardCard({ href, icon, title, body, count }: DashboardCardProps) {
           {count}
         </span>
       )}
-      <span className="material-symbols-outlined text-primary text-3xl">{icon}</span>
+      <div className="flex items-center justify-between">
+        <span className="material-symbols-outlined text-primary text-3xl">{icon}</span>
+        {stat != null && (
+          <span className="font-numeric-data text-numeric-data text-primary">{stat.toLocaleString("fr-FR")}</span>
+        )}
+      </div>
       <h3 className="font-title-md text-title-md text-on-surface">{title}</h3>
       <p className="font-body-md text-body-md text-on-surface-variant">{body}</p>
     </Link>
@@ -36,6 +44,7 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
   const [contributionsCount, setContributionsCount] = useState<number | null>(null);
   const [swapCount, setSwapCount] = useState<number | null>(null);
   const [paymentIssueCount, setPaymentIssueCount] = useState<number | null>(null);
+  const [totalUsersCount, setTotalUsersCount] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/membership-queue")
@@ -50,6 +59,9 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
     fetch("/api/admin/payment-issues")
       .then((r) => r.json())
       .then((b) => setPaymentIssueCount((b.issues ?? []).filter((i: { status: string }) => i.status !== "REFUNDED").length));
+    fetch("/api/admin/users")
+      .then((r) => r.json())
+      .then((b) => setTotalUsersCount(typeof b.total === "number" ? b.total : (b.users ?? []).length));
   }, []);
 
   return (
@@ -98,6 +110,7 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
           title={t("allUsersCard")}
           body={t("allUsersCardBody")}
           count={null}
+          stat={totalUsersCount}
         />
         <DashboardCard
           href="/admin/payment-issues"

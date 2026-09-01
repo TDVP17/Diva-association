@@ -2,6 +2,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { prisma } from "@/lib/prisma";
+import { formatXAF } from "@/lib/format-currency";
 
 /**
  * Every calendar year (UTC) with any Contribution/Fine history for this
@@ -115,7 +116,7 @@ export async function generateArchivePdf(memberName: string, year: number, rows:
     page.drawText(dateStr, { x: LEFT, y, size: 9, font, color: dark });
     page.drawText(row.label, { x: LEFT + 70, y, size: 9, font, color: dark });
     page.drawText(row.status, { x: LEFT + 260, y, size: 9, font, color: colors.muted });
-    const amountStr = `${row.amount.toLocaleString("en-US")} F`;
+    const amountStr = formatXAF(row.amount);
     const amountWidth = font.widthOfTextAtSize(amountStr, 9);
     page.drawText(amountStr, { x: RIGHT - amountWidth, y, size: 9, font, color: dark });
     y -= ROW_HEIGHT;
@@ -129,7 +130,7 @@ export async function generateArchivePdf(memberName: string, year: number, rows:
   y -= 6;
   page.drawLine({ start: { x: LEFT, y }, end: { x: RIGHT, y }, thickness: 1, color: rgb(0.9, 0.91, 0.91) });
   y -= 20;
-  const totalStr = `${totalAmount.toLocaleString("en-US")} F`;
+  const totalStr = formatXAF(totalAmount);
   const totalWidth = bold.widthOfTextAtSize(totalStr, 11);
   page.drawText("Total for the year", { x: LEFT, y, size: 11, font: bold, color: colors.primary });
   page.drawText(totalStr, { x: RIGHT - totalWidth, y, size: 11, font: bold, color: colors.primary });

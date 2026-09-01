@@ -97,24 +97,51 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       saveFile(selfieKey, Buffer.from(await selfieFile.arrayBuffer())),
     ]);
 
-    const membership = await prisma.membership.upsert({
-      where: { userId_tontineSessionId: { userId: session.user.id, tontineSessionId } },
-      create: { userId: session.user.id, tontineSessionId, status: "PENDING" },
-      update: { status: "PENDING" },
+    // The uploads above take real time on a slow connection, which widens
+    // the gap since the existence check at the top of this handler — two
+    // submits (double-tap, or a client retry after a slow/timed-out
+    // response) can both pass that check before either has written
+    // anything, each creating its own Membership/KycVerification/
+    // notification. A Postgres advisory lock keyed on (userId,
+    // tontineSessionId) serializes concurrent requests for the same pair
+    // even though no Membership row may exist yet to row-lock directly —
+    // the second request then sees the first one's already-PENDING row and
+    // exits without duplicating anything.
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`${session.user.id}:${tontineSessionId}`}))`;
+
+      const fresh = await tx.membership.findUnique({
+        where: { userId_tontineSessionId: { userId: session.user.id, tontineSessionId } },
+      });
+      if (fresh && fresh.status !== "REJECTED") {
+        return { alreadyPending: true as const, status: fresh.status };
+      }
+
+      const membership = await tx.membership.upsert({
+        where: { userId_tontineSessionId: { userId: session.user.id, tontineSessionId } },
+        create: { userId: session.user.id, tontineSessionId, status: "PENDING" },
+        update: { status: "PENDING" },
+      });
+
+      await tx.kycVerification.create({
+        data: {
+          userId: session.user.id,
+          tontineSessionId,
+          membershipId: membership.id,
+          documentType: "CNI",
+          status: "PENDING",
+          documentImageUrl: `/api/files/${documentFrontKey}`,
+          documentBackImageUrl: `/api/files/${documentBackKey}`,
+          selfieImageUrl: `/api/files/${selfieKey}`,
+        },
+      });
+
+      return { alreadyPending: false as const };
     });
 
-    await prisma.kycVerification.create({
-      data: {
-        userId: session.user.id,
-        tontineSessionId,
-        membershipId: membership.id,
-        documentType: "CNI",
-        status: "PENDING",
-        documentImageUrl: `/api/files/${documentFrontKey}`,
-        documentBackImageUrl: `/api/files/${documentBackKey}`,
-        selfieImageUrl: `/api/files/${selfieKey}`,
-      },
-    });
+    if (result.alreadyPending) {
+      return NextResponse.json({ status: result.status });
+    }
 
     const admins = await prisma.user.findMany({
       where: { role: { in: ["ADMIN", "PRESIDENT"] } },

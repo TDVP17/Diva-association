@@ -6,6 +6,7 @@ import { computePayoutPreview } from "@/lib/payout-preview";
 import { sendPayout, FapshiPayoutError } from "@/lib/fapshi-payout";
 import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
 import { logAudit } from "@/lib/audit";
+import { formatXAF } from "@/lib/format-currency";
 
 const bodySchema = z.object({ payoutClaimId: z.string().min(1) });
 
@@ -80,8 +81,8 @@ export async function POST(request: Request) {
   await sendWhatsAppMessageSafe(
     user.phone,
     `🎉 Payout released — DIVA Association\n\n` +
-      `Congratulations ${user.name} (${slot.beneficiaryName})! Your payout of ${netPayout.toLocaleString("en-US")} F has been released` +
-      (deducted > 0 ? ` after deducting ${deducted.toLocaleString("en-US")} F in outstanding fines.` : `.`) +
+      `Congratulations ${user.name} (${slot.beneficiaryName})! Your payout of ${formatXAF(netPayout)} has been released` +
+      (deducted > 0 ? ` after deducting ${formatXAF(deducted)} in outstanding fines.` : `.`) +
       ` Confirm on the app once you've received it.`,
   );
 

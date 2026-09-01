@@ -10,6 +10,7 @@ import { NotificationsTab } from "./notifications-tab";
 import { ActivityTab } from "./activity-tab";
 import { LoadingSpinner } from "@/components/loading-spinner";
 import { MemberArchivesToggle } from "@/components/admin/member-archives-toggle";
+import { formatXAF } from "@/lib/format-currency";
 
 interface MembershipRequest {
   id: string;
@@ -331,9 +332,9 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
       }
       setPayoutResult(
         t("payoutResultLine", {
-          pot: body.pot.toLocaleString("en-US"),
-          deducted: body.deducted.toLocaleString("en-US"),
-          net: body.netPayout.toLocaleString("en-US"),
+          pot: formatXAF(body.pot),
+          deducted: formatXAF(body.deducted),
+          net: formatXAF(body.netPayout),
         }),
       );
       setPayoutPreview(null);
@@ -696,17 +697,17 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
             </h3>
             <div className="mb-4 relative z-10">
               <p className="font-label-sm text-label-sm text-primary-fixed-dim">{t("totalCollectedFees")}</p>
-              <p className="font-numeric-data text-numeric-data text-white">{(ledger?.totalFees ?? 0).toLocaleString("en-US")} F</p>
+              <p className="font-numeric-data text-numeric-data text-white">{formatXAF(ledger?.totalFees ?? 0)}</p>
             </div>
             {ledger?.feeSplit && (
               <div className="bg-on-primary-fixed-variant/50 rounded-lg p-3 mb-4 backdrop-blur-sm relative z-10">
                 <div className="flex justify-between items-center border-b border-primary-fixed-dim/20 pb-2 mb-2">
                   <span className="font-label-sm text-label-sm text-primary-fixed-dim">{t("presidentLabel")}</span>
-                  <span className="font-label-md text-label-md text-white">{ledger.feeSplit.president.toLocaleString("en-US")} F</span>
+                  <span className="font-label-md text-label-md text-white">{formatXAF(ledger.feeSplit.president)}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="font-label-sm text-label-sm text-primary-fixed-dim">{t("winnerLabel")}</span>
-                  <span className="font-label-md text-label-md text-white">{ledger.feeSplit.winner.toLocaleString("en-US")} F</span>
+                  <span className="font-label-md text-label-md text-white">{formatXAF(ledger.feeSplit.winner)}</span>
                 </div>
               </div>
             )}
@@ -715,7 +716,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                 <span className="material-symbols-outlined text-[20px]">warning</span>
                 <span className="font-label-md text-label-md font-bold">{t("unpaidFines")}</span>
               </div>
-              <span className="font-numeric-data text-[18px] text-on-surface">{(ledger?.totalUnpaidFines ?? 0).toLocaleString("en-US")} F</span>
+              <span className="font-numeric-data text-[18px] text-on-surface">{formatXAF(ledger?.totalUnpaidFines ?? 0)}</span>
             </div>
           </section>
         </div>
@@ -920,7 +921,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                         </p>
                       </div>
                       <div className="text-right flex-shrink-0 ml-2">
-                        <p className="font-numeric-data text-[14px] text-on-surface">{tx.amount.toLocaleString("en-US")} F</p>
+                        <p className="font-numeric-data text-[14px] text-on-surface">{formatXAF(tx.amount)}</p>
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded-md font-label-sm text-label-sm ${
                             tx.status === "PAID" ? "bg-[#d1fae5] text-[#065f46]" : "bg-secondary-fixed text-on-secondary-fixed-variant"
@@ -1019,7 +1020,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                         </div>
                         <div className="flex justify-between">
                           <span className="font-label-sm text-label-sm text-on-surface-variant">{t("amountToSendLabel")}</span>
-                          <span className="font-numeric-data text-numeric-data text-primary">{payoutPreview.netPayout.toLocaleString("en-US")} F</span>
+                          <span className="font-numeric-data text-numeric-data text-primary">{formatXAF(payoutPreview.netPayout)}</span>
                         </div>
                         <p className="font-label-sm text-label-sm text-error">{t("onFileNotVerifiedNote")}</p>
                         <button
@@ -1061,7 +1062,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                     </p>
                   </div>
                   <div className="text-right flex-shrink-0 ml-2">
-                    <p className="font-numeric-data text-[14px] text-error">{f.amount.toLocaleString("en-US")} F</p>
+                    <p className="font-numeric-data text-[14px] text-error">{formatXAF(f.amount)}</p>
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-md font-label-sm text-label-sm ${
                         f.status === "UNPAID" ? "bg-error-container text-on-error-container" : "bg-[#d1fae5] text-[#065f46]"

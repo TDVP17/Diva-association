@@ -6,7 +6,17 @@ const CACHE_NAME = "diva-static-v1";
 const STATIC_ASSETS = ["/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS)));
+  // cache.addAll() is all-or-nothing — one failed request (offline install,
+  // a transient network blip, a stale asset URL) rejects the whole promise.
+  // Caught here so that failure never surfaces as an unhandled promise
+  // rejection; precaching is a nice-to-have, not something that should
+  // block the service worker from installing.
+  event.waitUntil(
+    caches
+      .open(CACHE_NAME)
+      .then((cache) => cache.addAll(STATIC_ASSETS))
+      .catch((err) => console.error("[sw] precache failed:", err)),
+  );
   self.skipWaiting();
 });
 
@@ -25,6 +35,13 @@ self.addEventListener("fetch", (event) => {
   if (!isStaticAsset) return; // network passthrough for everything else
 
   event.respondWith(
-    caches.match(event.request).then((cached) => cached ?? fetch(event.request)),
+    caches.match(event.request).then(
+      (cached) =>
+        cached ??
+        fetch(event.request).catch((err) => {
+          console.error("[sw] fetch failed for", url.pathname, err);
+          return new Response(null, { status: 504, statusText: "Offline" });
+        }),
+    ),
   );
 });

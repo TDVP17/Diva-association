@@ -1,4 +1,5 @@
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { formatXAF } from "@/lib/format-currency";
 
 interface Props {
   lang: Lang;
@@ -37,9 +38,9 @@ export function PaymentSuccessBanner({
       <div className="flex flex-col gap-2">
         <Row label={t("contributedForLabel")} value={beneficiaryName} />
         <Row label={t("contributionLabel")} value={sessionLabel} />
-        <Row label={t("amountLabel")} value={`${amount.toLocaleString("en-US")} F`} />
-        {paymentFee > 0 && <Row label={t("paymentFeeLabel")} value={`${paymentFee.toLocaleString("en-US")} F`} />}
-        <Row label={t("totalToBeDeductedLabel")} value={`${total.toLocaleString("en-US")} F`} emphasize />
+        <Row label={t("amountLabel")} value={formatXAF(amount)} />
+        {paymentFee > 0 && <Row label={t("paymentFeeLabel")} value={formatXAF(paymentFee)} />}
+        <Row label={t("totalToBeDeductedLabel")} value={formatXAF(total)} emphasize />
         <Row label={t("paidByLabel")} value={paidByName} />
         <Row label={t("dateLabelShort")} value={date} />
         <Row label={t("timeLabel")} value={time} />

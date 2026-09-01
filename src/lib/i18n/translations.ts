@@ -31,7 +31,7 @@ export const translations = {
     fineReasonLatePayment: "Late payment — cycle of {date}",
     payThisFine: "Pay this fine",
     paymentsLockedUntilPayout: "Reopens once {name} receives this round's payout.",
-    finePaidMessage: "Your {amount} F fine for {session} has been paid. Thank you!",
+    finePaidMessage: "Your {amount} fine for {session} has been paid. Thank you!",
     finePaidEmailSubject: "Fine payment received",
     messages: "Messages",
     openChat: "Open Chat",
@@ -107,7 +107,7 @@ export const translations = {
     receiptConfirmed: "Thank you — your receipt has been confirmed.",
     couldNotSubmitPayoutDetails: "Could not submit your payout details. Please try again.",
     autoReplySupport:
-      "Hello {name}, please explain your issue in detail. A customer service agent will attend to you shortly.",
+      "Hello {name}, could you describe your issue in detail? A customer service agent will attend to you shortly.",
     helpCenterTitle: "Help Center",
     helpAndSupport: "Help & Support",
     contactAdminSupport: "Contact Admin Support",
@@ -192,7 +192,7 @@ export const translations = {
     waFineNotice:
       "🔴 Late payment notice — DIVA Association\n\n{name}, your contribution for the {cotisation} was not received before the 18:30 deadline. A late fine of {amount} has been applied to your account.\n\nPlease settle your contribution and fine as soon as possible.",
     waDuplicateRefunded:
-      "Your payment was received twice for the same name. The second payment of {amount} FCFA has been automatically refunded.",
+      "Your payment was received twice for the same name. The second payment of {amount} has been automatically refunded.",
     myConversations: "My Conversations",
 
     // Slot selection form
@@ -235,7 +235,7 @@ export const translations = {
     membershipStatusApproved: "Active",
     membershipStatusRejected: "Not approved",
     allSlotsPaidThisCycle: "Everyone paid this cycle",
-    slotsPaidSummary: "{paid}/{total} names paid · {amount} F each due",
+    slotsPaidSummary: "{paid}/{total} names paid · {amount} each due",
 
     // Public pay
     contributeForMember: "Contribute for a Member",
@@ -245,7 +245,7 @@ export const translations = {
     redirectingToFapshi: "Redirecting to Fapshi...",
 
     // Admin
-    adminBrand: "DIVA Association Admin",
+    adminBrand: "DIVA Admin",
     adminNavDashboard: "Dashboard",
     adminNavNotifications: "Notifications",
     adminNavSupport: "Support",
@@ -271,6 +271,7 @@ export const translations = {
     allUsersCardBody: "Search and view every registered account in the system.",
     searchAllUsersPlaceholder: "Search by name, email, phone, or code…",
     noUsersFound: "No users found.",
+    totalRegisteredUsers: "{count} registered users in total",
     paymentIssuesCard: "Payment Security",
     paymentIssuesCardBody: "Duplicate payments and refunds needing attention.",
     paymentIssuesPageTitle: "Payment Security & Refunds",
@@ -399,14 +400,14 @@ export const translations = {
     noPendingSwaps: "No pending swap approvals.",
     positionAbbrev: "Pos",
     userAsksUser: "{requester} asks {target}",
-    foodTurnTab: "Food Turn",
-    noFoodTurnRequests: "No food turn requests right now.",
+    foodTurnTab: "Payout Turn",
+    noFoodTurnRequests: "No payout requests right now.",
     foodTurnActionRequired: "Action Required",
     outstandingZero: "0 F outstanding",
-    foodRequestsSubtitle: "Members whose food turn needs your action, across every contribution.",
+    foodRequestsSubtitle: "Members whose payout needs your action, across every contribution.",
     openMenu: "Menu",
     joinRequestsNav: "Join Requests",
-    foodRequestsNav: "Food Requests",
+    foodRequestsNav: "Payout Requests",
     addContributionNav: "Add Contribution",
     contributionsNavItem: "Contributions",
     presidentBadgeLabel: "President",
@@ -446,7 +447,7 @@ export const translations = {
     contributionRecorded: "Contribution recorded.",
     couldNotRecordContribution: "Could not record this contribution",
     failedToReleasePayout: "Failed to release payout",
-    payoutResultLine: "Pot: {pot} F — Fines deducted: {deducted} F — Net payout: {net} F",
+    payoutResultLine: "Pot: {pot} — Fines deducted: {deducted} — Net payout: {net}",
     wantsToJoin: "{name} wants to join {session}",
     maxSlotsHelperText: "Once this number is reached, no new members can join — even before the Start Date.",
     startDateHelperText: "Once this date arrives, no new members can request to join.",
@@ -478,6 +479,8 @@ export const translations = {
     stillWaitingForConfirmation: "Still waiting — you can leave this open, or check back later from your history.",
     adminSupportTab: "Admin Support",
     noConversationsYet: "No conversations yet.",
+    browseCotisations: "Browse Cotisations",
+    quickActions: "Quick Actions",
     searchMembersPlaceholder: "Search members by name…",
     noSearchResults: "No members match your search.",
     sayHello: "Say hello!",
@@ -586,16 +589,16 @@ export const translations = {
     fineReminderMessage:
       "Hello {name} ❤️\nThis is a friendly reminder about your outstanding fine of {amount}. Please remember to settle it before the contribution closes so that you remain eligible to participate in future contributions. 🙏",
     foodTurnMessage:
-      "🎉 Yaaay {name}! Today is YOUR food day! 🍽️😋\n\nIt's your big day! 😄 Make something delicious and, most importantly... make good use of it! 😂❤️\n\nEveryone is counting on you! 🥳🍲",
+      "🎉 Great news, {name}! Today is YOUR payout day! 💰🎊\n\nIt's your turn to receive this cycle's pot — congratulations, and thank you for your regular contributions! ❤️\n\nEveryone is happy for you! 🥳",
     notifTypeContributionReminder: "Contribution Reminder",
     notifTypeFineReminder: "Fine Reminder",
     notifTypeFoodTurn: "It's Your Turn!",
     notifTypePaymentSuccess: "Payment Confirmation",
     notifTypePaymentFailed: "Payment Failed",
     notifTypePaymentRefundEscalated: "Refund Needs Manual Review",
-    paymentSuccessNotifMessage: "Your payment of {amount} F for {session} was received. Thank you!",
-    paymentFailedNotifMessage: "Your {amount} F payment for {session} did not go through. Insufficient balance or the transaction was declined — please try again.",
-    paymentRefundEscalatedNotifMessage: "Automated refund failed 3 times for a duplicate payment of {amount} F on slot \"{slot}\". Please refund the payer manually.",
+    paymentSuccessNotifMessage: "Your payment of {amount} for {session} was received. Thank you!",
+    paymentFailedNotifMessage: "Your {amount} payment for {session} did not go through. Insufficient balance or the transaction was declined — please try again.",
+    paymentRefundEscalatedNotifMessage: "Automated refund failed 3 times for a duplicate payment of {amount} on slot \"{slot}\". Please refund the payer manually.",
     notifTypeAdminBroadcast: "Announcement",
     notifTypeMemberApproved: "Account Verified",
     notifTypeMemberRejected: "Request Not Approved",
@@ -618,8 +621,14 @@ export const translations = {
     allContributions: "All contributions",
     allChannels: "All channels",
     allStatuses: "All statuses",
-    unpaidFinesWarning: "You have {amount} F in unpaid fines. Settle them to stay in good standing.",
-    memberHasUnpaidFines: "This member has {amount} F in unpaid fines.",
+    notifStatusSent: "Sent",
+    notifStatusScheduled: "Scheduled",
+    notifStatusProcessing: "Processing",
+    notifStatusFailed: "Failed",
+    notifStatusPending: "Pending",
+    couldNotLoadNotifications: "Could not load notifications. Please try again.",
+    unpaidFinesWarning: "You have {amount} in unpaid fines. Settle them to stay in good standing.",
+    memberHasUnpaidFines: "This member has {amount} in unpaid fines.",
     identityVerification: "Identity Verification",
     identityVerificationBody:
       "To join this cotisation, we need to verify your identity. Upload your ID document and a selfie — an admin will review them and approve your request.",
@@ -637,6 +646,96 @@ export const translations = {
 
     // Language toggle
     language: "Language",
+
+    // Public landing page
+    landingNavSignIn: "Sign In",
+    landingNavGetStarted: "Get Started",
+    landingHeroEyebrow: "Trusted Tontine Management",
+    landingHeroTitle: "Manage Your Tontine, Automatically",
+    landingHeroSubtitle:
+      "DIVA Association brings your traditional savings group online — automated contributions, verified members, and transparent payouts, all tracked in one place.",
+    landingHeroCtaPrimary: "Create a Free Account",
+    landingHeroCtaSecondary: "Sign In",
+    landingHowItWorksTitle: "How It Works",
+    landingHowItWorksSubtitle: "From sign-up to payout, every step is tracked and verified.",
+    landingStep1Title: "Create Your Account",
+    landingStep1Body: "Sign up and verify your identity with a quick KYC check, for everyone's security.",
+    landingStep2Title: "Join a Cotisation",
+    landingStep2Body: "Join an existing tontine group, or let an admin create one for your community.",
+    landingStep3Title: "Contribute via Mobile Money",
+    landingStep3Body: "Pay your contribution directly from your phone — Mobile Money or Orange Money, no cash handling.",
+    landingStep4Title: "Get Paid on Your Turn",
+    landingStep4Body: "Payout order is tracked automatically, and every contribution and payout is recorded.",
+    landingTrustTitle: "Built on Security and Transparency",
+    landingTrustSubtitle: "Every member is verified. Every transaction is recorded.",
+    landingBadgeEncryptedTitle: "Encrypted & Secure",
+    landingBadgeEncryptedBody: "Your data is protected in transit and at rest.",
+    landingBadgeKycTitle: "Identity Verification",
+    landingBadgeKycBody: "Every member completes identity verification before joining a group.",
+    landingBadgeMobileMoneyTitle: "Mobile Money Payments",
+    landingBadgeMobileMoneyBody: "Secure contributions via Mobile Money and Orange Money.",
+    landingBadgeTransparentTitle: "Transparent Records",
+    landingBadgeTransparentBody: "Every contribution, fine, and payout is logged and auditable.",
+    landingStatMembers: "Registered Members",
+    landingStatCotisations: "Active Cotisations",
+    landingStatContributions: "FCFA in Tracked Contributions",
+    landingFooterTagline: "Automated management for traditional tontines.",
+    landingFooterRights: "© {year} DIVA Association. All rights reserved.",
+    landingFooterPrivacy: "Privacy Policy",
+    landingFooterTerms: "Terms of Service",
+
+    // Privacy Policy
+    privacyPolicyTitle: "Privacy Policy",
+    privacyPolicyLastUpdated: "Last updated: {date}",
+    privacyPolicyIntro:
+      "This Privacy Policy explains what information DIVA Association collects, why we collect it, and how it is used and protected when you use our platform to manage tontine (cotisation) savings groups.",
+    privacyPolicySectionDataTitle: "Information We Collect",
+    privacyPolicySectionDataBody:
+      "Account information (name, email, phone number, preferred language); identity verification documents (Cameroonian national ID card, a selfie photo, and the result of an automated face-match/liveness check) required to join a cotisation; location information (city, neighborhood, and GPS coordinates) if you choose to share it; payment information related to your Mobile Money/Orange Money contributions (phone number and transaction status — we never see or store your Mobile Money PIN); and messages you send through the in-app chat.",
+    privacyPolicySectionUseTitle: "How We Use Your Information",
+    privacyPolicySectionUseBody:
+      "We use your information to verify your identity before you can join a cotisation, to process and track your contributions and payouts, to send you reminders and notifications about your cotisations (by WhatsApp, email, or in-app), to prevent fraud and duplicate payments, and to let your group's administrator manage membership and resolve disputes.",
+    privacyPolicySectionSharingTitle: "Who We Share It With",
+    privacyPolicySectionSharingBody:
+      "We share the minimum necessary data with the service providers that power the platform: Didit (identity document and face verification), Fapshi (Mobile Money/Orange Money payment processing), Evolution API (WhatsApp notifications), Resend (email notifications), and Supabase (secure data storage and authentication). We do not sell your personal information to anyone.",
+    privacyPolicySectionSecurityTitle: "Data Security",
+    privacyPolicySectionSecurityBody:
+      "Your data is encrypted in transit (HTTPS) and access to it is restricted to authorized administrators of your own cotisation group. Identity documents and payment records are stored in access-controlled storage, not publicly accessible.",
+    privacyPolicySectionRightsTitle: "Your Rights",
+    privacyPolicySectionRightsBody:
+      "You can access or update most of your account information from your Profile page at any time. To request a copy of your data, a correction, or deletion of your account, contact your association's administrator or reach out using the contact details below.",
+    privacyPolicySectionContactTitle: "Contact Us",
+    privacyPolicySectionContactBody:
+      "If you have questions about this Privacy Policy or how your data is handled, please contact your association's administrator through the in-app Support chat.",
+
+    // Terms of Service
+    termsOfServiceTitle: "Terms of Service",
+    termsOfServiceLastUpdated: "Last updated: {date}",
+    termsOfServiceIntro:
+      "These Terms of Service govern your use of the DIVA Association platform. By creating an account, you agree to these terms.",
+    termsSectionServiceTitle: "About the Service",
+    termsSectionServiceBody:
+      "DIVA Association is software that helps traditional tontine (cotisation) savings groups organize contributions, track payout order, and communicate. DIVA Association is not a bank, a licensed financial institution, or a payment processor — Mobile Money and Orange Money payments are processed by our third-party payment partner, and DIVA Association is not liable for outages or delays caused by that provider or by mobile network operators.",
+    termsSectionEligibilityTitle: "Eligibility & Verification",
+    termsSectionEligibilityBody:
+      "To join a cotisation, you must complete identity verification (KYC) with a valid Cameroonian national ID card and a matching selfie. An administrator may reject or remove a member who fails verification, provides false information, or violates a group's own rules (Règlement Général).",
+    termsSectionResponsibilitiesTitle: "Member Responsibilities",
+    termsSectionResponsibilitiesBody:
+      "You are responsible for making your contributions on time, for keeping your account information accurate, and for the confidentiality of your login credentials and Mobile Money PIN (which DIVA Association never asks for and never stores). Late contributions may incur a fine as configured by your group's administrator.",
+    termsSectionPaymentsTitle: "Payments & Fees",
+    termsSectionPaymentsBody:
+      "Contributions are collected via Mobile Money/Orange Money through our payment partner, which charges a processing fee shown to you before you confirm any payment. Payouts follow the order configured for your cotisation (random draw or admin-assigned) and are recorded once confirmed.",
+    termsSectionTerminationTitle: "Suspension & Termination",
+    termsSectionTerminationBody:
+      "An administrator may suspend or remove a member for non-payment, fraud, or violation of a group's rules. You may close your account at any time by contacting your administrator.",
+    termsSectionLiabilityTitle: "Limitation of Liability",
+    termsSectionLiabilityBody:
+      "DIVA Association provides record-keeping and coordination tools for tontines organized and run by their own members and administrators. We are not a party to, and are not liable for, the tontine agreement between members. To the fullest extent permitted by law, DIVA Association is not liable for indirect or consequential damages arising from use of the platform.",
+    termsSectionChangesTitle: "Changes to These Terms",
+    termsSectionChangesBody:
+      "We may update these terms from time to time. Continued use of the platform after a change constitutes acceptance of the updated terms.",
+    termsSectionContactTitle: "Contact Us",
+    termsSectionContactBody: "Questions about these terms can be directed to your association's administrator through the in-app Support chat.",
   },
   fr: {
     // Login
@@ -667,8 +766,8 @@ export const translations = {
     noUnpaidFines: "Vous n'avez aucune amende impayée.",
     fineReasonLatePayment: "Retard de paiement — cycle du {date}",
     payThisFine: "Payer cette amende",
-    paymentsLockedUntilPayout: "Rouvre dès que {name} reçoit la bouffe de ce tour.",
-    finePaidMessage: "Votre amende de {amount} F pour {session} a été payée. Merci !",
+    paymentsLockedUntilPayout: "Rouvre dès que {name} reçoit le versement de ce tour.",
+    finePaidMessage: "Votre amende de {amount} pour {session} a été payée. Merci !",
     finePaidEmailSubject: "Paiement d'amende reçu",
     messages: "Messages",
     openChat: "Ouvrir le chat",
@@ -726,8 +825,8 @@ export const translations = {
     generalRulesSaved: "Règlement général mis à jour.",
     couldNotSaveGeneralRules: "Impossible d'enregistrer le règlement général. Veuillez réessayer.",
     notYetRevealed: "Pas encore révélé",
-    viewPayoutOrder: "Ordre de bouffe",
-    payoutOrderTitle: "Ordre de bouffe",
+    viewPayoutOrder: "Ordre de versement",
+    payoutOrderTitle: "Ordre de versement",
     payoutStatusPending: "Pas encore dû",
     payoutStatusDetailsSubmitted: "En attente de virement",
     payoutStatusReleased: "Envoyé — en attente de confirmation",
@@ -745,7 +844,7 @@ export const translations = {
     receiptConfirmed: "Merci — votre confirmation de réception a été enregistrée.",
     couldNotSubmitPayoutDetails: "Impossible de soumettre vos coordonnées de paiement. Veuillez réessayer.",
     autoReplySupport:
-      "Bonjour {name}, veuillez expliquer votre problème en détail. Un agent du service client vous répondra sous peu.",
+      "Bonjour {name}, pouvez-vous décrire votre problème en détail ? Un agent du service client vous répondra sous peu.",
     helpCenterTitle: "Centre d'aide",
     helpAndSupport: "Aide et support",
     contactAdminSupport: "Contacter le support admin",
@@ -831,7 +930,7 @@ export const translations = {
     waFineNotice:
       "🔴 Avis de retard de paiement — DIVA Association\n\n{name}, votre contribution pour la {cotisation} n'a pas été reçue avant l'échéance de 18h30. Une amende de retard de {amount} a été appliquée à votre compte.\n\nVeuillez régler votre contribution et votre amende dès que possible.",
     waDuplicateRefunded:
-      "Votre paiement a été reçu deux fois pour le même nom. Le second paiement de {amount} FCFA a été automatiquement remboursé.",
+      "Votre paiement a été reçu deux fois pour le même nom. Le second paiement de {amount} a été automatiquement remboursé.",
     myConversations: "Mes conversations",
 
     // Slot selection form
@@ -874,7 +973,7 @@ export const translations = {
     membershipStatusApproved: "Actif",
     membershipStatusRejected: "Non approuvé",
     allSlotsPaidThisCycle: "Tout le monde a payé ce cycle",
-    slotsPaidSummary: "{paid}/{total} noms payés · {amount} F chacun dû",
+    slotsPaidSummary: "{paid}/{total} noms payés · {amount} chacun dû",
 
     // Public pay
     contributeForMember: "Contribuer pour un membre",
@@ -884,7 +983,7 @@ export const translations = {
     redirectingToFapshi: "Redirection vers Fapshi...",
 
     // Admin
-    adminBrand: "DIVA Association Admin",
+    adminBrand: "DIVA Admin",
     adminNavDashboard: "Tableau de bord",
     adminNavNotifications: "Notifications",
     adminNavSupport: "Support",
@@ -910,6 +1009,7 @@ export const translations = {
     allUsersCardBody: "Recherchez et consultez tous les comptes enregistrés dans le système.",
     searchAllUsersPlaceholder: "Rechercher par nom, email, téléphone ou code…",
     noUsersFound: "Aucun utilisateur trouvé.",
+    totalRegisteredUsers: "{count} utilisateurs enregistrés au total",
     paymentIssuesCard: "Sécurité des paiements",
     paymentIssuesCardBody: "Paiements en double et remboursements nécessitant une attention.",
     paymentIssuesPageTitle: "Sécurité des paiements et remboursements",
@@ -1038,14 +1138,14 @@ export const translations = {
     noPendingSwaps: "Aucune demande d'échange en attente.",
     positionAbbrev: "Pos",
     userAsksUser: "{requester} demande à {target}",
-    foodTurnTab: "Tour de bouffe",
-    noFoodTurnRequests: "Aucune demande de tour de bouffe pour le moment.",
+    foodTurnTab: "Tour de versement",
+    noFoodTurnRequests: "Aucune demande de versement pour le moment.",
     foodTurnActionRequired: "Action requise",
     outstandingZero: "0 F restant",
-    foodRequestsSubtitle: "Membres dont le tour de bouffe nécessite votre action, sur toutes les cotisations.",
+    foodRequestsSubtitle: "Membres dont le versement nécessite votre action, sur toutes les cotisations.",
     openMenu: "Menu",
     joinRequestsNav: "Demandes pour rejoindre",
-    foodRequestsNav: "Demandes de bouffe",
+    foodRequestsNav: "Demandes de versement",
     addContributionNav: "Ajouter une cotisation",
     contributionsNavItem: "Cotisations",
     presidentBadgeLabel: "Présidente",
@@ -1085,7 +1185,7 @@ export const translations = {
     contributionRecorded: "Contribution enregistrée.",
     couldNotRecordContribution: "Impossible d'enregistrer cette contribution",
     failedToReleasePayout: "Échec du versement du paiement",
-    payoutResultLine: "Cagnotte : {pot} F — Amendes déduites : {deducted} F — Versement net : {net} F",
+    payoutResultLine: "Cagnotte : {pot} — Amendes déduites : {deducted} — Versement net : {net}",
     wantsToJoin: "{name} souhaite rejoindre {session}",
     maxSlotsHelperText: "Une fois ce nombre atteint, aucun nouveau membre ne peut rejoindre — même avant la date de début.",
     startDateHelperText: "Une fois cette date arrivée, aucun nouveau membre ne peut demander à rejoindre.",
@@ -1118,6 +1218,8 @@ export const translations = {
       "Toujours en attente — vous pouvez laisser cette fenêtre ouverte, ou revenir plus tard depuis votre historique.",
     adminSupportTab: "Support admin",
     noConversationsYet: "Aucune conversation pour le moment.",
+    browseCotisations: "Voir les cotisations",
+    quickActions: "Actions rapides",
     searchMembersPlaceholder: "Rechercher un membre par nom…",
     noSearchResults: "Aucun membre ne correspond à votre recherche.",
     sayHello: "Dites bonjour !",
@@ -1228,16 +1330,16 @@ export const translations = {
     fineReminderMessage:
       "Bonjour {name} ❤️\nPetit rappel amical concernant votre amende impayée de {amount}. Merci de la régler avant la clôture de la cotisation pour rester éligible aux prochaines cotisations. 🙏",
     foodTurnMessage:
-      "🎉 Youpi {name} ! Aujourd'hui c'est TON jour de bouffe ! 🍽️😋\n\nC'est ton grand jour ! 😄 Prépare quelque chose de délicieux et surtout... régale-toi bien ! 😂❤️\n\nTout le monde compte sur toi ! 🥳🍲",
+      "🎉 Youpi {name} ! Aujourd'hui c'est TON tour de recevoir la cagnotte ! 💰🎊\n\nC'est ton grand jour ! Merci pour ta régularité dans les cotisations ! ❤️\n\nToute la communauté est contente pour toi ! 🥳",
     notifTypeContributionReminder: "Rappel de cotisation",
     notifTypeFineReminder: "Rappel d'amende",
     notifTypeFoodTurn: "C'est ton tour !",
     notifTypePaymentSuccess: "Confirmation de paiement",
     notifTypePaymentFailed: "Échec du paiement",
     notifTypePaymentRefundEscalated: "Remboursement à traiter manuellement",
-    paymentSuccessNotifMessage: "Votre paiement de {amount} F pour {session} a été reçu. Merci !",
-    paymentFailedNotifMessage: "Votre paiement de {amount} F pour {session} n'a pas abouti. Solde insuffisant ou transaction refusée — veuillez réessayer.",
-    paymentRefundEscalatedNotifMessage: "Le remboursement automatique a échoué 3 fois pour un double paiement de {amount} F sur le nom « {slot} ». Veuillez rembourser le payeur manuellement.",
+    paymentSuccessNotifMessage: "Votre paiement de {amount} pour {session} a été reçu. Merci !",
+    paymentFailedNotifMessage: "Votre paiement de {amount} pour {session} n'a pas abouti. Solde insuffisant ou transaction refusée — veuillez réessayer.",
+    paymentRefundEscalatedNotifMessage: "Le remboursement automatique a échoué 3 fois pour un double paiement de {amount} sur le nom « {slot} ». Veuillez rembourser le payeur manuellement.",
     notifTypeAdminBroadcast: "Annonce",
     notifTypeMemberApproved: "Compte vérifié",
     notifTypeMemberRejected: "Demande non approuvée",
@@ -1260,8 +1362,14 @@ export const translations = {
     allContributions: "Toutes les cotisations",
     allChannels: "Tous les canaux",
     allStatuses: "Tous les statuts",
-    unpaidFinesWarning: "Vous avez {amount} F d'amendes impayées. Réglez-les pour rester en règle.",
-    memberHasUnpaidFines: "Ce membre a {amount} F d'amendes impayées.",
+    notifStatusSent: "Envoyé",
+    notifStatusScheduled: "Planifié",
+    notifStatusProcessing: "En cours",
+    notifStatusFailed: "Échoué",
+    notifStatusPending: "En attente",
+    couldNotLoadNotifications: "Impossible de charger les notifications. Veuillez réessayer.",
+    unpaidFinesWarning: "Vous avez {amount} d'amendes impayées. Réglez-les pour rester en règle.",
+    memberHasUnpaidFines: "Ce membre a {amount} d'amendes impayées.",
     identityVerification: "Vérification d'identité",
     identityVerificationBody:
       "Pour rejoindre cette cotisation, nous devons vérifier votre identité. Téléversez votre pièce d'identité et un selfie — un admin les examinera et approuvera votre demande.",
@@ -1279,6 +1387,96 @@ export const translations = {
 
     // Language toggle
     language: "Langue",
+
+    // Public landing page
+    landingNavSignIn: "Se connecter",
+    landingNavGetStarted: "Commencer",
+    landingHeroEyebrow: "Gestion de tontine de confiance",
+    landingHeroTitle: "Gérez votre tontine, automatiquement",
+    landingHeroSubtitle:
+      "DIVA Association met votre groupe d'épargne traditionnel en ligne — cotisations automatisées, membres vérifiés et versements transparents, le tout suivi au même endroit.",
+    landingHeroCtaPrimary: "Créer un compte gratuit",
+    landingHeroCtaSecondary: "Se connecter",
+    landingHowItWorksTitle: "Comment ça marche",
+    landingHowItWorksSubtitle: "De l'inscription au versement, chaque étape est suivie et vérifiée.",
+    landingStep1Title: "Créez votre compte",
+    landingStep1Body: "Inscrivez-vous et vérifiez votre identité avec un contrôle KYC rapide, pour la sécurité de tous.",
+    landingStep2Title: "Rejoignez une cotisation",
+    landingStep2Body: "Rejoignez une tontine existante, ou laissez un admin en créer une pour votre communauté.",
+    landingStep3Title: "Cotisez via Mobile Money",
+    landingStep3Body: "Payez votre cotisation directement depuis votre téléphone — Mobile Money ou Orange Money, sans manipulation d'espèces.",
+    landingStep4Title: "Recevez votre versement à votre tour",
+    landingStep4Body: "L'ordre de versement est suivi automatiquement, et chaque cotisation et versement est enregistré.",
+    landingTrustTitle: "Fondé sur la sécurité et la transparence",
+    landingTrustSubtitle: "Chaque membre est vérifié. Chaque transaction est enregistrée.",
+    landingBadgeEncryptedTitle: "Chiffré et sécurisé",
+    landingBadgeEncryptedBody: "Vos données sont protégées en transit et au repos.",
+    landingBadgeKycTitle: "Vérification d'identité",
+    landingBadgeKycBody: "Chaque membre effectue une vérification d'identité avant de rejoindre un groupe.",
+    landingBadgeMobileMoneyTitle: "Paiements Mobile Money",
+    landingBadgeMobileMoneyBody: "Cotisations sécurisées via Mobile Money et Orange Money.",
+    landingBadgeTransparentTitle: "Registres transparents",
+    landingBadgeTransparentBody: "Chaque cotisation, amende et versement est enregistré et vérifiable.",
+    landingStatMembers: "Membres inscrits",
+    landingStatCotisations: "Cotisations actives",
+    landingStatContributions: "FCFA de cotisations suivies",
+    landingFooterTagline: "Gestion automatisée pour les tontines traditionnelles.",
+    landingFooterRights: "© {year} DIVA Association. Tous droits réservés.",
+    landingFooterPrivacy: "Politique de confidentialité",
+    landingFooterTerms: "Conditions d'utilisation",
+
+    // Privacy Policy
+    privacyPolicyTitle: "Politique de confidentialité",
+    privacyPolicyLastUpdated: "Dernière mise à jour : {date}",
+    privacyPolicyIntro:
+      "Cette politique de confidentialité explique quelles informations DIVA Association collecte, pourquoi nous les collectons, et comment elles sont utilisées et protégées lorsque vous utilisez notre plateforme pour gérer des groupes d'épargne tontine (cotisation).",
+    privacyPolicySectionDataTitle: "Informations que nous collectons",
+    privacyPolicySectionDataBody:
+      "Informations de compte (nom, email, numéro de téléphone, langue préférée) ; documents de vérification d'identité (carte nationale d'identité camerounaise, une photo selfie, et le résultat d'une vérification automatique de correspondance faciale/détection de vivacité) requis pour rejoindre une cotisation ; informations de localisation (ville, quartier et coordonnées GPS) si vous choisissez de les partager ; informations de paiement liées à vos cotisations Mobile Money/Orange Money (numéro de téléphone et statut de transaction — nous ne voyons ni ne stockons jamais votre code secret Mobile Money) ; et les messages que vous envoyez via le chat intégré.",
+    privacyPolicySectionUseTitle: "Comment nous utilisons vos informations",
+    privacyPolicySectionUseBody:
+      "Nous utilisons vos informations pour vérifier votre identité avant que vous puissiez rejoindre une cotisation, pour traiter et suivre vos cotisations et versements, pour vous envoyer des rappels et notifications concernant vos cotisations (par WhatsApp, email ou dans l'application), pour prévenir la fraude et les paiements en double, et pour permettre à l'administrateur de votre groupe de gérer les adhésions et résoudre les litiges.",
+    privacyPolicySectionSharingTitle: "Avec qui nous les partageons",
+    privacyPolicySectionSharingBody:
+      "Nous partageons le minimum de données nécessaire avec les prestataires qui font fonctionner la plateforme : Didit (vérification de documents d'identité et du visage), Fapshi (traitement des paiements Mobile Money/Orange Money), Evolution API (notifications WhatsApp), Resend (notifications par email) et Supabase (stockage sécurisé des données et authentification). Nous ne vendons vos informations personnelles à personne.",
+    privacyPolicySectionSecurityTitle: "Sécurité des données",
+    privacyPolicySectionSecurityBody:
+      "Vos données sont chiffrées en transit (HTTPS) et l'accès y est limité aux administrateurs autorisés de votre propre groupe de cotisation. Les documents d'identité et les enregistrements de paiement sont stockés dans un espace à accès contrôlé, non accessible publiquement.",
+    privacyPolicySectionRightsTitle: "Vos droits",
+    privacyPolicySectionRightsBody:
+      "Vous pouvez consulter ou modifier la plupart des informations de votre compte depuis votre page Profil à tout moment. Pour demander une copie de vos données, une correction ou la suppression de votre compte, contactez l'administrateur de votre association ou utilisez les coordonnées ci-dessous.",
+    privacyPolicySectionContactTitle: "Nous contacter",
+    privacyPolicySectionContactBody:
+      "Pour toute question concernant cette politique de confidentialité ou la gestion de vos données, veuillez contacter l'administrateur de votre association via le chat d'assistance de l'application.",
+
+    // Terms of Service
+    termsOfServiceTitle: "Conditions d'utilisation",
+    termsOfServiceLastUpdated: "Dernière mise à jour : {date}",
+    termsOfServiceIntro:
+      "Ces conditions d'utilisation régissent votre usage de la plateforme DIVA Association. En créant un compte, vous acceptez ces conditions.",
+    termsSectionServiceTitle: "À propos du service",
+    termsSectionServiceBody:
+      "DIVA Association est un logiciel qui aide les groupes d'épargne tontine (cotisation) traditionnels à organiser les cotisations, suivre l'ordre des versements et communiquer. DIVA Association n'est pas une banque, un établissement financier agréé ou un prestataire de services de paiement — les paiements Mobile Money et Orange Money sont traités par notre partenaire de paiement tiers, et DIVA Association n'est pas responsable des interruptions ou retards causés par ce prestataire ou par les opérateurs de réseaux mobiles.",
+    termsSectionEligibilityTitle: "Éligibilité et vérification",
+    termsSectionEligibilityBody:
+      "Pour rejoindre une cotisation, vous devez compléter une vérification d'identité (KYC) avec une carte nationale d'identité camerounaise valide et un selfie correspondant. Un administrateur peut rejeter ou retirer un membre qui échoue à la vérification, fournit de fausses informations, ou viole le règlement propre à un groupe (Règlement Général).",
+    termsSectionResponsibilitiesTitle: "Responsabilités des membres",
+    termsSectionResponsibilitiesBody:
+      "Vous êtes responsable du paiement de vos cotisations à temps, de l'exactitude des informations de votre compte, et de la confidentialité de vos identifiants de connexion et de votre code secret Mobile Money (que DIVA Association ne demande ni ne stocke jamais). Les cotisations en retard peuvent entraîner une amende telle que configurée par l'administrateur de votre groupe.",
+    termsSectionPaymentsTitle: "Paiements et frais",
+    termsSectionPaymentsBody:
+      "Les cotisations sont collectées via Mobile Money/Orange Money par l'intermédiaire de notre partenaire de paiement, qui applique des frais de traitement affichés avant que vous ne confirmiez tout paiement. Les versements suivent l'ordre configuré pour votre cotisation (tirage au sort ou attribution par l'admin) et sont enregistrés une fois confirmés.",
+    termsSectionTerminationTitle: "Suspension et résiliation",
+    termsSectionTerminationBody:
+      "Un administrateur peut suspendre ou retirer un membre en cas de non-paiement, de fraude ou de violation du règlement d'un groupe. Vous pouvez fermer votre compte à tout moment en contactant votre administrateur.",
+    termsSectionLiabilityTitle: "Limitation de responsabilité",
+    termsSectionLiabilityBody:
+      "DIVA Association fournit des outils de tenue de registres et de coordination pour des tontines organisées et gérées par leurs propres membres et administrateurs. Nous ne sommes pas partie à l'accord de tontine entre membres et n'en sommes pas responsables. Dans toute la mesure permise par la loi, DIVA Association n'est pas responsable des dommages indirects ou consécutifs résultant de l'utilisation de la plateforme.",
+    termsSectionChangesTitle: "Modifications de ces conditions",
+    termsSectionChangesBody:
+      "Nous pouvons mettre à jour ces conditions de temps à autre. La poursuite de l'utilisation de la plateforme après une modification vaut acceptation des conditions mises à jour.",
+    termsSectionContactTitle: "Nous contacter",
+    termsSectionContactBody: "Pour toute question concernant ces conditions, veuillez contacter l'administrateur de votre association via le chat d'assistance de l'application.",
   },
 } as const satisfies Record<Lang, Record<string, string>>;
 

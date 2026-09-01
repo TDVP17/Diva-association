@@ -6,6 +6,12 @@ export const PROTECTED_PATH_PREFIXES = [
   "/chat",
   "/admin",
   "/profile",
+  "/fines",
+  "/notifications",
+  "/history",
+  "/help",
+  "/contribute-for-relative",
+  "/reglement-general",
 ] as const;
 
 export const ADMIN_PATH_PREFIX = "/admin";

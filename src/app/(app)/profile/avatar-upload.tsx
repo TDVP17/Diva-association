@@ -8,6 +8,7 @@ import { getCroppedImageBlob } from "./crop-image";
 import { AvatarViewer } from "./avatar-viewer";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 import { compressImage } from "@/lib/compress-image";
+import { getInitials } from "@/lib/initials";
 
 export function AvatarUpload({
   currentAvatarUrl,
@@ -65,12 +66,12 @@ export function AvatarUpload({
     <div className="flex flex-col items-center">
       <div className="relative w-24 h-24">
         <AvatarViewer avatarUrl={avatarUrl ?? ""} userName={userName} lang={lang}>
-          <div className="w-24 h-24 rounded-full border-2 border-secondary-fixed-dim overflow-hidden bg-surface-variant flex items-center justify-center">
+          <div className="w-24 h-24 rounded-full border-2 border-secondary-fixed-dim overflow-hidden bg-primary-container flex items-center justify-center">
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={avatarUrl} alt={userName} className="w-full h-full object-cover" />
             ) : (
-              <span className="material-symbols-outlined text-4xl text-outline">person</span>
+              <span className="font-headline-lg text-headline-lg text-primary">{getInitials(userName)}</span>
             )}
           </div>
         </AvatarViewer>
@@ -79,9 +80,10 @@ export function AvatarUpload({
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
           aria-label={t("changeProfilePicture")}
-          className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-60"
+          title={t("changeProfilePicture")}
+          className="absolute bottom-0 right-0 w-11 h-11 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-lg border-2 border-white hover:opacity-90 active:scale-95 transition-all disabled:opacity-60"
         >
-          <span className="material-symbols-outlined text-[18px]">photo_camera</span>
+          <span className="material-symbols-outlined text-[20px]">photo_camera</span>
         </button>
         <input
           ref={inputRef}

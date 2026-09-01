@@ -9,36 +9,45 @@ export async function GET(request: Request) {
 
   const q = new URL(request.url).searchParams.get("q")?.trim();
 
-  const users = await prisma.user.findMany({
-    where: q
-      ? {
-          OR: [
-            { name: { contains: q, mode: "insensitive" } },
-            { email: { contains: q, mode: "insensitive" } },
-            { phone: { contains: q } },
-            { memberCode: { contains: q, mode: "insensitive" } },
-          ],
-        }
-      : undefined,
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      phone: true,
-      avatar: true,
-      image: true,
-      role: true,
-      memberCode: true,
-      city: true,
-      neighborhood: true,
-      createdAt: true,
-      _count: { select: { memberships: true } },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 200,
-  });
+  const where = q
+    ? {
+        OR: [
+          { name: { contains: q, mode: "insensitive" as const } },
+          { email: { contains: q, mode: "insensitive" as const } },
+          { phone: { contains: q } },
+          { memberCode: { contains: q, mode: "insensitive" as const } },
+        ],
+      }
+    : undefined;
+
+  const [users, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        avatar: true,
+        image: true,
+        role: true,
+        memberCode: true,
+        city: true,
+        neighborhood: true,
+        createdAt: true,
+        _count: { select: { memberships: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    }),
+    // Unfiltered (q=undefined) this is the platform's true total registered
+    // user count, independent of the take:200 cap above — the admin
+    // dashboard's "All Users" stat reads this, not users.length.
+    prisma.user.count({ where }),
+  ]);
 
   return NextResponse.json({
+    total,
     users: users.map((u) => ({
       id: u.id,
       name: u.name,

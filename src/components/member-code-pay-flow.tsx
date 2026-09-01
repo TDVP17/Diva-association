@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { PaymentConfirmDialog } from "@/components/payment-confirm-dialog";
+import { formatXAF } from "@/lib/format-currency";
 
 interface FoundMember {
   memberCode: string;
@@ -123,7 +124,7 @@ export function MemberCodePayFlow({ lang, payEndpoint }: { lang: Lang; payEndpoi
         <div className="bg-error-container/40 border border-error/30 rounded-xl p-3 flex items-center gap-2">
           <span className="material-symbols-outlined text-error text-[18px]">warning</span>
           <p className="font-label-sm text-label-sm text-on-error-container">
-            {t("memberHasUnpaidFines", { amount: member.totalUnpaidFines.toLocaleString("en-US") })}
+            {t("memberHasUnpaidFines", { amount: formatXAF(member.totalUnpaidFines) })}
           </p>
         </div>
       )}
@@ -150,7 +151,7 @@ export function MemberCodePayFlow({ lang, payEndpoint }: { lang: Lang; payEndpoi
                 <div className="min-w-0">
                   <p className="font-label-md text-label-md text-on-surface truncate">{s.tontineSessionTitle}</p>
                   <p className="font-label-sm text-label-sm text-on-surface-variant truncate">
-                    {s.beneficiaryName} — {s.amount.toLocaleString("en-US")} F
+                    {s.beneficiaryName} — {formatXAF(s.amount)}
                   </p>
                 </div>
                 <button

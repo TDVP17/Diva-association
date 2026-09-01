@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
+import { formatXAF } from "@/lib/format-currency";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -109,7 +110,7 @@ export default async function HistoryPage() {
                   {r.kind === "contribution" ? t("contributionLabel") : t("fineLabel")} – {r.sessionLabel}
                 </span>
                 <span className="font-numeric-data text-[13px] sm:text-numeric-data text-on-surface">
-                  {r.amount.toLocaleString("en-US")} F
+                  {formatXAF(r.amount)}
                 </span>
                 <span className="font-label-sm text-label-sm text-on-surface-variant">
                   {r.dueDate.toLocaleDateString("en-GB", { timeZone: "Africa/Douala" })}

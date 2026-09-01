@@ -27,6 +27,7 @@ const ROLE_CLASS: Record<string, string> = {
 export function AdminUsersClient({ lang }: { lang: Lang }) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
   const [users, setUsers] = useState<AdminUserRow[] | null>(null);
+  const [total, setTotal] = useState<number | null>(null);
   const [query, setQuery] = useState("");
 
   useEffect(() => {
@@ -35,7 +36,10 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
     const handle = setTimeout(() => {
       fetch(`/api/admin/users?${params.toString()}`)
         .then((r) => r.json())
-        .then((b) => setUsers(b.users ?? []))
+        .then((b) => {
+          setUsers(b.users ?? []);
+          setTotal(typeof b.total === "number" ? b.total : null);
+        })
         .catch(() => setUsers([]));
     }, 200);
     return () => clearTimeout(handle);
@@ -43,6 +47,11 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
 
   return (
     <div className="flex flex-col gap-stack-gap-md">
+      {total != null && (
+        <p className="font-label-sm text-label-sm text-on-surface-variant">
+          {t("totalRegisteredUsers", { count: total.toLocaleString("fr-FR") })}
+        </p>
+      )}
       <div className="relative">
         <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">
           search

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { renderNotificationMessage } from "@/lib/notifications/render-message";
 import { LoadingSpinner } from "@/components/loading-spinner";
+import { NOTIFICATION_TYPE_KEY as TYPE_KEY } from "@/lib/notifications/type-labels";
 
 interface NotificationRow {
   id: string;
@@ -18,34 +19,33 @@ interface NotificationRow {
   readAt: string | null;
 }
 
-const TYPE_KEY: Record<string, Parameters<typeof translate>[1]> = {
-  CONTRIBUTION_REMINDER: "notifTypeContributionReminder",
-  FINE_REMINDER: "notifTypeFineReminder",
-  FOOD_TURN: "notifTypeFoodTurn",
-  PAYMENT_SUCCESS: "notifTypePaymentSuccess",
-  PAYMENT_FAILED: "notifTypePaymentFailed",
-  ADMIN_BROADCAST: "notifTypeAdminBroadcast",
-  MEMBER_APPROVED: "notifTypeMemberApproved",
-  MEMBER_REJECTED: "notifTypeMemberRejected",
-  SWAP_REQUEST_CREATED: "notifTypeSwapRequestCreated",
-  SWAP_REQUEST_PENDING_ADMIN: "notifTypeSwapRequestPendingAdmin",
-  SWAP_REQUEST_APPROVED: "notifTypeSwapRequestApproved",
-  SWAP_REQUEST_REJECTED: "notifTypeSwapRequestRejected",
-  NEW_MEMBERSHIP_REQUEST: "notifTypeNewMembershipRequest",
-  DRAW_LAUNCHED: "notifTypeDrawLaunched",
-  PAYMENT_REFUND_ESCALATED: "notifTypePaymentRefundEscalated",
-};
-
 export function NotificationsClient({ lang }: { lang: Lang }) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
   const router = useRouter();
   const [notifications, setNotifications] = useState<NotificationRow[] | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
     fetch("/api/notifications")
-      .then((r) => r.json())
-      .then((b) => setNotifications(b.notifications ?? []));
-  }, []);
+      .then((r) => {
+        if (!r.ok) throw new Error(`Request failed with status ${r.status}`);
+        return r.json();
+      })
+      .then((b) => {
+        if (cancelled) return;
+        setNotifications(b.notifications ?? []);
+        setLoadError(false);
+      })
+      .catch((err) => {
+        console.error("[notifications] failed to load:", err);
+        if (!cancelled) setLoadError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadToken]);
 
   async function markRead(id: string) {
     setNotifications((current) => (current ? current.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n)) : current));
@@ -71,6 +71,20 @@ export function NotificationsClient({ lang }: { lang: Lang }) {
   function handleClick(n: NotificationRow) {
     if (!n.readAt) markRead(n.id);
     if (n.actionUrl) router.push(n.actionUrl);
+  }
+
+  if (loadError) {
+    return (
+      <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-5 text-center flex flex-col items-center gap-stack-gap-sm">
+        <p className="font-body-md text-body-md text-error">{t("couldNotLoadNotifications")}</p>
+        <button
+          onClick={() => setReloadToken((n) => n + 1)}
+          className="px-4 py-2 rounded-lg border border-outline-variant text-primary font-label-md text-label-md hover:bg-surface-container-low transition-colors"
+        >
+          {t("tryAgain")}
+        </button>
+      </div>
+    );
   }
 
   if (!notifications) {

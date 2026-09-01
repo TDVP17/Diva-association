@@ -12,6 +12,7 @@ import { updatePhoneAction, updateEmailAction } from "./actions";
 import { InstallAppButton } from "@/components/install-app-button";
 import { AndroidApkButton } from "@/components/android-apk-button";
 import { MemberCodeCard } from "./member-code-card";
+import { formatXAF } from "@/lib/format-currency";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -115,7 +116,7 @@ export default async function ProfilePage() {
           <div className="w-full bg-error-container/40 border border-error/30 rounded-xl p-4 flex items-center gap-3">
             <span className="material-symbols-outlined text-error">warning</span>
             <p className="font-label-sm text-label-sm text-on-error-container">
-              {t("unpaidFinesWarning", { amount: unpaidFinesTotal.toLocaleString("en-US") })}
+              {t("unpaidFinesWarning", { amount: formatXAF(unpaidFinesTotal) })}
             </p>
           </div>
         )}
@@ -177,7 +178,7 @@ export default async function ProfilePage() {
                     : t("slotsPaidSummary", {
                         paid: String(paidSlots),
                         total: String(m.slots.length),
-                        amount: total.toLocaleString("en-US"),
+                        amount: formatXAF(total),
                       });
               } else if (m.status === "APPROVED" && m.slotCount === null) {
                 summary = t("selectSlotsToStart");

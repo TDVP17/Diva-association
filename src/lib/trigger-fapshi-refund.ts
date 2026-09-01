@@ -4,6 +4,7 @@ import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { logAudit } from "@/lib/audit";
+import { formatXAF } from "@/lib/format-currency";
 import type { PaymentAttempt } from "@/generated/prisma/client";
 
 const MAX_REFUND_ATTEMPTS = 3;
@@ -89,7 +90,7 @@ export async function triggerAutomatedRefund(paymentAttemptId: string): Promise<
       await sendWhatsAppMessageSafe(
         attempt.payerPhone,
         translate(target.payerLang, "waDuplicateRefunded", {
-          amount: Number(attempt.amount).toLocaleString("en-US"),
+          amount: formatXAF(Number(attempt.amount)),
         }),
       );
     }
@@ -144,13 +145,13 @@ async function escalateToManualReview(
   });
   if (admins.length === 0) return;
 
-  const amountLabel = Number(attempt.amount).toLocaleString("en-US");
+  const amountLabel = formatXAF(Number(attempt.amount));
   const slotLabel = target?.slotLabel ?? "—";
   await scheduleInAppNotifications({
     type: "PAYMENT_REFUND_ESCALATED",
     recipients: admins.map((a) => ({
       userId: a.id,
-      message: `Automated refund failed 3 times for a duplicate payment of ${amountLabel} F on slot "${slotLabel}". Please refund the payer manually.`,
+      message: `Automated refund failed 3 times for a duplicate payment of ${amountLabel} on slot "${slotLabel}". Please refund the payer manually.`,
       messageKey: "paymentRefundEscalatedNotifMessage",
       messageVars: { amount: amountLabel, slot: slotLabel },
       actionUrl: "/admin/payment-issues",

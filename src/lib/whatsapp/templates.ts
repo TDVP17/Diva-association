@@ -1,10 +1,7 @@
 import type { TontineType } from "@/generated/prisma/enums";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { TONTINE_TYPE_LABELS as TONTINE_LABELS } from "@/lib/tontine-labels";
-
-function formatXAF(amount: number): string {
-  return `${amount.toLocaleString("en-US")} F`;
-}
+import { formatXAF } from "@/lib/format-currency";
 
 export function reminderNoonMessage(
   lang: Lang,

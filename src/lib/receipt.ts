@@ -3,12 +3,9 @@ import path from "path";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { TontineType } from "@/generated/prisma/enums";
 import { TONTINE_TYPE_LABELS as TONTINE_LABELS } from "@/lib/tontine-labels";
+import { formatXAF } from "@/lib/format-currency";
 
 const ASSOCIATION_EMAIL = "divaassociation17@gmail.com";
-
-function formatXAF(amount: number): string {
-  return `${amount.toLocaleString("en-US")} F`;
-}
 
 export interface ReceiptData {
   /// The beneficiary — whose contribution this credits.

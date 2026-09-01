@@ -11,8 +11,14 @@ export default auth((req) => {
   const path = nextUrl.pathname;
   const session = req.auth;
 
+  // Role-aware, mirroring signInAction's post-login redirect (src/app/login/actions.ts)
+  // — an admin who lands back on /login with a still-valid session must not
+  // bounce through /dashboard first. Sending them there only for
+  // (app)/layout.tsx to immediately redirect again to /admin produced an
+  // extra hop that looked like a retry loop for admin accounts specifically.
   if (session?.user && path === "/login") {
-    return NextResponse.redirect(new URL("/dashboard", nextUrl));
+    const target = isAdminRole(session.user.role) ? "/admin" : "/dashboard";
+    return NextResponse.redirect(new URL(target, nextUrl));
   }
 
   if (!matchesPrefix(path, PROTECTED_PATH_PREFIXES)) {

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
+import { formatXAF } from "@/lib/format-currency";
 
 interface Quote {
   baseTotal: number;
@@ -179,19 +180,19 @@ export function PaymentConfirmDialog({
                 <div className="flex justify-between items-center">
                   <span className="font-body-md text-body-md text-on-surface-variant">{t("amountLabel")}</span>
                   <span className="font-label-md text-label-md text-on-surface">
-                    {quote.baseTotal.toLocaleString("en-US")} F
+                    {formatXAF(quote.baseTotal)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="font-body-md text-body-md text-on-surface-variant">{t("paymentFeeLabel")}</span>
                   <span className="font-label-md text-label-md text-on-surface">
-                    {quote.providerFeeAmount.toLocaleString("en-US")} F
+                    {formatXAF(quote.providerFeeAmount)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center border-t border-outline-variant pt-2 mt-1">
                   <span className="font-label-md text-label-md text-on-surface">{t("totalToBeDeductedLabel")}</span>
                   <span className="font-headline-sm text-headline-sm text-primary">
-                    {quote.totalCharged.toLocaleString("en-US")} F
+                    {formatXAF(quote.totalCharged)}
                   </span>
                 </div>
               </div>
@@ -241,7 +242,7 @@ export function PaymentConfirmDialog({
             <h2 className="font-headline-sm text-headline-sm text-on-surface">{t("waitingForUssdConfirmationTitle")}</h2>
             {quote && (
               <p className="font-label-md text-label-md text-on-surface">
-                {quote.totalCharged.toLocaleString("en-US")} F
+                {formatXAF(quote.totalCharged)}
               </p>
             )}
             <p className="font-label-sm text-label-sm text-on-surface-variant">
