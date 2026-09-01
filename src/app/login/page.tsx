@@ -36,9 +36,9 @@ async function signInWithGoogle(callbackUrl: string) {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ callbackUrl?: string; error?: string }>;
+  searchParams: Promise<{ callbackUrl?: string; error?: string; mode?: string }>;
 }) {
-  const { callbackUrl = "/dashboard", error } = await searchParams;
+  const { callbackUrl = "/dashboard", error, mode } = await searchParams;
   const signInWithGoogleAction = signInWithGoogle.bind(null, callbackUrl);
   const lang = await getLang();
 
@@ -73,6 +73,7 @@ export default async function LoginPage({
       isDev={isDev}
       oauthError={error}
       lang={lang}
+      initialMode={mode === "signup" ? "signup" : "signin"}
     />
   );
 }

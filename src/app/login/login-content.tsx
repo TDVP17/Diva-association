@@ -48,6 +48,7 @@ export function LoginContent({
   isDev,
   oauthError,
   lang,
+  initialMode,
 }: {
   callbackUrl: string;
   signInWithGoogleAction: () => Promise<void>;
@@ -55,6 +56,7 @@ export function LoginContent({
   isDev: boolean;
   oauthError?: string;
   lang: Lang;
+  initialMode?: "signin" | "signup";
 }) {
   const t = (key: TranslationKey) => translate(lang, key);
 
@@ -83,7 +85,7 @@ export function LoginContent({
 
         <OAuthErrorBanner error={oauthError} lang={lang} />
 
-        <CredentialsForm callbackUrl={callbackUrl} lang={lang} />
+        <CredentialsForm callbackUrl={callbackUrl} lang={lang} initialMode={initialMode} />
 
         <div className="relative z-10 flex items-center py-stack-gap-sm mt-stack-gap-lg">
           <div className="flex-grow border-t border-outline-variant" />

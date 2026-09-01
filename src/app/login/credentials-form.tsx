@@ -31,11 +31,13 @@ function PasswordField({
   label,
   minLength,
   lang,
+  autoComplete,
 }: {
   id: string;
   label: string;
   minLength?: number;
   lang: Lang;
+  autoComplete: "current-password" | "new-password";
 }) {
   const t = (key: TranslationKey) => translate(lang, key);
   const [visible, setVisible] = useState(false);
@@ -50,6 +52,7 @@ function PasswordField({
         placeholder=" "
         required
         minLength={minLength}
+        autoComplete={autoComplete}
       />
       <label className="floating-label" htmlFor={id}>
         {label}
@@ -68,9 +71,17 @@ function PasswordField({
   );
 }
 
-export function CredentialsForm({ callbackUrl, lang }: { callbackUrl: string; lang: Lang }) {
+export function CredentialsForm({
+  callbackUrl,
+  lang,
+  initialMode,
+}: {
+  callbackUrl: string;
+  lang: Lang;
+  initialMode?: "signin" | "signup";
+}) {
   const t = (key: TranslationKey) => translate(lang, key);
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "signup">(initialMode ?? "signin");
   const [signInState, signInFormAction] = useActionState(
     signInAction.bind(null, callbackUrl),
     initialState,
@@ -117,12 +128,13 @@ export function CredentialsForm({ callbackUrl, lang }: { callbackUrl: string; la
               type="email"
               placeholder=" "
               required
+              autoComplete="username"
             />
             <label className="floating-label" htmlFor="signin-email">
               {t("email")}
             </label>
           </div>
-          <PasswordField id="signin-password" label={t("password")} lang={lang} />
+          <PasswordField id="signin-password" label={t("password")} lang={lang} autoComplete="current-password" />
           {signInState.error && (
             <p className="font-label-sm text-label-sm text-error text-center">{signInState.error}</p>
           )}
@@ -138,6 +150,7 @@ export function CredentialsForm({ callbackUrl, lang }: { callbackUrl: string; la
               type="text"
               placeholder=" "
               required
+              autoComplete="name"
             />
             <label className="floating-label" htmlFor="signup-name">
               {t("fullName")}
@@ -151,12 +164,13 @@ export function CredentialsForm({ callbackUrl, lang }: { callbackUrl: string; la
               type="email"
               placeholder=" "
               required
+              autoComplete="email"
             />
             <label className="floating-label" htmlFor="signup-email">
               {t("email")}
             </label>
           </div>
-          <PasswordField id="signup-password" label={t("password")} minLength={6} lang={lang} />
+          <PasswordField id="signup-password" label={t("password")} minLength={6} lang={lang} autoComplete="new-password" />
           {signUpState.error && (
             <p className="font-label-sm text-label-sm text-error text-center">{signUpState.error}</p>
           )}
