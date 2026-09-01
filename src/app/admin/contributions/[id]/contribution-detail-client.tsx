@@ -8,6 +8,7 @@ import { getCycleDateForRound } from "@/lib/tontine-engine";
 import type { TontineType } from "@/generated/prisma/enums";
 import { NotificationsTab } from "./notifications-tab";
 import { ActivityTab } from "./activity-tab";
+import { LoadingSpinner } from "@/components/loading-spinner";
 import { MemberArchivesToggle } from "@/components/admin/member-archives-toggle";
 
 interface MembershipRequest {
@@ -493,7 +494,11 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   }
 
   if (!session) {
-    return <main className="px-container-padding py-stack-gap-lg max-w-4xl mx-auto">…</main>;
+    return (
+      <main className="px-container-padding py-stack-gap-lg max-w-4xl mx-auto">
+        <LoadingSpinner fullPage />
+      </main>
+    );
   }
 
   const drawUnlocked = session.drawDate ? new Date() >= new Date(session.drawDate) : false;

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { LoadingSpinner } from "@/components/loading-spinner";
 
 interface PayoutOrderRow {
   position: number | null;
@@ -64,7 +65,7 @@ export function PayoutOrderModal({ tontineSessionId, lang }: { tontineSessionId:
             <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md">{t("payoutOrderTitle")}</h2>
 
             {!rows ? (
-              <p className="font-label-sm text-label-sm text-on-surface-variant">…</p>
+              <LoadingSpinner className="py-6" />
             ) : rows.length === 0 ? (
               <p className="font-label-sm text-label-sm text-on-surface-variant">{t("notYetRevealed")}</p>
             ) : (

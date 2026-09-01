@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { LoadingSpinner } from "@/components/loading-spinner";
 
 interface Archive {
   id: string;
@@ -36,7 +37,7 @@ export function MemberArchivesToggle({ userId, lang }: { userId: string; lang: L
       {open && (
         <div className="mt-1 flex flex-col gap-1">
           {archives === null ? (
-            <p className="font-label-sm text-label-sm text-on-surface-variant">…</p>
+            <LoadingSpinner className="py-4" />
           ) : archives.length === 0 ? (
             <p className="font-label-sm text-label-sm text-on-surface-variant">—</p>
           ) : (

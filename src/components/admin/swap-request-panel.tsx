@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { LoadingSpinner } from "@/components/loading-spinner";
 
 interface SwapRequestRow {
   id: string;
@@ -45,7 +46,7 @@ export function SwapRequestPanel({ lang }: { lang: Lang }) {
   }
 
   if (!requests) {
-    return <p className="font-label-sm text-label-sm text-on-surface-variant">…</p>;
+    return <LoadingSpinner />;
   }
 
   if (requests.length === 0) {

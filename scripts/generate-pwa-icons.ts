@@ -60,11 +60,16 @@ async function main() {
   // square-then-pad-then-downscale sequence actually happens in order.
   //
   // Geometry always happens against a white backdrop (so contain/extend
-  // math and edge anti-aliasing stay identical either way) — "transparent"
-  // mode then chroma-keys that white away as a final step. "opaque" mode
-  // (apple-touch-icon, which iOS renders transparency as solid black on,
-  // and the maskable icons, which need a solid fill for the OS mask) keeps
-  // its real background color all the way through instead.
+  // math and edge anti-aliasing stay identical either way), and the white
+  // is ALWAYS chroma-keyed away afterward — including the white filling the
+  // mark's own negative space (inside the "D"/ring), not just the padding
+  // sharp added. Skipping that step for "opaque" mode was the previous bug:
+  // apple-touch-icon/maskable icons ended up with a visible white patch
+  // baked in behind the logo instead of the brand-green backdrop. "opaque"
+  // mode (apple-touch-icon, which iOS renders transparency as solid black
+  // on, and the maskable icons, which need a solid fill for the OS mask)
+  // now flattens the fully-transparent result onto the brand color as the
+  // last step, so the mark sits directly on green with no white anywhere.
   async function squareIcon(
     sizePx: number,
     paddingRatio: number,
@@ -74,16 +79,16 @@ async function main() {
   ) {
     const canvas = Math.round(markSize * (1 + paddingRatio * 2));
     const pad = Math.round((canvas - markSize) / 2);
-    const geometryBg = mode === "transparent" ? "#ffffff" : background;
 
     const squared = await sharp(leftHalf)
-      .resize({ width: markSize, height: markSize, fit: "contain", background: geometryBg })
+      .resize({ width: markSize, height: markSize, fit: "contain", background: "#ffffff" })
       .toBuffer();
     const padded = await sharp(squared)
-      .extend({ top: pad, bottom: pad, left: pad, right: pad, background: geometryBg })
+      .extend({ top: pad, bottom: pad, left: pad, right: pad, background: "#ffffff" })
       .toBuffer();
-    const resized = await sharp(padded).resize(sizePx, sizePx, { fit: "cover", background: geometryBg }).png().toBuffer();
-    const final = mode === "transparent" ? await chromaKeyWhite(resized) : resized;
+    const resized = await sharp(padded).resize(sizePx, sizePx, { fit: "cover", background: "#ffffff" }).png().toBuffer();
+    const transparent = await chromaKeyWhite(resized);
+    const final = mode === "transparent" ? transparent : await sharp(transparent).flatten({ background }).png().toBuffer();
     await sharp(final).toFile(path.join(OUT_DIR, fileName));
   }
 

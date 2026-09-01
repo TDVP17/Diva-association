@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { LoadingSpinner } from "@/components/loading-spinner";
 
 interface ContributionCard {
   id: string;
@@ -33,7 +34,7 @@ export function AdminContributionsClient({ lang }: { lang: Lang }) {
   }, []);
 
   if (!contributions) {
-    return <p className="font-label-sm text-label-sm text-on-surface-variant">…</p>;
+    return <LoadingSpinner fullPage />;
   }
 
   if (contributions.length === 0) {

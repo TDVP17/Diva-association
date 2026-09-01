@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { LoadingSpinner } from "@/components/loading-spinner";
 
 interface FoodRequestRow {
   id: string;
@@ -37,7 +38,7 @@ export function FoodRequestsClient({ lang }: { lang: Lang }) {
       </div>
 
       {rows === null ? (
-        <p className="font-label-sm text-label-sm text-on-surface-variant">…</p>
+        <LoadingSpinner fullPage />
       ) : rows.length === 0 ? (
         <p className="font-label-sm text-label-sm text-on-surface-variant">{t("noFoodTurnRequests")}</p>
       ) : (

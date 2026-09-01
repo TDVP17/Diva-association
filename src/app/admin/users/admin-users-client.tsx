@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { LoadingSpinner } from "@/components/loading-spinner";
 
 interface AdminUserRow {
   id: string;
@@ -55,7 +56,7 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
       </div>
 
       {!users ? (
-        <p className="font-label-sm text-label-sm text-on-surface-variant">…</p>
+        <LoadingSpinner fullPage />
       ) : users.length === 0 ? (
         <p className="font-label-sm text-label-sm text-on-surface-variant">{t("noUsersFound")}</p>
       ) : (
