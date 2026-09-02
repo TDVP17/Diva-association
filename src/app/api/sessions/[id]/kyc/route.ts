@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { prisma, withTransientRetry } from "@/lib/prisma";
 import { assertJoinable, sumRegisteredSlots } from "@/lib/session-joinability";
 import { isAdminRole } from "@/lib/constants";
 import { saveFile } from "@/lib/storage";
@@ -199,39 +199,43 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // even though no Membership row may exist yet to row-lock directly —
     // the second request then sees the first one's already-PENDING row and
     // exits without duplicating anything.
-    const result = await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`${session.user.id}:${tontineSessionId}`}))`;
+    const result = await withTransientRetry(
+      () =>
+        prisma.$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`${session.user.id}:${tontineSessionId}`}))`;
 
-      const fresh = await tx.membership.findUnique({
-        where: { userId_tontineSessionId: { userId: session.user.id, tontineSessionId } },
-      });
-      if (fresh && fresh.status !== "REJECTED") {
-        return { alreadyPending: true as const, status: fresh.status };
-      }
+          const fresh = await tx.membership.findUnique({
+            where: { userId_tontineSessionId: { userId: session.user.id, tontineSessionId } },
+          });
+          if (fresh && fresh.status !== "REJECTED") {
+            return { alreadyPending: true as const, status: fresh.status };
+          }
 
-      const membership = await tx.membership.upsert({
-        where: { userId_tontineSessionId: { userId: session.user.id, tontineSessionId } },
-        create: { userId: session.user.id, tontineSessionId, status: "PENDING" },
-        update: { status: "PENDING" },
-      });
+          const membership = await tx.membership.upsert({
+            where: { userId_tontineSessionId: { userId: session.user.id, tontineSessionId } },
+            create: { userId: session.user.id, tontineSessionId, status: "PENDING" },
+            update: { status: "PENDING" },
+          });
 
-      await tx.kycVerification.create({
-        data: {
-          userId: session.user.id,
-          tontineSessionId,
-          membershipId: membership.id,
-          documentType: "CNI",
-          status: "PENDING",
-          documentImageUrl: `/api/files/${documentFrontKey}`,
-          documentBackImageUrl: `/api/files/${documentBackKey}`,
-          selfieImageUrl: `/api/files/${selfieKey}`,
-          referrerName,
-          referrerPhone: referrerPhoneDigits,
-        },
-      });
+          await tx.kycVerification.create({
+            data: {
+              userId: session.user.id,
+              tontineSessionId,
+              membershipId: membership.id,
+              documentType: "CNI",
+              status: "PENDING",
+              documentImageUrl: `/api/files/${documentFrontKey}`,
+              documentBackImageUrl: `/api/files/${documentBackKey}`,
+              selfieImageUrl: `/api/files/${selfieKey}`,
+              referrerName,
+              referrerPhone: referrerPhoneDigits,
+            },
+          });
 
-      return { alreadyPending: false as const };
-    });
+          return { alreadyPending: false as const };
+        }),
+      "sessions/kyc membership+kycVerification transaction",
+    );
 
     if (result.alreadyPending) {
       return NextResponse.json({ status: result.status });

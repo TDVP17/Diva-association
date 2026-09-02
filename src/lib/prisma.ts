@@ -33,8 +33,22 @@ if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = rawPrisma;
 }
 
+// P1000 ("Authentication failed") is the one this was originally written
+// for, but the same underlying pooler flakiness surfaces under several
+// other codes too — P1001/P1002 (can't reach / timed out), P1008
+// (operation timed out), P1017 (server closed the connection), and raw
+// driver-level codes (@prisma/adapter-pg passes node-postgres/network
+// errors through more directly than the old query-engine binary did) like
+// ECONNREFUSED, ECONNRESET, ETIMEDOUT, EPIPE. Restricting the match to only
+// P1000 meant a real transient failure under any of these other codes
+// propagated straight through as an unhandled 500 instead of being retried.
+const TRANSIENT_PRISMA_CODES = new Set(["P1000", "P1001", "P1002", "P1008", "P1017"]);
+const TRANSIENT_DRIVER_CODES = new Set(["ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "EPIPE"]);
+
 function isTransientConnectionError(err: unknown): boolean {
-  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P1000";
+  if (err instanceof Prisma.PrismaClientKnownRequestError && TRANSIENT_PRISMA_CODES.has(err.code)) return true;
+  const code = (err as { code?: unknown } | null)?.code;
+  return typeof code === "string" && TRANSIENT_DRIVER_CODES.has(code);
 }
 
 // Every query gets automatic retries on the specific "pooled connection
@@ -48,21 +62,36 @@ const RETRY_DELAYS_MS = [200, 500, 1000];
 export const prisma = rawPrisma.$extends({
   query: {
     async $allOperations({ model, operation, args, query }) {
-      let lastErr: unknown;
-      for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
-        try {
-          return await query(args);
-        } catch (err) {
-          if (!isTransientConnectionError(err)) throw err;
-          lastErr = err;
-          if (attempt === RETRY_DELAYS_MS.length) break;
-          console.warn(
-            `[prisma] transient connection error on ${model}.${operation}, retrying (attempt ${attempt + 1}/${RETRY_DELAYS_MS.length})`,
-          );
-          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
-        }
-      }
-      throw lastErr;
+      return withTransientRetry(() => query(args), `${model}.${operation}`);
     },
   },
 });
+
+/**
+ * Retries a full async operation from scratch on the same transient-
+ * connection error class $allOperations handles for single queries above —
+ * needed separately because that per-query wrapping can't help
+ * prisma.$transaction(): an interactive transaction holds one connection
+ * for its whole callback, so if THAT connection is one of the pool's
+ * sometimes-dead-on-first-use ones, retrying a query inside the callback
+ * just retries against the same broken connection. Wrap the *entire*
+ * $transaction(...) call in this instead — a fresh attempt acquires a new
+ * connection from the pool, same as a retried standalone query does.
+ */
+export async function withTransientRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (!isTransientConnectionError(err)) throw err;
+      lastErr = err;
+      if (attempt === RETRY_DELAYS_MS.length) break;
+      console.warn(
+        `[prisma] transient connection error on ${label}, retrying (attempt ${attempt + 1}/${RETRY_DELAYS_MS.length})`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
+    }
+  }
+  throw lastErr;
+}

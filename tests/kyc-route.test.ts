@@ -26,6 +26,9 @@ vi.mock("@/lib/prisma", () => ({
         kycVerification: { create: (...a: unknown[]) => txCreateKycVerification(...a) },
       }),
   },
+  // Passthrough — the retry behavior itself is covered by dedicated tests
+  // in tests/prisma-retry.test.ts, not re-verified at every call site.
+  withTransientRetry: async (fn: () => unknown) => fn(),
 }));
 
 const saveFile = vi.fn();

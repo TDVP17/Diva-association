@@ -112,97 +112,107 @@ export function KycModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-container-padding bg-black/50">
-      <div className="w-full max-w-sm bg-white rounded-2xl p-5 shadow-xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="material-symbols-outlined text-primary">verified_user</span>
-          <h2 className="font-title-md text-title-md text-on-surface">{t("identityVerification")}</h2>
-        </div>
-        <p className="font-body-md text-body-md text-on-surface-variant mb-stack-gap-md">
-          {t("identityVerificationBody")}
-        </p>
+    // z-[60] — deliberately above BottomNav's z-50 (public/... bottom-nav.tsx
+    // is fixed, z-50, and DOM-appears after page content) so this modal
+    // always paints on top of it instead of the nav bar covering the modal's
+    // own footer. max-h reserves room for the nav (h-20 + safe-area inset)
+    // so the box itself never even reaches that far, on top of the z-index
+    // guarantee — belt and suspenders after the buttons were getting hidden
+    // behind the nav on short mobile viewports.
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-container-padding bg-black/50">
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl max-h-[calc(100dvh-7rem)] flex flex-col overflow-hidden">
+        <div className="flex-1 overflow-y-auto p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="material-symbols-outlined text-primary">verified_user</span>
+            <h2 className="font-title-md text-title-md text-on-surface">{t("identityVerification")}</h2>
+          </div>
+          <p className="font-body-md text-body-md text-on-surface-variant mb-stack-gap-md">
+            {t("identityVerificationBody")}
+          </p>
 
-        <p className="font-label-sm text-label-sm text-error mb-stack-gap-md flex items-start gap-1.5">
-          <span className="material-symbols-outlined text-[16px] flex-shrink-0 mt-0.5">info</span>
-          {t("cniCountryWarning")}
-        </p>
+          <p className="font-label-sm text-label-sm text-error mb-stack-gap-md flex items-start gap-1.5">
+            <span className="material-symbols-outlined text-[16px] flex-shrink-0 mt-0.5">info</span>
+            {t("cniCountryWarning")}
+          </p>
 
-        <div className="flex flex-col gap-stack-gap-sm mb-stack-gap-md">
-          <PhotoPicker
-            label={t("documentFrontPhotoLabel")}
-            file={documentFrontFile}
-            onChange={setDocumentFrontFile}
-            captureMode="environment"
-            chooseLabel={t("choosePhotoAction")}
-            selectedLabel={t("photoSelectedLabel")}
-          />
-          <PhotoPicker
-            label={t("documentBackPhotoLabel")}
-            file={documentBackFile}
-            onChange={setDocumentBackFile}
-            captureMode="environment"
-            chooseLabel={t("choosePhotoAction")}
-            selectedLabel={t("photoSelectedLabel")}
-          />
-          <PhotoPicker
-            label={t("selfiePhotoLabel")}
-            file={selfieFile}
-            onChange={setSelfieFile}
-            captureMode="user"
-            chooseLabel={t("choosePhotoAction")}
-            selectedLabel={t("photoSelectedLabel")}
-          />
-        </div>
-
-        <div className="flex flex-col gap-stack-gap-sm mb-stack-gap-md">
-          <div>
-            <label htmlFor="referrer-name" className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
-              {t("referrerNameLabel")}
-            </label>
-            <input
-              id="referrer-name"
-              type="text"
-              value={referrerName}
-              onChange={(e) => setReferrerName(e.target.value)}
-              placeholder={t("referrerNamePlaceholder")}
-              className="w-full border border-outline-variant rounded-lg px-3 py-2.5 font-body-md text-body-md text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+          <div className="flex flex-col gap-stack-gap-sm mb-stack-gap-md">
+            <PhotoPicker
+              label={t("documentFrontPhotoLabel")}
+              file={documentFrontFile}
+              onChange={setDocumentFrontFile}
+              captureMode="environment"
+              chooseLabel={t("choosePhotoAction")}
+              selectedLabel={t("photoSelectedLabel")}
+            />
+            <PhotoPicker
+              label={t("documentBackPhotoLabel")}
+              file={documentBackFile}
+              onChange={setDocumentBackFile}
+              captureMode="environment"
+              chooseLabel={t("choosePhotoAction")}
+              selectedLabel={t("photoSelectedLabel")}
+            />
+            <PhotoPicker
+              label={t("selfiePhotoLabel")}
+              file={selfieFile}
+              onChange={setSelfieFile}
+              captureMode="user"
+              chooseLabel={t("choosePhotoAction")}
+              selectedLabel={t("photoSelectedLabel")}
             />
           </div>
-          <div>
-            <label htmlFor="referrer-phone" className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
-              {t("referrerPhoneLabel")}
-            </label>
-            <input
-              id="referrer-phone"
-              type="tel"
-              inputMode="tel"
-              value={referrerPhone}
-              onChange={(e) => setReferrerPhone(e.target.value)}
-              placeholder={t("referrerPhonePlaceholder")}
-              className="w-full border border-outline-variant rounded-lg px-3 py-2.5 font-body-md text-body-md text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
-            />
+
+          <div className="flex flex-col gap-stack-gap-sm">
+            <div>
+              <label htmlFor="referrer-name" className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                {t("referrerNameLabel")}
+              </label>
+              <input
+                id="referrer-name"
+                type="text"
+                value={referrerName}
+                onChange={(e) => setReferrerName(e.target.value)}
+                placeholder={t("referrerNamePlaceholder")}
+                className="w-full border border-outline-variant rounded-lg px-3 py-2.5 font-body-md text-body-md text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+              />
+            </div>
+            <div>
+              <label htmlFor="referrer-phone" className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                {t("referrerPhoneLabel")}
+              </label>
+              <input
+                id="referrer-phone"
+                type="tel"
+                inputMode="tel"
+                value={referrerPhone}
+                onChange={(e) => setReferrerPhone(e.target.value)}
+                placeholder={t("referrerPhonePlaceholder")}
+                className="w-full border border-outline-variant rounded-lg px-3 py-2.5 font-body-md text-body-md text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+              />
+            </div>
           </div>
         </div>
 
-        {error && <p className="font-label-sm text-label-sm text-error mb-stack-gap-sm">{error}</p>}
-
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={submitting}
-            className="flex-1 py-2.5 rounded-lg border border-outline-variant text-on-surface-variant font-label-md text-label-md hover:bg-surface-container-low transition-all disabled:opacity-60"
-          >
-            {t("cancel")}
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={submitting || !canSubmit}
-            className="flex-1 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-60"
-          >
-            {submitting ? t("submittingEllipsis") : t("submitForReview")}
-          </button>
+        <div className="flex-shrink-0 p-5 pt-3 border-t border-surface-variant">
+          {error && <p className="font-label-sm text-label-sm text-error mb-stack-gap-sm">{error}</p>}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 py-2.5 rounded-lg border border-outline-variant text-on-surface-variant font-label-md text-label-md hover:bg-surface-container-low transition-all disabled:opacity-60"
+            >
+              {t("cancel")}
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={submitting || !canSubmit}
+              className="flex-1 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-60"
+            >
+              {submitting ? t("submittingEllipsis") : t("submitForReview")}
+            </button>
+          </div>
         </div>
       </div>
     </div>
