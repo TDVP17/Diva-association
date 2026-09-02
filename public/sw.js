@@ -18,7 +18,7 @@
 //     principle the original version of this file was built around, now
 //     scoped precisely to the calls where staleness would actually mislead
 //     someone, instead of blocking page-shell caching entirely.
-const CACHE_NAME = "diva-shell-v2";
+const CACHE_NAME = "diva-shell-v3";
 const STATIC_ASSETS = ["/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png", "/offline.html"];
 
 self.addEventListener("install", (event) => {
@@ -66,7 +66,15 @@ self.addEventListener("fetch", (event) => {
           cached ??
           fetch(request)
             .then((res) => {
-              if (res.ok) caches.open(CACHE_NAME).then((cache) => cache.put(request, res.clone()));
+              // Must clone synchronously, in this same tick — event.respondWith
+              // hands `res` to the browser to start consuming as soon as this
+              // callback returns, and caches.open() is async, so cloning
+              // inside its .then() risked losing the race and throwing
+              // "Response body is already used" (seen in production).
+              if (res.ok) {
+                const copy = res.clone();
+                caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+              }
               return res;
             })
             .catch((err) => {
@@ -82,7 +90,10 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request)
         .then((res) => {
-          if (res.ok) caches.open(CACHE_NAME).then((cache) => cache.put(request, res.clone()));
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          }
           return res;
         })
         .catch(async () => {
