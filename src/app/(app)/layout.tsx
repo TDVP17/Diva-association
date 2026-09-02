@@ -7,6 +7,7 @@ import { BackBar } from "@/components/back-bar";
 import { BottomNav } from "@/components/bottom-nav";
 import { MemberSidebar } from "@/components/member-sidebar";
 import { IosInstallBanner } from "@/components/ios-install-banner";
+import { InstallPromptModal } from "@/components/install-prompt-modal";
 import { TutorialPopup } from "@/components/tutorial-popup";
 import { NotificationBadgeSync } from "@/components/notification-badge-sync";
 import { isAdminRole } from "@/lib/constants";
@@ -47,6 +48,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </div>
       <BottomNav lang={lang} />
       <IosInstallBanner lang={lang} />
+      <InstallPromptModal lang={lang} />
       <TutorialPopup lang={lang} />
       <NotificationBadgeSync />
     </div>

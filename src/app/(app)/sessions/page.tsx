@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { assertJoinable, sumRegisteredSlots } from "@/lib/session-joinability";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
+import { HideClosedSessionButton } from "./hide-closed-session-button";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -24,10 +25,11 @@ export default async function SessionsPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
   const userId = session.user.id;
-  const t = getTranslator(await getLang());
+  const lang = await getLang();
+  const t = getTranslator(lang);
 
   const memberships = await prisma.membership.findMany({
-    where: { userId },
+    where: { userId, hiddenByMemberAt: null },
     include: { tontineSession: true, slots: true },
     orderBy: { joinedAt: "desc" },
   });
@@ -51,9 +53,18 @@ export default async function SessionsPage() {
   return (
     <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-6xl mx-auto w-full flex flex-col gap-section-margin">
       <section>
-        <h2 className="sticky top-16 z-30 bg-background py-2 -mx-container-padding px-container-padding font-title-md text-title-md text-primary mb-stack-gap-md shadow-[0px_4px_20px_rgba(30,41,59,0.05)]">
-          {t("mySessions")}
-        </h2>
+        <div className="sticky top-16 z-30 bg-background py-2 -mx-container-padding px-container-padding mb-stack-gap-md shadow-[0px_4px_20px_rgba(30,41,59,0.05)] flex items-center justify-between gap-2">
+          <h2 className="font-title-md text-title-md text-primary">{t("mySessions")}</h2>
+          {memberships.length > 0 && (
+            <Link
+              href="/global-payment"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary font-label-sm text-label-sm hover:bg-primary/20 transition-colors flex-shrink-0"
+            >
+              <span className="material-symbols-outlined text-[16px]">account_balance_wallet</span>
+              {t("globalPaymentNavLabel")}
+            </Link>
+          )}
+        </div>
         {memberships.length === 0 ? (
           <div className="bg-white rounded-xl p-8 text-center shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant flex flex-col items-center gap-stack-gap-sm">
             <span className="material-symbols-outlined text-outline text-[40px]">group_add</span>
@@ -62,12 +73,12 @@ export default async function SessionsPage() {
         ) : (
           <div className="flex flex-col gap-stack-gap-md lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-stack-gap-md">
             {memberships.map((m) => (
-              <Link
+              <div
                 key={m.id}
-                href={`/sessions/${m.tontineSession.id}`}
-                className="bg-white rounded-xl p-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant flex items-center justify-between hover:bg-surface-container-low transition-colors"
+                className="relative bg-white rounded-xl p-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant flex items-center justify-between hover:bg-surface-container-low transition-colors"
               >
-                <div>
+                <Link href={`/sessions/${m.tontineSession.id}`} className="absolute inset-0 rounded-xl" />
+                <div className="pointer-events-none">
                   <h3 className="font-label-md text-label-md text-on-surface">
                     {m.tontineSession.title || TONTINE_LABELS[m.tontineSession.type]}
                   </h3>
@@ -81,12 +92,17 @@ export default async function SessionsPage() {
                         : t("requestRejected")}
                   </p>
                 </div>
-                <span
-                  className={`font-label-sm text-label-sm px-2 py-1 rounded ${STATUS_STYLES[m.tontineSession.status]}`}
-                >
-                  {m.tontineSession.status}
-                </span>
-              </Link>
+                <div className="relative z-10 flex items-center gap-1 flex-shrink-0">
+                  <span
+                    className={`font-label-sm text-label-sm px-2 py-1 rounded pointer-events-none ${STATUS_STYLES[m.tontineSession.status]}`}
+                  >
+                    {m.tontineSession.status}
+                  </span>
+                  {m.tontineSession.status === "CLOSED" && (
+                    <HideClosedSessionButton membershipId={m.id} lang={lang} />
+                  )}
+                </div>
+              </div>
             ))}
           </div>
         )}

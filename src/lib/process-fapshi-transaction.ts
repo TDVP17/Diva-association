@@ -61,6 +61,9 @@ async function handleSuccessful(
   if (attempt?.fineId) {
     return await settleOrFlagFine(attempt);
   }
+  if (attempt?.bulkPaymentId) {
+    return await settleBulkPayment(attempt, verified, origin);
+  }
 
   // No ledger row — a transaction initiated before the PaymentAttempt table
   // existed. Falls back to the old direct-match-by-fapshiTxRef behavior;
@@ -170,6 +173,70 @@ async function settleOrFlagFine(attempt: PaymentAttempt): Promise<ProcessedTrans
   return { status: "SUCCESSFUL" };
 }
 
+/**
+ * Settles a Global Payment: one Fapshi transId claims every Contribution
+ * linked to this BulkPayment at once. No duplicate/refund branch is needed
+ * here (unlike settleOrFlagContribution) — initiateBulkPayment locks every
+ * membership_slot row before creating these PENDING contributions, and
+ * initiateSlotPayment's own in-flight guard checks that same PENDING+
+ * fapshiTxRef window, so a slot bundled into a bulk payment can't also be
+ * independently claimed by a competing single-slot payment in the meantime.
+ * A contribution found already PAID here is skipped, not flagged, on the
+ * assumption it was settled out-of-band (e.g. an admin manual override).
+ */
+async function settleBulkPayment(
+  attempt: PaymentAttempt,
+  verified: PaymentStatusResult,
+  origin: string,
+): Promise<ProcessedTransaction> {
+  const transId = attempt.transId;
+  const paidAt = verified.dateConfirmed ? new Date(verified.dateConfirmed) : new Date();
+
+  const outcome = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM bulk_payments WHERE id = ${attempt.bulkPaymentId} FOR UPDATE`;
+    const fresh = await tx.bulkPayment.findUnique({ where: { id: attempt.bulkPaymentId! } });
+    if (!fresh) return { kind: "missing" as const };
+    if (fresh.status === "SUCCESSFUL") return { kind: "alreadyProcessed" as const };
+
+    const contributions = await tx.contribution.findMany({ where: { bulkPaymentId: fresh.id } });
+    for (const c of contributions) {
+      await tx.$queryRaw`SELECT id FROM contributions WHERE id = ${c.id} FOR UPDATE`;
+    }
+    const claimedIds: string[] = [];
+    for (const c of contributions) {
+      if (c.status === "PAID") continue;
+      await tx.contribution.update({ where: { id: c.id }, data: { status: "PAID", paidAt, fapshiTxRef: transId } });
+      claimedIds.push(c.id);
+    }
+    await tx.bulkPayment.update({ where: { id: fresh.id }, data: { status: "SUCCESSFUL" } });
+    return { kind: "winner" as const, claimedIds };
+  });
+
+  if (outcome.kind === "missing") return { status: "SUCCESSFUL" };
+
+  if (outcome.kind === "alreadyProcessed") {
+    await prisma.paymentAttempt.updateMany({
+      where: { id: attempt.id, status: { notIn: ["REFUNDED", "REFUND_INITIATED"] } },
+      data: { status: "SUCCESSFUL" },
+    });
+    return { status: "SUCCESSFUL", alreadyProcessed: true };
+  }
+
+  const contributions = await prisma.contribution.findMany({
+    where: { id: { in: outcome.claimedIds } },
+    include: {
+      membershipSlot: { include: { membership: { include: { user: true, tontineSession: true } } } },
+      paidByUser: true,
+    },
+  });
+  for (const contribution of contributions) {
+    await settleContribution(contribution, { paidAt, origin });
+  }
+
+  await prisma.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "SUCCESSFUL" } });
+  return { status: "SUCCESSFUL" };
+}
+
 async function flagDuplicate(attempt: PaymentAttempt, slotLabel: string): Promise<void> {
   await prisma.paymentAttempt.update({
     where: { id: attempt.id },
@@ -231,6 +298,37 @@ async function handleFailedOrExpired(transId: string, verified: PaymentStatusRes
     where: { transId, status: "PENDING" },
     data: { status: verified.status === "FAILED" ? "FAILED" : "EXPIRED" },
   });
+
+  // Bulk-paid contributions never get their own fapshiTxRef set until the
+  // payment actually succeeds (see settleBulkPayment), so a failed/expired
+  // Global Payment has to be looked up by BulkPayment.transId instead of the
+  // fapshiTxRef-based lookups below.
+  const bulkPayment = await prisma.bulkPayment.findUnique({ where: { transId } });
+  if (bulkPayment && bulkPayment.status !== "SUCCESSFUL" && bulkPayment.status !== "FAILED") {
+    await prisma.bulkPayment.update({ where: { id: bulkPayment.id }, data: { status: "FAILED", failureReason } });
+    const failedContributions = await prisma.contribution.findMany({
+      where: { bulkPaymentId: bulkPayment.id, status: { notIn: ["PAID", "FAILED"] } },
+    });
+    if (failedContributions.length > 0) {
+      await prisma.contribution.updateMany({
+        where: { id: { in: failedContributions.map((c) => c.id) } },
+        data: { status: "FAILED", failureReason },
+      });
+      const amount = Number(bulkPayment.amount);
+      await scheduleInAppNotifications({
+        type: "PAYMENT_FAILED",
+        recipients: [
+          {
+            userId: bulkPayment.userId,
+            message: `Your combined payment of ${formatXAF(amount)} for ${failedContributions.length} names did not go through. Please try again.`,
+            messageKey: "bulkPaymentFailedNotifMessage",
+            messageVars: { amount: formatXAF(amount), count: String(failedContributions.length) },
+            actionUrl: "/sessions",
+          },
+        ],
+      });
+    }
+  }
 
   const contribution = await prisma.contribution.findUnique({
     where: { fapshiTxRef: transId },

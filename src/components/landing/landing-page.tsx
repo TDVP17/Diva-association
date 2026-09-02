@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LanguageToggle } from "@/components/language-toggle";
+import { InstallPromptModal } from "@/components/install-prompt-modal";
 import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 import type { PublicStats } from "@/lib/landing-stats";
 
@@ -29,6 +30,7 @@ export function LandingPage({ lang, stats }: { lang: Lang; stats: PublicStats })
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <InstallPromptModal lang={lang} />
       {/* Header */}
       <header className="w-full sticky top-0 z-40 bg-surface/95 backdrop-blur-sm border-b border-outline-variant/30">
         <div className="max-w-6xl mx-auto px-container-padding h-16 flex items-center justify-between">

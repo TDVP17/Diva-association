@@ -11,12 +11,13 @@ export function AppLoadingScreen({ lang }: { lang: Lang }) {
   const t = (key: Parameters<typeof translate>[1]) => translate(lang, key);
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background px-container-padding">
+    <main className="min-h-screen w-full flex flex-col items-center justify-center gap-4 bg-background px-container-padding text-center">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/icons/icon-512.png" alt="DIVA Association" className="w-20 h-20 rounded-2xl shadow-md" />
-      <h1 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary tracking-tight text-center">
-        DIVA Association
-      </h1>
+      <img src="/icons/icon-512.png" alt="" className="w-32 h-32 sm:w-36 sm:h-36 rounded-3xl shadow-lg" />
+      <div className="flex flex-col items-center leading-tight">
+        <span className="font-display-lg text-display-lg text-primary tracking-tight">DIVA</span>
+        <span className="font-headline-lg text-headline-lg text-secondary tracking-wide -mt-1">Association</span>
+      </div>
       <span
         aria-hidden
         className="w-8 h-8 border-4 border-surface-variant border-t-primary rounded-full animate-spin mt-2"

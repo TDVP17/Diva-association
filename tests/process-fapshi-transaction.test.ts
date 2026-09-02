@@ -14,12 +14,19 @@ const findUniqueContribution = vi.fn();
 const updateContribution = vi.fn();
 const findUniqueFine = vi.fn();
 const updateFine = vi.fn();
+const findUniqueBulkPayment = vi.fn().mockResolvedValue(null);
+const updateBulkPayment = vi.fn();
+const findManyContribution = vi.fn().mockResolvedValue([]);
+const updateManyContribution = vi.fn();
 
 const txQueryRaw = vi.fn().mockResolvedValue(undefined);
 const txFindUniqueContribution = vi.fn();
 const txUpdateContribution = vi.fn();
 const txFindUniqueFine = vi.fn();
 const txUpdateFine = vi.fn();
+const txFindManyContribution = vi.fn().mockResolvedValue([]);
+const txFindUniqueBulkPayment = vi.fn();
+const txUpdateBulkPayment = vi.fn();
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -32,10 +39,16 @@ vi.mock("@/lib/prisma", () => ({
     contribution: {
       findUnique: (...a: unknown[]) => findUniqueContribution(...a),
       update: (...a: unknown[]) => updateContribution(...a),
+      findMany: (...a: unknown[]) => findManyContribution(...a),
+      updateMany: (...a: unknown[]) => updateManyContribution(...a),
     },
     fine: {
       findUnique: (...a: unknown[]) => findUniqueFine(...a),
       update: (...a: unknown[]) => updateFine(...a),
+    },
+    bulkPayment: {
+      findUnique: (...a: unknown[]) => findUniqueBulkPayment(...a),
+      update: (...a: unknown[]) => updateBulkPayment(...a),
     },
     $transaction: async (cb: (tx: unknown) => unknown) =>
       cb({
@@ -43,10 +56,15 @@ vi.mock("@/lib/prisma", () => ({
         contribution: {
           findUnique: (...a: unknown[]) => txFindUniqueContribution(...a),
           update: (...a: unknown[]) => txUpdateContribution(...a),
+          findMany: (...a: unknown[]) => txFindManyContribution(...a),
         },
         fine: {
           findUnique: (...a: unknown[]) => txFindUniqueFine(...a),
           update: (...a: unknown[]) => txUpdateFine(...a),
+        },
+        bulkPayment: {
+          findUnique: (...a: unknown[]) => txFindUniqueBulkPayment(...a),
+          update: (...a: unknown[]) => txUpdateBulkPayment(...a),
         },
       }),
   },
@@ -170,5 +188,82 @@ describe("processFapshiTransaction — contribution duplicate detection", () => 
     expect(updateManyPaymentAttempt).toHaveBeenCalledWith(
       expect.objectContaining({ where: { transId: "tx-1", status: "PENDING" }, data: { status: "FAILED" } }),
     );
+  });
+});
+
+describe("processFapshiTransaction — bulk (Global Payment) settlement", () => {
+  const bulkAttempt = {
+    id: "pa-bulk-1",
+    transId: "tx-bulk-1",
+    contributionId: null,
+    fineId: null,
+    bulkPaymentId: "bulk-1",
+    payerPhone: "677123456",
+    amount: 5200,
+    refundAttempts: 0,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    txQueryRaw.mockResolvedValue(undefined);
+    txFindManyContribution.mockResolvedValue([]);
+  });
+
+  it("claims the BulkPayment and settles every linked Contribution exactly once", async () => {
+    findUniquePaymentAttempt.mockResolvedValue(bulkAttempt);
+    getPaymentStatus.mockResolvedValue({ status: "SUCCESSFUL", dateConfirmed: "2026-01-01T00:00:00Z" });
+    txFindUniqueBulkPayment.mockResolvedValue({ id: "bulk-1", status: "PENDING" });
+    txFindManyContribution.mockResolvedValue([
+      { id: "c1", status: "PENDING" },
+      { id: "c2", status: "PENDING" },
+    ]);
+    txUpdateContribution.mockResolvedValue({});
+    txUpdateBulkPayment.mockResolvedValue({});
+    findManyContribution.mockResolvedValue([
+      { id: "c1", membershipSlot: { beneficiaryName: "A" }, paidByUser: null },
+      { id: "c2", membershipSlot: { beneficiaryName: "B" }, paidByUser: null },
+    ]);
+
+    const result = await processFapshiTransaction("tx-bulk-1", "http://x");
+
+    expect(result).toEqual({ status: "SUCCESSFUL" });
+    expect(txUpdateContribution).toHaveBeenCalledTimes(2);
+    expect(txUpdateBulkPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "bulk-1" }, data: expect.objectContaining({ status: "SUCCESSFUL" }) }),
+    );
+    expect(settleContribution).toHaveBeenCalledTimes(2);
+    expect(updatePaymentAttempt).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: "SUCCESSFUL" } }),
+    );
+  });
+
+  it("returns alreadyProcessed without re-settling when this BulkPayment was already claimed", async () => {
+    findUniquePaymentAttempt.mockResolvedValue(bulkAttempt);
+    getPaymentStatus.mockResolvedValue({ status: "SUCCESSFUL", dateConfirmed: null });
+    txFindUniqueBulkPayment.mockResolvedValue({ id: "bulk-1", status: "SUCCESSFUL" });
+
+    const result = await processFapshiTransaction("tx-bulk-1", "http://x");
+
+    expect(result).toEqual({ status: "SUCCESSFUL", alreadyProcessed: true });
+    expect(settleContribution).not.toHaveBeenCalled();
+    expect(txUpdateContribution).not.toHaveBeenCalled();
+  });
+
+  it("skips a linked contribution that's already PAID out-of-band instead of re-settling it", async () => {
+    findUniquePaymentAttempt.mockResolvedValue(bulkAttempt);
+    getPaymentStatus.mockResolvedValue({ status: "SUCCESSFUL", dateConfirmed: null });
+    txFindUniqueBulkPayment.mockResolvedValue({ id: "bulk-1", status: "PENDING" });
+    txFindManyContribution.mockResolvedValue([
+      { id: "c1", status: "PAID" },
+      { id: "c2", status: "PENDING" },
+    ]);
+    txUpdateContribution.mockResolvedValue({});
+    txUpdateBulkPayment.mockResolvedValue({});
+    findManyContribution.mockResolvedValue([{ id: "c2", membershipSlot: { beneficiaryName: "B" }, paidByUser: null }]);
+
+    await processFapshiTransaction("tx-bulk-1", "http://x");
+
+    expect(txUpdateContribution).toHaveBeenCalledTimes(1);
+    expect(settleContribution).toHaveBeenCalledTimes(1);
   });
 });

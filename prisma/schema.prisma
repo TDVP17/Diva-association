@@ -215,13 +215,48 @@ model PaymentAttempt {
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
 
+  /// Set instead of contributionId/fineId when this attempt paid for a
+  /// BulkPayment (several slots' current-cycle contributions in one Fapshi
+  /// transaction) rather than a single Contribution/Fine.
+  bulkPaymentId String?
+
   contribution Contribution? @relation(fields: [contributionId], references: [id], onDelete: SetNull)
   fine         Fine?         @relation(fields: [fineId], references: [id], onDelete: SetNull)
+  bulkPayment  BulkPayment?  @relation(fields: [bulkPaymentId], references: [id], onDelete: SetNull)
 
   @@index([contributionId])
   @@index([fineId])
+  @@index([bulkPaymentId])
   @@index([status, nextRefundAttemptAt])
   @@map("payment_attempts")
+}
+
+/// One combined Fapshi transaction covering several MembershipSlots'
+/// current-cycle Contributions at once — e.g. a member holding 3 named
+/// slots under one membership (or across several) paying all 3 in a
+/// single USSD prompt instead of three separate ones. Deliberately scoped
+/// to Contributions only, not Fines, which stay on the existing per-fine
+/// payment flow. See src/lib/initiate-bulk-payment.ts.
+model BulkPayment {
+  id            String               @id @default(cuid())
+  userId        String
+  /// Null until the Fapshi call succeeds — the row is created first (inside
+  /// the same row-locked transaction that claims every included slot) so
+  /// the anti-race check-and-claim pattern matches single-slot payments.
+  transId       String?              @unique
+  payerPhone    String
+  amount        Decimal              @db.Decimal(12, 2)
+  status        PaymentAttemptStatus @default(PENDING)
+  failureReason String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contributions   Contribution[]
+  paymentAttempts PaymentAttempt[]
+
+  @@index([userId, createdAt])
+  @@map("bulk_payments")
 }
 
 model User {
@@ -264,6 +299,7 @@ model User {
   memberships                  Membership[]
   contributionsRecordedAsAdmin Contribution[]        @relation("ContributionRecordedByAdmin")
   paymentsMadeForOthers        Contribution[]        @relation("ContributionPaidBy")
+  bulkPayments                 BulkPayment[]
   swapRequestsMade             PositionSwapRequest[] @relation("SwapRequester")
   swapRequestsReceived         PositionSwapRequest[] @relation("SwapTarget")
   messagesSent                 ChatMessage[]         @relation("MessageSender")
@@ -418,6 +454,12 @@ model Membership {
   /// Optional, admin-entered when rejecting a join request — shown to the
   /// member in their rejection notification when present.
   rejectionReason  String?          @db.Text
+  /// Set when the member dismisses this membership from their own /sessions
+  /// view after the admin has closed the cotisation (tontineSession.status
+  /// = CLOSED) — purely a per-member display preference, never touches the
+  /// underlying data, and only takes effect once the session is actually
+  /// closed (dismissing an active one has no route to set this).
+  hiddenByMemberAt DateTime?
 
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   tontineSession  TontineSession   @relation(fields: [tontineSessionId], references: [id], onDelete: Cascade)
@@ -593,13 +635,18 @@ model Contribution {
   /// The President's cut of providerFeeAmount (e.g. Fapshi's 0.3%).
   /// President-only visibility, enforced server-side.
   presidentFeeShareAmount Decimal?           @db.Decimal(12, 2)
+  /// Set when this contribution was paid as part of a combined Global
+  /// Payment (see BulkPayment) rather than individually.
+  bulkPaymentId           String?
 
   membershipSlot  MembershipSlot @relation(fields: [membershipSlotId], references: [id], onDelete: Cascade)
   recordedByAdmin User?          @relation("ContributionRecordedByAdmin", fields: [recordedByAdminId], references: [id])
   paidByUser      User?          @relation("ContributionPaidBy", fields: [paidByUserId], references: [id])
+  bulkPayment     BulkPayment?   @relation(fields: [bulkPaymentId], references: [id], onDelete: SetNull)
   paymentAttempts PaymentAttempt[]
 
   @@unique([membershipSlotId, dueDate])
+  @@index([bulkPaymentId])
   @@map("contributions")
 }
 
