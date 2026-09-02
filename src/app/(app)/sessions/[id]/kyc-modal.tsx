@@ -1,9 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { translate, type Lang } from "@/lib/i18n/translations";
+import { translate, translateIfKnown, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
-import { compressImage } from "@/lib/compress-image";
+import { compressImage, formatImageSize, ImageTooLargeError, MAX_OUTPUT_BYTES } from "@/lib/compress-image";
+
+// Maps the server's/compressImage's field identifiers to the already-
+// user-facing label for that photo, so a validation error can name exactly
+// which of the 3 uploads failed ("Front of your CNI is too large…") in
+// whichever language is currently selected — never a raw field name.
+const FIELD_LABEL_KEY: Record<string, TranslationKey> = {
+  documentImage: "documentFrontPhotoLabel",
+  documentBackImage: "documentBackPhotoLabel",
+  selfieImage: "selfiePhotoLabel",
+};
 
 export function KycModal({
   tontineSessionId,
@@ -18,25 +28,76 @@ export function KycModal({
   const [documentFrontFile, setDocumentFrontFile] = useState<File | null>(null);
   const [documentBackFile, setDocumentBackFile] = useState<File | null>(null);
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
+  const [referrerName, setReferrerName] = useState("");
+  const [referrerPhone, setReferrerPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = documentFrontFile && documentBackFile && selfieFile;
+  const canSubmit =
+    documentFrontFile && documentBackFile && selfieFile && referrerName.trim() && referrerPhone.trim();
+
+  // Resolves a server-supplied errorKey/errorVars into the specific,
+  // localized message — e.g. "kycDocumentTooLarge" + {field, size, max}
+  // becomes "Back of your CNI is too large (6.2MB). Please choose a photo
+  // under 1.5MB…" — instead of the generic couldNotSubmitDocuments
+  // fallback that used to be shown for every failure regardless of cause.
+  function translateServerError(key: string, vars?: Record<string, string>): string | undefined {
+    const merged = { ...vars };
+    if (merged.field && merged.field in FIELD_LABEL_KEY) {
+      merged.document = t(FIELD_LABEL_KEY[merged.field]);
+    }
+    return translateIfKnown(lang, key, merged);
+  }
 
   async function handleSubmit() {
     if (!canSubmit) return;
+    if (!referrerName.trim()) {
+      setError(t("referrerNameRequired"));
+      return;
+    }
+    const referrerPhoneDigits = referrerPhone.replace(/\D/g, "");
+    if (referrerPhoneDigits.length < 8 || referrerPhoneDigits.length > 15) {
+      setError(t("referrerPhoneRequired"));
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
-      const [compressedFront, compressedBack, compressedSelfie] = await Promise.all([
+      const compressed = await Promise.allSettled([
         compressImage(documentFrontFile),
         compressImage(documentBackFile),
         compressImage(selfieFile),
       ]);
+      const fields: { key: keyof typeof FIELD_LABEL_KEY; result: PromiseSettledResult<Blob> }[] = [
+        { key: "documentImage", result: compressed[0] },
+        { key: "documentBackImage", result: compressed[1] },
+        { key: "selfieImage", result: compressed[2] },
+      ];
+      const failed = fields.find((f) => f.result.status === "rejected");
+      if (failed && failed.result.status === "rejected") {
+        const reason = failed.result.reason;
+        const size = reason instanceof ImageTooLargeError ? formatImageSize(reason.sizeBytes) : "?";
+        setError(
+          t("kycCompressionFailed", {
+            document: t(FIELD_LABEL_KEY[failed.key]),
+            size,
+            max: formatImageSize(MAX_OUTPUT_BYTES),
+          }),
+        );
+        setSubmitting(false);
+        return;
+      }
+
+      const [compressedFront, compressedBack, compressedSelfie] = fields.map(
+        (f) => (f.result as PromiseFulfilledResult<Blob>).value,
+      );
+
       const formData = new FormData();
       formData.append("documentImage", compressedFront, "document-front.jpg");
       formData.append("documentBackImage", compressedBack, "document-back.jpg");
       formData.append("selfieImage", compressedSelfie, "selfie.jpg");
+      formData.append("referrerName", referrerName.trim());
+      formData.append("referrerPhone", referrerPhoneDigits);
 
       const res = await fetch(`/api/sessions/${tontineSessionId}/kyc`, {
         method: "POST",
@@ -45,7 +106,7 @@ export function KycModal({
       await parseJsonOrThrow(res, t("couldNotSubmitDocuments"));
       window.location.reload();
     } catch (err) {
-      setError(friendlyErrorMessage(err, t("couldNotSubmitDocuments")));
+      setError(friendlyErrorMessage(err, t("couldNotSubmitDocuments"), translateServerError));
       setSubmitting(false);
     }
   }
@@ -91,6 +152,36 @@ export function KycModal({
             chooseLabel={t("choosePhotoAction")}
             selectedLabel={t("photoSelectedLabel")}
           />
+        </div>
+
+        <div className="flex flex-col gap-stack-gap-sm mb-stack-gap-md">
+          <div>
+            <label htmlFor="referrer-name" className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+              {t("referrerNameLabel")}
+            </label>
+            <input
+              id="referrer-name"
+              type="text"
+              value={referrerName}
+              onChange={(e) => setReferrerName(e.target.value)}
+              placeholder={t("referrerNamePlaceholder")}
+              className="w-full border border-outline-variant rounded-lg px-3 py-2.5 font-body-md text-body-md text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+            />
+          </div>
+          <div>
+            <label htmlFor="referrer-phone" className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+              {t("referrerPhoneLabel")}
+            </label>
+            <input
+              id="referrer-phone"
+              type="tel"
+              inputMode="tel"
+              value={referrerPhone}
+              onChange={(e) => setReferrerPhone(e.target.value)}
+              placeholder={t("referrerPhonePlaceholder")}
+              className="w-full border border-outline-variant rounded-lg px-3 py-2.5 font-body-md text-body-md text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+            />
+          </div>
         </div>
 
         {error && <p className="font-label-sm text-label-sm text-error mb-stack-gap-sm">{error}</p>}

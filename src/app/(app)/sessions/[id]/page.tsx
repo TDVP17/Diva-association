@@ -12,6 +12,7 @@ import { SelectSlotsForm } from "./select-slots-form";
 import { PayoutOrderModal } from "./payout-order-modal";
 import { PayoutTurnPanel } from "./payout-turn-panel";
 import { PaymentSuccessBanner } from "./payment-success-banner";
+import { SwapRequestPanel } from "./swap-request-panel";
 import { getDesignatedSlot, assertPriorCyclePaidOut } from "@/lib/round-robin-lock";
 
 const TONTINE_LABELS: Record<string, string> = {
@@ -253,6 +254,55 @@ export default async function SessionDetailPage({
     paidContribution = await loadPaidContribution(paymentId, userId);
   }
 
+  // Position-exchange data — only meaningful once positions exist to swap
+  // (DRAWING/ACTIVE), matching what the old chat-based "Request Exchange"
+  // button required. One representative slot per co-member (earliest
+  // created), same simplification the removed common-sessions route used.
+  let coMembers: { userId: string; name: string; avatar: string | null; position: number | null }[] = [];
+  let myPosition: number | null = null;
+  let pendingSwapRequests: {
+    id: string;
+    requesterId: string;
+    targetId: string;
+    requesterName: string;
+    targetName: string;
+    status: "PENDING_MEMBERSHIP" | "PENDING_ADMIN" | "APPROVED" | "REJECTED";
+  }[] = [];
+  if (tontineSession.status === "DRAWING" || tontineSession.status === "ACTIVE") {
+    const coMembersMap = new Map<string, { userId: string; name: string; avatar: string | null; position: number | null }>();
+    for (const m of approvedMemberships) {
+      if (m.userId === userId || coMembersMap.has(m.userId)) continue;
+      const firstSlot = [...m.slots].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
+      coMembersMap.set(m.userId, {
+        userId: m.userId,
+        name: m.user.name,
+        avatar: m.user.avatar ?? m.user.image ?? null,
+        position: firstSlot?.officialPosition ?? firstSlot?.ballDrawn ?? null,
+      });
+    }
+    coMembers = [...coMembersMap.values()];
+
+    const myFirstSlot = [...myMembership.slots].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
+    myPosition = myFirstSlot?.officialPosition ?? myFirstSlot?.ballDrawn ?? null;
+
+    const rawSwapRequests = await prisma.positionSwapRequest.findMany({
+      where: {
+        tontineSessionId: id,
+        status: { in: ["PENDING_MEMBERSHIP", "PENDING_ADMIN"] },
+        OR: [{ requesterId: userId }, { targetId: userId }],
+      },
+      include: { requester: { select: { name: true } }, target: { select: { name: true } } },
+    });
+    pendingSwapRequests = rawSwapRequests.map((r) => ({
+      id: r.id,
+      requesterId: r.requesterId,
+      targetId: r.targetId,
+      requesterName: r.requester.name,
+      targetName: r.target.name,
+      status: r.status,
+    }));
+  }
+
   return (
     <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-5xl mx-auto w-full pb-32">
       {paidContribution && (
@@ -336,6 +386,15 @@ export default async function SessionDetailPage({
         />
       )}
 
+      <SwapRequestPanel
+        tontineSessionId={id}
+        currentUserId={userId}
+        myPosition={myPosition}
+        coMembers={coMembers}
+        pendingRequests={pendingSwapRequests}
+        lang={lang}
+      />
+
       <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
       <section className="mb-stack-gap-lg lg:mb-0">
         <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md px-1 flex items-center gap-2">
@@ -362,6 +421,7 @@ export default async function SessionDetailPage({
                 {!paid && (
                   <PayButton
                     membershipSlotId={s.id}
+                    beneficiaryName={s.beneficiaryName}
                     amountLabel={formatXAF(slotTotal)}
                     description={paymentDescription}
                     defaultPhone={myMembership.user.phone}

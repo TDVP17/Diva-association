@@ -23,6 +23,8 @@ export async function GET(request: Request) {
             documentImageUrl: true,
             documentBackImageUrl: true,
             selfieImageUrl: true,
+            referrerName: true,
+            referrerPhone: true,
             verifiedAt: true,
           },
         },

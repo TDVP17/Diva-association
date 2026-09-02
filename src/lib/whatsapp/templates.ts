@@ -56,3 +56,26 @@ export function fineNoticeMessage(
     cotisation: TONTINE_LABELS[type],
   });
 }
+
+/**
+ * Sent once, right when a member becomes the newly-designated beneficiary
+ * (see getDesignatedSlot) — a heads-up that their turn is coming, not a
+ * confirmation that money has moved (that's the separate "payout released"
+ * message in the admin release route). `amount` is an estimate (per-slot
+ * contribution × registered slots), since this fires before that cycle's
+ * contributions are actually collected.
+ */
+export function payoutTurnMessage(
+  lang: Lang,
+  firstName: string,
+  cotisationName: string,
+  estimatedAmount: number,
+  expectedDateLabel: string,
+): string {
+  return translate(lang, "waPayoutTurn", {
+    name: firstName,
+    amount: formatXAF(estimatedAmount),
+    cotisation: cotisationName,
+    date: expectedDateLabel,
+  });
+}

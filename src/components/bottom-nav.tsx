@@ -7,6 +7,7 @@ import { translate, type Lang } from "@/lib/i18n/translations";
 const ITEMS = [
   { href: "/dashboard", label: "navHome", icon: "home" },
   { href: "/sessions", label: "contributionsNavItem", icon: "account_balance" },
+  { href: "/fines", label: "finesNavItem", icon: "receipt_long" },
   { href: "/chat", label: "messages", icon: "chat_bubble" },
   { href: "/profile", label: "navProfile", icon: "person" },
 ] as const;
@@ -25,8 +26,8 @@ export function BottomNav({ lang }: { lang: Lang }) {
             href={item.href}
             className={
               active
-                ? "flex flex-col items-center justify-center text-primary font-bold w-1/4 h-full transition-colors active:scale-90 duration-200"
-                : "flex flex-col items-center justify-center text-on-surface-variant w-1/4 h-full hover:bg-surface-container-low transition-colors active:scale-90 duration-200"
+                ? "flex flex-col items-center justify-center text-primary font-bold w-1/5 h-full transition-colors active:scale-90 duration-200"
+                : "flex flex-col items-center justify-center text-on-surface-variant w-1/5 h-full hover:bg-surface-container-low transition-colors active:scale-90 duration-200"
             }
           >
             <span

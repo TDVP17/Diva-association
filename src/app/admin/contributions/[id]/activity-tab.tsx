@@ -22,6 +22,8 @@ interface KycSnapshot {
   documentImageUrl: string | null;
   documentBackImageUrl: string | null;
   selfieImageUrl: string | null;
+  referrerName: string | null;
+  referrerPhone: string | null;
   submittedAt: string;
 }
 
@@ -219,6 +221,20 @@ function MemberSnapshot({
               />
               <span className="font-label-sm text-[10px] text-primary text-center underline">{t("viewSelfie")}</span>
             </a>
+          )}
+        </div>
+      )}
+      {kyc && (kyc.referrerName || kyc.referrerPhone) && (
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 bg-surface-container-low rounded-lg px-3 py-2 max-w-sm">
+          <span className="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1">
+            <span className="material-symbols-outlined text-[16px]">person_search</span>
+            {t("referredByLabel")}
+          </span>
+          {kyc.referrerName && (
+            <span className="font-label-sm text-label-sm text-on-surface font-semibold">{kyc.referrerName}</span>
+          )}
+          {kyc.referrerPhone && (
+            <span className="font-label-sm text-label-sm text-on-surface-variant">{kyc.referrerPhone}</span>
           )}
         </div>
       )}

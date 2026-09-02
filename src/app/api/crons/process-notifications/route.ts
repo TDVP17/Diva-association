@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email/resend";
 import { sendWhatsAppMessage } from "@/lib/whatsapp/evolution";
+import { sendPushToUser } from "@/lib/push/send";
 
 const MAX_RETRIES = 3;
 const BATCH_SIZE = 25;
@@ -40,6 +41,25 @@ export async function GET(request: Request) {
       } else if (n.channel === "WHATSAPP") {
         if (!n.user.phone) throw new Error("Recipient has no WhatsApp number on file");
         await sendWhatsAppMessage(n.user.phone, n.message);
+      } else if (n.channel === "PUSH") {
+        // +1 because this row's own status flips to SENT right after this
+        // block — it isn't counted yet by the same query the badge-sync
+        // endpoint uses, so the service worker would otherwise set the
+        // badge one notification behind.
+        const badgeCount =
+          (await prisma.notification.count({
+            where: { userId: n.userId, status: { in: ["SENT", "FAILED"] }, readAt: null },
+          })) + 1;
+        // Best-effort across every device this user has subscribed on —
+        // never throws, so a push failure never retries the whole row the
+        // way an EMAIL/WHATSAPP API error does (there's nothing more to
+        // retry once every known subscription has already been tried).
+        await sendPushToUser(n.userId, {
+          title: subjectFor(n.type),
+          body: n.message,
+          url: n.actionUrl ?? undefined,
+          badgeCount,
+        });
       }
       // IN_APP has no external delivery — the row itself is the message.
 

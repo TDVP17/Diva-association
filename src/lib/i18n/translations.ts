@@ -27,6 +27,7 @@ export const translations = {
     yourTontines: "Your Tontines",
     notInActiveTontine: "You're not part of any active tontine session yet.",
     unpaidFines: "Unpaid Fines",
+    finesNavItem: "Fines",
     noUnpaidFines: "You have no unpaid fines.",
     fineReasonLatePayment: "Late payment — cycle of {date}",
     payThisFine: "Pay this fine",
@@ -127,7 +128,7 @@ export const translations = {
       "Yes — every contribution has a public link (shown on the contribution page) that lets someone else pay for any specific unpaid name, no account required. You can also use \"Contribute for a Relative\" from your own account.",
     helpQ5: "How do I reach an admin if I have a problem?",
     helpA5:
-      "Use Admin Support in the Chat tab — send a message describing your issue and an admin will follow up. You'll get an automatic acknowledgement the first time you reach out.",
+      "Use the Messages tab — send a message describing your issue and an admin will follow up. You'll get an automatic acknowledgement the first time you reach out.",
     howDivaAssociationWorks: "How DIVA Association Works",
     watchTutorial: "Watch tutorial",
     notNow: "Not now",
@@ -138,6 +139,16 @@ export const translations = {
     tutorialVideoUnavailable: "This video could not be loaded.",
     installApp: "Install App",
     installAppDescription: "Add DIVA Association to your home screen for quick, app-like access.",
+    offlineBannerText: "You're offline — showing your last-seen data.",
+    draftContributionsReady: "{count} contribution draft(s) ready to submit",
+    reviewDraftsAction: "Review",
+    contributionSavedOfflineTitle: "Saved for when you're back online",
+    contributionSavedOfflineBody:
+      "You're offline, so this contribution couldn't be sent yet. We've saved it — you'll be prompted to review and confirm it as soon as your connection is back.",
+    pushPromptTitle: "Stay in the loop",
+    pushPromptBody: "Get notified instantly about payments, your payout turn, and admin messages — even when the app is closed.",
+    pushEnableAction: "Enable Notifications",
+    pushEnableFailed: "Could not enable notifications. Please try again.",
     installModalTitle: "Welcome! Get the full DIVA experience",
     installModalBody: "Install the app for faster access, offline support, and notifications.",
     downloadAndroidApk: "Download Android App (.apk)",
@@ -197,6 +208,9 @@ export const translations = {
       "🔴 Late payment notice — DIVA Association\n\n{name}, your contribution for the {cotisation} was not received before the 18:30 deadline. A late fine of {amount} has been applied to your account.\n\nPlease settle your contribution and fine as soon as possible.",
     waDuplicateRefunded:
       "Your payment was received twice for the same name. The second payment of {amount} has been automatically refunded.",
+    waPayoutTurn:
+      "Hello {name},\n\nWe're pleased to let you know that it's your turn to receive the {cotisation} payout.\n\n💰 Total amount: {amount}\n📅 Expected payout date: {date}\n\nPlease make sure your contact and payment details are up to date in your profile. If you have any questions, contact support from the app.\n\nThe DIVA Association team",
+    payoutTurnNotifMessage: "It's your turn to receive the {cotisation} payout — estimated {amount}, expected around {date}.",
     myConversations: "My Conversations",
 
     // Slot selection form
@@ -220,6 +234,7 @@ export const translations = {
     gotIt: "Got it",
     drawingInProgress: "Drawing...",
     drawFailed: "Draw failed",
+    drawRequiresConnection: "Drawing your position needs a live connection — reconnect and try again.",
     youDrewBalls: "You drew {count} balls!",
     youDrewBall: "You drew Ball #{number}!",
 
@@ -379,6 +394,7 @@ export const translations = {
     startDate: "Start Date",
     couldNotUpdateMembership: "Could not update this membership request. Please try again.",
     cameroonianCni: "Cameroonian CNI",
+    referredByLabel: "Referred by:",
     faceMatch: "{percent}% face match",
     compareFacesInstruction: "Compare the selfie against the CNI photos before approving",
     viewDocument: "View document",
@@ -416,6 +432,7 @@ export const translations = {
     contributionsNavItem: "Contributions",
     presidentBadgeLabel: "President",
     validatedMembersCount: "{count} validated members",
+    plusFeeSuffix: "+ {fee} fee",
     memberApprovedMessage:
       "Good news 🎉 Your account has been verified by the association. You can now continue with your contribution request.",
     memberRejectedMessage:
@@ -495,7 +512,6 @@ export const translations = {
     globalPaymentEmptySelection: "Select at least one name to pay for.",
     bulkPaymentFailedNotifMessage:
       "Your combined payment of {amount} for {count} names did not go through. Please try again.",
-    adminSupportTab: "Admin Support",
     noConversationsYet: "No conversations yet.",
     browseCotisations: "Browse Cotisations",
     quickActions: "Quick Actions",
@@ -505,13 +521,14 @@ export const translations = {
     chatMemberFallbackName: "Member",
     messageApplicant: "Message",
     typeMessagePlaceholder: "Type a message...",
-    positionExchangeRequested: "Position exchange requested",
+    messageQueuedOffline: "You're offline — this message will be sent automatically once you're back online.",
     swapAwaitingYourResponse: "Awaiting your response",
     swapPendingAdminApproval: "Pending admin approval",
     swapApproved: "Approved",
     swapDeclined: "Declined",
     declineAction: "Decline",
     acceptAction: "Accept",
+    positionExchangeSectionTitle: "Position Exchange",
     requestExchangeLabel: "Request Exchange (Pos #{mine} ↔ #{theirs})",
     backToMessages: "Back to Messages",
     goBack: "Go back",
@@ -626,6 +643,7 @@ export const translations = {
     notifTypeSwapRequestRejected: "Exchange Rejected",
     notifTypeNewMembershipRequest: "New Membership Request",
     notifTypeDrawLaunched: "Draw Started",
+    notifTypePayoutTurn: "Your Payout Turn",
     noNotificationsYet: "You have no notifications yet.",
     dismissNotification: "Dismiss",
     clearAllNotifications: "Clear all",
@@ -656,11 +674,25 @@ export const translations = {
     selfiePhotoLabel: "A selfie of yourself",
     choosePhotoAction: "Choose photo",
     photoSelectedLabel: "Photo selected",
+    referrerNameLabel: "Full name of the person who told you about this cotisation",
+    referrerNamePlaceholder: "e.g. Marie Ngo",
+    referrerPhoneLabel: "Referrer's phone number",
+    referrerPhonePlaceholder: "677123456",
+    referrerNameRequired: "Please enter the referrer's full name.",
+    referrerPhoneRequired: "Please enter a valid referrer phone number.",
+    kycMissingReferrerName: "Please enter the full name of the person who told you about this cotisation.",
+    kycInvalidReferrerPhone: "Please enter a valid referrer phone number.",
     cancel: "Cancel",
     close: "Close",
     submitForReview: "Submit for Review",
     submittingEllipsis: "Submitting...",
     couldNotSubmitDocuments: "Could not submit your documents. Please try again.",
+    kycMissingDocument: "{document} is required. Please add a photo before submitting.",
+    kycInvalidDocumentType: "{document} must be a JPEG, PNG, or WebP image ({type} isn't supported).",
+    kycDocumentTooLarge: "{document} is too large ({size}). Please choose a photo under {max}, or retake it so it can compress better.",
+    kycCombinedTooLarge: "Your 3 photos together are too large ({size}). Please keep the combined total under {max} — try retaking one at a lower resolution.",
+    kycUploadFailed: "{document} could not be uploaded. Please check your connection and try again.",
+    kycCompressionFailed: "{document} couldn't be prepared for upload ({size}, over the {max} limit). Please retake the photo — a plain JPEG or PNG usually works best.",
 
     // Language toggle
     language: "Language",
@@ -781,6 +813,7 @@ export const translations = {
     yourTontines: "Vos Tontines",
     notInActiveTontine: "Vous ne faites partie d'aucune session de tontine active pour le moment.",
     unpaidFines: "Amendes impayées",
+    finesNavItem: "Amendes",
     noUnpaidFines: "Vous n'avez aucune amende impayée.",
     fineReasonLatePayment: "Retard de paiement — cycle du {date}",
     payThisFine: "Payer cette amende",
@@ -890,9 +923,19 @@ export const translations = {
     tutorialVideoUnavailable: "Cette vidéo n'a pas pu être chargée.",
     helpQ5: "Comment contacter un admin en cas de problème ?",
     helpA5:
-      "Utilisez Support Admin dans l'onglet Chat — envoyez un message décrivant votre problème et un admin vous répondra. Vous recevrez un accusé de réception automatique la première fois que vous nous contactez.",
+      "Utilisez l'onglet Messages — envoyez un message décrivant votre problème et un admin vous répondra. Vous recevrez un accusé de réception automatique la première fois que vous nous contactez.",
     installApp: "Installer l'application",
     installAppDescription: "Ajoutez DIVA Association à votre écran d'accueil pour un accès rapide, comme une app.",
+    offlineBannerText: "Vous êtes hors ligne — affichage de vos dernières données connues.",
+    draftContributionsReady: "{count} brouillon(s) de cotisation prêt(s) à soumettre",
+    reviewDraftsAction: "Examiner",
+    contributionSavedOfflineTitle: "Enregistré pour votre retour en ligne",
+    contributionSavedOfflineBody:
+      "Vous êtes hors ligne, cette cotisation n'a pas pu être envoyée. Nous l'avons enregistrée — vous serez invité à l'examiner et la confirmer dès que votre connexion sera rétablie.",
+    pushPromptTitle: "Restez informé",
+    pushPromptBody: "Recevez instantanément les paiements, votre tour de versement et les messages admin — même quand l'application est fermée.",
+    pushEnableAction: "Activer les notifications",
+    pushEnableFailed: "Impossible d'activer les notifications. Veuillez réessayer.",
     installModalTitle: "Bienvenue ! Profitez de l'expérience DIVA complète",
     installModalBody: "Installez l'application pour un accès plus rapide, une utilisation hors ligne et les notifications.",
     downloadAndroidApk: "Télécharger l'app Android (.apk)",
@@ -953,6 +996,9 @@ export const translations = {
       "🔴 Avis de retard de paiement — DIVA Association\n\n{name}, votre contribution pour la {cotisation} n'a pas été reçue avant l'échéance de 18h30. Une amende de retard de {amount} a été appliquée à votre compte.\n\nVeuillez régler votre contribution et votre amende dès que possible.",
     waDuplicateRefunded:
       "Votre paiement a été reçu deux fois pour le même nom. Le second paiement de {amount} a été automatiquement remboursé.",
+    waPayoutTurn:
+      "Bonjour {name},\n\nNous avons le plaisir de vous informer que c'est votre tour de recevoir la cagnotte de la cotisation {cotisation}.\n\n💰 Montant total : {amount}\n📅 Date de versement prévue : {date}\n\nAssurez-vous que vos informations de contact et de paiement sont à jour dans votre profil. En cas de question, contactez le support depuis l'application.\n\nL'équipe DIVA Association",
+    payoutTurnNotifMessage: "C'est votre tour de recevoir la cagnotte de {cotisation} — environ {amount}, prévu vers le {date}.",
     myConversations: "Mes conversations",
 
     // Slot selection form
@@ -976,6 +1022,7 @@ export const translations = {
     gotIt: "Compris",
     drawingInProgress: "Tirage en cours...",
     drawFailed: "Échec du tirage",
+    drawRequiresConnection: "Le tirage de votre position nécessite une connexion active — reconnectez-vous et réessayez.",
     youDrewBalls: "Vous avez tiré {count} boules !",
     youDrewBall: "Vous avez tiré la boule n°{number} !",
 
@@ -1135,6 +1182,7 @@ export const translations = {
     startDate: "Date de début",
     couldNotUpdateMembership: "Impossible de mettre à jour cette demande d'adhésion. Veuillez réessayer.",
     cameroonianCni: "CNI camerounaise",
+    referredByLabel: "Recommandé par :",
     faceMatch: "{percent}% de correspondance faciale",
     compareFacesInstruction: "Comparez le selfie avec les photos de la CNI avant d'approuver",
     viewDocument: "Voir le document",
@@ -1172,6 +1220,7 @@ export const translations = {
     contributionsNavItem: "Cotisations",
     presidentBadgeLabel: "Présidente",
     validatedMembersCount: "{count} membres validés",
+    plusFeeSuffix: "+ {fee} de frais",
     memberApprovedMessage:
       "Bonne nouvelle 🎉 Votre compte a été vérifié par l'association. Vous pouvez maintenant continuer votre demande de cotisation.",
     memberRejectedMessage:
@@ -1252,7 +1301,6 @@ export const translations = {
     globalPaymentEmptySelection: "Sélectionnez au moins un nom à payer.",
     bulkPaymentFailedNotifMessage:
       "Votre paiement combiné de {amount} pour {count} noms n'a pas abouti. Veuillez réessayer.",
-    adminSupportTab: "Support admin",
     noConversationsYet: "Aucune conversation pour le moment.",
     browseCotisations: "Voir les cotisations",
     quickActions: "Actions rapides",
@@ -1262,13 +1310,14 @@ export const translations = {
     chatMemberFallbackName: "Membre",
     messageApplicant: "Message",
     typeMessagePlaceholder: "Écrivez un message...",
-    positionExchangeRequested: "Échange de position demandé",
+    messageQueuedOffline: "Vous êtes hors ligne — ce message sera envoyé automatiquement dès votre retour en ligne.",
     swapAwaitingYourResponse: "En attente de votre réponse",
     swapPendingAdminApproval: "En attente d'approbation admin",
     swapApproved: "Approuvé",
     swapDeclined: "Refusé",
     declineAction: "Refuser",
     acceptAction: "Accepter",
+    positionExchangeSectionTitle: "Échange de position",
     requestExchangeLabel: "Demander un échange (Pos #{mine} ↔ #{theirs})",
     backToMessages: "Retour aux messages",
     goBack: "Retour",
@@ -1385,6 +1434,7 @@ export const translations = {
     notifTypeSwapRequestRejected: "Échange refusé",
     notifTypeNewMembershipRequest: "Nouvelle demande d'adhésion",
     notifTypeDrawLaunched: "Tirage commencé",
+    notifTypePayoutTurn: "Votre tour de versement",
     noNotificationsYet: "Vous n'avez aucune notification pour le moment.",
     dismissNotification: "Ignorer",
     clearAllNotifications: "Tout effacer",
@@ -1415,11 +1465,25 @@ export const translations = {
     selfiePhotoLabel: "Un selfie de vous",
     choosePhotoAction: "Choisir une photo",
     photoSelectedLabel: "Photo sélectionnée",
+    referrerNameLabel: "Nom complet de la personne qui vous a parlé de cette cotisation",
+    referrerNamePlaceholder: "ex. Marie Ngo",
+    referrerPhoneLabel: "Numéro de téléphone du parrain / recommandant",
+    referrerPhonePlaceholder: "677123456",
+    referrerNameRequired: "Veuillez indiquer le nom complet du parrain.",
+    referrerPhoneRequired: "Veuillez indiquer un numéro de téléphone valide.",
+    kycMissingReferrerName: "Veuillez indiquer le nom complet de la personne qui vous a parlé de cette cotisation.",
+    kycInvalidReferrerPhone: "Veuillez indiquer un numéro de téléphone valide pour le parrain.",
     cancel: "Annuler",
     close: "Fermer",
     submitForReview: "Soumettre pour examen",
     submittingEllipsis: "Envoi en cours...",
     couldNotSubmitDocuments: "Impossible de soumettre vos documents. Veuillez réessayer.",
+    kycMissingDocument: "{document} est requis. Veuillez ajouter une photo avant de soumettre.",
+    kycInvalidDocumentType: "{document} doit être une image JPEG, PNG ou WebP ({type} n'est pas pris en charge).",
+    kycDocumentTooLarge: "{document} est trop volumineux ({size}). Veuillez choisir une photo de moins de {max}, ou reprenez-la pour une meilleure compression.",
+    kycCombinedTooLarge: "Vos 3 photos combinées sont trop volumineuses ({size}). Veuillez garder le total sous {max} — réessayez avec une photo en résolution plus basse.",
+    kycUploadFailed: "{document} n'a pas pu être téléversé. Vérifiez votre connexion et réessayez.",
+    kycCompressionFailed: "{document} n'a pas pu être préparé pour l'envoi ({size}, au-delà de la limite de {max}). Reprenez la photo — un simple JPEG ou PNG fonctionne généralement mieux.",
 
     // Language toggle
     language: "Langue",
@@ -1532,4 +1596,17 @@ export function formatTranslation(template: string, vars: Record<string, string>
 export function translate(lang: Lang, key: TranslationKey, vars?: Record<string, string>): string {
   const template = translations[lang][key];
   return vars ? formatTranslation(template, vars) : template;
+}
+
+/**
+ * Like `translate`, but for a key that isn't guaranteed to exist — e.g. an
+ * `errorKey` an API route attached to an error response, which is a plain
+ * `string` on the wire, not a type-checked `TranslationKey`. Returns
+ * `undefined` instead of throwing when the key isn't in the table, so a
+ * caller (see `friendlyErrorMessage` in api-error.ts) can fall back to a
+ * generic message rather than crash on an unrecognized/stale key.
+ */
+export function translateIfKnown(lang: Lang, key: string, vars?: Record<string, string>): string | undefined {
+  if (!(key in translations[lang])) return undefined;
+  return translate(lang, key as TranslationKey, vars);
 }

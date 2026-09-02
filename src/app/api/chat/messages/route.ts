@@ -20,46 +20,23 @@ export async function GET(request: Request) {
 
   const myId = session.user.id;
 
-  const [messages, swapRequests] = await Promise.all([
-    prisma.chatMessage.findMany({
-      where: {
-        OR: [
-          { senderId: myId, receiverId: otherId },
-          { senderId: otherId, receiverId: myId },
-        ],
-      },
-      orderBy: { createdAt: "asc" },
-    }),
-    prisma.positionSwapRequest.findMany({
-      where: {
-        OR: [
-          { requesterId: myId, targetId: otherId },
-          { requesterId: otherId, targetId: myId },
-        ],
-      },
-      include: { tontineSession: true },
-      orderBy: { createdAt: "asc" },
-    }),
-  ]);
+  const messages = await prisma.chatMessage.findMany({
+    where: {
+      OR: [
+        { senderId: myId, receiverId: otherId },
+        { senderId: otherId, receiverId: myId },
+      ],
+    },
+    orderBy: { createdAt: "asc" },
+  });
 
-  const feed = [
-    ...messages.map((m) => ({
-      kind: "message" as const,
-      id: m.id,
-      senderId: m.senderId,
-      content: m.content,
-      createdAt: m.createdAt.toISOString(),
-    })),
-    ...swapRequests.map((r) => ({
-      kind: "swap_request" as const,
-      id: r.id,
-      requesterId: r.requesterId,
-      targetId: r.targetId,
-      status: r.status,
-      tontineType: r.tontineSession.type,
-      createdAt: r.createdAt.toISOString(),
-    })),
-  ].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const feed = messages.map((m) => ({
+    kind: "message" as const,
+    id: m.id,
+    senderId: m.senderId,
+    content: m.content,
+    createdAt: m.createdAt.toISOString(),
+  }));
 
   // Opening this thread marks every message the other person sent me as
   // read — powers the unread-messages badge in the top-right menu.
@@ -90,6 +67,18 @@ export async function POST(request: Request) {
   const receiver = await prisma.user.findUnique({ where: { id: parsed.data.receiverId } });
   if (!receiver) {
     return NextResponse.json({ error: "Recipient not found" }, { status: 404 });
+  }
+
+  // Messaging is admin-only: a non-admin sender may only ever message an
+  // admin/president (the support thread). Peer-to-peer messages between two
+  // regular members are rejected outright, regardless of what the UI
+  // exposes — this used to be enforced only by which contacts the client
+  // happened to show.
+  if (!isAdminRole(session.user.role) && !isAdminRole(receiver.role)) {
+    return NextResponse.json(
+      { error: "You can only message Admin Support" },
+      { status: 403 },
+    );
   }
 
   const message = await prisma.chatMessage.create({

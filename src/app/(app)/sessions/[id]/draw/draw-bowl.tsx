@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
@@ -33,6 +33,31 @@ export function DrawBowl({
   const [drawing, setDrawing] = useState(false);
   const [results, setResults] = useState<DrawnSlot[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(true);
+
+  // The draw assigns each slot's position from the session's shared
+  // unclaimed-number pool server-side — it has to stay perfectly
+  // consistent across every member, so unlike a contribution there's no
+  // safe way to queue this offline. Disabled with a clear reason instead
+  // of letting the fetch fail generically.
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setIsOnline(navigator.onLine);
+    }, 0);
+    function handleOnline() {
+      setIsOnline(true);
+    }
+    function handleOffline() {
+      setIsOnline(false);
+    }
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      clearTimeout(handle);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
   // Purely decorative — the actual outcome is assigned server-side at
   // random from the pool of unclaimed numbers, regardless of which ball
@@ -47,6 +72,10 @@ export function DrawBowl({
 
   async function handleDraw() {
     if (drawing) return;
+    if (!isOnline) {
+      setError(t("drawRequiresConnection"));
+      return;
+    }
     setDrawing(true);
     setError(null);
     try {
@@ -73,7 +102,7 @@ export function DrawBowl({
                 key={i}
                 type="button"
                 onClick={handleDraw}
-                disabled={drawing}
+                disabled={drawing || !isOnline}
                 className={`absolute rounded-full bg-white flex items-center justify-center font-numeric-data text-numeric-data text-primary focus:outline-none transition-transform hover:scale-110 hover:-translate-y-1 shadow-[inset_-5px_-5px_15px_rgba(0,0,0,0.2),inset_5px_5px_15px_rgba(255,255,255,0.8),0_10px_20px_rgba(0,53,40,0.2)] ${FLOAT_CLASSES[i]}`}
               >
                 {n}
@@ -88,11 +117,16 @@ export function DrawBowl({
 
       <button
         onClick={handleDraw}
-        disabled={drawing}
+        disabled={drawing || !isOnline}
         className="w-full max-w-sm py-4 px-6 rounded-xl bg-primary text-on-primary font-label-md text-label-md uppercase tracking-wider shadow-[0px_8px_30px_rgba(0,53,40,0.2)] hover:shadow-[0px_10px_35px_rgba(0,53,40,0.3)] active:scale-95 transition-all duration-200 disabled:opacity-60"
       >
         {drawing ? t("drawingInProgress") : t("pickYourBalls")}
       </button>
+      {!isOnline && (
+        <p className="font-label-sm text-label-sm text-on-surface-variant text-center mt-2">
+          {t("drawRequiresConnection")}
+        </p>
+      )}
 
       {results !== null && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-on-background/40 backdrop-blur-sm px-container-padding">

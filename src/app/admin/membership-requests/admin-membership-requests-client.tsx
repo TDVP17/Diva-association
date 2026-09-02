@@ -25,6 +25,8 @@ interface MembershipRequest {
     documentImageUrl: string | null;
     documentBackImageUrl: string | null;
     selfieImageUrl: string | null;
+    referrerName: string | null;
+    referrerPhone: string | null;
     verifiedAt: string | null;
   } | null;
 }
@@ -195,6 +197,24 @@ export function AdminMembershipRequestsClient({ lang }: { lang: Lang }) {
                   </a>
                 )}
               </div>
+              {(m.kycVerification.referrerName || m.kycVerification.referrerPhone) && (
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 bg-surface-container-low rounded-lg px-3 py-2 max-w-sm">
+                  <span className="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[16px]">person_search</span>
+                    {t("referredByLabel")}
+                  </span>
+                  {m.kycVerification.referrerName && (
+                    <span className="font-label-sm text-label-sm text-on-surface font-semibold">
+                      {m.kycVerification.referrerName}
+                    </span>
+                  )}
+                  {m.kycVerification.referrerPhone && (
+                    <span className="font-label-sm text-label-sm text-on-surface-variant">
+                      {m.kycVerification.referrerPhone}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

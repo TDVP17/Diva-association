@@ -5,6 +5,11 @@ import { requireAdmin } from "@/lib/require-admin";
 import { computePayoutPreview } from "@/lib/payout-preview";
 import { sendPayout, FapshiPayoutError } from "@/lib/fapshi-payout";
 import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
+import { payoutTurnMessage } from "@/lib/whatsapp/templates";
+import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
+import { getDesignatedSlot } from "@/lib/round-robin-lock";
+import { getNextDueDate } from "@/lib/tontine-engine";
+import { TONTINE_TYPE_LABELS } from "@/lib/tontine-labels";
 import { logAudit } from "@/lib/audit";
 import { formatXAF } from "@/lib/format-currency";
 
@@ -85,6 +90,59 @@ export async function POST(request: Request) {
       (deducted > 0 ? ` after deducting ${formatXAF(deducted)} in outstanding fines.` : `.`) +
       ` Confirm on the app once you've received it.`,
   );
+
+  // The round-robin just advanced — whoever getDesignatedSlot() now resolves
+  // to (first slot by officialPosition with zero payout rows) is next in
+  // line, for the first time. A one-time heads-up, distinct from the
+  // "payout released" message above sent to the PREVIOUS beneficiary.
+  const newDesignatedSlot = await getDesignatedSlot(claim.tontineSessionId);
+  if (newDesignatedSlot) {
+    const newBeneficiaryMembership = await prisma.membership.findFirst({
+      where: { slots: { some: { id: newDesignatedSlot.id } } },
+      include: { user: true },
+    });
+    if (newBeneficiaryMembership) {
+      const approvedMemberships = await prisma.membership.findMany({
+        where: { tontineSessionId: claim.tontineSessionId, status: "APPROVED" },
+        select: { slotCount: true },
+      });
+      const totalApprovedSlots = approvedMemberships.reduce(
+        (sum, m) => sum + (m.slotCount ? Number(m.slotCount) : 0),
+        0,
+      );
+      const estimatedPot = Number(claim.tontineSession.amount) * totalApprovedSlots;
+      const nextDueDate = getNextDueDate(claim.tontineSession.type, new Date());
+      const beneficiaryUser = newBeneficiaryMembership.user;
+      const sessionLabel =
+        claim.tontineSession.title || TONTINE_TYPE_LABELS[claim.tontineSession.type] || claim.tontineSession.type;
+      const beneficiaryLang = beneficiaryUser.preferredLang === "fr" ? "fr" : "en";
+      const firstName = beneficiaryUser.name.trim().split(/\s+/)[0] ?? beneficiaryUser.name;
+      const dateLabel = nextDueDate.toLocaleDateString(beneficiaryLang === "fr" ? "fr-FR" : "en-GB", {
+        timeZone: "Africa/Douala",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+
+      await sendWhatsAppMessageSafe(
+        beneficiaryUser.phone,
+        payoutTurnMessage(beneficiaryLang, firstName, sessionLabel, estimatedPot, dateLabel),
+      );
+      await scheduleInAppNotifications({
+        tontineSessionId: claim.tontineSessionId,
+        type: "PAYOUT_TURN",
+        recipients: [
+          {
+            userId: beneficiaryUser.id,
+            message: `It's your turn to receive the ${sessionLabel} payout — estimated ${formatXAF(estimatedPot)}, expected around ${dateLabel}.`,
+            messageKey: "payoutTurnNotifMessage",
+            messageVars: { cotisation: sessionLabel, amount: formatXAF(estimatedPot), date: dateLabel },
+            actionUrl: `/sessions/${claim.tontineSessionId}`,
+          },
+        ],
+      });
+    }
+  }
 
   await logAudit({
     actorId: admin.user.id,

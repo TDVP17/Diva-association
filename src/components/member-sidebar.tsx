@@ -7,6 +7,7 @@ import { translate, type Lang } from "@/lib/i18n/translations";
 const ITEMS = [
   { href: "/dashboard", label: "navHome", icon: "home" },
   { href: "/sessions", label: "contributionsNavItem", icon: "account_balance" },
+  { href: "/fines", label: "finesNavItem", icon: "receipt_long" },
   { href: "/chat", label: "messages", icon: "chat_bubble" },
   { href: "/contribute-for-relative", label: "contributeForRelativeNav", icon: "volunteer_activism" },
   { href: "/notifications", label: "myNotificationsNav", icon: "notifications" },

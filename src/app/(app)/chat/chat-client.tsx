@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 import { formatMessageDate } from "@/lib/format-message-date";
 import { LoadingSpinner } from "@/components/loading-spinner";
+import { queueChatMessage, requestBackgroundSync } from "@/lib/offline/db";
 
 interface Contact {
   id: string;
@@ -17,37 +17,31 @@ interface Contact {
   unreadCount: number;
 }
 
-type FeedItem =
-  | { kind: "message"; id: string; senderId: string; content: string; createdAt: string }
-  | {
-      kind: "swap_request";
-      id: string;
-      requesterId: string;
-      targetId: string;
-      status: "PENDING_MEMBERSHIP" | "PENDING_ADMIN" | "APPROVED" | "REJECTED";
-      tontineType: string;
-      createdAt: string;
-    };
-
-interface CommonSession {
-  tontineSessionId: string;
-  tontineType: string;
-  myPosition: number | null;
-  theirPosition: number | null;
+interface FeedItem {
+  kind: "message";
+  id: string;
+  senderId: string;
+  content: string;
+  createdAt: string;
 }
-
-const TONTINE_LABELS: Record<string, string> = {
-  HEBDO_SUNDAY: "Weekly Tontine",
-  MONTHLY_28: "Monthly Tontine (28th)",
-  MONTHLY_25: "Monthly Tontine (25th)",
-  BIWEEKLY_SUNDAY: "Every 2 Weeks",
-  QUARTERLY_25: "Every 3 Months",
-};
 
 function initials(name: string) {
   return name.slice(0, 2).toUpperCase();
 }
 
+/**
+ * Messaging is admin-only — a member has exactly one possible contact (the
+ * support admin), so there's no contact-picking UI for them at all; this
+ * jumps straight into that single thread. An admin/president still sees
+ * their normal list of everyone who's messaged them (their support inbox),
+ * unaffected — this component is shared by both /chat (member) and
+ * /admin/support (admin), differing only by the `isAdmin` prop.
+ *
+ * Position-exchange requests used to render inline in this thread; that
+ * member-to-member feature moved to the relevant cotisation's session page
+ * (see SwapRequestPanel) once peer-to-peer chat was removed, since it no
+ * longer has a peer conversation to live inside of.
+ */
 export function ChatClient({
   currentUserId,
   isAdmin,
@@ -59,15 +53,14 @@ export function ChatClient({
 }) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState<"members" | "admin">(searchParams.get("tab") === "admin" ? "admin" : "members");
   const [contacts, setContacts] = useState<{ members: Contact[]; admin: Contact | null } | null>(null);
   const [active, setActive] = useState<Contact | null>(null);
   const [feed, setFeed] = useState<FeedItem[]>([]);
-  const [commonSessions, setCommonSessions] = useState<CommonSession[]>([]);
   const [input, setInput] = useState("");
   const [search, setSearch] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [sendInfo, setSendInfo] = useState<string | null>(null);
   const feedEndRef = useRef<HTMLDivElement>(null);
 
   // Deep link from elsewhere in the admin area (e.g. "Message" on a pending
@@ -77,8 +70,12 @@ export function ChatClient({
   // real contacts list loads, the matching entry (with avatar/unread
   // count) takes over if present. Only applies if nothing is already
   // active, so it never overrides a conversation the user picked manually.
+  //
+  // For a non-admin, there's nothing to deep-link to — they only ever have
+  // the one admin contact, auto-selected below regardless of `with`.
   const applyDeepLinkedContact = useCallback(
     (data: { members: Contact[]; admin: Contact | null }) => {
+      if (!isAdmin) return;
       const withId = searchParams.get("with");
       if (!withId) return;
       const known = [...data.members, ...(data.admin ? [data.admin] : [])].find((c) => c.id === withId);
@@ -96,7 +93,7 @@ export function ChatClient({
       );
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [searchParams],
+    [searchParams, isAdmin],
   );
 
   const refreshContacts = useCallback(() => {
@@ -104,10 +101,16 @@ export function ChatClient({
       .then((r) => r.json())
       .then((data) => {
         setContacts(data);
-        applyDeepLinkedContact(data);
+        if (!isAdmin) {
+          // A member's only possible contact is Admin Support — skip the
+          // list screen and open it directly.
+          setActive((current) => current ?? data.admin ?? null);
+        } else {
+          applyDeepLinkedContact(data);
+        }
       })
       .catch(() => setContacts({ members: [], admin: null }));
-  }, [applyDeepLinkedContact]);
+  }, [applyDeepLinkedContact, isAdmin]);
 
   useEffect(() => {
     refreshContacts();
@@ -132,10 +135,6 @@ export function ChatClient({
         refreshContacts(); // opening a thread marks it read server-side — sync the badge
       })
       .catch(() => setFeed([]));
-    fetch(`/api/chat/common-sessions?with=${active.id}`)
-      .then((r) => r.json())
-      .then((body) => setCommonSessions(body.sessions ?? []))
-      .catch(() => setCommonSessions([]));
 
     const interval = setInterval(() => loadFeed(active.id), 4000);
     return () => clearInterval(interval);
@@ -146,12 +145,35 @@ export function ChatClient({
     feedEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [feed]);
 
+  async function queueOffline(receiverId: string, content: string) {
+    await queueChatMessage({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      receiverId,
+      content,
+      createdAt: new Date().toISOString(),
+    });
+    await requestBackgroundSync("sync-chat-messages");
+    setSendInfo(t("messageQueuedOffline"));
+  }
+
   async function sendMessage() {
     if (!active || !input.trim() || sending) return;
     setSending(true);
     setSendError(null);
+    setSendInfo(null);
     const content = input.trim();
     setInput("");
+
+    // No point attempting the fetch at all — queue it directly so it goes
+    // out via Background Sync (safe to auto-send; no money involved,
+    // unlike a contribution — see offline-draft-sync.tsx) the moment
+    // connectivity returns.
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      await queueOffline(active.id, content);
+      setSending(false);
+      return;
+    }
+
     try {
       const res = await fetch("/api/chat/messages", {
         method: "POST",
@@ -161,45 +183,24 @@ export function ChatClient({
       await parseJsonOrThrow(res, t("somethingWentWrong"));
       await loadFeed(active.id);
     } catch (err) {
-      setSendError(friendlyErrorMessage(err, t("somethingWentWrong")));
-      setInput(content); // don't lose what the user typed
+      // navigator.onLine can lag reality (e.g. Wi-Fi connected but no
+      // internet) — a genuine network failure (not a server rejection)
+      // gets the same queue-and-retry treatment instead of just an error.
+      if (err instanceof TypeError) {
+        await queueOffline(active.id, content);
+      } else {
+        setSendError(friendlyErrorMessage(err, t("somethingWentWrong")));
+        setInput(content); // don't lose what the user typed
+      }
     } finally {
       setSending(false);
     }
   }
 
-  async function requestExchange() {
-    if (!active || commonSessions.length === 0) return;
-    const target = commonSessions[0];
-    const res = await fetch("/api/chat/swap-requests", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ targetId: active.id, tontineSessionId: target.tontineSessionId }),
-    });
-    if (res.ok) await loadFeed(active.id);
-  }
-
-  async function respondToSwap(id: string, action: "accept" | "decline") {
-    const res = await fetch(`/api/chat/swap-requests/${id}/respond`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
-    });
-    if (res.ok && active) await loadFeed(active.id);
-  }
-
-  const baseList = tab === "members" ? (contacts?.members ?? []) : contacts?.admin ? [contacts.admin] : [];
+  const baseList = contacts?.members ?? [];
   const list = search.trim()
     ? baseList.filter((c) => c.name.toLowerCase().includes(search.trim().toLowerCase()))
     : baseList;
-  const primarySwap = commonSessions[0];
-
-  const swapStatusLabel: Record<"PENDING_MEMBERSHIP" | "PENDING_ADMIN" | "APPROVED" | "REJECTED", string> = {
-    PENDING_MEMBERSHIP: t("swapAwaitingYourResponse"),
-    PENDING_ADMIN: t("swapPendingAdminApproval"),
-    APPROVED: t("swapApproved"),
-    REJECTED: t("swapDeclined"),
-  };
 
   if (active) {
     return (
@@ -211,13 +212,15 @@ export function ChatClient({
       // browser's address bar shows/hides and changes the visual viewport.
       <div className="flex flex-col h-[calc(100dvh-64px-80px)] md:h-[calc(100dvh-64px)] bg-background">
         <div className="flex items-center gap-3 px-4 py-3 bg-white shadow-sm border-b border-surface-container z-10 sticky top-0 flex-shrink-0">
-          <button
-            className="p-2 -ml-2 text-primary hover:bg-surface-container-low rounded-full transition-colors"
-            onClick={() => setActive(null)}
-            aria-label={t("backToMessages")}
-          >
-            <span className="material-symbols-outlined">arrow_back</span>
-          </button>
+          {isAdmin && (
+            <button
+              className="p-2 -ml-2 text-primary hover:bg-surface-container-low rounded-full transition-colors"
+              onClick={() => setActive(null)}
+              aria-label={t("backToMessages")}
+            >
+              <span className="material-symbols-outlined">arrow_back</span>
+            </button>
+          )}
           <div className="w-10 h-10 rounded-full bg-surface-container-high text-primary flex items-center justify-center font-title-md text-title-md overflow-hidden flex-shrink-0">
             {active.avatar ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -231,57 +234,21 @@ export function ChatClient({
 
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 min-h-0">
           {feed.map((item) => {
-            if (item.kind === "message") {
-              const mine = item.senderId === currentUserId;
-              return (
-                <div key={item.id} className={`flex flex-col max-w-[85%] ${mine ? "items-end self-end" : "items-start"}`}>
-                  <div
-                    className={
-                      mine
-                        ? "bg-primary text-white shadow-sm rounded-2xl rounded-tr-sm px-4 py-3 font-body-md text-body-md"
-                        : "bg-white border border-surface-container shadow-sm rounded-2xl rounded-tl-sm px-4 py-3 text-on-surface font-body-md text-body-md"
-                    }
-                  >
-                    {item.content}
-                  </div>
-                  <span className="font-label-sm text-label-sm text-outline mt-1 mx-1">
-                    {formatMessageDate(new Date(item.createdAt), lang)}
-                  </span>
-                </div>
-              );
-            }
-
-            const isTarget = item.targetId === currentUserId;
+            const mine = item.senderId === currentUserId;
             return (
-              <div
-                key={item.id}
-                className="self-center flex flex-col items-center gap-2 bg-surface-container-low border border-outline-variant px-4 py-3 rounded-xl text-center my-2 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] max-w-[90%]"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-secondary text-sm">swap_horiz</span>
-                  <p className="font-label-sm text-label-sm text-on-surface-variant">
-                    {t("positionExchangeRequested")} &middot; {TONTINE_LABELS[item.tontineType] ?? item.tontineType}
-                  </p>
+              <div key={item.id} className={`flex flex-col max-w-[85%] ${mine ? "items-end self-end" : "items-start"}`}>
+                <div
+                  className={
+                    mine
+                      ? "bg-primary text-white shadow-sm rounded-2xl rounded-tr-sm px-4 py-3 font-body-md text-body-md"
+                      : "bg-white border border-surface-container shadow-sm rounded-2xl rounded-tl-sm px-4 py-3 text-on-surface font-body-md text-body-md"
+                  }
+                >
+                  {item.content}
                 </div>
-                <span className="font-label-sm text-label-sm px-2 py-0.5 rounded-full bg-secondary-fixed-dim/20 text-on-secondary-fixed-variant">
-                  {swapStatusLabel[item.status]}
+                <span className="font-label-sm text-label-sm text-outline mt-1 mx-1">
+                  {formatMessageDate(new Date(item.createdAt), lang)}
                 </span>
-                {isTarget && item.status === "PENDING_MEMBERSHIP" && (
-                  <div className="flex gap-2 mt-1">
-                    <button
-                      onClick={() => respondToSwap(item.id, "decline")}
-                      className="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-label-sm text-label-sm hover:bg-surface transition-colors"
-                    >
-                      {t("declineAction")}
-                    </button>
-                    <button
-                      onClick={() => respondToSwap(item.id, "accept")}
-                      className="px-3 py-1.5 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 transition-opacity"
-                    >
-                      {t("acceptAction")}
-                    </button>
-                  </div>
-                )}
               </div>
             );
           })}
@@ -289,21 +256,8 @@ export function ChatClient({
         </div>
 
         <div className="bg-white p-3 border-t border-surface-container shadow-[0px_-4px_20px_rgba(30,41,59,0.05)] sticky bottom-0 z-10 w-full flex-shrink-0">
-          {primarySwap && (
-            <div className="mb-3 flex justify-center">
-              <button
-                onClick={requestExchange}
-                className="bg-secondary-fixed-dim bg-opacity-20 text-on-secondary-container border border-secondary-fixed-dim hover:bg-opacity-30 transition-colors font-label-md text-label-md font-semibold py-2 px-4 rounded-full flex items-center gap-2 shadow-sm"
-              >
-                <span className="material-symbols-outlined text-[18px]">swap_horiz</span>
-                {t("requestExchangeLabel", {
-                  mine: String(primarySwap.myPosition ?? "?"),
-                  theirs: String(primarySwap.theirPosition ?? "?"),
-                })}
-              </button>
-            </div>
-          )}
           {sendError && <p className="font-label-sm text-label-sm text-error mb-2 px-1">{sendError}</p>}
+          {sendInfo && <p className="font-label-sm text-label-sm text-on-surface-variant mb-2 px-1">{sendInfo}</p>}
           <div className="flex items-end gap-2">
             <div className="flex-1 bg-surface-container-low rounded-2xl border border-surface-container overflow-hidden focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
               <textarea
@@ -333,27 +287,13 @@ export function ChatClient({
     );
   }
 
+  // Only an admin ever reaches this list view — a member is auto-routed
+  // into their single Admin Support thread above as soon as contacts load.
   return (
     <main className="px-container-padding pt-4 pb-8 max-w-2xl lg:max-w-4xl mx-auto w-full">
       <h1 className="sticky top-16 z-30 bg-background py-2 -mx-container-padding px-container-padding font-title-md text-title-md text-primary mb-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)]">
         {t("myConversations")}
       </h1>
-      {!isAdmin && (
-        <div className="flex bg-surface-container-low rounded-lg p-1 mb-4 max-w-xs">
-          <button
-            onClick={() => setTab("members")}
-            className={`flex-1 py-1.5 px-3 rounded-md text-sm font-label-md transition-all ${tab === "members" ? "font-semibold bg-white shadow-sm text-primary" : "font-medium text-on-surface-variant"}`}
-          >
-            {t("membersTab")}
-          </button>
-          <button
-            onClick={() => setTab("admin")}
-            className={`flex-1 py-1.5 px-3 rounded-md text-sm font-label-md transition-all ${tab === "admin" ? "font-semibold bg-white shadow-sm text-primary" : "font-medium text-on-surface-variant"}`}
-          >
-            {t("adminSupportTab")}
-          </button>
-        </div>
-      )}
 
       <div className="relative mb-4">
         <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">
@@ -376,14 +316,6 @@ export function ChatClient({
             <p className="font-body-md text-body-md text-on-surface-variant">
               {search.trim() && baseList.length > 0 ? t("noSearchResults") : t("noConversationsYet")}
             </p>
-            {!search.trim() && baseList.length === 0 && (
-              <Link
-                href="/sessions"
-                className="mt-1 px-4 py-2 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all"
-              >
-                {t("browseCotisations")}
-              </Link>
-            )}
           </div>
         ) : (
           list.map((contact) => {

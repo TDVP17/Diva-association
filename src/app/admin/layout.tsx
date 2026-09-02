@@ -7,6 +7,7 @@ import { BackBar } from "@/components/back-bar";
 import { AdminBottomNav } from "@/components/admin/admin-bottom-nav";
 import { IosInstallBanner } from "@/components/ios-install-banner";
 import { NotificationBadgeSync } from "@/components/notification-badge-sync";
+import { PushPermissionPrompt } from "@/components/push-permission-prompt";
 import { isAdminRole } from "@/lib/constants";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -26,6 +27,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       </div>
       <AdminBottomNav lang={lang} isPresident={isPresident} />
       <IosInstallBanner lang={lang} />
+      <PushPermissionPrompt lang={lang} />
       <NotificationBadgeSync />
     </div>
   );

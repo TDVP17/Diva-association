@@ -115,6 +115,10 @@ enum NotificationChannel {
   EMAIL
   WHATSAPP
   IN_APP
+  /// Web Push, delivered via the service worker's `push` event — the only
+  /// channel that can reach a member while the app is closed/backgrounded.
+  /// See src/lib/push/send.ts and the PushSubscription model below.
+  PUSH
 }
 
 enum NotificationEventType {
@@ -139,6 +143,10 @@ enum NotificationEventType {
   NEW_MEMBERSHIP_REQUEST
   /// Admin started a cotisation's drawing phase — sent to its approved members.
   DRAW_LAUNCHED
+  /// The previous cycle's payout was released, so this member is now next in
+  /// line — sent once, right when they become the newly-designated
+  /// beneficiary (see getDesignatedSlot in src/lib/round-robin-lock.ts).
+  PAYOUT_TURN
   /// An automated duplicate-payment refund failed 3 times and needs manual
   /// review — sent to every ADMIN/PRESIDENT user.
   PAYMENT_REFUND_ESCALATED
@@ -312,6 +320,7 @@ model User {
   payoutsReleasedAsAdmin       Payout[]              @relation("PayoutReleasedByAdmin")
   savedPaymentMethods          SavedPaymentMethod[]
   transactionArchives          TransactionArchive[]
+  pushSubscriptions            PushSubscription[]
 
   @@map("users")
 }
@@ -574,6 +583,12 @@ model KycVerification {
   /// Selfie photo submitted alongside the document, for the admin to
   /// visually compare during manual review.
   selfieImageUrl       String?
+  /// Full name of whoever told this applicant about the cotisation —
+  /// collected at submission time so an admin can see who's driving
+  /// referrals. Required at the API layer; nullable here only because rows
+  /// created before this field existed have none.
+  referrerName         String?
+  referrerPhone        String?
   createdAt            DateTime              @default(now())
   verifiedAt           DateTime?
 
@@ -780,6 +795,27 @@ model Notification {
   @@index([tontineSessionId, status])
   @@index([status, scheduledAt])
   @@map("notifications")
+}
+
+/// One row per browser/device the user has granted Web Push permission on
+/// (a user can have several — phone + desktop, or after reinstalling the
+/// PWA). `endpoint` is the push service URL the browser vendor assigns that
+/// subscription; `p256dh`/`auth` are the keys needed to encrypt a payload
+/// for it. See src/lib/push/send.ts for how these are used, and
+/// src/app/api/push/subscribe/route.ts for how they're created/refreshed.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique @db.Text
+  p256dh    String   @db.Text
+  auth      String   @db.Text
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }
 
 /// One row per member per fully-elapsed calendar year with any Contribution

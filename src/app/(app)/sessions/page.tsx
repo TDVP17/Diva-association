@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { assertJoinable, sumRegisteredSlots } from "@/lib/session-joinability";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { HideClosedSessionButton } from "./hide-closed-session-button";
+import { formatXAF } from "@/lib/format-currency";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -134,6 +135,10 @@ export default async function SessionsPage() {
                     {t("validatedMembersCount", {
                       count: String(s.memberships.filter((m) => m.status === "APPROVED").length),
                     })}
+                  </p>
+                  <p className="font-label-sm text-label-sm text-on-surface-variant mt-1 flex items-center gap-1 flex-wrap">
+                    <span className="font-numeric-data text-on-surface">{formatXAF(Number(s.amount))}</span>
+                    <span>{t("plusFeeSuffix", { fee: formatXAF(Number(s.fee)) })}</span>
                   </p>
                 </div>
                 <span className="material-symbols-outlined text-outline">chevron_right</span>

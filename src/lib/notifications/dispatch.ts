@@ -62,6 +62,14 @@ export async function scheduleNotifications(params: {
  * up in the recipients' notification feed right away instead of waiting on
  * the cron. Mirrors the pattern first used in the membership approve/reject
  * route, now shared so every IN_APP trigger site behaves consistently.
+ *
+ * Every IN_APP event also gets a companion PUSH row for the same
+ * recipients — this is what actually reaches a member while the app is
+ * closed/backgrounded (see the service worker's `push` handler and
+ * src/lib/push/send.ts). Unlike the IN_APP row, the PUSH row is left
+ * SCHEDULED for the cron to pick up normally: sending it is a real network
+ * call (to each of the recipient's push subscriptions), not just a DB
+ * write, so it can't be resolved synchronously the way IN_APP is.
  */
 export async function scheduleInAppNotifications(params: {
   tontineSessionId?: string;
@@ -76,10 +84,13 @@ export async function scheduleInAppNotifications(params: {
       userId: { in: params.recipients.map((r) => r.userId) },
       tontineSessionId: params.tontineSessionId,
       type: params.type,
+      channel: "IN_APP",
       status: "SCHEDULED",
     },
     data: { status: "SENT", sentAt: new Date() },
   });
+
+  await scheduleNotifications({ ...params, channel: "PUSH" });
 
   return count;
 }

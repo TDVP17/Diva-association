@@ -103,7 +103,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             ? "Your position exchange request was approved."
             : "Your position exchange request was rejected.",
         messageKey: nextStatus === "APPROVED" ? "swapApprovedRequesterMessage" : "swapRejectedRequesterMessage",
-        actionUrl: "/chat",
+        actionUrl: `/sessions/${preCheck.tontineSessionId}`,
       },
       {
         userId: preCheck.targetId,
@@ -112,7 +112,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             ? "A position exchange you accepted was approved."
             : "A position exchange you accepted was rejected.",
         messageKey: nextStatus === "APPROVED" ? "swapApprovedTargetMessage" : "swapRejectedTargetMessage",
-        actionUrl: "/chat",
+        actionUrl: `/sessions/${preCheck.tontineSessionId}`,
       },
     ],
   });

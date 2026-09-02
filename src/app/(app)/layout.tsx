@@ -10,6 +10,8 @@ import { IosInstallBanner } from "@/components/ios-install-banner";
 import { InstallPromptModal } from "@/components/install-prompt-modal";
 import { TutorialPopup } from "@/components/tutorial-popup";
 import { NotificationBadgeSync } from "@/components/notification-badge-sync";
+import { PushPermissionPrompt } from "@/components/push-permission-prompt";
+import { OfflineDraftSync } from "@/components/offline-draft-sync";
 import { isAdminRole } from "@/lib/constants";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -50,6 +52,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <IosInstallBanner lang={lang} />
       <InstallPromptModal lang={lang} />
       <TutorialPopup lang={lang} />
+      <PushPermissionPrompt lang={lang} />
+      <OfflineDraftSync lang={lang} />
       <NotificationBadgeSync />
     </div>
   );

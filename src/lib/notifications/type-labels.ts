@@ -23,6 +23,7 @@ export const NOTIFICATION_TYPE_KEY: Record<string, Parameters<typeof translate>[
   NEW_MEMBERSHIP_REQUEST: "notifTypeNewMembershipRequest",
   DRAW_LAUNCHED: "notifTypeDrawLaunched",
   PAYMENT_REFUND_ESCALATED: "notifTypePaymentRefundEscalated",
+  PAYOUT_TURN: "notifTypePayoutTurn",
 };
 
 /** Notification/reminder delivery status, for the admin notification center's log view. */

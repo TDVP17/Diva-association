@@ -18,7 +18,8 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
-vi.mock("@/lib/chat/support-admin", () => ({ getSupportAdmin: vi.fn() }));
+const getSupportAdmin = vi.fn();
+vi.mock("@/lib/chat/support-admin", () => ({ getSupportAdmin: (...a: unknown[]) => getSupportAdmin(...a) }));
 
 import { GET } from "@/app/api/chat/contacts/route";
 
@@ -28,6 +29,7 @@ describe("GET /api/chat/contacts — admin conversation list", () => {
     chatMessageFindMany.mockReset();
     chatMessageGroupBy.mockReset();
     userFindMany.mockReset();
+    getSupportAdmin.mockReset();
     chatMessageGroupBy.mockResolvedValue([]);
   });
 
@@ -66,5 +68,53 @@ describe("GET /api/chat/contacts — admin conversation list", () => {
 
     expect(body.members).toEqual([]);
     expect(userFindMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/chat/contacts — member view is admin-only (no peer-to-peer contacts)", () => {
+  beforeEach(() => {
+    auth.mockReset();
+    chatMessageFindMany.mockReset();
+    chatMessageGroupBy.mockReset();
+    userFindMany.mockReset();
+    getSupportAdmin.mockReset();
+    chatMessageGroupBy.mockResolvedValue([]);
+  });
+
+  it("never returns co-members, regardless of shared cotisations — only the support admin", async () => {
+    auth.mockResolvedValue({ user: { id: "member-1", role: "MEMBER" } });
+    getSupportAdmin.mockResolvedValue({ id: "admin-1", name: "Admin", avatar: null, image: null });
+    chatMessageFindMany.mockResolvedValue([]);
+    userFindMany.mockResolvedValue([{ id: "admin-1", name: "Admin", avatar: null, image: null }]);
+
+    const res = await GET();
+    const body = await res.json();
+
+    expect(body.members).toEqual([]);
+    expect(body.admin).toMatchObject({ id: "admin-1", name: "Admin" });
+    // The only user lookup that happens is for the admin contact itself —
+    // the old co-membership-derived peer lookup path is gone entirely, not
+    // just filtered down to an empty result.
+    expect(userFindMany).toHaveBeenCalledTimes(1);
+    expect(userFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: { in: ["admin-1"] } } }));
+  });
+
+  it("still returns the admin contact even with zero prior messages", async () => {
+    auth.mockResolvedValue({ user: { id: "member-1", role: "MEMBER" } });
+    getSupportAdmin.mockResolvedValue({ id: "admin-1", name: "Admin", avatar: null, image: null });
+    chatMessageFindMany.mockResolvedValue([]);
+    userFindMany.mockResolvedValue([{ id: "admin-1", name: "Admin", avatar: null, image: null }]);
+
+    const res = await GET();
+    const body = await res.json();
+
+    expect(body.admin).toEqual({
+      id: "admin-1",
+      name: "Admin",
+      avatar: null,
+      lastMessageAt: null,
+      lastMessagePreview: null,
+      unreadCount: 0,
+    });
   });
 });

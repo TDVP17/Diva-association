@@ -67,11 +67,12 @@ export async function GET() {
 
   const isAdmin = isAdminRole(session.user.role);
 
-  let memberIds: string[];
+  // Messaging is admin-only: a member's only possible contact is the
+  // support admin (below); an admin's contact list is everyone who's
+  // actually messaged them (unaffected by removing peer-to-peer chat,
+  // since it was never peer-to-peer from an admin's perspective).
+  let memberIds: string[] = [];
   if (isAdmin) {
-    // Only users who have actually exchanged a message with this admin —
-    // not every registered member. Derived from real ChatMessage rows, not
-    // a role filter, so the list only grows as real conversations happen.
     const messages = await prisma.chatMessage.findMany({
       where: { OR: [{ senderId: session.user.id }, { receiverId: session.user.id }] },
       select: { senderId: true, receiverId: true },
@@ -81,22 +82,6 @@ export async function GET() {
       partnerIds.add(m.senderId === session.user.id ? m.receiverId : m.senderId);
     }
     memberIds = [...partnerIds];
-  } else {
-    // Only members who share at least one ACTIVE cotisation — an approved
-    // membership in a session that's actually collecting contributions
-    // (DRAWING or ACTIVE). A shared DRAFT/CLOSED session, or a pending/
-    // rejected membership, doesn't unlock messaging with that person.
-    const myMemberships = await prisma.membership.findMany({
-      where: { userId: session.user.id, status: "APPROVED", tontineSession: { status: { in: ["DRAWING", "ACTIVE"] } } },
-      select: { tontineSessionId: true },
-    });
-    const sessionIds = myMemberships.map((m) => m.tontineSessionId);
-    const coMemberships = await prisma.membership.findMany({
-      where: { tontineSessionId: { in: sessionIds }, userId: { not: session.user.id }, status: "APPROVED" },
-      select: { userId: true },
-      distinct: ["userId"],
-    });
-    memberIds = coMemberships.map((m) => m.userId);
   }
 
   const [members, adminUser] = await Promise.all([

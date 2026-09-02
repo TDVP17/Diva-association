@@ -119,6 +119,8 @@ export async function POST(
                     documentImageUrl: existing.kycVerification.documentImageUrl,
                     documentBackImageUrl: existing.kycVerification.documentBackImageUrl,
                     selfieImageUrl: existing.kycVerification.selfieImageUrl,
+                    referrerName: existing.kycVerification.referrerName,
+                    referrerPhone: existing.kycVerification.referrerPhone,
                     submittedAt: existing.kycVerification.createdAt.toISOString(),
                   }
                 : null,
