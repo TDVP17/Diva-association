@@ -6,6 +6,18 @@ import { isAdminRole } from "@/lib/constants";
 import { saveFile } from "@/lib/storage";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 
+// No route in this project overrode Vercel's default serverless function
+// timeout (10s), including this one — a real risk here specifically:
+// receiving a multipart body with 3 photos over a slow/unstable mobile
+// connection (this app's actual target network conditions) counts toward
+// that limit before this handler's own code even starts running, and 3
+// storage uploads + a DB transaction (now with its own retry delays, see
+// withTransientRetry) can add up fast on top of that. A function killed
+// for running too long returns Vercel's own error page, not JSON — which
+// is why every failure here looked like the same generic fallback message
+// regardless of cause; the client never got real JSON to parse.
+export const maxDuration = 60;
+
 const ALLOWED_TYPES: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/png": ".png",
@@ -169,24 +181,32 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const documentBackKey = `kyc-documents/${session.user.id}/${stamp}-document-back${ALLOWED_TYPES[documentBackFile.type]}`;
     const selfieKey = `kyc-documents/${session.user.id}/${stamp}-selfie${ALLOWED_TYPES[selfieFile.type]}`;
 
-    // Uploaded one at a time (not Promise.all) so a storage failure can be
-    // attributed to the specific document that failed, instead of a vague
-    // "something went wrong with one of your 3 files".
+    // Uploaded concurrently — three round trips to Supabase Storage summed
+    // sequentially was real latency on a slow mobile connection, stacking on
+    // top of the request body's own (also slow, also counted against
+    // maxDuration) upload time. Promise.allSettled still lets a failure be
+    // attributed to the specific document that failed, instead of either
+    // losing that precision (Promise.all) or paying the sequential latency
+    // cost just to keep it.
     const uploads: { field: DocumentFieldName; key: string; file: File }[] = [
       { field: "documentImage", key: documentFrontKey, file: documentFrontFile },
       { field: "documentBackImage", key: documentBackKey, file: documentBackFile },
       { field: "selfieImage", key: selfieKey, file: selfieFile },
     ];
-    for (const { field, key, file } of uploads) {
-      try {
-        await saveFile(key, Buffer.from(await file.arrayBuffer()));
-      } catch (err) {
-        console.error(`[sessions/kyc] storage upload failed for ${field} (key=${key}):`, err);
-        return NextResponse.json(
-          { error: `Could not upload ${field} to storage`, errorKey: "kycUploadFailed", errorVars: { field } },
-          { status: 502 },
-        );
-      }
+    const uploadResults = await Promise.allSettled(
+      uploads.map(({ key, file }) => file.arrayBuffer().then((buf) => saveFile(key, Buffer.from(buf)))),
+    );
+    const failedUpload = uploadResults.findIndex((r) => r.status === "rejected");
+    if (failedUpload !== -1) {
+      const { field, key } = uploads[failedUpload];
+      console.error(
+        `[sessions/kyc] storage upload failed for ${field} (key=${key}):`,
+        (uploadResults[failedUpload] as PromiseRejectedResult).reason,
+      );
+      return NextResponse.json(
+        { error: `Could not upload ${field} to storage`, errorKey: "kycUploadFailed", errorVars: { field } },
+        { status: 502 },
+      );
     }
 
     // The uploads above take real time on a slow connection, which widens
