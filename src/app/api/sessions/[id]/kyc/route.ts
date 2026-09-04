@@ -153,10 +153,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       );
     }
 
-    const tontineSession = await prisma.tontineSession.findUnique({
-      where: { id: tontineSessionId },
-      include: { memberships: { select: { status: true, slotCount: true } } },
-    });
+    // Each remaining DB-touching section gets its own try/catch with a
+    // distinct errorKey — deliberately more granular than one outer catch,
+    // so a real failure is identifiable straight from the (translated) text
+    // shown on screen, without needing server log access to tell which
+    // step broke.
+    let tontineSession;
+    try {
+      tontineSession = await prisma.tontineSession.findUnique({
+        where: { id: tontineSessionId },
+        include: { memberships: { select: { status: true, slotCount: true } } },
+      });
+    } catch (err) {
+      console.error("[sessions/kyc] session lookup failed:", err);
+      return NextResponse.json(
+        { error: "Could not load this cotisation's details", errorKey: "kycSessionLookupFailed" },
+        { status: 502 },
+      );
+    }
     if (!tontineSession) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
@@ -169,9 +183,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: joinable.error }, { status: joinable.status });
     }
 
-    const existingMembership = await prisma.membership.findUnique({
-      where: { userId_tontineSessionId: { userId: session.user.id, tontineSessionId } },
-    });
+    let existingMembership;
+    try {
+      existingMembership = await prisma.membership.findUnique({
+        where: { userId_tontineSessionId: { userId: session.user.id, tontineSessionId } },
+      });
+    } catch (err) {
+      console.error("[sessions/kyc] existing-membership check failed:", err);
+      return NextResponse.json(
+        { error: "Could not check your membership status", errorKey: "kycMembershipCheckFailed" },
+        { status: 502 },
+      );
+    }
     if (existingMembership && existingMembership.status !== "REJECTED") {
       return NextResponse.json({ status: existingMembership.status });
     }
@@ -219,63 +242,82 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // even though no Membership row may exist yet to row-lock directly —
     // the second request then sees the first one's already-PENDING row and
     // exits without duplicating anything.
-    const result = await withTransientRetry(
-      () =>
-        prisma.$transaction(async (tx) => {
-          await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`${session.user.id}:${tontineSessionId}`}))`;
+    let result;
+    try {
+      result = await withTransientRetry(
+        () =>
+          prisma.$transaction(async (tx) => {
+            await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`${session.user.id}:${tontineSessionId}`}))`;
 
-          const fresh = await tx.membership.findUnique({
-            where: { userId_tontineSessionId: { userId: session.user.id, tontineSessionId } },
-          });
-          if (fresh && fresh.status !== "REJECTED") {
-            return { alreadyPending: true as const, status: fresh.status };
-          }
+            const fresh = await tx.membership.findUnique({
+              where: { userId_tontineSessionId: { userId: session.user.id, tontineSessionId } },
+            });
+            if (fresh && fresh.status !== "REJECTED") {
+              return { alreadyPending: true as const, status: fresh.status };
+            }
 
-          const membership = await tx.membership.upsert({
-            where: { userId_tontineSessionId: { userId: session.user.id, tontineSessionId } },
-            create: { userId: session.user.id, tontineSessionId, status: "PENDING" },
-            update: { status: "PENDING" },
-          });
+            const membership = await tx.membership.upsert({
+              where: { userId_tontineSessionId: { userId: session.user.id, tontineSessionId } },
+              create: { userId: session.user.id, tontineSessionId, status: "PENDING" },
+              update: { status: "PENDING" },
+            });
 
-          await tx.kycVerification.create({
-            data: {
-              userId: session.user.id,
-              tontineSessionId,
-              membershipId: membership.id,
-              documentType: "CNI",
-              status: "PENDING",
-              documentImageUrl: `/api/files/${documentFrontKey}`,
-              documentBackImageUrl: `/api/files/${documentBackKey}`,
-              selfieImageUrl: `/api/files/${selfieKey}`,
-              referrerName,
-              referrerPhone: referrerPhoneDigits,
-            },
-          });
+            await tx.kycVerification.create({
+              data: {
+                userId: session.user.id,
+                tontineSessionId,
+                membershipId: membership.id,
+                documentType: "CNI",
+                status: "PENDING",
+                documentImageUrl: `/api/files/${documentFrontKey}`,
+                documentBackImageUrl: `/api/files/${documentBackKey}`,
+                selfieImageUrl: `/api/files/${selfieKey}`,
+                referrerName,
+                referrerPhone: referrerPhoneDigits,
+              },
+            });
 
-          return { alreadyPending: false as const };
-        }),
-      "sessions/kyc membership+kycVerification transaction",
-    );
+            return { alreadyPending: false as const };
+          }),
+        "sessions/kyc membership+kycVerification transaction",
+      );
+    } catch (err) {
+      console.error("[sessions/kyc] membership+kycVerification transaction failed:", err);
+      return NextResponse.json(
+        { error: "Could not save your submission", errorKey: "kycTransactionFailed" },
+        { status: 502 },
+      );
+    }
 
     if (result.alreadyPending) {
       return NextResponse.json({ status: result.status });
     }
 
-    const admins = await prisma.user.findMany({
-      where: { role: { in: ["ADMIN", "PRESIDENT"] } },
-      select: { id: true },
-    });
-    await scheduleInAppNotifications({
-      tontineSessionId,
-      type: "NEW_MEMBERSHIP_REQUEST",
-      recipients: admins.map((a) => ({
-        userId: a.id,
-        message: `${session.user.name ?? "A member"} requested to join a cotisation.`,
-        messageKey: "newMembershipRequestMessage",
-        messageVars: { name: session.user.name ?? "A member" },
-        actionUrl: "/admin/membership-requests",
-      })),
-    });
+    // The member's actual submission (membership + KYC row, including their
+    // uploaded documents) is already durably saved at this point — nothing
+    // past here should be able to turn that success into an error response.
+    // Notifying admins is a best-effort side effect; failing quietly and
+    // logging is strictly better than telling the member their submission
+    // failed when it didn't.
+    try {
+      const admins = await prisma.user.findMany({
+        where: { role: { in: ["ADMIN", "PRESIDENT"] } },
+        select: { id: true },
+      });
+      await scheduleInAppNotifications({
+        tontineSessionId,
+        type: "NEW_MEMBERSHIP_REQUEST",
+        recipients: admins.map((a) => ({
+          userId: a.id,
+          message: `${session.user.name ?? "A member"} requested to join a cotisation.`,
+          messageKey: "newMembershipRequestMessage",
+          messageVars: { name: session.user.name ?? "A member" },
+          actionUrl: "/admin/membership-requests",
+        })),
+      });
+    } catch (err) {
+      console.error("[sessions/kyc] admin notification scheduling failed (submission was still saved):", err);
+    }
 
     return NextResponse.json({ ok: true, status: "PENDING" });
   } catch (err) {

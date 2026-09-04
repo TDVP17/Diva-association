@@ -81,7 +81,7 @@ describe("POST /api/sessions/[id]/kyc", () => {
     findUniqueTontineSession.mockReset();
     findUniqueMembership.mockReset();
     findManyUser.mockReset().mockResolvedValue([]);
-    txQueryRaw.mockClear();
+    txQueryRaw.mockReset().mockResolvedValue(undefined);
     txFindUniqueMembership.mockReset();
     txUpsertMembership.mockReset();
     txCreateKycVerification.mockReset();
@@ -220,7 +220,7 @@ describe("POST /api/sessions/[id]/kyc", () => {
     expect(scheduleInAppNotifications).toHaveBeenCalledTimes(1);
   });
 
-  it("logs the real error to stdout and returns a generic 500 for a truly unexpected failure, never crashing unhandled", async () => {
+  it("returns a specific errorKey (not the generic fallback) when the session lookup itself fails", async () => {
     findUniqueTontineSession.mockRejectedValue(new Error("DB connection reset"));
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -232,10 +232,55 @@ describe("POST /api/sessions/[id]/kyc", () => {
     const res = await POST(req, { params: Promise.resolve({ id: "session-1" }) });
     const body = await res.json();
 
-    expect(res.status).toBe(500);
-    expect(body.error).toBe("Could not submit your documents. Please try again.");
+    expect(res.status).toBe(502);
+    expect(body.errorKey).toBe("kycSessionLookupFailed");
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("[sessions/kyc] session lookup failed"), expect.any(Error));
+    consoleSpy.mockRestore();
+  });
+
+  it("returns a specific errorKey when the membership+KYC transaction itself fails, distinct from the generic fallback", async () => {
+    findUniqueTontineSession.mockResolvedValue(openTontineSession);
+    findUniqueMembership.mockResolvedValue(null);
+    saveFile.mockResolvedValue("ok");
+    txQueryRaw.mockRejectedValue(new Error("connection terminated"));
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const req = fakeFormRequest({
+      documentImage: VALID_FRONT(),
+      documentBackImage: VALID_BACK(),
+      selfieImage: VALID_SELFIE(),
+    });
+    const res = await POST(req, { params: Promise.resolve({ id: "session-1" }) });
+    const body = await res.json();
+
+    expect(res.status).toBe(502);
+    expect(body.errorKey).toBe("kycTransactionFailed");
+    consoleSpy.mockRestore();
+  });
+
+  it("still returns success when admin-notification scheduling fails — the submission itself was already saved", async () => {
+    findUniqueTontineSession.mockResolvedValue(openTontineSession);
+    findUniqueMembership.mockResolvedValue(null);
+    saveFile.mockResolvedValue("ok");
+    txFindUniqueMembership.mockResolvedValue(null);
+    txUpsertMembership.mockResolvedValue({ id: "membership-1" });
+    txCreateKycVerification.mockResolvedValue({});
+    findManyUser.mockRejectedValue(new Error("admin lookup exploded"));
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const req = fakeFormRequest({
+      documentImage: VALID_FRONT(),
+      documentBackImage: VALID_BACK(),
+      selfieImage: VALID_SELFIE(),
+    });
+    const res = await POST(req, { params: Promise.resolve({ id: "session-1" }) });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ ok: true, status: "PENDING" });
+    expect(txCreateKycVerification).toHaveBeenCalledTimes(1);
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[sessions/kyc] unexpected error"),
+      expect.stringContaining("[sessions/kyc] admin notification scheduling failed"),
       expect.any(Error),
     );
     consoleSpy.mockRestore();
