@@ -14,6 +14,7 @@ import { PayoutTurnPanel } from "./payout-turn-panel";
 import { PaymentSuccessBanner } from "./payment-success-banner";
 import { SwapRequestPanel } from "./swap-request-panel";
 import { getDesignatedSlot, assertPriorCyclePaidOut } from "@/lib/round-robin-lock";
+import { sessionStatusKey } from "@/lib/session-status-label";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -334,9 +335,19 @@ export default async function SessionDetailPage({
         <div className="flex justify-between items-start mb-4">
           <div>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary-container/20 text-on-secondary-container font-label-sm text-label-sm uppercase tracking-wider mb-2">
-              {tontineSession.status}
+              {t(sessionStatusKey(tontineSession.status))}
             </span>
             <h1 className="text-xl md:text-2xl font-bold text-on-surface">{sessionLabel}</h1>
+            <p className="font-body-md text-body-md text-on-surface-variant flex items-center gap-1 mt-1">
+              <span className="material-symbols-outlined text-sm">event</span>
+              {t("contributionStartDateLabel")}:{" "}
+              {tontineSession.startDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-GB", {
+                timeZone: "Africa/Douala",
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
+            </p>
             <p className="font-body-md text-body-md text-on-surface-variant flex items-center gap-1 mt-1">
               <span className="material-symbols-outlined text-sm">schedule</span>
               {t("deadlineLabel")}: {tontineSession.limitTime}
@@ -365,6 +376,13 @@ export default async function SessionDetailPage({
           <PayoutOrderModal tontineSessionId={id} lang={lang} />
         </div>
       </section>
+
+      {tontineSession.status !== "ACTIVE" && tontineSession.status !== "CLOSED" && (
+        <div className="mb-stack-gap-lg flex items-start gap-2 bg-secondary-container/15 text-on-secondary-container rounded-xl p-4 border border-secondary-fixed-dim/30">
+          <span className="material-symbols-outlined text-[20px] flex-shrink-0 mt-0.5">info</span>
+          <p className="font-body-md text-body-md">{t("paymentsAvailableAfterDraw")}</p>
+        </div>
+      )}
 
       {(tontineSession.status === "DRAWING" || tontineSession.status === "ACTIVE") &&
         myUndrawnSlots.length > 0 && (

@@ -3,6 +3,7 @@ import { getContributionTotal, getNextDueDate } from "@/lib/tontine-engine";
 import { initiateDirectPayment, normalizeCameroonPhone, FapshiError } from "@/lib/fapshi";
 import { assertPriorCyclePaidOut } from "@/lib/round-robin-lock";
 import { computeProviderFee } from "@/lib/payment-fees";
+import { detectMobileMoneyProvider, fapshiMediumFor } from "@/lib/mobile-money-provider";
 import type { PaymentProvider } from "@/generated/prisma/enums";
 
 export type InitiateSlotPaymentResult =
@@ -58,6 +59,15 @@ export async function getSlotPaymentQuote(
   }
   if (slot.membership.tontineSession.isPaused) {
     return { ok: false, status: 409, error: "This cotisation is temporarily paused — payments will resume shortly" };
+  }
+  // Defense in depth: in practice the only route that ever flips a session
+  // to ACTIVE (publish-ranking) does so in the same transaction that
+  // assigns officialPosition to every slot, so this can't currently happen
+  // through the app's own routes — but the payment gate shouldn't rely on
+  // that being the only way ACTIVE ever gets set. A slot with no assigned
+  // position was never through the draw, regardless of session status.
+  if (slot.officialPosition === null) {
+    return { ok: false, status: 409, error: "This name hasn't been assigned a draw position yet" };
   }
 
   const { tontineSession } = slot.membership;
@@ -127,6 +137,11 @@ export async function initiateSlotPayment(
   }
   if (slot.membership.tontineSession.isPaused) {
     return { ok: false, status: 409, error: "This cotisation is temporarily paused — payments will resume shortly" };
+  }
+  // See the identical check in getSlotPaymentQuote above for why this is
+  // enforced here independently of tontineSession.status.
+  if (slot.officialPosition === null) {
+    return { ok: false, status: 409, error: "This name hasn't been assigned a draw position yet" };
   }
 
   const { tontineSession } = slot.membership;
@@ -213,12 +228,19 @@ export async function initiateSlotPayment(
   }
 
   try {
+    // Best-effort — tells Fapshi explicitly which network to route the USSD
+    // push through instead of leaving it to Fapshi's own auto-detection.
+    // Always re-derived from the phone number itself (never trusted from
+    // client input); an unrecognized prefix just falls back to undefined
+    // (today's behavior) rather than blocking the payment.
+    const detectedProvider = detectMobileMoneyProvider(normalizedPhone);
     const result = await initiateDirectPayment({
       amount: providerFee.totalCharged,
       phone: normalizedPhone,
       userId: slot.membership.userId,
       externalId: contribution.id,
       message: `DIVA tontine contribution — ${slot.beneficiaryName} (${tontineSession.type})`,
+      medium: detectedProvider ? fapshiMediumFor(detectedProvider) : undefined,
     });
 
     await prisma.$transaction([

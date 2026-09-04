@@ -3,6 +3,7 @@ import { getContributionTotal, getNextDueDate } from "@/lib/tontine-engine";
 import { initiateDirectPayment, normalizeCameroonPhone, FapshiError } from "@/lib/fapshi";
 import { assertPriorCyclePaidOut } from "@/lib/round-robin-lock";
 import { computeProviderFee } from "@/lib/payment-fees";
+import { detectMobileMoneyProvider, fapshiMediumFor } from "@/lib/mobile-money-provider";
 import type { PaymentProvider } from "@/generated/prisma/enums";
 
 const MAX_SLOTS_PER_BULK_PAYMENT = 20;
@@ -319,12 +320,14 @@ export async function initiateBulkPayment(
   const namesLabel = names.length > 3 ? `${names.slice(0, 3).join(", ")}…` : names.join(", ");
 
   try {
+    const detectedProvider = detectMobileMoneyProvider(normalizedPhone);
     const result = await initiateDirectPayment({
       amount: totalCharged,
       phone: normalizedPhone,
       userId,
       externalId: bulkPayment.id,
       message: `DIVA tontine — combined payment for ${names.length} names: ${namesLabel}`,
+      medium: detectedProvider ? fapshiMediumFor(detectedProvider) : undefined,
     });
 
     await prisma.$transaction([

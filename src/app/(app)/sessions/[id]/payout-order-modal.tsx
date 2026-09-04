@@ -84,7 +84,7 @@ export function PayoutOrderModal({ tontineSessionId, lang }: { tontineSessionId:
                         <p className="font-label-sm text-label-sm text-on-surface-variant truncate">
                           {r.memberName}
                           {r.estimatedDate &&
-                            ` — ~${new Date(r.estimatedDate).toLocaleDateString("en-US", { day: "numeric", month: "short" })}`}
+                            ` — ~${new Date(r.estimatedDate).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "long", year: "numeric" })}`}
                         </p>
                       </div>
                     </div>

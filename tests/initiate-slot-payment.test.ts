@@ -58,6 +58,7 @@ const VALID_PHONE = "677123456";
 const approvedActiveSlot = {
   id: "slot-1",
   beneficiaryName: "John Doe",
+  officialPosition: 1,
   membership: {
     userId: "member-1",
     status: "APPROVED",
@@ -113,6 +114,17 @@ describe("initiateSlotPayment", () => {
     if (!result.ok) expect(result.status).toBe(409);
   });
 
+  it("rejects when the slot has no assigned draw position yet — defense in depth even though today's only ACTIVE-setting route can't produce this state", async () => {
+    findUniqueSlot.mockResolvedValue({ ...approvedActiveSlot, officialPosition: null });
+    const result = await initiateSlotPayment("slot-1", VALID_PHONE);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(409);
+      expect(result.error).toMatch(/position/i);
+    }
+    expect(assertPriorCyclePaidOut).not.toHaveBeenCalled();
+  });
+
   it("rejects when the round-robin lock blocks a new cycle", async () => {
     findUniqueSlot.mockResolvedValue(approvedActiveSlot);
     assertPriorCyclePaidOut.mockResolvedValue({ ok: false, status: 409, error: "prior cycle not paid out" });
@@ -165,6 +177,42 @@ describe("initiateSlotPayment", () => {
     const result = await initiateSlotPayment("slot-1", VALID_PHONE);
     expect(result.ok).toBe(true);
     expect(txUpdateContribution).toHaveBeenCalled();
+  });
+
+  it("derives the Fapshi medium from the phone number's own prefix — MTN for 67x", async () => {
+    findUniqueSlot.mockResolvedValue(approvedActiveSlot);
+    txFindUniqueContribution.mockResolvedValue(null);
+    txCreateContribution.mockResolvedValue({ id: "contrib-mtn" });
+    initiateDirectPayment.mockResolvedValue({ transId: "tx-mtn" });
+    updateContribution.mockResolvedValue({});
+
+    await initiateSlotPayment("slot-1", "677123456"); // 67x = MTN
+
+    expect(initiateDirectPayment.mock.calls[0][0].medium).toBe("mobile money");
+  });
+
+  it("derives the Fapshi medium from the phone number's own prefix — Orange for 69x", async () => {
+    findUniqueSlot.mockResolvedValue(approvedActiveSlot);
+    txFindUniqueContribution.mockResolvedValue(null);
+    txCreateContribution.mockResolvedValue({ id: "contrib-orange" });
+    initiateDirectPayment.mockResolvedValue({ transId: "tx-orange" });
+    updateContribution.mockResolvedValue({});
+
+    await initiateSlotPayment("slot-1", "690123456"); // 69x = Orange
+
+    expect(initiateDirectPayment.mock.calls[0][0].medium).toBe("orange money");
+  });
+
+  it("leaves medium undefined (Fapshi auto-detects) for a number outside any known range", async () => {
+    findUniqueSlot.mockResolvedValue(approvedActiveSlot);
+    txFindUniqueContribution.mockResolvedValue(null);
+    txCreateContribution.mockResolvedValue({ id: "contrib-unknown" });
+    initiateDirectPayment.mockResolvedValue({ transId: "tx-unknown" });
+    updateContribution.mockResolvedValue({});
+
+    await initiateSlotPayment("slot-1", "620123456");
+
+    expect(initiateDirectPayment.mock.calls[0][0].medium).toBeUndefined();
   });
 
   it("threads paidByUserId from a relative/admin payer into the contribution row", async () => {

@@ -11,6 +11,7 @@ import { ActivityTab } from "./activity-tab";
 import { LoadingSpinner } from "@/components/loading-spinner";
 import { MemberArchivesToggle } from "@/components/admin/member-archives-toggle";
 import { formatXAF } from "@/lib/format-currency";
+import { sessionStatusKey } from "@/lib/session-status-label";
 
 interface MembershipRequest {
   id: string;
@@ -540,6 +541,9 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
             <h2 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary">
               {sessionLabel}
             </h2>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-secondary-container/30 text-on-secondary-container font-label-sm text-label-sm mt-1">
+              {t(sessionStatusKey(session.status))}
+            </span>
             {session.isPaused && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-secondary-container/40 text-on-secondary-container font-label-sm text-label-sm mt-1">
                 {t("pausedBadge")}

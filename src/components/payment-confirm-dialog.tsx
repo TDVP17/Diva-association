@@ -4,11 +4,25 @@ import { useEffect, useRef, useState } from "react";
 import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 import { formatXAF } from "@/lib/format-currency";
+import { detectMobileMoneyProvider } from "@/lib/mobile-money-provider";
+import type { MobileMoneyProvider } from "@/generated/prisma/enums";
 
 interface Quote {
   baseTotal: number;
   providerFeeAmount: number;
   totalCharged: number;
+}
+
+interface SavedMethod {
+  id: string;
+  provider: MobileMoneyProvider;
+  label: string | null;
+  phone: string;
+  isDefault: boolean;
+}
+
+function providerLabelKey(provider: MobileMoneyProvider): TranslationKey {
+  return provider === "ORANGE" ? "orangeMoneyLabel" : "mtnMobileMoneyLabel";
 }
 
 // Fapshi rate-limits payment-status checks to 6/min per transaction — this
@@ -61,6 +75,45 @@ export function PaymentConfirmDialog({
   const [showWaitingHint, setShowWaitingHint] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hintRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // null while loading; [] once loaded (empty, or the fetch 401'd — the
+  // public/anonymous pay-slot flow has no session, so this silently
+  // degrades to the plain phone input below, same as it worked before this
+  // feature existed).
+  const [savedMethods, setSavedMethods] = useState<SavedMethod[] | null>(null);
+  const [canManageSavedMethods, setCanManageSavedMethods] = useState(false);
+  const [selectedMethodId, setSelectedMethodId] = useState<string>("new");
+  const [saveNewNumber, setSaveNewNumber] = useState(false);
+  // The phone actually sent to the payment endpoint — distinct from the
+  // `phone` input state, which stays empty when a saved method (not the
+  // free-text field) is what's being used.
+  const [usedPhone, setUsedPhone] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/profile/payment-methods")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: { methods: SavedMethod[] } | null) => {
+        if (cancelled) return;
+        if (!body) {
+          setSavedMethods([]);
+          return;
+        }
+        setCanManageSavedMethods(true);
+        setSavedMethods(body.methods);
+        const defaultMethod = body.methods.find((m) => m.isDefault);
+        if (defaultMethod) setSelectedMethodId(defaultMethod.id);
+      })
+      .catch(() => {
+        if (!cancelled) setSavedMethods([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const detectedProvider = phone.trim() ? detectMobileMoneyProvider(phone.replace(/\D/g, "").replace(/^237/, "")) : null;
+  const usingNewNumber = selectedMethodId === "new" || (savedMethods?.length ?? 0) === 0;
 
   useEffect(() => {
     let cancelled = false;
@@ -116,11 +169,23 @@ export function PaymentConfirmDialog({
   }
 
   async function handleConfirm() {
-    const digits = phone.replace(/\D/g, "");
-    const normalized = digits.startsWith("237") ? digits.slice(3) : digits;
-    if (!/^[6-9]\d{8}$/.test(normalized)) {
-      setPhoneError(t("invalidMobileMoneyPhone"));
-      return;
+    let normalized: string;
+    if (!usingNewNumber) {
+      // A saved method's phone was already validated/normalized when it was
+      // saved — no need to re-run the regex against it.
+      const method = savedMethods?.find((m) => m.id === selectedMethodId);
+      if (!method) {
+        setPhoneError(t("invalidMobileMoneyPhone"));
+        return;
+      }
+      normalized = method.phone;
+    } else {
+      const digits = phone.replace(/\D/g, "");
+      normalized = digits.startsWith("237") ? digits.slice(3) : digits;
+      if (!/^[6-9]\d{8}$/.test(normalized)) {
+        setPhoneError(t("invalidMobileMoneyPhone"));
+        return;
+      }
     }
     setPhoneError(null);
     setSubmitting(true);
@@ -136,8 +201,19 @@ export function PaymentConfirmDialog({
       });
       const body = await parseJsonOrThrow<{ transId: string }>(res, t("paymentInitiationFailed"));
       setTransId(body.transId);
+      setUsedPhone(normalized);
       setStep("waiting");
       startPolling(body.transId);
+      // Best-effort, fire-and-forget — saving the number for next time is a
+      // convenience, never something that should block or fail the payment
+      // that's already in flight.
+      if (usingNewNumber && saveNewNumber && canManageSavedMethods) {
+        fetch("/api/profile/payment-methods", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: normalized }),
+        }).catch(() => {});
+      }
     } catch (err) {
       setPayError(friendlyErrorMessage(err, t("paymentInitiationFailed")));
     } finally {
@@ -200,19 +276,98 @@ export function PaymentConfirmDialog({
 
             {quote && (
               <div className="mb-4">
-                <label htmlFor="mm-phone" className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
                   {t("mobileMoneyPhoneLabel")}
                 </label>
-                <input
-                  id="mm-phone"
-                  type="tel"
-                  inputMode="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder={t("mobileMoneyPhonePlaceholder")}
-                  className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
-                />
-                {phoneError && <p className="font-label-sm text-label-sm text-error mt-1">{phoneError}</p>}
+
+                {savedMethods && savedMethods.length > 0 && (
+                  <div className="flex flex-col gap-1.5 mb-2">
+                    {savedMethods.map((m) => (
+                      <label
+                        key={m.id}
+                        className={`flex items-center gap-2 border rounded-lg px-3 py-2 cursor-pointer transition-colors ${
+                          selectedMethodId === m.id ? "border-primary bg-primary/5" : "border-outline-variant"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="payer-method"
+                          checked={selectedMethodId === m.id}
+                          onChange={() => setSelectedMethodId(m.id)}
+                          className="accent-primary flex-shrink-0"
+                        />
+                        <span
+                          className={`px-1.5 py-0.5 rounded font-label-sm text-[10px] uppercase tracking-wide flex-shrink-0 ${
+                            m.provider === "ORANGE" ? "bg-orange-100 text-orange-700" : "bg-yellow-100 text-yellow-800"
+                          }`}
+                        >
+                          {t(providerLabelKey(m.provider))}
+                        </span>
+                        <span className="font-label-md text-label-md text-on-surface truncate">
+                          {m.label || m.phone}
+                        </span>
+                        {m.isDefault && (
+                          <span className="ml-auto font-label-sm text-[10px] text-primary flex-shrink-0">
+                            {t("defaultPayerLabel")}
+                          </span>
+                        )}
+                      </label>
+                    ))}
+                    <label
+                      className={`flex items-center gap-2 border rounded-lg px-3 py-2 cursor-pointer transition-colors ${
+                        selectedMethodId === "new" ? "border-primary bg-primary/5" : "border-outline-variant"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="payer-method"
+                        checked={selectedMethodId === "new"}
+                        onChange={() => setSelectedMethodId("new")}
+                        className="accent-primary flex-shrink-0"
+                      />
+                      <span className="font-label-md text-label-md text-on-surface">{t("useNewPayerNumberAction")}</span>
+                    </label>
+                  </div>
+                )}
+
+                {usingNewNumber && (
+                  <>
+                    <input
+                      id="mm-phone"
+                      type="tel"
+                      inputMode="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder={t("mobileMoneyPhonePlaceholder")}
+                      className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+                    />
+                    {detectedProvider && (
+                      <p className="font-label-sm text-label-sm text-on-surface-variant mt-1 flex items-center gap-1">
+                        <span
+                          className={`px-1.5 py-0.5 rounded font-label-sm text-[10px] uppercase tracking-wide ${
+                            detectedProvider === "ORANGE" ? "bg-orange-100 text-orange-700" : "bg-yellow-100 text-yellow-800"
+                          }`}
+                        >
+                          {t(providerLabelKey(detectedProvider))}
+                        </span>
+                      </p>
+                    )}
+                    {phoneError && <p className="font-label-sm text-label-sm text-error mt-1">{phoneError}</p>}
+                    {canManageSavedMethods && (
+                      <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={saveNewNumber}
+                          onChange={(e) => setSaveNewNumber(e.target.checked)}
+                          className="accent-primary"
+                        />
+                        <span className="font-label-sm text-label-sm text-on-surface-variant">
+                          {t("savePayerNumberAction")}
+                        </span>
+                      </label>
+                    )}
+                  </>
+                )}
               </div>
             )}
 
@@ -227,7 +382,7 @@ export function PaymentConfirmDialog({
               </button>
               <button
                 onClick={handleConfirm}
-                disabled={!quote || submitting || !phone.trim()}
+                disabled={!quote || submitting || (usingNewNumber ? !phone.trim() : !selectedMethodId)}
                 className="flex-1 px-3 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-60"
               >
                 {submitting ? t("redirectingToFapshi") : t("confirmAndPay")}
@@ -246,7 +401,7 @@ export function PaymentConfirmDialog({
               </p>
             )}
             <p className="font-label-sm text-label-sm text-on-surface-variant">
-              {t("ussdSentToPhone", { phone })}
+              {t("ussdSentToPhone", { phone: usedPhone })}
             </p>
             <p className="font-body-md text-body-md text-on-surface-variant">{t("ussdInstructions")}</p>
             {showWaitingHint && (

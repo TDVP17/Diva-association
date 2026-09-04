@@ -5,6 +5,7 @@ import Link from "next/link";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { LoadingSpinner } from "@/components/loading-spinner";
 import { formatXAF } from "@/lib/format-currency";
+import { sessionStatusKey } from "@/lib/session-status-label";
 
 interface ContributionCard {
   id: string;
@@ -53,7 +54,7 @@ export function AdminContributionsClient({ lang }: { lang: Lang }) {
           <div className="flex items-center justify-between gap-2">
             <h4 className="font-title-sm text-title-sm text-on-surface truncate">{c.title}</h4>
             <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-secondary-container/30 text-on-secondary-container font-label-sm text-label-sm flex-shrink-0">
-              {c.status}
+              {t(sessionStatusKey(c.status))}
             </span>
           </div>
           <div className="grid grid-cols-2 gap-2">

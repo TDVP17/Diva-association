@@ -12,6 +12,7 @@ import { updatePhoneAction, updateEmailAction } from "./actions";
 import { InstallAppButton } from "@/components/install-app-button";
 import { AndroidApkButton } from "@/components/android-apk-button";
 import { MemberCodeCard } from "./member-code-card";
+import { SavedPaymentMethodsCard } from "./saved-payment-methods-card";
 import { formatXAF } from "@/lib/format-currency";
 
 const TONTINE_LABELS: Record<string, string> = {
@@ -147,6 +148,8 @@ export default async function ProfilePage() {
           <span className="font-label-md text-label-md text-on-surface">{user.role}</span>
         </div>
       </div>
+
+      <SavedPaymentMethodsCard lang={lang} />
 
       <section className="mb-stack-gap-lg">
         <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md px-1">

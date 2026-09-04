@@ -170,6 +170,16 @@ enum PaymentMethodType {
   MOBILE_MONEY
 }
 
+/// The Cameroonian mobile money network a phone number belongs to — always
+/// derived server-side from the number's prefix (see
+/// src/lib/mobile-money-provider.ts), never trusted from client input.
+/// Passed through to Fapshi as `medium` so it routes to the right network
+/// instead of relying on Fapshi's own auto-detection.
+enum MobileMoneyProvider {
+  ORANGE
+  MTN
+}
+
 /// The payment gateway that processed a Contribution — see
 /// src/lib/payment-fees.ts for its fee structure. Fapshi (Mobile
 /// Money/Orange Money) is the platform's sole payment gateway — Kora
@@ -325,19 +335,25 @@ model User {
   @@map("users")
 }
 
-/// A user's saved Mobile Money number shortcut — max 4 per user, enforced
-/// at the API layer.
+/// A user's saved Mobile Money/Orange Money payer number shortcut — max 4
+/// per user, enforced at the API layer (src/app/api/profile/payment-
+/// methods/route.ts). `provider` is always server-derived from `phone` at
+/// save time (see src/lib/mobile-money-provider.ts), never client-supplied,
+/// so it can't drift from what the number actually is.
 model SavedPaymentMethod {
-  id        String            @id @default(cuid())
+  id        String              @id @default(cuid())
   userId    String
-  type      PaymentMethodType
+  type      PaymentMethodType   @default(MOBILE_MONEY)
+  provider  MobileMoneyProvider
   label     String?
-  phone     String?
-  isDefault Boolean           @default(false)
-  createdAt DateTime          @default(now())
+  /// Normalized 9-digit Cameroonian MSISDN, no country code (e.g. "677123456").
+  phone     String
+  isDefault Boolean             @default(false)
+  createdAt DateTime            @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, phone])
   @@map("saved_payment_methods")
 }
 

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { initiateDirectPayment, normalizeCameroonPhone, FapshiError } from "@/lib/fapshi";
 import { computeProviderFee } from "@/lib/payment-fees";
+import { detectMobileMoneyProvider, fapshiMediumFor } from "@/lib/mobile-money-provider";
 import type { PaymentProvider } from "@/generated/prisma/enums";
 
 export type InitiateFinePaymentResult =
@@ -117,12 +118,14 @@ export async function initiateFinePayment(
   }
 
   try {
+    const detectedProvider = detectMobileMoneyProvider(normalizedPhone);
     const result = await initiateDirectPayment({
       amount: providerFee.totalCharged,
       phone: normalizedPhone,
       userId,
       externalId: fine.id,
       message: `DIVA late-payment fine — ${fine.membershipSlot.beneficiaryName}`,
+      medium: detectedProvider ? fapshiMediumFor(detectedProvider) : undefined,
     });
 
     await prisma.$transaction([
