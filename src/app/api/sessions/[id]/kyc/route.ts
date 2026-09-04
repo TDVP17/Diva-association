@@ -247,7 +247,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       result = await withTransientRetry(
         () =>
           prisma.$transaction(async (tx) => {
-            await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`${session.user.id}:${tontineSessionId}`}))`;
+            // $executeRaw, not $queryRaw — pg_advisory_xact_lock() returns
+            // void, and Prisma 7's client-engine-runtime (used with the
+            // @prisma/adapter-pg driver adapter this project relies on)
+            // can't deserialize a void-typed result column: every call
+            // through $queryRaw threw P2010 "UnsupportedNativeDataType",
+            // unconditionally failing this transaction on every single
+            // attempt. $executeRaw only needs a row count, never attempts
+            // to deserialize column values, and works correctly.
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${session.user.id}:${tontineSessionId}`}))`;
 
             const fresh = await tx.membership.findUnique({
               where: { userId_tontineSessionId: { userId: session.user.id, tontineSessionId } },

@@ -6,7 +6,7 @@ vi.mock("@/auth", () => ({ auth: (...a: unknown[]) => auth(...a) }));
 const findUniqueTontineSession = vi.fn();
 const findUniqueMembership = vi.fn();
 const findManyUser = vi.fn().mockResolvedValue([]);
-const txQueryRaw = vi.fn().mockResolvedValue(undefined);
+const txExecuteRaw = vi.fn().mockResolvedValue(undefined);
 const txFindUniqueMembership = vi.fn();
 const txUpsertMembership = vi.fn();
 const txCreateKycVerification = vi.fn();
@@ -18,7 +18,7 @@ vi.mock("@/lib/prisma", () => ({
     user: { findMany: (...a: unknown[]) => findManyUser(...a) },
     $transaction: async (cb: (tx: unknown) => unknown) =>
       cb({
-        $queryRaw: (...a: unknown[]) => txQueryRaw(...a),
+        $executeRaw: (...a: unknown[]) => txExecuteRaw(...a),
         membership: {
           findUnique: (...a: unknown[]) => txFindUniqueMembership(...a),
           upsert: (...a: unknown[]) => txUpsertMembership(...a),
@@ -81,7 +81,7 @@ describe("POST /api/sessions/[id]/kyc", () => {
     findUniqueTontineSession.mockReset();
     findUniqueMembership.mockReset();
     findManyUser.mockReset().mockResolvedValue([]);
-    txQueryRaw.mockReset().mockResolvedValue(undefined);
+    txExecuteRaw.mockReset().mockResolvedValue(undefined);
     txFindUniqueMembership.mockReset();
     txUpsertMembership.mockReset();
     txCreateKycVerification.mockReset();
@@ -213,6 +213,12 @@ describe("POST /api/sessions/[id]/kyc", () => {
     expect(res.status).toBe(200);
     expect(body).toEqual({ ok: true, status: "PENDING" });
     expect(saveFile).toHaveBeenCalledTimes(3);
+    // Regression guard: pg_advisory_xact_lock() returns void, which Prisma's
+    // $queryRaw can't deserialize (P2010 UnsupportedNativeDataType) — it
+    // must go through $executeRaw instead, which never attempts to. Using
+    // $queryRaw here again would fail this test outright, since the mock
+    // transaction object below only wires up $executeRaw.
+    expect(txExecuteRaw).toHaveBeenCalledTimes(1);
     expect(txCreateKycVerification).toHaveBeenCalledTimes(1);
     expect(txCreateKycVerification.mock.calls[0][0]).toMatchObject({
       data: expect.objectContaining({ referrerName: "Marie Ngo", referrerPhone: "677123456" }),
@@ -242,7 +248,7 @@ describe("POST /api/sessions/[id]/kyc", () => {
     findUniqueTontineSession.mockResolvedValue(openTontineSession);
     findUniqueMembership.mockResolvedValue(null);
     saveFile.mockResolvedValue("ok");
-    txQueryRaw.mockRejectedValue(new Error("connection terminated"));
+    txExecuteRaw.mockRejectedValue(new Error("connection terminated"));
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const req = fakeFormRequest({
