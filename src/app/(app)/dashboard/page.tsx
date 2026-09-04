@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getContributionTotal } from "@/lib/tontine-engine";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { formatXAF } from "@/lib/format-currency";
+import { sessionStatusKey } from "@/lib/session-status-label";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -80,7 +81,7 @@ export default async function DashboardPage() {
                     </h3>
                     <p className="font-numeric-data text-numeric-data text-on-surface">{formatXAF(amount)}</p>
                     <p className="font-label-sm text-label-sm text-on-surface-variant">
-                      +{formatXAF(fee)} fee &middot; {m.tontineSession.status}
+                      {t("plusFeeSuffix", { fee: formatXAF(fee) })} &middot; {t(sessionStatusKey(m.tontineSession.status))}
                     </p>
                   </div>
                   <span className="material-symbols-outlined text-outline">chevron_right</span>

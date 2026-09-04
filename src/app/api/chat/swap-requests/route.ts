@@ -23,7 +23,10 @@ export async function POST(request: Request) {
   const { targetId, tontineSessionId } = parsed.data;
 
   if (targetId === session.user.id) {
-    return NextResponse.json({ error: "You cannot request a swap with yourself" }, { status: 400 });
+    return NextResponse.json(
+      { error: "You cannot request a swap with yourself", errorKey: "swapCannotRequestSelf" },
+      { status: 400 },
+    );
   }
 
   const [requesterMembership, targetMembership, existing] = await Promise.all([
@@ -47,13 +50,13 @@ export async function POST(request: Request) {
 
   if (!requesterMembership || !targetMembership) {
     return NextResponse.json(
-      { error: "Both members must belong to this tontine session" },
+      { error: "Both members must belong to this tontine session", errorKey: "swapMembersMustBelong" },
       { status: 404 },
     );
   }
   if (existing) {
     return NextResponse.json(
-      { error: "There is already a pending swap request between you two" },
+      { error: "There is already a pending swap request between you two", errorKey: "swapAlreadyPending" },
       { status: 409 },
     );
   }
@@ -70,7 +73,7 @@ export async function POST(request: Request) {
     // between the same pair.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       return NextResponse.json(
-        { error: "There is already a pending swap request between you two" },
+        { error: "There is already a pending swap request between you two", errorKey: "swapAlreadyPending" },
         { status: 409 },
       );
     }

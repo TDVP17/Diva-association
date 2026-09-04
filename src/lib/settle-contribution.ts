@@ -7,12 +7,8 @@ import { sendEmailSafe } from "@/lib/email/resend";
 import { paymentSuccessMessage } from "@/lib/whatsapp/templates";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { formatXAF } from "@/lib/format-currency";
-
-const TONTINE_LABELS: Record<string, string> = {
-  HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
-  MONTHLY_28: "Monthly Tontine (28th)",
-  MONTHLY_25: "Monthly Tontine (25th)",
-};
+import { translate, type Lang } from "@/lib/i18n/translations";
+import { TONTINE_TYPE_LABELS } from "@/lib/tontine-labels";
 
 type ContributionWithSlot = Contribution & {
   membershipSlot: MembershipSlot & {
@@ -76,13 +72,14 @@ export async function settleContribution(
 
   const totalPaid =
     Number(contribution.amountPaid) + Number(contribution.feePaid) + Number(contribution.finePaid) + paymentFee;
-  const sessionLabel = tontineSession.title || TONTINE_LABELS[tontineSession.type];
+  const sessionLabel = tontineSession.title || TONTINE_TYPE_LABELS[tontineSession.type];
   const receiptUrl = `${options.origin}/api/files/${receiptKey}`;
+  const recipientLang: Lang = user.preferredLang === "fr" ? "fr" : "en";
 
   await sendWhatsAppMessageSafe(
     user.phone,
     paymentSuccessMessage(
-      user.preferredLang === "fr" ? "fr" : "en",
+      recipientLang,
       `${user.name} (${contribution.membershipSlot.beneficiaryName})`,
       totalPaid,
       sessionLabel,
@@ -92,8 +89,8 @@ export async function settleContribution(
 
   await sendEmailSafe(
     user.email,
-    `Payment received — ${sessionLabel}`,
-    paymentSuccessEmailHtml({
+    translate(recipientLang, "paymentReceivedEmailSubject", { session: sessionLabel }),
+    paymentSuccessEmailHtml(recipientLang, {
       recipientName: user.name,
       beneficiaryName: contribution.membershipSlot.beneficiaryName,
       paidByName,
@@ -119,12 +116,14 @@ export async function settleContribution(
   });
 
   // The payer gets their own confirmation too, when they aren't the
-  // beneficiary themselves (relative/friend paying via their own code).
+  // beneficiary themselves (relative/friend paying via their own code) —
+  // in their OWN preferredLang, not the beneficiary's.
   if (contribution.paidByUser && contribution.paidByUser.id !== user.id) {
+    const payerLang: Lang = contribution.paidByUser.preferredLang === "fr" ? "fr" : "en";
     await sendEmailSafe(
       contribution.paidByUser.email,
-      `Payment sent — ${sessionLabel}`,
-      paymentSuccessEmailHtml({
+      translate(payerLang, "paymentSentEmailSubject", { session: sessionLabel }),
+      paymentSuccessEmailHtml(payerLang, {
         recipientName: contribution.paidByUser.name,
         beneficiaryName: contribution.membershipSlot.beneficiaryName,
         paidByName: contribution.paidByUser.name,
@@ -137,25 +136,29 @@ export async function settleContribution(
   }
 }
 
-function paymentSuccessEmailHtml(data: {
-  recipientName: string;
-  beneficiaryName: string;
-  paidByName?: string;
-  sessionLabel: string;
-  amount: number;
-  transRef: string;
-  receiptUrl: string;
-}): string {
-  const paidByLine = data.paidByName ? `<p><strong>Paid by:</strong> ${data.paidByName}</p>` : "";
+function paymentSuccessEmailHtml(
+  lang: Lang,
+  data: {
+    recipientName: string;
+    beneficiaryName: string;
+    paidByName?: string;
+    sessionLabel: string;
+    amount: number;
+    transRef: string;
+    receiptUrl: string;
+  },
+): string {
+  const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
+  const paidByLine = data.paidByName ? `<p><strong>${t("paidByLabel")}:</strong> ${data.paidByName}</p>` : "";
   return `
-    <p>Hello ${data.recipientName},</p>
-    <p>🎉 Your contribution has been received successfully.</p>
-    <p><strong>Contributed for:</strong> ${data.beneficiaryName}</p>
+    <p>${t("paymentReceivedEmailGreeting", { name: data.recipientName })}</p>
+    <p>${t("paymentReceivedEmailIntro")}</p>
+    <p><strong>${t("contributedForLabel")}:</strong> ${data.beneficiaryName}</p>
     ${paidByLine}
-    <p><strong>Contribution:</strong> ${data.sessionLabel}</p>
-    <p><strong>Amount:</strong> ${formatXAF(data.amount)}</p>
-    <p><strong>Transaction ID:</strong> ${data.transRef}</p>
-    <p><a href="${data.receiptUrl}">Download your PDF receipt</a></p>
-    <p>Thank you for your contribution to the community fund.</p>
+    <p><strong>${t("contributionLabel")}:</strong> ${data.sessionLabel}</p>
+    <p><strong>${t("amountLabel")}:</strong> ${formatXAF(data.amount)}</p>
+    <p><strong>${t("transactionIdLabel")}:</strong> ${data.transRef}</p>
+    <p><a href="${data.receiptUrl}">${t("downloadReceiptPdf")}</a></p>
+    <p>${t("thankYouContributionLine")}</p>
   `;
 }

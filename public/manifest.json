@@ -1,6 +1,6 @@
 {
-  "name": "DIVA Association",
-  "short_name": "DIVA",
+  "name": "Tontine",
+  "short_name": "Tontine",
   "description": "Automated management for traditional tontines.",
   "start_url": "/dashboard",
   "display": "standalone",

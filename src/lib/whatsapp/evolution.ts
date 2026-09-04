@@ -15,9 +15,20 @@ export class EvolutionApiError extends Error {
   }
 }
 
-/** Strips everything but digits — Evolution API expects a bare E.164-style number, no `+`. */
+/**
+ * Evolution API (Baileys/WhatsApp) needs the FULL international number
+ * (country code + subscriber number, no `+`) to resolve a WhatsApp JID —
+ * unlike Fapshi, which is Cameroon-only and accepts the bare 9-digit local
+ * number (see normalizeCameroonPhone in src/lib/fapshi.ts). User.phone is
+ * stored in that bare local format throughout the app, so it must be
+ * prefixed with "237" here specifically, or every WhatsApp send silently
+ * targets a non-existent JID.
+ */
 function normalizePhone(phone: string): string {
-  return phone.replace(/\D/g, "");
+  const digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("237")) return digits;
+  if (/^[6-9]\d{8}$/.test(digits)) return `237${digits}`;
+  return digits;
 }
 
 export async function sendWhatsAppMessage(phone: string, text: string): Promise<void> {

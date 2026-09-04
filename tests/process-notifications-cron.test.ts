@@ -122,4 +122,68 @@ describe("GET /api/crons/process-notifications — PUSH channel", () => {
     expect(sendEmail).toHaveBeenCalledTimes(1);
     expect(sendPushToUser).not.toHaveBeenCalled();
   });
+
+  it("sends the email subject in the recipient's own language, not hardcoded English", async () => {
+    findManyNotification.mockResolvedValue([
+      {
+        id: "notif-fr",
+        userId: "user-1",
+        channel: "EMAIL",
+        type: "FOOD_TURN",
+        message: "C'est ton tour !",
+        actionUrl: null,
+        retryCount: 0,
+        user: { email: "marie@example.com", phone: null, preferredLang: "fr" },
+      },
+    ]);
+    sendEmail.mockResolvedValue({});
+
+    await GET(fakeCronRequest());
+
+    expect(sendEmail).toHaveBeenCalledWith("marie@example.com", "C'est ton tour !", expect.any(String));
+  });
+
+  it("falls back to English when the recipient has no preferredLang on file", async () => {
+    findManyNotification.mockResolvedValue([
+      {
+        id: "notif-en",
+        userId: "user-2",
+        channel: "EMAIL",
+        type: "FOOD_TURN",
+        message: "It's your turn!",
+        actionUrl: null,
+        retryCount: 0,
+        user: { email: "john@example.com", phone: null, preferredLang: null },
+      },
+    ]);
+    sendEmail.mockResolvedValue({});
+
+    await GET(fakeCronRequest());
+
+    expect(sendEmail).toHaveBeenCalledWith("john@example.com", "It's Your Turn!", expect.any(String));
+  });
+
+  it("puts the recipient's own language subject on a PUSH notification's title too", async () => {
+    findManyNotification.mockResolvedValue([
+      {
+        id: "notif-push-fr",
+        userId: "user-1",
+        channel: "PUSH",
+        type: "PAYOUT_TURN",
+        message: "C'est votre tour",
+        actionUrl: "/sessions/session-1",
+        retryCount: 0,
+        user: { email: null, phone: null, preferredLang: "fr" },
+      },
+    ]);
+    notificationCount.mockResolvedValue(0);
+    sendPushToUser.mockResolvedValue({ sent: 1, failed: 0 });
+
+    await GET(fakeCronRequest());
+
+    expect(sendPushToUser).toHaveBeenCalledWith(
+      "user-1",
+      expect.objectContaining({ title: "Votre tour de versement" }),
+    );
+  });
 });

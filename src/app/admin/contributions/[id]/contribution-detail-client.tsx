@@ -12,6 +12,10 @@ import { LoadingSpinner } from "@/components/loading-spinner";
 import { MemberArchivesToggle } from "@/components/admin/member-archives-toggle";
 import { formatXAF } from "@/lib/format-currency";
 import { sessionStatusKey } from "@/lib/session-status-label";
+import { CONTRIBUTION_STATUS_KEY } from "@/lib/contribution-status-label";
+import { FINE_STATUS_KEY } from "@/lib/fine-status-label";
+import { PAYOUT_CLAIM_STATUS_KEY } from "@/lib/payout-claim-status-label";
+import { TONTINE_TYPE_LABELS } from "@/lib/tontine-labels";
 
 interface MembershipRequest {
   id: string;
@@ -507,7 +511,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   const drawUnlocksAtLabel = session.drawDate
     ? new Date(session.drawDate).toLocaleString("en-US", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
     : "";
-  const sessionLabel = session.title || session.type;
+  const sessionLabel = session.title || TONTINE_TYPE_LABELS[session.type as keyof typeof TONTINE_TYPE_LABELS] || session.type;
 
   const TAB_LABELS: Record<Tab, string> = {
     overview: t("overviewTab"),
@@ -931,7 +935,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                             tx.status === "PAID" ? "bg-[#d1fae5] text-[#065f46]" : "bg-secondary-fixed text-on-secondary-fixed-variant"
                           }`}
                         >
-                          {tx.status}
+                          {t(CONTRIBUTION_STATUS_KEY[tx.status] ?? "pending")}
                         </span>
                       </div>
                     </div>
@@ -986,7 +990,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                             c.status === "CONFIRMED" ? "bg-[#d1fae5] text-[#065f46]" : "bg-secondary-container/40 text-on-secondary-container"
                           }`}
                         >
-                          {c.status}
+                          {t(PAYOUT_CLAIM_STATUS_KEY[c.status])}
                         </span>
                         {c.status === "CONFIRMED" && (
                           <p className="font-label-sm text-label-sm text-on-surface-variant mt-0.5">
@@ -1072,7 +1076,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                         f.status === "UNPAID" ? "bg-error-container text-on-error-container" : "bg-[#d1fae5] text-[#065f46]"
                       }`}
                     >
-                      {f.status}
+                      {t(FINE_STATUS_KEY[f.status] ?? "unpaidStatus")}
                     </span>
                   </div>
                 </div>

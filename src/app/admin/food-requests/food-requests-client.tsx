@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { LoadingSpinner } from "@/components/loading-spinner";
+import { PAYOUT_CLAIM_STATUS_KEY } from "@/lib/payout-claim-status-label";
 
 interface FoodRequestRow {
   id: string;
@@ -64,7 +65,7 @@ export function FoodRequestsClient({ lang }: { lang: Lang }) {
                   r.status === "RELEASED" ? "bg-secondary-container/40 text-on-secondary-container" : "bg-secondary-fixed text-on-secondary-fixed-variant"
                 }`}
               >
-                {r.status}
+                {t(PAYOUT_CLAIM_STATUS_KEY[r.status])}
               </span>
             </Link>
           ))}

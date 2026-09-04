@@ -71,11 +71,58 @@ export function payoutTurnMessage(
   cotisationName: string,
   estimatedAmount: number,
   expectedDateLabel: string,
+  position: number,
 ): string {
   return translate(lang, "waPayoutTurn", {
     name: firstName,
     amount: formatXAF(estimatedAmount),
     cotisation: cotisationName,
     date: expectedDateLabel,
+    position: String(position),
+  });
+}
+
+/** Sent right when an admin releases a payout — confirms the transfer to the beneficiary who was just paid. */
+export function payoutReleasedMessage(
+  lang: Lang,
+  memberName: string,
+  beneficiaryName: string,
+  netPayout: number,
+  deducted: number,
+): string {
+  return deducted > 0
+    ? translate(lang, "waPayoutReleasedWithDeduction", {
+        name: memberName,
+        beneficiary: beneficiaryName,
+        amount: formatXAF(netPayout),
+        deducted: formatXAF(deducted),
+      })
+    : translate(lang, "waPayoutReleased", {
+        name: memberName,
+        beneficiary: beneficiaryName,
+        amount: formatXAF(netPayout),
+      });
+}
+
+/**
+ * Sent the day before the currently-designated beneficiary's ESTIMATED
+ * payout date (see getCycleDateForRound) — a reminder distinct from
+ * payoutTurnMessage above, which fires once, right when they first become
+ * designated (possibly weeks earlier).
+ */
+export function turnReminderTomorrowMessage(
+  lang: Lang,
+  firstName: string,
+  cotisationName: string,
+  position: number,
+  estimatedAmount: number,
+  tomorrowDateLabel: string,
+): string {
+  return translate(lang, "waTurnReminderTomorrow", {
+    name: firstName,
+    cotisation: cotisationName,
+    position: String(position),
+    amount: formatXAF(estimatedAmount),
+    date: tomorrowDateLabel,
   });
 }

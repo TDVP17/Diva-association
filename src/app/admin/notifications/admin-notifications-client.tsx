@@ -107,7 +107,7 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
           <option value="">{t("allChannels")}</option>
           <option value="EMAIL">Email</option>
           <option value="WHATSAPP">WhatsApp</option>
-          <option value="IN_APP">In-App</option>
+          <option value="IN_APP">{t("notifChannelInApp")}</option>
         </select>
         <select
           value={status}
@@ -115,10 +115,10 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
           className="border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
         >
           <option value="">{t("allStatuses")}</option>
-          <option value="SENT">SENT</option>
-          <option value="SCHEDULED">SCHEDULED</option>
-          <option value="PROCESSING">PROCESSING</option>
-          <option value="FAILED">FAILED</option>
+          <option value="SENT">{t("notifStatusSent")}</option>
+          <option value="SCHEDULED">{t("notifStatusScheduled")}</option>
+          <option value="PROCESSING">{t("notifStatusProcessing")}</option>
+          <option value="FAILED">{t("notifStatusFailed")}</option>
         </select>
         <input
           value={member}

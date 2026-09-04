@@ -13,6 +13,7 @@ import { InstallAppButton } from "@/components/install-app-button";
 import { AndroidApkButton } from "@/components/android-apk-button";
 import { MemberCodeCard } from "./member-code-card";
 import { SavedPaymentMethodsCard } from "./saved-payment-methods-card";
+import { ROLE_KEY } from "@/lib/role-label";
 import { formatXAF } from "@/lib/format-currency";
 
 const TONTINE_LABELS: Record<string, string> = {
@@ -145,7 +146,7 @@ export default async function ProfilePage() {
         <InlineLocationField city={user.city} neighborhood={user.neighborhood} lang={lang} />
         <div className="flex justify-between items-center px-4 py-3 border-t border-surface-variant">
           <span className="font-label-sm text-label-sm text-on-surface-variant">{t("roleLabel")}</span>
-          <span className="font-label-md text-label-md text-on-surface">{user.role}</span>
+          <span className="font-label-md text-label-md text-on-surface">{t(ROLE_KEY[user.role] ?? "roleMember")}</span>
         </div>
       </div>
 

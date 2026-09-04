@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { NOTIFICATION_TYPE_KEY, NOTIFICATION_STATUS_KEY } from "@/lib/notifications/type-labels";
 
 interface NotificationRow {
   id: string;
@@ -192,12 +193,13 @@ export function NotificationsTab({
                     {n.userName} · {n.channel}
                   </p>
                   <p className="font-label-sm text-label-sm text-on-surface-variant truncate">
-                    {n.type} — {new Date(n.sentAt ?? n.scheduledAt).toLocaleString("en-GB", { timeZone: "Africa/Douala" })}
+                    {NOTIFICATION_TYPE_KEY[n.type] ? t(NOTIFICATION_TYPE_KEY[n.type]) : n.type} —{" "}
+                    {new Date(n.sentAt ?? n.scheduledAt).toLocaleString("en-GB", { timeZone: "Africa/Douala" })}
                     {n.errorMessage && ` — ${n.errorMessage}`}
                   </p>
                 </div>
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-md font-label-sm text-label-sm flex-shrink-0 ml-2 ${STATUS_CLASS[n.status]}`}>
-                  {n.status}
+                  {NOTIFICATION_STATUS_KEY[n.status] ? t(NOTIFICATION_STATUS_KEY[n.status]) : n.status}
                 </span>
               </div>
             ))}

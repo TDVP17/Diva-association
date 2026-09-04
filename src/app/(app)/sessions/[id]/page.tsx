@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getContributionTotal, getNextDueDate } from "@/lib/tontine-engine";
+import { getContributionTotal, getNextDueDate, getCycleDateForRound } from "@/lib/tontine-engine";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { formatXAF } from "@/lib/format-currency";
 import { PayButton } from "./pay-button";
@@ -424,6 +424,13 @@ export default async function SessionDetailPage({
             const f = fineBySlot.get(s.id);
             const paid = c?.status === "PAID";
             const slotTotal = perSlotTotal + (f ? Number(f.amount) : 0);
+            const slotDateLabel = s.officialPosition
+              ? getCycleDateForRound(tontineSession.type, tontineSession.startDate, s.officialPosition).toLocaleDateString(
+                  lang === "fr" ? "fr-FR" : "en-GB",
+                  { timeZone: "Africa/Douala", day: "numeric", month: "short", year: "numeric" },
+                )
+              : null;
+            const notReadyForPayment = tontineSession.status !== "ACTIVE" || s.officialPosition === null;
             return (
               <div
                 key={s.id}
@@ -435,6 +442,12 @@ export default async function SessionDetailPage({
                     {t("positionLabel")} {s.ballDrawn ?? t("notYetRevealed")} ·{" "}
                     {paid ? t("paid") : `${formatXAF(slotTotal)} ${t("due")}`}
                   </div>
+                  {slotDateLabel && (
+                    <div className="font-label-sm text-[11px] text-on-surface-variant flex items-center gap-1 mt-0.5">
+                      <span className="material-symbols-outlined text-[13px]">event</span>
+                      {t("estimatedDateLabel")}: {slotDateLabel}
+                    </div>
+                  )}
                 </div>
                 {!paid && (
                   <PayButton
@@ -445,9 +458,11 @@ export default async function SessionDetailPage({
                     defaultPhone={myMembership.user.phone}
                     lang={lang}
                     lockedReason={
-                      !roundLock.ok && currentBeneficiaryName
-                        ? t("paymentsLockedUntilPayout", { name: currentBeneficiaryName })
-                        : undefined
+                      notReadyForPayment
+                        ? (s.officialPosition === null ? t("positionsNotYetAssigned") : t("paymentsAvailableAfterDraw"))
+                        : !roundLock.ok && currentBeneficiaryName
+                          ? t("paymentsLockedUntilPayout", { name: currentBeneficiaryName })
+                          : undefined
                     }
                   />
                 )}
@@ -464,6 +479,12 @@ export default async function SessionDetailPage({
             const c = contributionBySlot.get(s.id);
             const f = fineBySlot.get(s.id);
             const paid = c?.status === "PAID";
+            const slotDateLabel = s.officialPosition
+              ? getCycleDateForRound(tontineSession.type, tontineSession.startDate, s.officialPosition).toLocaleDateString(
+                  lang === "fr" ? "fr-FR" : "en-GB",
+                  { timeZone: "Africa/Douala", day: "numeric", month: "short", year: "numeric" },
+                )
+              : null;
             return (
               <div
                 key={s.id}
@@ -482,11 +503,14 @@ export default async function SessionDetailPage({
                 </div>
                 <div className="flex-grow min-w-0">
                   <div className="font-label-md text-label-md text-on-surface truncate">{s.beneficiaryName}</div>
-                  <div className="font-label-sm text-label-sm text-on-surface-variant">
+                  <div className="font-label-sm text-label-sm text-on-surface-variant truncate">
                     {s.member.name}
                     {paid
                       ? ` · ${c?.paidAt ? t("paidAtLabel", { time: c.paidAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) }) : t("paid")}`
                       : ` · ${t("notYetPaid")}`}
+                  </div>
+                  <div className="font-label-sm text-[11px] text-on-surface-variant truncate">
+                    {slotDateLabel ? `${t("estimatedDateLabel")}: ${slotDateLabel}` : t("positionNotYetAssignedShort")}
                   </div>
                 </div>
                 <div className="text-right">

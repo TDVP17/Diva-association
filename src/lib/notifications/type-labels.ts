@@ -24,6 +24,7 @@ export const NOTIFICATION_TYPE_KEY: Record<string, Parameters<typeof translate>[
   DRAW_LAUNCHED: "notifTypeDrawLaunched",
   PAYMENT_REFUND_ESCALATED: "notifTypePaymentRefundEscalated",
   PAYOUT_TURN: "notifTypePayoutTurn",
+  TURN_REMINDER_TOMORROW: "notifTypeTurnReminderTomorrow",
 };
 
 /** Notification/reminder delivery status, for the admin notification center's log view. */

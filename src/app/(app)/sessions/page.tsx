@@ -6,6 +6,7 @@ import { assertJoinable, sumRegisteredSlots } from "@/lib/session-joinability";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { HideClosedSessionButton } from "./hide-closed-session-button";
 import { formatXAF } from "@/lib/format-currency";
+import { sessionStatusKey } from "@/lib/session-status-label";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -97,7 +98,7 @@ export default async function SessionsPage() {
                   <span
                     className={`font-label-sm text-label-sm px-2 py-1 rounded pointer-events-none ${STATUS_STYLES[m.tontineSession.status]}`}
                   >
-                    {m.tontineSession.status}
+                    {t(sessionStatusKey(m.tontineSession.status))}
                   </span>
                   {m.tontineSession.status === "CLOSED" && (
                     <HideClosedSessionButton membershipId={m.id} lang={lang} />

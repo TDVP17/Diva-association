@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email/resend";
 import { sendWhatsAppMessage } from "@/lib/whatsapp/evolution";
 import { sendPushToUser } from "@/lib/push/send";
+import { translate, type Lang } from "@/lib/i18n/translations";
+import { NOTIFICATION_TYPE_KEY } from "@/lib/notifications/type-labels";
 
 const MAX_RETRIES = 3;
 const BATCH_SIZE = 25;
@@ -22,7 +24,7 @@ export async function GET(request: Request) {
 
   const due = await prisma.notification.findMany({
     where: { status: { in: ["PENDING", "SCHEDULED"] }, scheduledAt: { lte: new Date() } },
-    include: { user: { select: { email: true, phone: true } } },
+    include: { user: { select: { email: true, phone: true, preferredLang: true } } },
     orderBy: { scheduledAt: "asc" },
     take: BATCH_SIZE,
   });
@@ -32,11 +34,12 @@ export async function GET(request: Request) {
 
   for (const n of due) {
     await prisma.notification.update({ where: { id: n.id }, data: { status: "PROCESSING" } });
+    const lang: Lang = n.user.preferredLang === "fr" ? "fr" : "en";
 
     try {
       if (n.channel === "EMAIL") {
         if (!n.user.email) throw new Error("Recipient has no email on file");
-        const { subject, body } = splitSubjectAndBody(n.type, n.message);
+        const { subject, body } = splitSubjectAndBody(n.type, n.message, lang);
         await sendEmail(n.user.email, subject, htmlFor(body));
       } else if (n.channel === "WHATSAPP") {
         if (!n.user.phone) throw new Error("Recipient has no WhatsApp number on file");
@@ -55,7 +58,7 @@ export async function GET(request: Request) {
         // way an EMAIL/WHATSAPP API error does (there's nothing more to
         // retry once every known subscription has already been tried).
         await sendPushToUser(n.userId, {
-          title: subjectFor(n.type),
+          title: subjectFor(n.type, lang),
           body: n.message,
           url: n.actionUrl ?? undefined,
           badgeCount,
@@ -87,26 +90,19 @@ export async function GET(request: Request) {
   return NextResponse.json({ ok: true, processed: due.length, sent, failed });
 }
 
-function subjectFor(type: string): string {
-  switch (type) {
-    case "CONTRIBUTION_REMINDER":
-      return "Contribution Reminder";
-    case "FINE_REMINDER":
-      return "Fine Reminder";
-    case "FOOD_TURN":
-      return "It's your turn! 🎉";
-    default:
-      return "DIVA Association";
-  }
+/** Reuses the same type→label map the in-app feed renders with, so an email/push subject is never stuck in the wrong language for the recipient. */
+function subjectFor(type: string, lang: Lang): string {
+  const key = NOTIFICATION_TYPE_KEY[type];
+  return key ? translate(lang, key) : "DIVA Association";
 }
 
 /** ADMIN_BROADCAST messages are stored as "subject\n\nbody" (see broadcast-email/route.ts) — every other type has no admin-chosen subject, so it falls back to a type label. */
-function splitSubjectAndBody(type: string, message: string): { subject: string; body: string } {
+function splitSubjectAndBody(type: string, message: string, lang: Lang): { subject: string; body: string } {
   if (type === "ADMIN_BROADCAST") {
     const [subject, ...rest] = message.split("\n\n");
     return { subject, body: rest.join("\n\n") || subject };
   }
-  return { subject: subjectFor(type), body: message };
+  return { subject: subjectFor(type, lang), body: message };
 }
 
 function htmlFor(message: string): string {

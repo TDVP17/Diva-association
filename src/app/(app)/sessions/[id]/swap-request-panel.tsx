@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { translate, type Lang } from "@/lib/i18n/translations";
+import { translate, translateIfKnown, type Lang } from "@/lib/i18n/translations";
 import { getInitials } from "@/lib/initials";
+import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 
 type SwapStatus = "PENDING_MEMBERSHIP" | "PENDING_ADMIN" | "APPROVED" | "REJECTED";
 
@@ -68,12 +69,10 @@ export function SwapRequestPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ targetId, tontineSessionId }),
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        setError(body?.error ?? t("somethingWentWrong"));
-        return;
-      }
+      await parseJsonOrThrow(res, t("somethingWentWrong"));
       router.refresh();
+    } catch (err) {
+      setError(friendlyErrorMessage(err, t("somethingWentWrong"), (key, vars) => translateIfKnown(lang, key, vars)));
     } finally {
       setPendingActionId(null);
     }
@@ -88,12 +87,10 @@ export function SwapRequestPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        setError(body?.error ?? t("somethingWentWrong"));
-        return;
-      }
+      await parseJsonOrThrow(res, t("somethingWentWrong"));
       router.refresh();
+    } catch (err) {
+      setError(friendlyErrorMessage(err, t("somethingWentWrong"), (key, vars) => translateIfKnown(lang, key, vars)));
     } finally {
       setPendingActionId(null);
     }

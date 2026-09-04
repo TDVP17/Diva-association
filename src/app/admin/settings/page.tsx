@@ -8,6 +8,7 @@ import { InlinePasswordField } from "@/app/(app)/profile/inline-password-field";
 import { updatePhoneAction, updateEmailAction } from "@/app/(app)/profile/actions";
 import { getAssociationRules } from "@/lib/association-rules";
 import { GeneralRulesEditor } from "./general-rules-editor";
+import { ROLE_KEY } from "@/lib/role-label";
 
 export default async function AdminSettingsPage() {
   const session = await auth();
@@ -51,7 +52,7 @@ export default async function AdminSettingsPage() {
         />
         <div className="flex justify-between items-center px-4 py-3 border-t border-surface-variant">
           <span className="font-label-sm text-label-sm text-on-surface-variant">{t("roleLabel")}</span>
-          <span className="font-label-md text-label-md text-on-surface">{user.role}</span>
+          <span className="font-label-md text-label-md text-on-surface">{t(ROLE_KEY[user.role] ?? "roleMember")}</span>
         </div>
       </div>
 

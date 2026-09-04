@@ -130,14 +130,19 @@ export function KycModal({
             {t("identityVerificationBody")}
           </p>
 
-          <p className="font-label-sm text-label-sm text-error mb-stack-gap-md flex items-start gap-1.5">
+          <p className="font-label-sm text-label-sm text-error mb-stack-gap-sm flex items-start gap-1.5">
             <span className="material-symbols-outlined text-[16px] flex-shrink-0 mt-0.5">info</span>
             {t("cniCountryWarning")}
+          </p>
+          <p className="font-label-sm text-label-sm text-error mb-stack-gap-md flex items-start gap-1.5 font-semibold">
+            <span className="material-symbols-outlined text-[16px] flex-shrink-0 mt-0.5">contact_page</span>
+            {t("cniBothSidesRequired")}
           </p>
 
           <div className="flex flex-col gap-stack-gap-sm mb-stack-gap-md">
             <PhotoPicker
               label={t("documentFrontPhotoLabel")}
+              instruction={t("documentFrontPhotoInstruction")}
               file={documentFrontFile}
               onChange={setDocumentFrontFile}
               captureMode="environment"
@@ -146,6 +151,7 @@ export function KycModal({
             />
             <PhotoPicker
               label={t("documentBackPhotoLabel")}
+              instruction={t("documentBackPhotoInstruction")}
               file={documentBackFile}
               onChange={setDocumentBackFile}
               captureMode="environment"
@@ -154,6 +160,7 @@ export function KycModal({
             />
             <PhotoPicker
               label={t("selfiePhotoLabel")}
+              instruction={t("selfiePhotoInstruction")}
               file={selfieFile}
               onChange={setSelfieFile}
               captureMode="user"
@@ -194,6 +201,12 @@ export function KycModal({
         </div>
 
         <div className="flex-shrink-0 p-5 pt-3 border-t border-surface-variant">
+          {canSubmit && !error && (
+            <p className="font-label-sm text-[11px] text-on-surface-variant mb-stack-gap-sm flex items-start gap-1.5">
+              <span className="material-symbols-outlined text-[14px] flex-shrink-0 mt-0.5">summarize</span>
+              {t("kycSubmissionSummary", { referrer: referrerName.trim() })}
+            </p>
+          )}
           {error && <p className="font-label-sm text-label-sm text-error mb-stack-gap-sm">{error}</p>}
           <div className="flex gap-2">
             <button
@@ -221,6 +234,7 @@ export function KycModal({
 
 function PhotoPicker({
   label,
+  instruction,
   file,
   onChange,
   captureMode,
@@ -228,6 +242,8 @@ function PhotoPicker({
   selectedLabel,
 }: {
   label: string;
+  /** Shown once, before the field is filled — tells the member exactly what to photograph and how, instead of a bare "Document 1"-style label. */
+  instruction: string;
   file: File | null;
   onChange: (file: File | null) => void;
   captureMode: "environment" | "user";
@@ -235,23 +251,28 @@ function PhotoPicker({
   selectedLabel: string;
 }) {
   return (
-    <label className="flex items-center justify-between gap-3 border border-outline-variant rounded-lg px-3 py-2.5 cursor-pointer hover:bg-surface-container-low transition-colors">
-      <div className="min-w-0">
-        <p className="font-label-sm text-label-sm text-on-surface-variant">{label}</p>
-        <p className="font-label-md text-label-md text-on-surface truncate">
-          {file ? `${selectedLabel} — ${file.name}` : chooseLabel}
-        </p>
-      </div>
-      <span className="material-symbols-outlined text-primary flex-shrink-0">
-        {file ? "check_circle" : "add_a_photo"}
-      </span>
-      <input
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        capture={captureMode}
-        className="hidden"
-        onChange={(e) => onChange(e.target.files?.[0] ?? null)}
-      />
-    </label>
+    <div>
+      {!file && (
+        <p className="font-label-sm text-[11px] text-on-surface-variant mb-1 px-0.5">{instruction}</p>
+      )}
+      <label className="flex items-center justify-between gap-3 border border-outline-variant rounded-lg px-3 py-2.5 cursor-pointer hover:bg-surface-container-low transition-colors">
+        <div className="min-w-0">
+          <p className="font-label-sm text-label-sm text-on-surface-variant">{label}</p>
+          <p className="font-label-md text-label-md text-on-surface truncate">
+            {file ? `${selectedLabel} — ${file.name}` : chooseLabel}
+          </p>
+        </div>
+        <span className="material-symbols-outlined text-primary flex-shrink-0">
+          {file ? "check_circle" : "add_a_photo"}
+        </span>
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          capture={captureMode}
+          className="hidden"
+          onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+        />
+      </label>
+    </div>
   );
 }

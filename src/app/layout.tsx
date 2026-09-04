@@ -18,6 +18,11 @@ export const metadata: Metadata = {
   title: { default: SITE_TITLE, template: `%s — ${SITE_TITLE}` },
   description: SITE_DESCRIPTION,
   manifest: "/manifest.json",
+  // iOS Safari's "Add to Home Screen" ignores manifest.json entirely — it
+  // reads this meta tag for the label under the home-screen icon. Kept in
+  // sync with manifest.json's name/short_name below (both "Tontine") so the
+  // installed name matches on every platform.
+  appleWebApp: { title: "Tontine" },
   icons: {
     icon: [
       { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },

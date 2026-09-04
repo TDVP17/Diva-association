@@ -93,7 +93,7 @@ export function CreateSessionForm({ lang }: { lang: Lang }) {
           required
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="e.g. Sunday Cycle — Douala Team"
+          placeholder={t("sessionTitlePlaceholder")}
           className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
         />
       </div>

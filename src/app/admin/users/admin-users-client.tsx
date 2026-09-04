@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { LoadingSpinner } from "@/components/loading-spinner";
+import { ROLE_KEY } from "@/lib/role-label";
 
 interface AdminUserRow {
   id: string;
@@ -87,7 +88,7 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="font-label-md text-label-md text-on-surface truncate">{u.name}</p>
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-md font-label-sm text-[11px] flex-shrink-0 ${ROLE_CLASS[u.role] ?? ""}`}>
-                    {u.role}
+                    {t(ROLE_KEY[u.role] ?? "roleMember")}
                   </span>
                 </div>
                 <p className="font-label-sm text-label-sm text-on-surface-variant truncate">

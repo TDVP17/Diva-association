@@ -150,6 +150,12 @@ enum NotificationEventType {
   /// An automated duplicate-payment refund failed 3 times and needs manual
   /// review — sent to every ADMIN/PRESIDENT user.
   PAYMENT_REFUND_ESCALATED
+  /// The currently-designated beneficiary's estimated payout date (see
+  /// getCycleDateForRound) falls tomorrow — a heads-up distinct from
+  /// PAYOUT_TURN (which fires once, right when they become designated,
+  /// possibly weeks earlier). Only ever sent for ACTIVE sessions with a
+  /// published ranking — see /api/crons/turn-reminder.
+  TURN_REMINDER_TOMORROW
 }
 
 enum NotificationStatus {
@@ -522,6 +528,7 @@ model MembershipSlot {
   fines         Fine[]
   payouts       Payout[]
   foodTurnLogs  FoodTurnLog[]
+  turnReminderLogs TurnReminderLog[]
 
   @@map("membership_slots")
 }
@@ -867,6 +874,24 @@ model FoodTurnLog {
 
   @@unique([membershipSlotId, dueDate])
   @@map("food_turn_logs")
+}
+
+/// Idempotency ledger for the day-before turn reminder (see
+/// /api/crons/turn-reminder), keyed on the SAME estimatedDate FoodTurnLog
+/// will later use for that slot's actual due-day notification — kept as a
+/// separate table (not a shared key in FoodTurnLog) so a reminder sent a
+/// day early can never be mistaken by the food-turn cron for "already
+/// notified today" and cause it to skip the real same-day message.
+model TurnReminderLog {
+  id               String   @id @default(cuid())
+  membershipSlotId String
+  estimatedDate    DateTime
+  sentAt           DateTime @default(now())
+
+  membershipSlot MembershipSlot @relation(fields: [membershipSlotId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipSlotId, estimatedDate])
+  @@map("turn_reminder_logs")
 }
 
 /// Append-only trail of important admin/member actions. actorId is

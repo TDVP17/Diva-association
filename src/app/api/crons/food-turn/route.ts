@@ -6,6 +6,7 @@ import { translate } from "@/lib/i18n/translations";
 import { scheduleNotifications } from "@/lib/notifications/dispatch";
 import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
 import { sendEmailSafe } from "@/lib/email/resend";
+import { NOTIFICATION_TYPE_KEY } from "@/lib/notifications/type-labels";
 
 /**
  * Notifies whoever's turn it is to receive the "food"/payout this cycle —
@@ -48,7 +49,11 @@ export async function GET(request: Request) {
       const message = translate(lang, "foodTurnMessage", { name: membership.user.name });
 
       await sendWhatsAppMessageSafe(membership.user.phone, message);
-      await sendEmailSafe(membership.user.email, "It's your turn! 🎉", message.split("\n").map((l) => `<p>${l}</p>`).join(""));
+      await sendEmailSafe(
+        membership.user.email,
+        translate(lang, NOTIFICATION_TYPE_KEY.FOOD_TURN),
+        message.split("\n").map((l) => `<p>${l}</p>`).join(""),
+      );
       await scheduleNotifications({
         tontineSessionId: tontineSession.id,
         channel: "IN_APP",

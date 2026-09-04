@@ -5,8 +5,8 @@ import { requireAdmin } from "@/lib/require-admin";
 import { computePayoutPreview } from "@/lib/payout-preview";
 import { sendPayout, FapshiPayoutError } from "@/lib/fapshi-payout";
 import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
-import { payoutTurnMessage } from "@/lib/whatsapp/templates";
-import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
+import { payoutTurnMessage, payoutReleasedMessage } from "@/lib/whatsapp/templates";
+import { scheduleInAppNotifications, scheduleNotifications } from "@/lib/notifications/dispatch";
 import { getDesignatedSlot } from "@/lib/round-robin-lock";
 import { getNextDueDate } from "@/lib/tontine-engine";
 import { TONTINE_TYPE_LABELS } from "@/lib/tontine-labels";
@@ -85,10 +85,13 @@ export async function POST(request: Request) {
 
   await sendWhatsAppMessageSafe(
     user.phone,
-    `🎉 Payout released — DIVA Association\n\n` +
-      `Congratulations ${user.name} (${slot.beneficiaryName})! Your payout of ${formatXAF(netPayout)} has been released` +
-      (deducted > 0 ? ` after deducting ${formatXAF(deducted)} in outstanding fines.` : `.`) +
-      ` Confirm on the app once you've received it.`,
+    payoutReleasedMessage(
+      user.preferredLang === "fr" ? "fr" : "en",
+      user.name,
+      slot.beneficiaryName,
+      netPayout,
+      deducted,
+    ),
   );
 
   // The round-robin just advanced — whoever getDesignatedSlot() now resolves
@@ -124,19 +127,37 @@ export async function POST(request: Request) {
         year: "numeric",
       });
 
-      await sendWhatsAppMessageSafe(
-        beneficiaryUser.phone,
-        payoutTurnMessage(beneficiaryLang, firstName, sessionLabel, estimatedPot, dateLabel),
+      const newDesignatedPosition = newDesignatedSlot.officialPosition!;
+      const fullPayoutTurnMessage = payoutTurnMessage(
+        beneficiaryLang,
+        firstName,
+        sessionLabel,
+        estimatedPot,
+        dateLabel,
+        newDesignatedPosition,
       );
+
+      await sendWhatsAppMessageSafe(beneficiaryUser.phone, fullPayoutTurnMessage);
+      await scheduleNotifications({
+        tontineSessionId: claim.tontineSessionId,
+        channel: "EMAIL",
+        type: "PAYOUT_TURN",
+        recipients: [{ userId: beneficiaryUser.id, message: fullPayoutTurnMessage }],
+      });
       await scheduleInAppNotifications({
         tontineSessionId: claim.tontineSessionId,
         type: "PAYOUT_TURN",
         recipients: [
           {
             userId: beneficiaryUser.id,
-            message: `It's your turn to receive the ${sessionLabel} payout — estimated ${formatXAF(estimatedPot)}, expected around ${dateLabel}.`,
+            message: `It's your turn to receive the ${sessionLabel} payout (position #${newDesignatedPosition}) — estimated ${formatXAF(estimatedPot)}, expected around ${dateLabel}.`,
             messageKey: "payoutTurnNotifMessage",
-            messageVars: { cotisation: sessionLabel, amount: formatXAF(estimatedPot), date: dateLabel },
+            messageVars: {
+              cotisation: sessionLabel,
+              amount: formatXAF(estimatedPot),
+              date: dateLabel,
+              position: String(newDesignatedPosition),
+            },
             actionUrl: `/sessions/${claim.tontineSessionId}`,
           },
         ],

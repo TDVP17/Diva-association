@@ -3,12 +3,9 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { formatXAF } from "@/lib/format-currency";
-
-const TONTINE_LABELS: Record<string, string> = {
-  HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
-  MONTHLY_28: "Monthly Tontine (28th)",
-  MONTHLY_25: "Monthly Tontine (25th)",
-};
+import { TONTINE_TYPE_LABELS } from "@/lib/tontine-labels";
+import { CONTRIBUTION_STATUS_KEY } from "@/lib/contribution-status-label";
+import { FINE_STATUS_KEY } from "@/lib/fine-status-label";
 
 interface Row {
   kind: "contribution" | "fine";
@@ -58,7 +55,7 @@ export default async function HistoryPage() {
   const rows: Row[] = [];
   for (const slot of slots) {
     const sessionLabel =
-      slot.membership.tontineSession.title || TONTINE_LABELS[slot.membership.tontineSession.type];
+      slot.membership.tontineSession.title || TONTINE_TYPE_LABELS[slot.membership.tontineSession.type];
     for (const c of slot.contributions) {
       if (isArchived(c.dueDate)) continue;
       rows.push({
@@ -124,7 +121,9 @@ export default async function HistoryPage() {
               <span
                 className={`flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-md font-label-sm text-label-sm ${STATUS_CLASS[r.status] ?? ""}`}
               >
-                {r.status}
+                {t(
+                  (r.kind === "contribution" ? CONTRIBUTION_STATUS_KEY : FINE_STATUS_KEY)[r.status] ?? "pending",
+                )}
               </span>
               {r.receiptPdfUrl && (
                 <a

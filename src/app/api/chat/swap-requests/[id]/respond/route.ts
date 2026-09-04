@@ -22,10 +22,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   const swapRequest = await prisma.positionSwapRequest.findUnique({ where: { id } });
   if (!swapRequest) {
-    return NextResponse.json({ error: "Swap request not found" }, { status: 404 });
+    return NextResponse.json({ error: "Swap request not found", errorKey: "swapRequestNotFound" }, { status: 404 });
   }
   if (swapRequest.targetId !== session.user.id) {
-    return NextResponse.json({ error: "Only the requested member can respond" }, { status: 403 });
+    return NextResponse.json(
+      { error: "Only the requested member can respond", errorKey: "swapOnlyTargetCanRespond" },
+      { status: 403 },
+    );
   }
 
   const nextStatus = parsed.data.action === "accept" ? "PENDING_ADMIN" : "REJECTED";
@@ -38,7 +41,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     data: { status: nextStatus },
   });
   if (claimed.count === 0) {
-    return NextResponse.json({ error: "This request has already been resolved" }, { status: 409 });
+    return NextResponse.json(
+      { error: "This request has already been resolved", errorKey: "swapAlreadyResolved" },
+      { status: 409 },
+    );
   }
 
   const updated = await prisma.positionSwapRequest.findUniqueOrThrow({
