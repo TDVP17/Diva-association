@@ -36,6 +36,7 @@ const MAX_BYTES_PER_FILE = 1.5 * 1024 * 1024;
 const MAX_COMBINED_BYTES = 4 * 1024 * 1024;
 
 type DocumentFieldName = "documentImage" | "documentBackImage" | "selfieImage";
+type DocumentType = "CNI" | "RECEPISSE";
 
 function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
@@ -86,14 +87,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       );
     }
 
-    const fields: { field: DocumentFieldName; file: File | null }[] = [
-      { field: "documentImage", file: readImageFile(formData, "documentImage") },
-      { field: "documentBackImage", file: readImageFile(formData, "documentBackImage") },
-      { field: "selfieImage", file: readImageFile(formData, "selfieImage") },
+    // CNI (Cameroonian national ID card) requires both sides; a Récépissé
+    // (the temporary ID receipt issued while a CNI is being processed — a
+    // valid, common substitute in Cameroon) is often only printed on one
+    // side, so its back photo is optional. Defaults to CNI (the stricter
+    // requirement) for any legacy client that doesn't send this field yet.
+    const documentTypeRaw = (formData.get("documentType") as string | null) ?? "CNI";
+    if (documentTypeRaw !== "CNI" && documentTypeRaw !== "RECEPISSE") {
+      return NextResponse.json(
+        { error: `Invalid document type: ${documentTypeRaw}`, errorKey: "kycInvalidDocumentTypeSelection" },
+        { status: 400 },
+      );
+    }
+    const documentType: DocumentType = documentTypeRaw;
+    const backImageRequired = documentType === "CNI";
+
+    const fields: { field: DocumentFieldName; file: File | null; required: boolean }[] = [
+      { field: "documentImage", file: readImageFile(formData, "documentImage"), required: true },
+      { field: "documentBackImage", file: readImageFile(formData, "documentBackImage"), required: backImageRequired },
+      { field: "selfieImage", file: readImageFile(formData, "selfieImage"), required: true },
     ];
 
-    for (const { field, file } of fields) {
+    for (const { field, file, required } of fields) {
       if (!file) {
+        if (!required) continue; // Récépissé's back photo — legitimately absent
         return NextResponse.json(
           { error: `Missing required file: ${field}`, errorKey: "kycMissingDocument", errorVars: { field } },
           { status: 400 },
@@ -122,7 +139,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     const documentFrontFile = fields[0].file!;
-    const documentBackFile = fields[1].file!;
+    const documentBackFile = fields[1].file; // may be null for a Récépissé
     const selfieFile = fields[2].file!;
 
     const referrerName = (formData.get("referrerName") as string | null)?.trim() ?? "";
@@ -141,7 +158,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       );
     }
 
-    const combinedSize = documentFrontFile.size + documentBackFile.size + selfieFile.size;
+    const combinedSize = documentFrontFile.size + (documentBackFile?.size ?? 0) + selfieFile.size;
     if (combinedSize > MAX_COMBINED_BYTES) {
       return NextResponse.json(
         {
@@ -201,7 +218,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const stamp = Date.now();
     const documentFrontKey = `kyc-documents/${session.user.id}/${stamp}-document-front${ALLOWED_TYPES[documentFrontFile.type]}`;
-    const documentBackKey = `kyc-documents/${session.user.id}/${stamp}-document-back${ALLOWED_TYPES[documentBackFile.type]}`;
+    const documentBackKey = documentBackFile
+      ? `kyc-documents/${session.user.id}/${stamp}-document-back${ALLOWED_TYPES[documentBackFile.type]}`
+      : null;
     const selfieKey = `kyc-documents/${session.user.id}/${stamp}-selfie${ALLOWED_TYPES[selfieFile.type]}`;
 
     // Uploaded concurrently — three round trips to Supabase Storage summed
@@ -213,7 +232,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // cost just to keep it.
     const uploads: { field: DocumentFieldName; key: string; file: File }[] = [
       { field: "documentImage", key: documentFrontKey, file: documentFrontFile },
-      { field: "documentBackImage", key: documentBackKey, file: documentBackFile },
+      ...(documentBackFile && documentBackKey
+        ? [{ field: "documentBackImage" as const, key: documentBackKey, file: documentBackFile }]
+        : []),
       { field: "selfieImage", key: selfieKey, file: selfieFile },
     ];
     const uploadResults = await Promise.allSettled(
@@ -275,10 +296,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
                 userId: session.user.id,
                 tontineSessionId,
                 membershipId: membership.id,
-                documentType: "CNI",
+                documentType,
                 status: "PENDING",
                 documentImageUrl: `/api/files/${documentFrontKey}`,
-                documentBackImageUrl: `/api/files/${documentBackKey}`,
+                documentBackImageUrl: documentBackKey ? `/api/files/${documentBackKey}` : null,
                 selfieImageUrl: `/api/files/${selfieKey}`,
                 referrerName,
                 referrerPhone: referrerPhoneDigits,

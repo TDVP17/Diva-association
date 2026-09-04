@@ -25,10 +25,13 @@ enum MembershipStatus {
   REJECTED
 }
 
-/// CNI (Cameroonian national ID card) is the only accepted identity
-/// document — passport verification was removed entirely.
+/// CNI (Cameroonian national ID card) and Récépissé (a temporary ID receipt
+/// issued while a CNI is being processed — a valid, common substitute in
+/// Cameroon, often only printed on one side) are the two accepted identity
+/// documents. Passport verification was removed entirely.
 enum KycDocumentType {
   CNI
+  RECEPISSE
 }
 
 enum KycVerificationStatus {

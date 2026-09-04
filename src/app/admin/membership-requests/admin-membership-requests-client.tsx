@@ -138,8 +138,11 @@ export function AdminMembershipRequestsClient({ lang }: { lang: Lang }) {
           ) : null}
           {m.kycVerification && (
             <div className="pl-12">
-              <p className="font-label-sm text-label-sm text-on-surface-variant mb-1.5">
-                {t("cameroonianCni")} · {t("compareFacesInstruction")}
+              <p className="font-label-sm text-label-sm text-on-surface-variant mb-1.5 flex items-center gap-1.5 flex-wrap">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-secondary-container/30 text-on-secondary-container font-label-sm text-[10px] uppercase tracking-wide flex-shrink-0">
+                  {t(m.kycVerification.documentType === "RECEPISSE" ? "documentTypeRecepisse" : "documentTypeCni")}
+                </span>
+                {t("compareFacesInstruction")}
               </p>
               <div className="grid grid-cols-3 gap-2 max-w-sm">
                 {m.kycVerification.documentImageUrl && (
@@ -160,7 +163,7 @@ export function AdminMembershipRequestsClient({ lang }: { lang: Lang }) {
                     </span>
                   </a>
                 )}
-                {m.kycVerification.documentBackImageUrl && (
+                {m.kycVerification.documentBackImageUrl ? (
                   <a
                     href={m.kycVerification.documentBackImageUrl}
                     target="_blank"
@@ -177,6 +180,13 @@ export function AdminMembershipRequestsClient({ lang }: { lang: Lang }) {
                       {t("viewDocumentBack")}
                     </span>
                   </a>
+                ) : (
+                  m.kycVerification.documentType === "RECEPISSE" && (
+                    <div className="flex flex-col items-center justify-center gap-1 aspect-[4/3] rounded-lg border border-dashed border-outline-variant text-on-surface-variant">
+                      <span className="material-symbols-outlined text-[20px]">block</span>
+                      <span className="font-label-sm text-[10px] text-center px-1">{t("noBackSideSubmitted")}</span>
+                    </div>
+                  )
                 )}
                 {m.kycVerification.selfieImageUrl && (
                   <a

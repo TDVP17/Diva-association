@@ -71,8 +71,11 @@ export function PayoutTurnPanel({
                 {t("payoutPhoneLabel")}
               </label>
               <input
+                type="tel"
+                inputMode="tel"
+                maxLength={9}
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 9))}
                 required
                 className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
               />

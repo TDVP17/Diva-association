@@ -5,15 +5,32 @@ import { translate, translateIfKnown, type Lang, type TranslationKey } from "@/l
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 import { compressImage, formatImageSize, ImageTooLargeError, MAX_OUTPUT_BYTES } from "@/lib/compress-image";
 
+type DocumentType = "CNI" | "RECEPISSE";
+
 // Maps the server's/compressImage's field identifiers to the already-
 // user-facing label for that photo, so a validation error can name exactly
-// which of the 3 uploads failed ("Front of your CNI is too large…") in
-// whichever language is currently selected — never a raw field name.
+// which upload failed ("Front of your CNI is too large…") in whichever
+// language is currently selected — never a raw field name. Front/selfie
+// labels don't depend on document type; the back-photo label does (see
+// backLabelKey below), so it's resolved separately rather than through
+// this static map.
 const FIELD_LABEL_KEY: Record<string, TranslationKey> = {
   documentImage: "documentFrontPhotoLabel",
-  documentBackImage: "documentBackPhotoLabel",
   selfieImage: "selfiePhotoLabel",
 };
+
+function frontLabelKey(docType: DocumentType): TranslationKey {
+  return docType === "CNI" ? "documentFrontPhotoLabel" : "documentFrontPhotoLabelRecepisse";
+}
+function frontInstructionKey(docType: DocumentType): TranslationKey {
+  return docType === "CNI" ? "documentFrontPhotoInstruction" : "documentFrontPhotoInstructionRecepisse";
+}
+function backLabelKey(docType: DocumentType): TranslationKey {
+  return docType === "CNI" ? "documentBackPhotoLabel" : "documentBackPhotoLabelRecepisse";
+}
+function backInstructionKey(docType: DocumentType): TranslationKey {
+  return docType === "CNI" ? "documentBackPhotoInstruction" : "documentBackPhotoInstructionRecepisse";
+}
 
 export function KycModal({
   tontineSessionId,
@@ -25,6 +42,7 @@ export function KycModal({
   lang: Lang;
 }) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
+  const [documentType, setDocumentType] = useState<DocumentType>("CNI");
   const [documentFrontFile, setDocumentFrontFile] = useState<File | null>(null);
   const [documentBackFile, setDocumentBackFile] = useState<File | null>(null);
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
@@ -33,8 +51,23 @@ export function KycModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // A Récépissé's back side is optional — only CNI strictly requires it.
+  const backRequired = documentType === "CNI";
   const canSubmit =
-    documentFrontFile && documentBackFile && selfieFile && referrerName.trim() && referrerPhone.trim();
+    documentFrontFile &&
+    (documentBackFile || !backRequired) &&
+    selfieFile &&
+    referrerName.trim() &&
+    referrerPhone.trim();
+
+  function changeDocumentType(next: DocumentType) {
+    setDocumentType(next);
+    // Switching from Récépissé to CNI re-imposes the both-sides requirement
+    // — clearing a since-invalidated "optional, skipped" back photo would be
+    // wrong, but there's nothing to clear either way; this just guards
+    // against a stale error message referencing the previous document type.
+    setError(null);
+  }
 
   // Resolves a server-supplied errorKey/errorVars into the specific,
   // localized message — e.g. "kycDocumentTooLarge" + {field, size, max}
@@ -43,7 +76,9 @@ export function KycModal({
   // fallback that used to be shown for every failure regardless of cause.
   function translateServerError(key: string, vars?: Record<string, string>): string | undefined {
     const merged = { ...vars };
-    if (merged.field && merged.field in FIELD_LABEL_KEY) {
+    if (merged.field === "documentBackImage") {
+      merged.document = t(backLabelKey(documentType));
+    } else if (merged.field && merged.field in FIELD_LABEL_KEY) {
       merged.document = t(FIELD_LABEL_KEY[merged.field]);
     }
     return translateIfKnown(lang, key, merged);
@@ -63,39 +98,30 @@ export function KycModal({
     setSubmitting(true);
     setError(null);
     try {
-      const compressed = await Promise.allSettled([
-        compressImage(documentFrontFile),
-        compressImage(documentBackFile),
-        compressImage(selfieFile),
-      ]);
-      const fields: { key: keyof typeof FIELD_LABEL_KEY; result: PromiseSettledResult<Blob> }[] = [
-        { key: "documentImage", result: compressed[0] },
-        { key: "documentBackImage", result: compressed[1] },
-        { key: "selfieImage", result: compressed[2] },
+      const toCompress: { key: "documentImage" | "documentBackImage" | "selfieImage"; file: File }[] = [
+        { key: "documentImage", file: documentFrontFile },
+        ...(documentBackFile ? [{ key: "documentBackImage" as const, file: documentBackFile }] : []),
+        { key: "selfieImage", file: selfieFile },
       ];
-      const failed = fields.find((f) => f.result.status === "rejected");
-      if (failed && failed.result.status === "rejected") {
-        const reason = failed.result.reason;
+      const compressed = await Promise.allSettled(toCompress.map(({ file }) => compressImage(file)));
+      const failedIndex = compressed.findIndex((r) => r.status === "rejected");
+      if (failedIndex !== -1) {
+        const reason = (compressed[failedIndex] as PromiseRejectedResult).reason;
         const size = reason instanceof ImageTooLargeError ? formatImageSize(reason.sizeBytes) : "?";
-        setError(
-          t("kycCompressionFailed", {
-            document: t(FIELD_LABEL_KEY[failed.key]),
-            size,
-            max: formatImageSize(MAX_OUTPUT_BYTES),
-          }),
-        );
+        const failedKey = toCompress[failedIndex].key;
+        const label =
+          failedKey === "documentBackImage" ? t(backLabelKey(documentType)) : t(FIELD_LABEL_KEY[failedKey]);
+        setError(t("kycCompressionFailed", { document: label, size, max: formatImageSize(MAX_OUTPUT_BYTES) }));
         setSubmitting(false);
         return;
       }
 
-      const [compressedFront, compressedBack, compressedSelfie] = fields.map(
-        (f) => (f.result as PromiseFulfilledResult<Blob>).value,
-      );
-
       const formData = new FormData();
-      formData.append("documentImage", compressedFront, "document-front.jpg");
-      formData.append("documentBackImage", compressedBack, "document-back.jpg");
-      formData.append("selfieImage", compressedSelfie, "selfie.jpg");
+      formData.append("documentType", documentType);
+      toCompress.forEach(({ key }, i) => {
+        const blob = (compressed[i] as PromiseFulfilledResult<Blob>).value;
+        formData.append(key, blob, `${key}.jpg`);
+      });
       formData.append("referrerName", referrerName.trim());
       formData.append("referrerPhone", referrerPhoneDigits);
 
@@ -130,19 +156,58 @@ export function KycModal({
             {t("identityVerificationBody")}
           </p>
 
-          <p className="font-label-sm text-label-sm text-error mb-stack-gap-sm flex items-start gap-1.5">
-            <span className="material-symbols-outlined text-[16px] flex-shrink-0 mt-0.5">info</span>
-            {t("cniCountryWarning")}
-          </p>
-          <p className="font-label-sm text-label-sm text-error mb-stack-gap-md flex items-start gap-1.5 font-semibold">
-            <span className="material-symbols-outlined text-[16px] flex-shrink-0 mt-0.5">contact_page</span>
-            {t("cniBothSidesRequired")}
-          </p>
+          <fieldset className="mb-stack-gap-md">
+            <legend className="font-label-sm text-label-sm text-on-surface-variant mb-1.5">
+              {t("documentTypeSelectionLabel")}
+            </legend>
+            <div className="flex flex-col gap-2">
+              {(["CNI", "RECEPISSE"] as const).map((option) => (
+                <label
+                  key={option}
+                  className={`flex items-center gap-2 border rounded-lg px-3 py-2.5 cursor-pointer transition-colors ${
+                    documentType === option
+                      ? "border-primary bg-primary/5"
+                      : "border-outline-variant hover:bg-surface-container-low"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="document-type"
+                    value={option}
+                    checked={documentType === option}
+                    onChange={() => changeDocumentType(option)}
+                    className="accent-primary"
+                  />
+                  <span className="font-label-md text-label-md text-on-surface">
+                    {t(option === "CNI" ? "documentTypeCni" : "documentTypeRecepisse")}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          {documentType === "CNI" ? (
+            <>
+              <p className="font-label-sm text-label-sm text-error mb-stack-gap-sm flex items-start gap-1.5">
+                <span className="material-symbols-outlined text-[16px] flex-shrink-0 mt-0.5">info</span>
+                {t("cniCountryWarning")}
+              </p>
+              <p className="font-label-sm text-label-sm text-error mb-stack-gap-md flex items-start gap-1.5 font-semibold">
+                <span className="material-symbols-outlined text-[16px] flex-shrink-0 mt-0.5">contact_page</span>
+                {t("cniBothSidesRequired")}
+              </p>
+            </>
+          ) : (
+            <p className="font-label-sm text-label-sm text-on-surface-variant mb-stack-gap-md flex items-start gap-1.5">
+              <span className="material-symbols-outlined text-[16px] flex-shrink-0 mt-0.5">info</span>
+              {t("recepisseSingleSideNote")}
+            </p>
+          )}
 
           <div className="flex flex-col gap-stack-gap-sm mb-stack-gap-md">
             <PhotoPicker
-              label={t("documentFrontPhotoLabel")}
-              instruction={t("documentFrontPhotoInstruction")}
+              label={t(frontLabelKey(documentType))}
+              instruction={t(frontInstructionKey(documentType))}
               file={documentFrontFile}
               onChange={setDocumentFrontFile}
               captureMode="environment"
@@ -150,8 +215,8 @@ export function KycModal({
               selectedLabel={t("photoSelectedLabel")}
             />
             <PhotoPicker
-              label={t("documentBackPhotoLabel")}
-              instruction={t("documentBackPhotoInstruction")}
+              label={t(backLabelKey(documentType))}
+              instruction={t(backInstructionKey(documentType))}
               file={documentBackFile}
               onChange={setDocumentBackFile}
               captureMode="environment"
@@ -191,8 +256,9 @@ export function KycModal({
                 id="referrer-phone"
                 type="tel"
                 inputMode="tel"
+                maxLength={9}
                 value={referrerPhone}
-                onChange={(e) => setReferrerPhone(e.target.value)}
+                onChange={(e) => setReferrerPhone(e.target.value.replace(/\D/g, "").slice(0, 9))}
                 placeholder={t("referrerPhonePlaceholder")}
                 className="w-full border border-outline-variant rounded-lg px-3 py-2.5 font-body-md text-body-md text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
               />

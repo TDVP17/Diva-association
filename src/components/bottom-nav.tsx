@@ -26,17 +26,17 @@ export function BottomNav({ lang }: { lang: Lang }) {
             href={item.href}
             className={
               active
-                ? "flex flex-col items-center justify-center text-primary font-bold w-1/5 h-full transition-colors active:scale-90 duration-200"
-                : "flex flex-col items-center justify-center text-on-surface-variant w-1/5 h-full hover:bg-surface-container-low transition-colors active:scale-90 duration-200"
+                ? "flex flex-col items-center justify-center gap-1.5 text-primary font-bold w-1/5 h-full transition-colors active:scale-90 duration-200"
+                : "flex flex-col items-center justify-center gap-1.5 text-on-surface-variant w-1/5 h-full hover:bg-surface-container-low transition-colors active:scale-90 duration-200"
             }
           >
             <span
-              className="material-symbols-outlined mb-1"
+              className="material-symbols-outlined"
               style={active ? { fontVariationSettings: "'FILL' 1" } : undefined}
             >
               {item.icon}
             </span>
-            <span className="font-label-sm text-label-sm">{t(item.label)}</span>
+            <span className="font-label-sm text-label-sm leading-none whitespace-nowrap">{t(item.label)}</span>
           </Link>
         );
       })}

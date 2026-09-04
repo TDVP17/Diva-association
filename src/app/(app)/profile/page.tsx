@@ -7,7 +7,6 @@ import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { AvatarUpload } from "./avatar-upload";
 import { InlineField } from "./inline-field";
 import { InlineLocationField } from "./inline-location-field";
-import { InlinePasswordField } from "./inline-password-field";
 import { updatePhoneAction, updateEmailAction } from "./actions";
 import { InstallAppButton } from "@/components/install-app-button";
 import { AndroidApkButton } from "@/components/android-apk-button";
@@ -211,7 +210,6 @@ export default async function ProfilePage() {
       </section>
 
       <section className="mb-stack-gap-lg flex flex-col gap-stack-gap-sm">
-        <InlinePasswordField lang={lang} />
         <InstallAppButton lang={lang} />
         <AndroidApkButton lang={lang} />
         <Link

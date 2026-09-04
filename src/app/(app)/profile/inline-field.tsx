@@ -128,8 +128,12 @@ export function InlineField({
               <div className="flex flex-col gap-3">
                 <input
                   type={inputType}
+                  inputMode={inputType === "tel" ? "tel" : undefined}
+                  maxLength={inputType === "tel" ? 9 : undefined}
                   value={newValue}
-                  onChange={(e) => setNewValue(e.target.value)}
+                  onChange={(e) =>
+                    setNewValue(inputType === "tel" ? e.target.value.replace(/\D/g, "").slice(0, 9) : e.target.value)
+                  }
                   className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
                 />
                 {error && <p className="font-label-sm text-label-sm text-error">{error}</p>}

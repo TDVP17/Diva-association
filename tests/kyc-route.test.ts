@@ -48,6 +48,7 @@ function makeFile(name: string, type: string, sizeBytes: number): File {
 function fakeFormRequest(
   fields: Record<string, File | undefined>,
   referrer: { name?: string; phone?: string } = {},
+  documentType?: string,
 ): Request {
   const formData = new FormData();
   for (const [key, file] of Object.entries(fields)) {
@@ -58,6 +59,7 @@ function fakeFormRequest(
   // tests below override these explicitly.
   formData.append("referrerName", referrer.name ?? "Marie Ngo");
   formData.append("referrerPhone", referrer.phone ?? "677123456");
+  if (documentType) formData.append("documentType", documentType);
   return { formData: async () => formData } as unknown as Request;
 }
 
@@ -144,6 +146,82 @@ describe("POST /api/sessions/[id]/kyc", () => {
     expect(res.status).toBe(400);
     expect(body.errorKey).toBe("kycCombinedTooLarge");
     expect(findUniqueTontineSession).not.toHaveBeenCalled();
+  });
+
+  it("400s with kycInvalidDocumentTypeSelection for an unrecognized documentType value", async () => {
+    const req = fakeFormRequest(
+      { documentImage: VALID_FRONT(), documentBackImage: VALID_BACK(), selfieImage: VALID_SELFIE() },
+      {},
+      "PASSPORT",
+    );
+    const res = await POST(req, { params: Promise.resolve({ id: "session-1" }) });
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.errorKey).toBe("kycInvalidDocumentTypeSelection");
+    expect(findUniqueTontineSession).not.toHaveBeenCalled();
+  });
+
+  it("still requires the back image for CNI (explicit documentType, matching the default)", async () => {
+    const req = fakeFormRequest(
+      { documentImage: VALID_FRONT(), selfieImage: VALID_SELFIE() },
+      {},
+      "CNI",
+    );
+    const res = await POST(req, { params: Promise.resolve({ id: "session-1" }) });
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.errorKey).toBe("kycMissingDocument");
+    expect(body.errorVars.field).toBe("documentBackImage");
+  });
+
+  it("accepts a Récépissé submission with only the front image — the back is optional", async () => {
+    findUniqueTontineSession.mockResolvedValue(openTontineSession);
+    findUniqueMembership.mockResolvedValue(null);
+    saveFile.mockResolvedValue("ok");
+    txFindUniqueMembership.mockResolvedValue(null);
+    txUpsertMembership.mockResolvedValue({ id: "membership-1" });
+    txCreateKycVerification.mockResolvedValue({});
+    findManyUser.mockResolvedValue([]);
+
+    const req = fakeFormRequest(
+      { documentImage: VALID_FRONT(), selfieImage: VALID_SELFIE() },
+      {},
+      "RECEPISSE",
+    );
+    const res = await POST(req, { params: Promise.resolve({ id: "session-1" }) });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ ok: true, status: "PENDING" });
+    expect(saveFile).toHaveBeenCalledTimes(2); // front + selfie only, no back upload attempted
+    expect(txCreateKycVerification.mock.calls[0][0]).toMatchObject({
+      data: expect.objectContaining({ documentType: "RECEPISSE", documentBackImageUrl: null }),
+    });
+  });
+
+  it("accepts a Récépissé submission that DOES include a back image, and stores it", async () => {
+    findUniqueTontineSession.mockResolvedValue(openTontineSession);
+    findUniqueMembership.mockResolvedValue(null);
+    saveFile.mockResolvedValue("ok");
+    txFindUniqueMembership.mockResolvedValue(null);
+    txUpsertMembership.mockResolvedValue({ id: "membership-1" });
+    txCreateKycVerification.mockResolvedValue({});
+    findManyUser.mockResolvedValue([]);
+
+    const req = fakeFormRequest(
+      { documentImage: VALID_FRONT(), documentBackImage: VALID_BACK(), selfieImage: VALID_SELFIE() },
+      {},
+      "RECEPISSE",
+    );
+    const res = await POST(req, { params: Promise.resolve({ id: "session-1" }) });
+
+    expect(res.status).toBe(200);
+    expect(saveFile).toHaveBeenCalledTimes(3);
+    const createArgs = txCreateKycVerification.mock.calls[0][0];
+    expect(createArgs.data.documentType).toBe("RECEPISSE");
+    expect(createArgs.data.documentBackImageUrl).not.toBeNull();
   });
 
   it("400s when the referrer name is missing", async () => {

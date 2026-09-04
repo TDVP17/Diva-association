@@ -193,8 +193,9 @@ export function BulkPaymentDialog({
                   id="bulk-mm-phone"
                   type="tel"
                   inputMode="tel"
+                  maxLength={9}
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 9))}
                   placeholder={t("mobileMoneyPhonePlaceholder")}
                   className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
                 />

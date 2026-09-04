@@ -30,6 +30,7 @@ function providerLabelKey(provider: MobileMoneyProvider): TranslationKey {
 export function SavedPaymentMethodsCard({ lang }: { lang: Lang }) {
   const t = (key: TranslationKey, vars?: Record<string, string>) => translate(lang, key, vars);
   const [methods, setMethods] = useState<SavedMethod[] | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
   const [newPhone, setNewPhone] = useState("");
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +64,7 @@ export function SavedPaymentMethodsCard({ lang }: { lang: Lang }) {
       });
       await parseJsonOrThrow(res, t("somethingWentWrong"));
       setNewPhone("");
+      setShowAddForm(false);
       setSuccess(t("payerNumberSaved"));
       refresh();
     } catch (err) {
@@ -158,36 +160,59 @@ export function SavedPaymentMethodsCard({ lang }: { lang: Lang }) {
             </div>
           )}
 
-          {methods.length < 4 && (
-            <div className="flex flex-col gap-2">
-              <div className="flex gap-2">
-                <input
-                  type="tel"
-                  inputMode="tel"
-                  value={newPhone}
-                  onChange={(e) => setNewPhone(e.target.value)}
-                  placeholder={t("mobileMoneyPhonePlaceholder")}
-                  className="flex-1 min-w-0 border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
-                />
-                <button
-                  onClick={handleAdd}
-                  disabled={adding || !newPhone.trim()}
-                  className="px-3 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 active:scale-95 transition-all disabled:opacity-60 flex-shrink-0"
-                >
-                  {adding ? t("savingEllipsis") : t("addPayerNumberAction")}
-                </button>
+          {methods.length < 4 &&
+            (showAddForm ? (
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    maxLength={9}
+                    autoFocus
+                    value={newPhone}
+                    onChange={(e) => setNewPhone(e.target.value.replace(/\D/g, "").slice(0, 9))}
+                    placeholder={t("mobileMoneyPhonePlaceholder")}
+                    className="flex-1 min-w-0 border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+                  />
+                  <button
+                    onClick={handleAdd}
+                    disabled={adding || !newPhone.trim()}
+                    className="px-3 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 active:scale-95 transition-all disabled:opacity-60 flex-shrink-0"
+                  >
+                    {adding ? t("savingEllipsis") : t("addPayerNumberAction")}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowAddForm(false);
+                      setNewPhone("");
+                      setError(null);
+                    }}
+                    disabled={adding}
+                    aria-label={t("cancel")}
+                    className="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container-low transition-colors disabled:opacity-60 flex-shrink-0"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                </div>
+                {detectedProvider && (
+                  <span
+                    className={`self-start px-1.5 py-0.5 rounded font-label-sm text-[10px] uppercase tracking-wide ${
+                      detectedProvider === "ORANGE" ? "bg-orange-100 text-orange-700" : "bg-yellow-100 text-yellow-800"
+                    }`}
+                  >
+                    {t(providerLabelKey(detectedProvider))}
+                  </span>
+                )}
               </div>
-              {detectedProvider && (
-                <span
-                  className={`self-start px-1.5 py-0.5 rounded font-label-sm text-[10px] uppercase tracking-wide ${
-                    detectedProvider === "ORANGE" ? "bg-orange-100 text-orange-700" : "bg-yellow-100 text-yellow-800"
-                  }`}
-                >
-                  {t(providerLabelKey(detectedProvider))}
-                </span>
-              )}
-            </div>
-          )}
+            ) : (
+              <button
+                onClick={() => setShowAddForm(true)}
+                className="flex items-center gap-1.5 font-label-sm text-label-sm text-primary hover:underline"
+              >
+                <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                {t("addPayerNumberAction")}
+              </button>
+            ))}
 
           {error && <p className="font-label-sm text-label-sm text-error mt-2">{error}</p>}
           {success && <p className="font-label-sm text-label-sm text-primary mt-2">{success}</p>}
