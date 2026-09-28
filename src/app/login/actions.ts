@@ -323,3 +323,23 @@ export async function signUpAction(
     return { error: "Something went wrong while creating your account. Please try again." };
   }
 }
+
+export async function getGoogleSignInUrl(
+  callbackUrl: string = "/dashboard",
+): Promise<{ url?: string; error?: string }> {
+  try {
+    await signIn("google", { redirectTo: callbackUrl });
+    return { error: "No redirect occurred" };
+  } catch (err) {
+    if (isRedirectSignal(err)) {
+      const digest = (err as { digest?: string }).digest ?? "";
+      const parts = digest.split(";");
+      if (parts.length >= 3 && parts[2]?.startsWith("http")) {
+        return { url: parts[2] };
+      }
+    }
+    console.error("[getGoogleSignInUrl] unexpected error:", err);
+    return { error: "Failed to generate Google sign-in URL" };
+  }
+}
+

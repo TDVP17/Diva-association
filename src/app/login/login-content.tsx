@@ -1,9 +1,11 @@
 "use client";
 
+import { useState, useRef } from "react";
 import { CredentialsForm } from "./credentials-form";
 import { LanguageToggle } from "@/components/language-toggle";
 import { IosInstallBanner } from "@/components/ios-install-banner";
 import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translations";
+import { getGoogleSignInUrl } from "./actions";
 
 interface DevUser {
   email: string;
@@ -59,6 +61,79 @@ export function LoginContent({
   initialMode?: "signin" | "signup";
 }) {
   const t = (key: TranslationKey) => translate(lang, key);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const popupRef = useRef<Window | null>(null);
+
+  async function handleGoogleClick(e: React.MouseEvent) {
+    e.preventDefault();
+    setGoogleLoading(true);
+
+    try {
+      const res = await getGoogleSignInUrl(callbackUrl);
+      if (res.url) {
+        const width = 500;
+        const height = 650;
+        const left = window.screenX + (window.outerWidth - width) / 2;
+        const top = window.screenY + (window.outerHeight - height) / 2;
+        const popup = window.open(
+          res.url,
+          "google_signin_popup",
+          `width=${width},height=${height},left=${left},top=${top},status=no,menubar=no,toolbar=no`,
+        );
+
+        if (!popup || popup.closed || typeof popup.closed === "undefined") {
+          // If popup is blocked by the browser, fallback to standard redirect
+          window.location.href = res.url;
+          return;
+        }
+
+        popupRef.current = popup;
+
+        // Poll for popup closure or session establishment
+        const interval = setInterval(async () => {
+          if (!popupRef.current || popupRef.current.closed) {
+            clearInterval(interval);
+            try {
+              const sessionRes = await fetch("/api/auth/session");
+              const sessionData = await sessionRes.json();
+              if (sessionData?.user) {
+                window.location.href = callbackUrl;
+                return;
+              }
+            } catch {}
+            setGoogleLoading(false);
+            return;
+          }
+
+          try {
+            const sessionRes = await fetch("/api/auth/session");
+            const sessionData = await sessionRes.json();
+            if (sessionData?.user) {
+              clearInterval(interval);
+              try {
+                popupRef.current?.close();
+              } catch {}
+              window.location.href = callbackUrl;
+            }
+          } catch {}
+        }, 1200);
+      } else {
+        await signInWithGoogleAction();
+      }
+    } catch {
+      await signInWithGoogleAction();
+    }
+  }
+
+  function handleCancelGoogle() {
+    if (popupRef.current && !popupRef.current.closed) {
+      try {
+        popupRef.current.close();
+      } catch {}
+    }
+    popupRef.current = null;
+    setGoogleLoading(false);
+  }
 
   return (
     <main className="flex-grow flex flex-col items-center justify-center p-container-padding bg-background min-h-screen">
@@ -96,10 +171,12 @@ export function LoginContent({
           <div className="flex-grow border-t border-outline-variant" />
         </div>
 
-        <form action={signInWithGoogleAction} className="relative z-10">
+        <form onSubmit={(e) => { e.preventDefault(); }} className="relative z-10">
           <button
-            type="submit"
-            className="w-full flex items-center justify-center gap-stack-gap-sm bg-white border border-outline-variant rounded-lg py-3 px-4 hover:bg-surface-container-low transition-colors active:scale-[0.98]"
+            type="button"
+            onClick={handleGoogleClick}
+            disabled={googleLoading}
+            className="w-full flex items-center justify-center gap-stack-gap-sm bg-white border border-outline-variant rounded-lg py-3 px-4 hover:bg-surface-container-low transition-colors active:scale-[0.98] disabled:opacity-60 cursor-pointer"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path
@@ -124,6 +201,36 @@ export function LoginContent({
             </span>
           </button>
         </form>
+
+        <p className="font-label-sm text-[12px] text-on-surface-variant/80 text-center mt-2.5 relative z-10">
+          {t("orUseEmailPhoneNotice")}
+        </p>
+
+        {googleLoading && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center shadow-2xl border border-surface-variant flex flex-col items-center gap-4 animate-in fade-in zoom-in-95 duration-200">
+              <div className="w-14 h-14 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                <span className="w-7 h-7 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+              </div>
+              <div>
+                <h3 className="font-title-md text-title-md text-on-surface font-semibold">
+                  {t("googleSignInInProgress")}
+                </h3>
+                <p className="font-body-sm text-body-sm text-on-surface-variant mt-2 leading-relaxed">
+                  {t("googleSignInPopupNotice")}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCancelGoogle}
+                className="w-full mt-2 py-3 px-4 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-label-md transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-98"
+              >
+                <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+                {t("cancelAndReturn")}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="mt-section-margin pt-stack-gap-md border-t border-outline-variant/30 flex items-center justify-center gap-unit text-center relative z-10">
           <span className="material-symbols-outlined text-secondary text-[16px]">lock</span>

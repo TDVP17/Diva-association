@@ -22,6 +22,10 @@ export const translations = {
     oauthErrorAccessDenied: "Google sign-in was cancelled.",
     oauthErrorConfiguration: "Google sign-in is temporarily unavailable. Please try email/password instead.",
     oauthErrorDefault: "Google sign-in failed. Please try again.",
+    googleSignInInProgress: "Google Sign-In in progress…",
+    googleSignInPopupNotice: "A Google window has opened to choose your account. You can cancel and return at any time.",
+    cancelAndReturn: "Cancel and return to sign-in",
+    orUseEmailPhoneNotice: "You can also sign in or register with email or phone above.",
 
     // Dashboard
     yourTontines: "Your Tontines",
@@ -919,6 +923,10 @@ export const translations = {
     oauthErrorAccessDenied: "La connexion Google a été annulée.",
     oauthErrorConfiguration: "La connexion Google est temporairement indisponible. Essayez avec e-mail/mot de passe.",
     oauthErrorDefault: "La connexion Google a échoué. Veuillez réessayer.",
+    googleSignInInProgress: "Connexion avec Google en cours…",
+    googleSignInPopupNotice: "Une fenêtre Google est ouverte pour choisir votre compte. Vous pouvez annuler et revenir à tout moment.",
+    cancelAndReturn: "Annuler et revenir à la connexion",
+    orUseEmailPhoneNotice: "Vous pouvez aussi vous connecter ou créer un compte avec votre email ou téléphone ci-dessus.",
 
     // Dashboard
     yourTontines: "Vos Tontines",

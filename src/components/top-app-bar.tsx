@@ -25,6 +25,8 @@ export async function TopAppBar({
     prisma.membership.count({ where: { userId, status: "APPROVED", slotCount: null } }),
   ]);
 
+  const t = (key: Parameters<typeof translate>[1]) => translate(lang, key);
+
   const menuItems: TopRightMenuItem[] = [
     { href: "/fines", label: t("finesNavItem"), icon: "receipt_long", badge: unpaidFines || undefined },
     { href: "/chat", label: t("messages"), icon: "chat_bubble", badge: unreadMessages || undefined },
