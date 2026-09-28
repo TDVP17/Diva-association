@@ -83,6 +83,7 @@ const patchSchema = z.object({
   limitTime: z.string().trim().min(1).max(100).optional(),
   maxSlots: z.coerce.number().positive().nullable().optional(),
   drawDate: z.coerce.date().optional(),
+  status: z.enum(["DRAFT", "DRAWING", "ACTIVE", "CLOSED"]).optional(),
 });
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -122,20 +123,12 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id } = await params;
-  const [contributionCount, fineCount, payoutCount] = await Promise.all([
-    prisma.contribution.count({ where: { membershipSlot: { membership: { tontineSessionId: id } } } }),
-    prisma.fine.count({ where: { membershipSlot: { membership: { tontineSessionId: id } } } }),
-    prisma.payout.count({ where: { tontineSessionId: id } }),
-  ]);
-  if (contributionCount > 0 || fineCount > 0 || payoutCount > 0) {
-    return NextResponse.json(
-      { error: "This cotisation has payment history — use Lock instead of Delete." },
-      { status: 409 },
-    );
-  }
 
   try {
     const before = await prisma.tontineSession.findUnique({ where: { id } });
+    if (!before) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
     await prisma.tontineSession.delete({ where: { id } });
     await logAudit({
       actorId: admin.user.id,

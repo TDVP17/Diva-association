@@ -16,6 +16,7 @@ import { CONTRIBUTION_STATUS_KEY } from "@/lib/contribution-status-label";
 import { FINE_STATUS_KEY } from "@/lib/fine-status-label";
 import { PAYOUT_CLAIM_STATUS_KEY } from "@/lib/payout-claim-status-label";
 import { TONTINE_TYPE_LABELS } from "@/lib/tontine-labels";
+import { detectMobileMoneyProvider } from "@/lib/mobile-money-provider";
 
 interface MembershipRequest {
   id: string;
@@ -131,6 +132,13 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [releasing, setReleasing] = useState(false);
   const [confirmingOverrideId, setConfirmingOverrideId] = useState<string | null>(null);
+  const [directPayoutSlotId, setDirectPayoutSlotId] = useState<string>("");
+  const [directPayoutName, setDirectPayoutName] = useState<string>("");
+  const [directPayoutPhone, setDirectPayoutPhone] = useState<string>("");
+  const [directPayoutAmount, setDirectPayoutAmount] = useState<string>("");
+  const [directPayoutLoading, setDirectPayoutLoading] = useState(false);
+  const [directPayoutResult, setDirectPayoutResult] = useState<string | null>(null);
+  const [directPayoutError, setDirectPayoutError] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [startingDraw, setStartingDraw] = useState(false);
   const [contributionSlotId, setContributionSlotId] = useState<string>("");
@@ -166,6 +174,24 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   const [locking, setLocking] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const [showRelaunchModal, setShowRelaunchModal] = useState(false);
+  const [relaunchFields, setRelaunchFields] = useState<{
+    startDate: string;
+    drawDate: string;
+    amount: string;
+    fee: string;
+    maxSlots: string;
+  }>({
+    startDate: "",
+    drawDate: "",
+    amount: "",
+    fee: "",
+    maxSlots: "",
+  });
+  const [relaunching, setRelaunching] = useState(false);
+  const [relaunchError, setRelaunchError] = useState<string | null>(null);
+  const [closing, setClosing] = useState(false);
 
   const refreshSession = useCallback(async () => {
     const s: AdminSession = await fetch(`/api/admin/sessions/${tontineSessionId}`).then((r) => r.json());
@@ -361,6 +387,57 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     }
   }
 
+  function handleSelectDirectPayoutSlot(slotId: string) {
+    setDirectPayoutSlotId(slotId);
+    setDirectPayoutResult(null);
+    setDirectPayoutError(null);
+    const foundSlot = session?.slots.find((s) => s.id === slotId);
+    if (foundSlot) {
+      setDirectPayoutName(foundSlot.beneficiaryName || foundSlot.name);
+      const pot = (session?.amount ?? 0) * (session?.slots.length ?? 1);
+      setDirectPayoutAmount(String(pot));
+    } else {
+      setDirectPayoutName("");
+      setDirectPayoutAmount("");
+    }
+  }
+
+  async function executeDirectPayout(e: React.FormEvent) {
+    e.preventDefault();
+    if (!directPayoutSlotId || !directPayoutName.trim() || !directPayoutPhone.trim()) {
+      return;
+    }
+    setDirectPayoutLoading(true);
+    setDirectPayoutError(null);
+    setDirectPayoutResult(null);
+    try {
+      const res = await fetch("/api/admin/payouts/direct", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tontineSessionId,
+          membershipSlotId: directPayoutSlotId,
+          payoutAccountName: directPayoutName.trim(),
+          payoutPhone: directPayoutPhone.trim(),
+          customAmount: directPayoutAmount ? Number(directPayoutAmount) : undefined,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setDirectPayoutError(data?.error || t("failedToReleasePayout"));
+      } else {
+        setDirectPayoutResult(
+          `${t("payoutSentSuccess")} (${formatXAF(data.netPayout)})`
+        );
+        await refreshPayoutClaims();
+      }
+    } catch {
+      setDirectPayoutError(t("failedToReleasePayout"));
+    } finally {
+      setDirectPayoutLoading(false);
+    }
+  }
+
   function handleAddSlotCountChange(next: number) {
     setAddSlotCount(next);
     setAddNames((current) => {
@@ -481,6 +558,74 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     }
   }
 
+  function openRelaunchModal() {
+    if (!session) return;
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+    setRelaunchFields({
+      startDate: tomorrowStr,
+      drawDate: tomorrowStr,
+      amount: String(session.amount),
+      fee: String(session.fee),
+      maxSlots: session.maxSlots !== null ? String(session.maxSlots) : "",
+    });
+    setRelaunchError(null);
+    setShowRelaunchModal(true);
+  }
+
+  async function executeRelaunch() {
+    if (!relaunchFields.startDate) {
+      setRelaunchError(t("couldNotRelaunchCotisation"));
+      return;
+    }
+    setRelaunching(true);
+    setRelaunchError(null);
+    try {
+      const res = await fetch(`/api/admin/sessions/${tontineSessionId}/relaunch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          startDate: relaunchFields.startDate,
+          drawDate: relaunchFields.drawDate ? relaunchFields.drawDate : null,
+          amount: relaunchFields.amount ? Number(relaunchFields.amount) : undefined,
+          fee: relaunchFields.fee ? Number(relaunchFields.fee) : undefined,
+          maxSlots: relaunchFields.maxSlots ? Number(relaunchFields.maxSlots) : null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setRelaunchError(data.error || t("couldNotRelaunchCotisation"));
+        return;
+      }
+      setShowRelaunchModal(false);
+      await refreshSession();
+    } catch {
+      setRelaunchError(t("couldNotRelaunchCotisation"));
+    } finally {
+      setRelaunching(false);
+    }
+  }
+
+  async function closeSession() {
+    if (!window.confirm(t("closeCotisationConfirm"))) return;
+    setClosing(true);
+    try {
+      const res = await fetch(`/api/admin/sessions/${tontineSessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "CLOSED" }),
+      });
+      if (!res.ok) {
+        window.alert(t("couldNotCloseCotisation"));
+        return;
+      }
+      await refreshSession();
+    } finally {
+      setClosing(false);
+    }
+  }
+
   async function deleteSession() {
     if (!window.confirm(t("deleteConfirmMessage"))) return;
     setDeleting(true);
@@ -490,7 +635,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (body?.error) console.error("[deleteSession] server error:", body.error);
-        setDeleteError(t("couldNotDeleteCotisation"));
+        setDeleteError(body?.error || t("couldNotDeleteCotisation"));
         return;
       }
       router.push("/admin");
@@ -570,6 +715,11 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
           >
             <span className="material-symbols-outlined text-[16px]">{TAB_ICONS[tab]}</span>
             {TAB_LABELS[tab]}
+            {tab === "members" && membershipQueue.length > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-error text-on-error font-label-sm text-[10px] leading-none">
+                {membershipQueue.length}
+              </span>
+            )}
             {tab === "foodTurn" && foodTurnActionCount > 0 && (
               <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-error text-on-error font-label-sm text-[10px] leading-none">
                 {foodTurnActionCount}
@@ -588,48 +738,67 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
             </h3>
             <div className="flex items-center gap-2 flex-wrap">
               {session.status === "DRAFT" && (
+                <button
+                  onClick={startDrawingPhase}
+                  disabled={startingDraw || !drawUnlocked}
+                  title={drawUnlocked ? undefined : t("drawUnlocksAt", { date: drawUnlocksAtLabel })}
+                  className="px-3 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 disabled:opacity-60"
+                >
+                  {startingDraw ? t("startingEllipsis") : drawUnlocked ? t("startDrawingPhase") : t("drawUnlocksAt", { date: drawUnlocksAtLabel })}
+                </button>
+              )}
+              {(session.status === "CLOSED" || session.status === "ACTIVE") && (
+                <button
+                  onClick={openRelaunchModal}
+                  className="px-3 py-2 rounded-lg bg-emerald-600 text-white font-label-sm text-label-sm hover:bg-emerald-700 flex items-center gap-1 shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+                  {t("relaunchCotisation")}
+                </button>
+              )}
+              {(session.status === "ACTIVE" || session.status === "DRAWING") && (
+                <button
+                  onClick={closeSession}
+                  disabled={closing}
+                  className="px-3 py-2 rounded-lg border border-amber-600/40 text-amber-700 font-label-sm text-label-sm hover:bg-amber-50 disabled:opacity-60 flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                  {closing ? t("closing") : t("closeCotisation")}
+                </button>
+              )}
               <button
-                onClick={startDrawingPhase}
-                disabled={startingDraw || !drawUnlocked}
-                title={drawUnlocked ? undefined : t("drawUnlocksAt", { date: drawUnlocksAtLabel })}
-                className="px-3 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 disabled:opacity-60"
+                onClick={openEditModal}
+                className="px-3 py-2 rounded-lg border border-outline-variant text-on-surface font-label-sm text-label-sm hover:bg-surface flex items-center gap-1"
               >
-                {startingDraw ? t("startingEllipsis") : drawUnlocked ? t("startDrawingPhase") : t("drawUnlocksAt", { date: drawUnlocksAtLabel })}
+                <span className="material-symbols-outlined text-[16px]">edit</span>
+                {t("editCotisation")}
               </button>
-            )}
-            <button
-              onClick={openEditModal}
-              className="px-3 py-2 rounded-lg border border-outline-variant text-on-surface font-label-sm text-label-sm hover:bg-surface flex items-center gap-1"
-            >
-              <span className="material-symbols-outlined text-[16px]">edit</span>
-              {t("editCotisation")}
-            </button>
-            <button
-              onClick={togglePause}
-              disabled={pausing}
-              className="px-3 py-2 rounded-lg border border-outline-variant text-on-surface font-label-sm text-label-sm hover:bg-surface disabled:opacity-60 flex items-center gap-1"
-            >
-              <span className="material-symbols-outlined text-[16px]">{session.isPaused ? "play_arrow" : "pause"}</span>
-              {session.isPaused ? t("resume") : t("pause")}
-            </button>
-            {!session.lockedAt && (
               <button
-                onClick={lockSession}
-                disabled={locking}
+                onClick={togglePause}
+                disabled={pausing}
                 className="px-3 py-2 rounded-lg border border-outline-variant text-on-surface font-label-sm text-label-sm hover:bg-surface disabled:opacity-60 flex items-center gap-1"
               >
-                <span className="material-symbols-outlined text-[16px]">lock</span>
-                {t("lock")}
+                <span className="material-symbols-outlined text-[16px]">{session.isPaused ? "play_arrow" : "pause"}</span>
+                {session.isPaused ? t("resume") : t("pause")}
               </button>
-            )}
-            <button
-              onClick={deleteSession}
-              disabled={deleting}
-              className="px-3 py-2 rounded-lg border border-error/40 text-error font-label-sm text-label-sm hover:bg-error/5 disabled:opacity-60 flex items-center gap-1"
-            >
-              <span className="material-symbols-outlined text-[16px]">delete</span>
-              {t("delete")}
-            </button>
+              {!session.lockedAt && (
+                <button
+                  onClick={lockSession}
+                  disabled={locking}
+                  className="px-3 py-2 rounded-lg border border-outline-variant text-on-surface font-label-sm text-label-sm hover:bg-surface disabled:opacity-60 flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-[16px]">lock</span>
+                  {t("lock")}
+                </button>
+              )}
+              <button
+                onClick={deleteSession}
+                disabled={deleting}
+                className="px-3 py-2 rounded-lg border border-error/40 text-error font-label-sm text-label-sm hover:bg-error/5 disabled:opacity-60 flex items-center gap-1"
+              >
+                <span className="material-symbols-outlined text-[16px]">delete</span>
+                {deleting ? t("savingEllipsis") : t("delete")}
+              </button>
             </div>
           </div>
           {deleteError && <p className="font-label-sm text-label-sm text-error">{deleteError}</p>}
@@ -949,11 +1118,140 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
       )}
 
       {activeTab === "foodTurn" && (
-        <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4">
-          <h3 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-4">
-            <span className="material-symbols-outlined">restaurant</span>
-            {t("foodTurnTab")}
-          </h3>
+        <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4 flex flex-col gap-6">
+          {/* Formulaire de virement direct Fapshi */}
+          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-sm">
+            <h4 className="font-title-md text-title-md text-primary flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">send_money</span>
+              {t("directPayoutTitle")}
+            </h4>
+            <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
+              {t("directPayoutSubtitle")}
+            </p>
+
+            <form onSubmit={executeDirectPayout} className="mt-4 flex flex-col gap-4">
+              <div>
+                <label className="block font-label-sm text-label-sm text-on-surface font-semibold mb-1">
+                  {t("selectBeneficiarySlot")}
+                </label>
+                <select
+                  value={directPayoutSlotId}
+                  onChange={(e) => handleSelectDirectPayoutSlot(e.target.value)}
+                  className="w-full bg-surface border border-outline-variant rounded-lg p-2.5 font-body-md text-body-md text-on-surface focus:outline-none focus:border-primary"
+                  required
+                >
+                  <option value="">-- {t("selectBeneficiarySlot")} --</option>
+                  {(session?.slots ?? []).map((s) => (
+                    <option key={s.id} value={s.id}>
+                      #{s.officialPosition ?? "?"} — {s.beneficiaryName} ({s.name})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-label-sm text-label-sm text-on-surface font-semibold mb-1">
+                    {t("payoutAccountNameInput")}
+                  </label>
+                  <input
+                    type="text"
+                    value={directPayoutName}
+                    onChange={(e) => setDirectPayoutName(e.target.value)}
+                    placeholder="Ex: Jean Dupont"
+                    className="w-full bg-surface border border-outline-variant rounded-lg p-2.5 font-body-md text-body-md text-on-surface focus:outline-none focus:border-primary"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-label-sm text-label-sm text-on-surface font-semibold">
+                      {t("payoutPhoneInput")}
+                    </label>
+                    {(() => {
+                      const digits = directPayoutPhone.replace(/\D/g, "").replace(/^237/, "");
+                      const provider = detectMobileMoneyProvider(digits);
+                      if (provider === "MTN") {
+                        return (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-[#FFCC00] text-black">
+                            MTN Mobile Money
+                          </span>
+                        );
+                      }
+                      if (provider === "ORANGE") {
+                        return (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-[#FF6600] text-white">
+                            Orange Money
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+                  <input
+                    type="tel"
+                    value={directPayoutPhone}
+                    onChange={(e) => setDirectPayoutPhone(e.target.value)}
+                    placeholder="Ex: 677123456 ou 699123456"
+                    className="w-full bg-surface border border-outline-variant rounded-lg p-2.5 font-body-md text-body-md text-on-surface focus:outline-none focus:border-primary"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-label-sm text-label-sm text-on-surface font-semibold mb-1">
+                  {t("payoutAmountInput")}
+                </label>
+                <input
+                  type="number"
+                  value={directPayoutAmount}
+                  onChange={(e) => setDirectPayoutAmount(e.target.value)}
+                  className="w-full bg-surface border border-outline-variant rounded-lg p-2.5 font-body-md text-body-md text-on-surface focus:outline-none focus:border-primary"
+                  required
+                />
+              </div>
+
+              {directPayoutError && (
+                <div className="p-3 bg-error-container text-on-error-container rounded-lg text-sm font-medium flex items-center gap-2">
+                  <span className="material-symbols-outlined text-error text-[18px]">error</span>
+                  <span>{directPayoutError}</span>
+                </div>
+              )}
+
+              {directPayoutResult && (
+                <div className="p-3 bg-[#d1fae5] border border-[#10b981]/30 text-[#065f46] rounded-lg text-sm font-medium flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#059669] text-[18px]">check_circle</span>
+                  <span>{directPayoutResult}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={directPayoutLoading || !directPayoutSlotId || !directPayoutPhone || !directPayoutName}
+                className="w-full sm:w-auto self-start bg-primary text-on-primary font-label-md text-label-md px-6 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 transition-opacity"
+              >
+                {directPayoutLoading ? (
+                  <>
+                    <LoadingSpinner className="w-4 h-4 text-on-primary" />
+                    <span>{t("sendingPayout")}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[18px]">payments</span>
+                    <span>{t("sendFapshiPayout")}</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
+          <div>
+            <h3 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-4">
+              <span className="material-symbols-outlined">restaurant</span>
+              {t("foodTurnTab")}
+            </h3>
           {payoutClaims.length === 0 ? (
             <p className="font-label-sm text-label-sm text-on-surface-variant">{t("noFoodTurnRequests")}</p>
           ) : (
@@ -1046,6 +1344,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
             </div>
           )}
           {payoutResult && <p className="font-label-sm text-label-sm text-on-surface-variant mt-3">{payoutResult}</p>}
+          </div>
         </section>
       )}
 
@@ -1208,6 +1507,112 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
             >
               {savingEdit ? t("savingEllipsis") : t("saveChanges")}
             </button>
+          </div>
+        </div>
+      )}
+      {showRelaunchModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-surface rounded-xl shadow-xl max-w-lg w-full p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h3 className="font-title-md text-title-md text-primary flex items-center gap-2">
+                <span className="material-symbols-outlined text-emerald-600">restart_alt</span>
+                {t("relaunchModalTitle")}
+              </h3>
+              <button onClick={() => setShowRelaunchModal(false)} aria-label={t("cancel")}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs md:text-sm leading-relaxed flex items-start gap-2">
+              <span className="material-symbols-outlined text-[20px] text-emerald-600 flex-shrink-0 mt-0.5">info</span>
+              <div>{t("relaunchModalDescription")}</div>
+            </div>
+
+            <div>
+              <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                {t("newStartDate")} *
+              </label>
+              <input
+                type="date"
+                value={relaunchFields.startDate}
+                onChange={(e) => setRelaunchFields({ ...relaunchFields, startDate: e.target.value })}
+                className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+              />
+            </div>
+
+            <div>
+              <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                {t("newDrawDate")}
+              </label>
+              <input
+                type="date"
+                value={relaunchFields.drawDate}
+                onChange={(e) => setRelaunchFields({ ...relaunchFields, drawDate: e.target.value })}
+                className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                  {t("amountPerSlot")}
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={relaunchFields.amount}
+                  onChange={(e) => setRelaunchFields({ ...relaunchFields, amount: e.target.value })}
+                  className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+                />
+              </div>
+              <div>
+                <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                  {t("feePerSlot")}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={relaunchFields.fee}
+                  onChange={(e) => setRelaunchFields({ ...relaunchFields, fee: e.target.value })}
+                  className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                {t("maxSlotCapacity")}
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={relaunchFields.maxSlots}
+                onChange={(e) => setRelaunchFields({ ...relaunchFields, maxSlots: e.target.value })}
+                placeholder={t("leaveBlankForNoLimit")}
+                className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+              />
+            </div>
+
+            {relaunchError && <p className="font-label-sm text-label-sm text-error">{relaunchError}</p>}
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowRelaunchModal(false)}
+                className="flex-1 border border-outline-variant text-on-surface font-label-md text-label-md py-2.5 rounded-lg hover:bg-surface active:scale-95 transition-all"
+              >
+                {t("cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={executeRelaunch}
+                disabled={relaunching}
+                className="flex-1 bg-emerald-600 text-white font-label-md text-label-md py-2.5 rounded-lg hover:bg-emerald-700 active:scale-95 transition-all disabled:opacity-60 shadow-sm flex items-center justify-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[18px]">restart_alt</span>
+                {relaunching ? t("relaunching") : t("confirmRelaunch")}
+              </button>
+            </div>
           </div>
         </div>
       )}

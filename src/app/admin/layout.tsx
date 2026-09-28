@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { getLang } from "@/lib/i18n/get-lang";
 import { AdminTopBar } from "@/components/admin/admin-top-bar";
-import { AdminSidebar } from "@/components/admin/admin-sidebar";
+import { AdminSidebar, type AdminNavCounts } from "@/components/admin/admin-sidebar";
 import { BackBar } from "@/components/back-bar";
 import { AdminBottomNav } from "@/components/admin/admin-bottom-nav";
 import { IosInstallBanner } from "@/components/ios-install-banner";
@@ -17,15 +18,39 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const isPresident = session.user.role === "PRESIDENT";
 
+  const [unreadMessages, unreadNotifications, pendingPaymentIssues] = await Promise.all([
+    prisma.chatMessage.count({
+      where: {
+        OR: [
+          { receiverId: session.user.id },
+          { receiver: { role: { in: ["ADMIN", "PRESIDENT"] } } },
+        ],
+        readAt: null,
+      },
+    }),
+    prisma.notification.count({
+      where: { userId: session.user.id, status: { in: ["SENT", "FAILED"] }, readAt: null },
+    }),
+    prisma.paymentAttempt.count({
+      where: { status: { in: ["REFUND_FAILED_MANUAL_REVIEW", "DUPLICATE_PAID"] } },
+    }),
+  ]);
+
+  const counts: AdminNavCounts = {
+    support: unreadMessages,
+    notifications: unreadNotifications,
+    paymentIssues: pendingPaymentIssues,
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-surface-container-lowest">
       <AdminTopBar userId={session.user.id} userName={session.user.name ?? "Admin"} isPresident={isPresident} lang={lang} />
-      <AdminSidebar lang={lang} isPresident={isPresident} />
+      <AdminSidebar lang={lang} isPresident={isPresident} counts={counts} />
       <div className="flex-1 md:pl-60 pb-24 md:pb-8">
         <BackBar lang={lang} area="admin" />
         {children}
       </div>
-      <AdminBottomNav lang={lang} isPresident={isPresident} />
+      <AdminBottomNav lang={lang} isPresident={isPresident} counts={counts} />
       <IosInstallBanner lang={lang} />
       <PushPermissionPrompt lang={lang} />
       <NotificationBadgeSync />

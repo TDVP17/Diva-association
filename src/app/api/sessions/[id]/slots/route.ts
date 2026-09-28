@@ -31,18 +31,33 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   try {
+    const tontineSession = await prisma.tontineSession.findUnique({
+      where: { id: tontineSessionId },
+      select: { id: true, status: true },
+    });
+    if (!tontineSession) {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
+
+    if (tontineSession.status !== "DRAFT") {
+      return NextResponse.json(
+        { error: "Cannot modify slots once drawing or payments have started" },
+        { status: 409 },
+      );
+    }
+
     const membership = await prisma.membership.findUnique({
       where: { userId_tontineSessionId: { userId: session.user.id, tontineSessionId } },
     });
     if (!membership || membership.status !== "APPROVED") {
       return NextResponse.json({ error: "Your membership isn't approved yet" }, { status: 403 });
     }
-    if (membership.slotCount !== null) {
-      return NextResponse.json({ error: "You've already selected your slots" }, { status: 409 });
-    }
 
     const existingSlots = await prisma.membershipSlot.findMany({
-      where: { membership: { tontineSessionId } },
+      where: {
+        membership: { tontineSessionId },
+        NOT: { membershipId: membership.id },
+      },
       select: { beneficiaryName: true },
     });
     const finalNames = resolveUniqueSlotNames(
@@ -51,10 +66,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     );
 
     await prisma.$transaction(async (tx) => {
+      // Delete previous slots if member is adjusting (increasing/decreasing) names
+      await tx.membershipSlot.deleteMany({
+        where: { membershipId: membership.id },
+      });
+
       await tx.membership.update({
         where: { id: membership.id },
         data: { slotCount },
       });
+
       await tx.membershipSlot.createMany({
         data: finalNames.map((beneficiaryName) => ({
           membershipId: membership.id,

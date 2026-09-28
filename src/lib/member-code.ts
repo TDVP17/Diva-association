@@ -1,33 +1,39 @@
-import { randomInt } from "crypto";
 import { prisma } from "@/lib/prisma";
 
-// Excludes visually ambiguous characters (0/O, 1/I/L) so a code read aloud
-// or handwritten stays unambiguous.
-const ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
-
-function randomSegment(length: number): string {
-  let out = "";
-  for (let i = 0; i < length; i++) {
-    out += ALPHABET[randomInt(ALPHABET.length)];
-  }
-  return out;
-}
-
-function candidateCode(): string {
-  return `DIVA-${randomSegment(4)}-${randomSegment(4)}`;
-}
-
 /**
- * Generates a fresh, collision-checked member code. Retries on the rare
- * unique-constraint collision rather than trusting randomness alone.
+ * Generates an 8-character sequential member code: "DIVA" followed by a 4-digit sequence number
+ * (e.g. DIVA0001, DIVA0002, ..., DIVA0020).
  */
 export async function generateUniqueMemberCode(): Promise<string> {
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const code = candidateCode();
-    const existing = await prisma.user.findUnique({ where: { memberCode: code }, select: { id: true } });
-    if (!existing) return code;
+  const usersWithCode = await prisma.user.findMany({
+    where: { memberCode: { startsWith: "DIVA" } },
+    select: { memberCode: true },
+  });
+
+  let maxSeq = 0;
+  for (const u of usersWithCode) {
+    if (!u.memberCode) continue;
+    const m = u.memberCode.match(/^DIVA(\d{4,})$/);
+    if (m) {
+      const num = parseInt(m[1], 10);
+      if (!isNaN(num) && num > maxSeq) {
+        maxSeq = num;
+      }
+    }
   }
-  throw new Error("Could not generate a unique member code after 10 attempts");
+
+  for (let offset = 1; offset <= 50; offset++) {
+    const candidate = `DIVA${String(maxSeq + offset).padStart(4, "0")}`;
+    const exists = await prisma.user.findUnique({
+      where: { memberCode: candidate },
+      select: { id: true },
+    });
+    if (!exists) {
+      return candidate;
+    }
+  }
+
+  return `DIVA${String(maxSeq + 1).padStart(4, "0")}`;
 }
 
 /**
@@ -37,7 +43,9 @@ export async function generateUniqueMemberCode(): Promise<string> {
  */
 export async function ensureMemberCode(userId: string): Promise<string> {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { memberCode: true } });
-  if (user?.memberCode) return user.memberCode;
+  if (user?.memberCode && /^DIVA\d{4}$/.test(user.memberCode)) {
+    return user.memberCode;
+  }
 
   const code = await generateUniqueMemberCode();
   const updated = await prisma.user.update({ where: { id: userId }, data: { memberCode: code } });

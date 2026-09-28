@@ -9,6 +9,7 @@ import { PayButton } from "./pay-button";
 import { JoinButton } from "./join-button";
 import { VerificationPollingRefresh } from "./verification-status";
 import { SelectSlotsForm } from "./select-slots-form";
+import { MemberDraftManager } from "./member-draft-manager";
 import { PayoutOrderModal } from "./payout-order-modal";
 import { PayoutTurnPanel } from "./payout-turn-panel";
 import { PaymentSuccessBanner } from "./payment-success-banner";
@@ -450,6 +451,15 @@ export default async function SessionDetailPage({
           <PayoutOrderModal tontineSessionId={id} lang={lang} />
         </div>
       </section>
+
+      {tontineSession.status === "DRAFT" && (
+        <MemberDraftManager
+          tontineSessionId={id}
+          lang={lang}
+          currentSlotCount={myMembership.slotCount ?? mySlots.length}
+          currentNames={mySlots.map((s) => s.beneficiaryName)}
+        />
+      )}
 
       {tontineSession.status !== "ACTIVE" && tontineSession.status !== "CLOSED" && (
         <div className="mb-stack-gap-lg flex items-start gap-2 bg-secondary-container/15 text-on-secondary-container rounded-xl p-4 border border-secondary-fixed-dim/30">

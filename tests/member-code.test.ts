@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const findUnique = vi.fn();
+const findMany = vi.fn();
 const update = vi.fn();
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     user: {
       findUnique: (...args: unknown[]) => findUnique(...args),
+      findMany: (...args: unknown[]) => findMany(...args),
       update: (...args: unknown[]) => update(...args),
     },
   },
@@ -16,59 +18,55 @@ import { generateUniqueMemberCode, ensureMemberCode } from "@/lib/member-code";
 describe("generateUniqueMemberCode", () => {
   beforeEach(() => {
     findUnique.mockReset();
-  });
-
-  it("returns a code matching the DIVA-XXXX-XXXX shape", async () => {
-    findUnique.mockResolvedValue(null); // never collides
-    const code = await generateUniqueMemberCode();
-    expect(code).toMatch(/^DIVA-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/);
-  });
-
-  it("excludes visually ambiguous characters (0, O, 1, I, L) from the random segments", async () => {
+    findMany.mockReset();
+    findMany.mockResolvedValue([]);
     findUnique.mockResolvedValue(null);
-    for (let i = 0; i < 20; i++) {
-      const code = await generateUniqueMemberCode();
-      const randomSegments = code.replace(/^DIVA-/, "");
-      expect(randomSegments).not.toMatch(/[01OIL]/);
-    }
   });
 
-  it("retries on collision until it finds a free code", async () => {
-    findUnique
-      .mockResolvedValueOnce({ id: "taken-1" })
-      .mockResolvedValueOnce({ id: "taken-2" })
-      .mockResolvedValueOnce(null);
+  it("returns DIVA0001 when no members exist yet", async () => {
     const code = await generateUniqueMemberCode();
-    expect(findUnique).toHaveBeenCalledTimes(3);
-    expect(code).toMatch(/^DIVA-/);
+    expect(code).toBe("DIVA0001");
   });
 
-  it("gives up after 10 attempts rather than looping forever", async () => {
-    findUnique.mockResolvedValue({ id: "always-taken" });
-    await expect(generateUniqueMemberCode()).rejects.toThrow();
-    expect(findUnique).toHaveBeenCalledTimes(10);
+  it("increments sequentially based on highest existing code (DIVA0020 -> DIVA0021)", async () => {
+    findMany.mockResolvedValueOnce([
+      { memberCode: "DIVA0001" },
+      { memberCode: "DIVA0019" },
+      { memberCode: "DIVA0020" },
+    ]);
+    const code = await generateUniqueMemberCode();
+    expect(code).toBe("DIVA0021");
+  });
+
+  it("always produces exactly 8 characters", async () => {
+    findMany.mockResolvedValueOnce([{ memberCode: "DIVA0005" }]);
+    const code = await generateUniqueMemberCode();
+    expect(code.length).toBe(8);
+    expect(code).toMatch(/^DIVA\d{4}$/);
   });
 });
 
 describe("ensureMemberCode", () => {
   beforeEach(() => {
     findUnique.mockReset();
+    findMany.mockReset();
     update.mockReset();
+    findMany.mockResolvedValue([]);
   });
 
-  it("is idempotent — returns the existing code without generating a new one", async () => {
-    findUnique.mockResolvedValueOnce({ memberCode: "DIVA-EXST-CODE" });
+  it("is idempotent — returns the existing valid DIVA0001 code without generating a new one", async () => {
+    findUnique.mockResolvedValueOnce({ memberCode: "DIVA0005" });
     const code = await ensureMemberCode("user-1");
-    expect(code).toBe("DIVA-EXST-CODE");
+    expect(code).toBe("DIVA0005");
     expect(update).not.toHaveBeenCalled();
   });
 
   it("generates and persists a new code when the user has none yet", async () => {
-    findUnique.mockResolvedValueOnce({ memberCode: null }); // ensureMemberCode's own lookup
-    findUnique.mockResolvedValue(null); // generateUniqueMemberCode's collision check
-    update.mockResolvedValueOnce({ memberCode: "DIVA-NEWX-CODE" });
+    findUnique.mockResolvedValueOnce({ memberCode: null });
+    findUnique.mockResolvedValueOnce(null);
+    update.mockResolvedValueOnce({ memberCode: "DIVA0001" });
     const code = await ensureMemberCode("user-2");
-    expect(update).toHaveBeenCalledWith({ where: { id: "user-2" }, data: { memberCode: expect.any(String) } });
-    expect(code).toBe("DIVA-NEWX-CODE");
+    expect(update).toHaveBeenCalledWith({ where: { id: "user-2" }, data: { memberCode: "DIVA0001" } });
+    expect(code).toBe("DIVA0001");
   });
 });

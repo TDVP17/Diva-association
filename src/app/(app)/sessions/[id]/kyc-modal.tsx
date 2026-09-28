@@ -5,32 +5,9 @@ import { translate, translateIfKnown, type Lang, type TranslationKey } from "@/l
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 import { compressImage, formatImageSize, ImageTooLargeError, MAX_OUTPUT_BYTES } from "@/lib/compress-image";
 
-type DocumentType = "CNI" | "RECEPISSE";
-
-// Maps the server's/compressImage's field identifiers to the already-
-// user-facing label for that photo, so a validation error can name exactly
-// which upload failed ("Front of your CNI is too large…") in whichever
-// language is currently selected — never a raw field name. Front/selfie
-// labels don't depend on document type; the back-photo label does (see
-// backLabelKey below), so it's resolved separately rather than through
-// this static map.
 const FIELD_LABEL_KEY: Record<string, TranslationKey> = {
-  documentImage: "documentFrontPhotoLabel",
   selfieImage: "selfiePhotoLabel",
 };
-
-function frontLabelKey(docType: DocumentType): TranslationKey {
-  return docType === "CNI" ? "documentFrontPhotoLabel" : "documentFrontPhotoLabelRecepisse";
-}
-function frontInstructionKey(docType: DocumentType): TranslationKey {
-  return docType === "CNI" ? "documentFrontPhotoInstruction" : "documentFrontPhotoInstructionRecepisse";
-}
-function backLabelKey(docType: DocumentType): TranslationKey {
-  return docType === "CNI" ? "documentBackPhotoLabel" : "documentBackPhotoLabelRecepisse";
-}
-function backInstructionKey(docType: DocumentType): TranslationKey {
-  return docType === "CNI" ? "documentBackPhotoInstruction" : "documentBackPhotoInstructionRecepisse";
-}
 
 export function KycModal({
   tontineSessionId,
@@ -42,47 +19,24 @@ export function KycModal({
   lang: Lang;
 }) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
-  const [documentType, setDocumentType] = useState<DocumentType>("CNI");
-  const [documentFrontFile, setDocumentFrontFile] = useState<File | null>(null);
-  const [documentBackFile, setDocumentBackFile] = useState<File | null>(null);
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
+  const [applicantFullName, setApplicantFullName] = useState("");
   const [referrerName, setReferrerName] = useState("");
-  const [referrerPhone, setReferrerPhone] = useState("");
   const [residenceCity, setResidenceCity] = useState("");
   const [residenceNeighborhood, setResidenceNeighborhood] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // A Récépissé's back side is optional — only CNI strictly requires it.
-  const backRequired = documentType === "CNI";
   const canSubmit =
-    documentFrontFile &&
-    (documentBackFile || !backRequired) &&
     selfieFile &&
+    applicantFullName.trim() &&
     referrerName.trim() &&
-    referrerPhone.trim() &&
     residenceCity.trim() &&
     residenceNeighborhood.trim();
 
-  function changeDocumentType(next: DocumentType) {
-    setDocumentType(next);
-    // Switching from Récépissé to CNI re-imposes the both-sides requirement
-    // — clearing a since-invalidated "optional, skipped" back photo would be
-    // wrong, but there's nothing to clear either way; this just guards
-    // against a stale error message referencing the previous document type.
-    setError(null);
-  }
-
-  // Resolves a server-supplied errorKey/errorVars into the specific,
-  // localized message — e.g. "kycDocumentTooLarge" + {field, size, max}
-  // becomes "Back of your CNI is too large (6.2MB). Please choose a photo
-  // under 1.5MB…" — instead of the generic couldNotSubmitDocuments
-  // fallback that used to be shown for every failure regardless of cause.
   function translateServerError(key: string, vars?: Record<string, string>): string | undefined {
     const merged = { ...vars };
-    if (merged.field === "documentBackImage") {
-      merged.document = t(backLabelKey(documentType));
-    } else if (merged.field && merged.field in FIELD_LABEL_KEY) {
+    if (merged.field && merged.field in FIELD_LABEL_KEY) {
       merged.document = t(FIELD_LABEL_KEY[merged.field]);
     }
     return translateIfKnown(lang, key, merged);
@@ -90,13 +44,12 @@ export function KycModal({
 
   async function handleSubmit() {
     if (!canSubmit) return;
-    if (!referrerName.trim()) {
-      setError(t("referrerNameRequired"));
+    if (!applicantFullName.trim()) {
+      setError(t("applicantFullNameRequired"));
       return;
     }
-    const referrerPhoneDigits = referrerPhone.replace(/\D/g, "");
-    if (referrerPhoneDigits.length < 8 || referrerPhoneDigits.length > 15) {
-      setError(t("referrerPhoneRequired"));
+    if (!referrerName.trim()) {
+      setError(t("referrerNameRequired"));
       return;
     }
     if (!residenceCity.trim()) {
@@ -110,9 +63,7 @@ export function KycModal({
     setSubmitting(true);
     setError(null);
     try {
-      const toCompress: { key: "documentImage" | "documentBackImage" | "selfieImage"; file: File }[] = [
-        { key: "documentImage", file: documentFrontFile },
-        ...(documentBackFile ? [{ key: "documentBackImage" as const, file: documentBackFile }] : []),
+      const toCompress: { key: "selfieImage"; file: File }[] = [
         { key: "selfieImage", file: selfieFile },
       ];
       const compressed = await Promise.allSettled(toCompress.map(({ file }) => compressImage(file)));
@@ -120,22 +71,20 @@ export function KycModal({
       if (failedIndex !== -1) {
         const reason = (compressed[failedIndex] as PromiseRejectedResult).reason;
         const size = reason instanceof ImageTooLargeError ? formatImageSize(reason.sizeBytes) : "?";
-        const failedKey = toCompress[failedIndex].key;
-        const label =
-          failedKey === "documentBackImage" ? t(backLabelKey(documentType)) : t(FIELD_LABEL_KEY[failedKey]);
-        setError(t("kycCompressionFailed", { document: label, size, max: formatImageSize(MAX_OUTPUT_BYTES) }));
+        setError(t("kycCompressionFailed", { document: t("selfiePhotoLabel"), size, max: formatImageSize(MAX_OUTPUT_BYTES) }));
         setSubmitting(false);
         return;
       }
 
       const formData = new FormData();
-      formData.append("documentType", documentType);
-      toCompress.forEach(({ key }, i) => {
-        const blob = (compressed[i] as PromiseFulfilledResult<Blob>).value;
-        formData.append(key, blob, `${key}.jpg`);
-      });
+      // Send SELFIE as document type — server accepts this for selfie-only flow
+      formData.append("documentType", "SELFIE");
+      const selfieBlob = (compressed[0] as PromiseFulfilledResult<Blob>).value;
+      formData.append("selfieImage", selfieBlob, "selfieImage.jpg");
+      formData.append("applicantFullName", applicantFullName.trim());
       formData.append("referrerName", referrerName.trim());
-      formData.append("referrerPhone", referrerPhoneDigits);
+      // Send a placeholder for referrerPhone since the backend still expects it
+      formData.append("referrerPhone", "000000000");
       formData.append("residenceCity", residenceCity.trim());
       formData.append("residenceNeighborhood", residenceNeighborhood.trim());
 
@@ -152,13 +101,6 @@ export function KycModal({
   }
 
   return (
-    // z-[60] — deliberately above BottomNav's z-50 (public/... bottom-nav.tsx
-    // is fixed, z-50, and DOM-appears after page content) so this modal
-    // always paints on top of it instead of the nav bar covering the modal's
-    // own footer. max-h reserves room for the nav (h-20 + safe-area inset)
-    // so the box itself never even reaches that far, on top of the z-index
-    // guarantee — belt and suspenders after the buttons were getting hidden
-    // behind the nav on short mobile viewports.
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-container-padding bg-black/50">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl max-h-[calc(100dvh-7rem)] flex flex-col overflow-hidden">
         <div className="flex-1 overflow-y-auto p-5">
@@ -167,114 +109,43 @@ export function KycModal({
             <h2 className="font-title-md text-title-md text-on-surface">{t("identityVerification")}</h2>
           </div>
           <p className="font-body-md text-body-md text-on-surface-variant mb-stack-gap-md">
-            {t("identityVerificationBody")}
+            {t("identityVerificationBodySimplified")}
           </p>
 
-          <fieldset className="mb-stack-gap-md">
-            <legend className="font-label-sm text-label-sm text-on-surface-variant mb-1.5">
-              {t("documentTypeSelectionLabel")}
-            </legend>
-            <div className="flex flex-col gap-2">
-              {(["CNI", "RECEPISSE"] as const).map((option) => (
-                <label
-                  key={option}
-                  className={`flex items-center gap-2 border rounded-lg px-3 py-2.5 cursor-pointer transition-colors ${
-                    documentType === option
-                      ? "border-primary bg-primary/5"
-                      : "border-outline-variant hover:bg-surface-container-low"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="document-type"
-                    value={option}
-                    checked={documentType === option}
-                    onChange={() => changeDocumentType(option)}
-                    className="accent-primary"
-                  />
-                  <span className="font-label-md text-label-md text-on-surface">
-                    {t(option === "CNI" ? "documentTypeCni" : "documentTypeRecepisse")}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          {documentType === "CNI" ? (
-            <div className="bg-error/10 border border-error/20 rounded-lg p-2.5 mb-stack-gap-sm flex items-start gap-2">
-              <span className="material-symbols-outlined text-[18px] text-error flex-shrink-0 mt-0.5">info</span>
-              <p className="font-label-sm text-label-sm text-error leading-snug">
-                {t("cniWarningCompact")}
-              </p>
-            </div>
-          ) : (
-            <div className="bg-surface-container-low border border-outline-variant/50 rounded-lg p-2.5 mb-stack-gap-sm flex items-start gap-2">
-              <span className="material-symbols-outlined text-[18px] text-on-surface-variant flex-shrink-0 mt-0.5">info</span>
-              <p className="font-label-sm text-label-sm text-on-surface-variant leading-snug">
-                {t("recepisseSingleSideNote")}
-              </p>
-            </div>
-          )}
-
-          <div className="flex flex-col gap-stack-gap-sm mb-stack-gap-md">
-            <PhotoPicker
-              label={t(frontLabelKey(documentType))}
-              instruction={t(frontInstructionKey(documentType))}
-              file={documentFrontFile}
-              onChange={setDocumentFrontFile}
-              captureMode="environment"
-              chooseLabel={t("choosePhotoAction")}
-              selectedLabel={t("photoSelectedLabel")}
-            />
-            <PhotoPicker
-              label={t(backLabelKey(documentType))}
-              instruction={t(backInstructionKey(documentType))}
-              file={documentBackFile}
-              onChange={setDocumentBackFile}
-              captureMode="environment"
-              chooseLabel={t("choosePhotoAction")}
-              selectedLabel={t("photoSelectedLabel")}
-            />
-            <PhotoPicker
-              label={t("selfiePhotoLabel")}
-              instruction={t("selfiePhotoInstruction")}
-              file={selfieFile}
-              onChange={setSelfieFile}
-              captureMode="user"
-              chooseLabel={t("choosePhotoAction")}
-              selectedLabel={t("photoSelectedLabel")}
-            />
-          </div>
-
           <div className="flex flex-col gap-stack-gap-sm">
+            {/* 1. Nom complet de l'utilisateur pour la cotisation */}
+            <div>
+              <label htmlFor="applicant-full-name" className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                {t("applicantFullNameLabel")} <span className="text-error font-bold">*</span>
+              </label>
+              <input
+                id="applicant-full-name"
+                type="text"
+                required
+                value={applicantFullName}
+                onChange={(e) => setApplicantFullName(e.target.value)}
+                placeholder={t("applicantFullNamePlaceholder")}
+                className="w-full border border-outline-variant rounded-lg px-3 py-2.5 font-body-md text-body-md text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+              />
+            </div>
+
+            {/* 2. Nom de la personne qui a parlé de la cotisation */}
             <div>
               <label htmlFor="referrer-name" className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
-                {t("referrerNameLabel")}
+                {t("referrerNameLabel")} <span className="text-error font-bold">*</span>
               </label>
               <input
                 id="referrer-name"
                 type="text"
+                required
                 value={referrerName}
                 onChange={(e) => setReferrerName(e.target.value)}
                 placeholder={t("referrerNamePlaceholder")}
                 className="w-full border border-outline-variant rounded-lg px-3 py-2.5 font-body-md text-body-md text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
               />
             </div>
-            <div>
-              <label htmlFor="referrer-phone" className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
-                {t("referrerPhoneLabel")}
-              </label>
-              <input
-                id="referrer-phone"
-                type="tel"
-                inputMode="tel"
-                maxLength={9}
-                value={referrerPhone}
-                onChange={(e) => setReferrerPhone(e.target.value.replace(/\D/g, "").slice(0, 9))}
-                placeholder={t("referrerPhonePlaceholder")}
-                className="w-full border border-outline-variant rounded-lg px-3 py-2.5 font-body-md text-body-md text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
-              />
-            </div>
+
+            {/* 3. Ville */}
             <div>
               <label htmlFor="residence-city" className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
                 {t("residenceCityLabel")} <span className="text-error font-bold">*</span>
@@ -289,6 +160,8 @@ export function KycModal({
                 className="w-full border border-outline-variant rounded-lg px-3 py-2.5 font-body-md text-body-md text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
               />
             </div>
+
+            {/* 4. Quartier */}
             <div>
               <label htmlFor="residence-neighborhood" className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
                 {t("residenceNeighborhoodLabel")} <span className="text-error font-bold">*</span>
@@ -303,6 +176,62 @@ export function KycModal({
                 className="w-full border border-outline-variant rounded-lg px-3 py-2.5 font-body-md text-body-md text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
               />
             </div>
+
+            {/* 5. Photo/Selfie — se filmer ou upload de la galerie */}
+            <div>
+              <p className="font-label-sm text-label-sm text-on-surface-variant mb-1.5">
+                {t("selfiePhotoLabel")} <span className="text-error font-bold">*</span>
+              </p>
+              <p className="font-label-sm text-[11px] text-on-surface-variant mb-2">
+                {t("selfiePhotoInstruction")}
+              </p>
+              <div className="flex flex-col gap-2">
+                {/* Option 1: Se filmer directement (caméra selfie) */}
+                <label className="flex items-center justify-between gap-3 border border-outline-variant rounded-lg px-3 py-2.5 cursor-pointer hover:bg-surface-container-low transition-colors">
+                  <div className="min-w-0 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary flex-shrink-0">photo_camera</span>
+                    <div>
+                      <p className="font-label-md text-label-md text-on-surface">{t("takePhotoAction")}</p>
+                      {selfieFile && (
+                        <p className="font-label-sm text-[11px] text-on-surface-variant truncate">{selfieFile.name}</p>
+                      )}
+                    </div>
+                  </div>
+                  <span className="material-symbols-outlined text-primary flex-shrink-0">
+                    {selfieFile ? "check_circle" : "add_a_photo"}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    capture="user"
+                    className="hidden"
+                    onChange={(e) => setSelfieFile(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+                {/* Option 2: Upload depuis la galerie */}
+                <label className="flex items-center justify-between gap-3 border border-outline-variant rounded-lg px-3 py-2.5 cursor-pointer hover:bg-surface-container-low transition-colors">
+                  <div className="min-w-0 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary flex-shrink-0">photo_library</span>
+                    <div>
+                      <p className="font-label-md text-label-md text-on-surface">{t("uploadFromGalleryAction")}</p>
+                    </div>
+                  </div>
+                  <span className="material-symbols-outlined text-primary flex-shrink-0">upload</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(e) => setSelfieFile(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+              </div>
+              {selfieFile && (
+                <div className="mt-2 flex items-center gap-2 text-[#065f46] bg-[#d1fae5] rounded-lg px-3 py-2">
+                  <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                  <span className="font-label-sm text-label-sm">{t("photoSelectedLabel")} — {selfieFile.name}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -310,7 +239,7 @@ export function KycModal({
           {canSubmit && !error && (
             <p className="font-label-sm text-[11px] text-on-surface-variant mb-stack-gap-sm flex items-start gap-1.5">
               <span className="material-symbols-outlined text-[14px] flex-shrink-0 mt-0.5">summarize</span>
-              {t("kycSubmissionSummary", { referrer: referrerName.trim() })}
+              {t("kycSubmissionSummarySimplified", { name: applicantFullName.trim(), referrer: referrerName.trim() })}
             </p>
           )}
           {error && <p className="font-label-sm text-label-sm text-error mb-stack-gap-sm">{error}</p>}
@@ -334,51 +263,6 @@ export function KycModal({
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function PhotoPicker({
-  label,
-  instruction,
-  file,
-  onChange,
-  captureMode,
-  chooseLabel,
-  selectedLabel,
-}: {
-  label: string;
-  /** Shown once, before the field is filled — tells the member exactly what to photograph and how, instead of a bare "Document 1"-style label. */
-  instruction: string;
-  file: File | null;
-  onChange: (file: File | null) => void;
-  captureMode: "environment" | "user";
-  chooseLabel: string;
-  selectedLabel: string;
-}) {
-  return (
-    <div>
-      {!file && (
-        <p className="font-label-sm text-[11px] text-on-surface-variant mb-1 px-0.5">{instruction}</p>
-      )}
-      <label className="flex items-center justify-between gap-3 border border-outline-variant rounded-lg px-3 py-2.5 cursor-pointer hover:bg-surface-container-low transition-colors">
-        <div className="min-w-0">
-          <p className="font-label-sm text-label-sm text-on-surface-variant">{label}</p>
-          <p className="font-label-md text-label-md text-on-surface truncate">
-            {file ? `${selectedLabel} — ${file.name}` : chooseLabel}
-          </p>
-        </div>
-        <span className="material-symbols-outlined text-primary flex-shrink-0">
-          {file ? "check_circle" : "add_a_photo"}
-        </span>
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          capture={captureMode}
-          className="hidden"
-          onChange={(e) => onChange(e.target.files?.[0] ?? null)}
-        />
-      </label>
     </div>
   );
 }

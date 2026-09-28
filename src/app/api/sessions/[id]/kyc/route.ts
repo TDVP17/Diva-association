@@ -36,7 +36,7 @@ const MAX_BYTES_PER_FILE = 1.5 * 1024 * 1024;
 const MAX_COMBINED_BYTES = 4 * 1024 * 1024;
 
 type DocumentFieldName = "documentImage" | "documentBackImage" | "selfieImage";
-type DocumentType = "CNI" | "RECEPISSE";
+type DocumentType = "CNI" | "RECEPISSE" | "SELFIE";
 
 function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
@@ -87,24 +87,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       );
     }
 
-    // CNI (Cameroonian national ID card) requires both sides; a Récépissé
-    // (the temporary ID receipt issued while a CNI is being processed — a
-    // valid, common substitute in Cameroon) is often only printed on one
-    // side, so its back photo is optional. Defaults to CNI (the stricter
-    // requirement) for any legacy client that doesn't send this field yet.
+    // CNI requires both sides; Récépissé back is optional; SELFIE is the
+    // new simplified flow — only a selfie photo is required, no document.
     const documentTypeRaw = (formData.get("documentType") as string | null) ?? "CNI";
-    if (documentTypeRaw !== "CNI" && documentTypeRaw !== "RECEPISSE") {
+    if (documentTypeRaw !== "CNI" && documentTypeRaw !== "RECEPISSE" && documentTypeRaw !== "SELFIE") {
       return NextResponse.json(
         { error: `Invalid document type: ${documentTypeRaw}`, errorKey: "kycInvalidDocumentTypeSelection" },
         { status: 400 },
       );
     }
     const documentType: DocumentType = documentTypeRaw;
+    const isSelfieOnly = documentType === "SELFIE";
     const backImageRequired = documentType === "CNI";
 
     const fields: { field: DocumentFieldName; file: File | null; required: boolean }[] = [
-      { field: "documentImage", file: readImageFile(formData, "documentImage"), required: true },
-      { field: "documentBackImage", file: readImageFile(formData, "documentBackImage"), required: backImageRequired },
+      { field: "documentImage", file: readImageFile(formData, "documentImage"), required: !isSelfieOnly },
+      { field: "documentBackImage", file: readImageFile(formData, "documentBackImage"), required: !isSelfieOnly && backImageRequired },
       { field: "selfieImage", file: readImageFile(formData, "selfieImage"), required: true },
     ];
 
@@ -138,10 +136,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       }
     }
 
-    const documentFrontFile = fields[0].file!;
-    const documentBackFile = fields[1].file; // may be null for a Récépissé
-    const selfieFile = fields[2].file!;
-
     const referrerName = (formData.get("referrerName") as string | null)?.trim() ?? "";
     if (!referrerName) {
       return NextResponse.json(
@@ -151,16 +145,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
     const referrerPhoneRaw = (formData.get("referrerPhone") as string | null)?.trim() ?? "";
     const referrerPhoneDigits = referrerPhoneRaw.replace(/\D/g, "");
-    if (referrerPhoneDigits.length < 8 || referrerPhoneDigits.length > 15) {
-      return NextResponse.json(
-        { error: "Invalid referrer phone number", errorKey: "kycInvalidReferrerPhone" },
-        { status: 400 },
-      );
-    }
+    // Phone is now optional for the simplified SELFIE flow but kept for backward compat
+    const applicantFullName = (formData.get("applicantFullName") as string | null)?.trim() ?? "";
     const residenceCity = (formData.get("residenceCity") as string | null)?.trim() ?? "";
     const residenceNeighborhood = (formData.get("residenceNeighborhood") as string | null)?.trim() ?? "";
 
-    const combinedSize = documentFrontFile.size + (documentBackFile?.size ?? 0) + selfieFile.size;
+    const combinedSize = (fields[0].file?.size ?? 0) + (fields[1].file?.size ?? 0) + (fields[2].file?.size ?? 0);
     if (combinedSize > MAX_COMBINED_BYTES) {
       return NextResponse.json(
         {
@@ -219,7 +209,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     const stamp = Date.now();
-    const documentFrontKey = `kyc-documents/${session.user.id}/${stamp}-document-front${ALLOWED_TYPES[documentFrontFile.type]}`;
+    const documentFrontFile = fields[0].file; // may be null for SELFIE flow
+    const documentBackFile = fields[1].file; // may be null for a Récépissé or SELFIE flow
+    const selfieFile = fields[2].file!;
+
+    const documentFrontKey = documentFrontFile
+      ? `kyc-documents/${session.user.id}/${stamp}-document-front${ALLOWED_TYPES[documentFrontFile.type]}`
+      : null;
     const documentBackKey = documentBackFile
       ? `kyc-documents/${session.user.id}/${stamp}-document-back${ALLOWED_TYPES[documentBackFile.type]}`
       : null;
@@ -233,11 +229,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // losing that precision (Promise.all) or paying the sequential latency
     // cost just to keep it.
     const uploads: { field: DocumentFieldName; key: string; file: File }[] = [
-      { field: "documentImage", key: documentFrontKey, file: documentFrontFile },
+      ...(documentFrontFile && documentFrontKey
+        ? [{ field: "documentImage" as const, key: documentFrontKey, file: documentFrontFile }]
+        : []),
       ...(documentBackFile && documentBackKey
         ? [{ field: "documentBackImage" as const, key: documentBackKey, file: documentBackFile }]
         : []),
-      { field: "selfieImage", key: selfieKey, file: selfieFile },
+      { field: "selfieImage" as const, key: selfieKey, file: selfieFile },
     ];
     const uploadResults = await Promise.allSettled(
       uploads.map(({ key, file }) => file.arrayBuffer().then((buf) => saveFile(key, Buffer.from(buf)))),
@@ -298,25 +296,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
                 userId: session.user.id,
                 tontineSessionId,
                 membershipId: membership.id,
-                documentType,
+                documentType: isSelfieOnly ? "CNI" : documentType, // Store as CNI in DB for backward compat
                 status: "PENDING",
-                documentImageUrl: `/api/files/${documentFrontKey}`,
+                documentImageUrl: documentFrontKey ? `/api/files/${documentFrontKey}` : null,
                 documentBackImageUrl: documentBackKey ? `/api/files/${documentBackKey}` : null,
                 selfieImageUrl: `/api/files/${selfieKey}`,
                 referrerName,
-                referrerPhone: referrerPhoneDigits,
+                referrerPhone: referrerPhoneDigits || null,
               },
             });
 
-            const locationUpdate: { city?: string; neighborhood?: string } = {};
+            const locationUpdate: { city?: string; neighborhood?: string; name?: string } = {};
             if (residenceCity) locationUpdate.city = residenceCity;
             if (residenceNeighborhood) locationUpdate.neighborhood = residenceNeighborhood;
+            if (applicantFullName) locationUpdate.name = applicantFullName;
 
             if (Object.keys(locationUpdate).length > 0 && typeof tx.user?.update === "function") {
               await tx.user.update({
                 where: { id: session.user.id },
                 data: locationUpdate,
-              }).catch((err: unknown) => console.error("[sessions/kyc] failed to update user location:", err));
+              }).catch((err: unknown) => console.error("[sessions/kyc] failed to update user profile:", err));
             }
 
             return { alreadyPending: false as const };

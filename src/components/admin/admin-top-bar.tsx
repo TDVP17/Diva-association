@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { signOut } from "@/auth";
 import { LanguageToggle } from "@/components/language-toggle";
 import { NotificationBell } from "@/components/notification-bell";
@@ -17,17 +18,27 @@ export async function AdminTopBar({
   lang: Lang;
 }) {
   const t = (key: Parameters<typeof translate>[1]) => translate(lang, key);
-  const [unreadMessages, unreadNotifications] = await Promise.all([
-    prisma.chatMessage.count({ where: { receiverId: userId, readAt: null } }),
+  const [unreadMessages, unreadNotifications, pendingMemberships, pendingFoodRequests] = await Promise.all([
+    prisma.chatMessage.count({
+      where: {
+        OR: [
+          { receiverId: userId },
+          { receiver: { role: { in: ["ADMIN", "PRESIDENT"] } } },
+        ],
+        readAt: null,
+      },
+    }),
     prisma.notification.count({ where: { userId, status: { in: ["SENT", "FAILED"] }, readAt: null } }),
+    prisma.membership.count({ where: { status: "PENDING" } }),
+    prisma.payout.count({ where: { status: { not: "CONFIRMED" } } }),
   ]);
 
   const menuItems: TopRightMenuItem[] = [
     { href: "/admin/support", label: t("messages"), icon: "chat_bubble", badge: unreadMessages },
     { href: "/admin/contributions", label: t("contributionsNavItem"), icon: "account_balance" },
     { href: "/admin/sessions/new", label: t("addContributionNav"), icon: "add_circle" },
-    { href: "/admin/membership-requests", label: t("joinRequestsNav"), icon: "group_add" },
-    { href: "/admin/food-requests", label: t("foodRequestsNav"), icon: "restaurant" },
+    { href: "/admin/membership-requests", label: t("joinRequestsNav"), icon: "group_add", badge: pendingMemberships },
+    { href: "/admin/food-requests", label: t("foodRequestsNav"), icon: "restaurant", badge: pendingFoodRequests },
     { href: "/admin/users", label: t("allUsersCard"), icon: "group" },
   ];
 
@@ -46,8 +57,20 @@ export async function AdminTopBar({
           </p>
         </div>
       </div>
-      <nav className="flex items-center gap-2 flex-shrink-0">
+      <nav className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
         <LanguageToggle currentLang={lang} dark />
+        <Link
+          href="/admin/support"
+          aria-label={t("messages")}
+          className="relative w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors"
+        >
+          <span className="material-symbols-outlined text-on-primary">support_agent</span>
+          {unreadMessages > 0 && (
+            <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-error text-on-error rounded-full font-label-sm text-[10px] font-bold flex items-center justify-center leading-none">
+              {unreadMessages}
+            </span>
+          )}
+        </Link>
         <NotificationBell lang={lang} unreadCount={unreadNotifications} href="/admin/notifications" dark />
         <TopRightMenu
           lang={lang}

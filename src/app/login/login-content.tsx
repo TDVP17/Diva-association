@@ -202,10 +202,6 @@ export function LoginContent({
           </button>
         </form>
 
-        <p className="font-label-sm text-[12px] text-on-surface-variant/80 text-center mt-2.5 relative z-10">
-          {t("orUseEmailPhoneNotice")}
-        </p>
-
         {googleLoading && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center shadow-2xl border border-surface-variant flex flex-col items-center gap-4 animate-in fade-in zoom-in-95 duration-200">
@@ -231,13 +227,6 @@ export function LoginContent({
             </div>
           </div>
         )}
-
-        <div className="mt-section-margin pt-stack-gap-md border-t border-outline-variant/30 flex items-center justify-center gap-unit text-center relative z-10">
-          <span className="material-symbols-outlined text-secondary text-[16px]">lock</span>
-          <p className="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1">
-            {t("footer")}
-          </p>
-        </div>
       </div>
 
       {isDev && (

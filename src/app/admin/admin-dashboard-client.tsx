@@ -21,8 +21,8 @@ function DashboardCard({ href, icon, title, body, count, stat }: DashboardCardPr
       href={href}
       className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-5 hover:border-primary transition-colors flex flex-col gap-2 relative"
     >
-      {!!count && (
-        <span className="absolute top-4 right-4 bg-error text-on-error font-label-sm text-label-sm min-w-[22px] h-[22px] rounded-full flex items-center justify-center px-1.5">
+      {!!count && count > 0 && (
+        <span className="absolute top-4 right-4 bg-error text-on-error font-bold text-xs min-w-[22px] h-[22px] rounded-full flex items-center justify-center px-1.5 shadow-sm">
           {count}
         </span>
       )}
@@ -45,6 +45,8 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
   const [swapCount, setSwapCount] = useState<number | null>(null);
   const [paymentIssueCount, setPaymentIssueCount] = useState<number | null>(null);
   const [totalUsersCount, setTotalUsersCount] = useState<number | null>(null);
+  const [supportCount, setSupportCount] = useState<number | null>(null);
+  const [foodRequestCount, setFoodRequestCount] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/membership-queue")
@@ -62,6 +64,14 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
     fetch("/api/admin/users")
       .then((r) => r.json())
       .then((b) => setTotalUsersCount(typeof b.total === "number" ? b.total : (b.users ?? []).length));
+    fetch("/api/chat/unread-count")
+      .then((r) => r.json())
+      .then((b) => setSupportCount(typeof b.unread === "number" ? b.unread : 0))
+      .catch(() => {});
+    fetch("/api/admin/payout-claims")
+      .then((r) => r.json())
+      .then((b) => setFoodRequestCount((b.claims ?? []).filter((c: { status: string }) => c.status !== "CONFIRMED").length))
+      .catch(() => {});
   }, []);
 
   return (
@@ -82,13 +92,27 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
         {t("createAndPublishNewCotisation")}
       </Link>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-stack-gap-md">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-stack-gap-md">
+        <DashboardCard
+          href="/admin/support"
+          icon="support_agent"
+          title={t("messages")}
+          body={lang === "fr" ? "Messages et questions des membres en attente de réponse." : "Member messages awaiting admin response."}
+          count={supportCount}
+        />
         <DashboardCard
           href="/admin/membership-requests"
           icon="group_add"
           title={t("cotisationMembershipRequestsCard")}
           body={t("cotisationMembershipRequestsCardBody")}
           count={membershipCount}
+        />
+        <DashboardCard
+          href="/admin/food-requests"
+          icon="restaurant"
+          title={t("foodTurnTab")}
+          body={lang === "fr" ? "Virements des bénéficiaires et tours de table à régler." : "Beneficiary payouts and turn claims to process."}
+          count={foodRequestCount}
         />
         <DashboardCard
           href="/admin/contributions"
@@ -105,19 +129,19 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
           count={swapCount}
         />
         <DashboardCard
+          href="/admin/payment-issues"
+          icon="shield_person"
+          title={t("paymentIssuesCard")}
+          body={t("paymentIssuesCardBody")}
+          count={paymentIssueCount}
+        />
+        <DashboardCard
           href="/admin/users"
           icon="group"
           title={t("allUsersCard")}
           body={t("allUsersCardBody")}
           count={null}
           stat={totalUsersCount}
-        />
-        <DashboardCard
-          href="/admin/payment-issues"
-          icon="shield_person"
-          title={t("paymentIssuesCard")}
-          body={t("paymentIssuesCardBody")}
-          count={paymentIssueCount}
         />
       </div>
     </main>

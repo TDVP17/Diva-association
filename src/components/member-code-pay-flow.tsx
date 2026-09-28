@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { PaymentConfirmDialog } from "@/components/payment-confirm-dialog";
 import { formatXAF } from "@/lib/format-currency";
@@ -28,16 +28,29 @@ interface FundableSlot {
  * for a Relative" page (payEndpoint records paidByUserId) and the public,
  * no-account /pay entry point (payEndpoint is anonymous) — same flow,
  * different endpoint depending on whether the payer is signed in.
+ *
+ * When an `initialCode` is provided (e.g. from a shared link), the flow
+ * auto-searches on mount so the payer sees the member's unpaid cotisations
+ * immediately without needing to type anything.
  */
-export function MemberCodePayFlow({ lang, payEndpoint }: { lang: Lang; payEndpoint: string }) {
+export function MemberCodePayFlow({
+  lang,
+  payEndpoint,
+  initialCode,
+}: {
+  lang: Lang;
+  payEndpoint: string;
+  initialCode?: string;
+}) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
 
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(initialCode?.trim().toUpperCase() ?? "");
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [member, setMember] = useState<FoundMember | null>(null);
   const [slots, setSlots] = useState<FundableSlot[]>([]);
   const [confirmSlotId, setConfirmSlotId] = useState<string | null>(null);
+  const autoSearchDone = useRef(false);
 
   async function fetchSlots(memberCode: string) {
     const membershipsRes = await fetch(`/api/members/${encodeURIComponent(memberCode)}/memberships`);
@@ -45,8 +58,8 @@ export function MemberCodePayFlow({ lang, payEndpoint }: { lang: Lang; payEndpoi
     setSlots(membershipsRes.ok ? (membershipsBody.slots ?? []) : []);
   }
 
-  async function findMember() {
-    const trimmed = code.trim();
+  async function findMember(codeToSearch?: string) {
+    const trimmed = (codeToSearch ?? code).trim();
     if (!trimmed) return;
     setSearching(true);
     setSearchError(null);
@@ -67,6 +80,15 @@ export function MemberCodePayFlow({ lang, payEndpoint }: { lang: Lang; payEndpoi
     }
   }
 
+  // Auto-search when initialCode is provided (from a shared link)
+  useEffect(() => {
+    if (initialCode && initialCode.trim() && !autoSearchDone.current) {
+      autoSearchDone.current = true;
+      findMember(initialCode.trim().toUpperCase());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialCode]);
+
   function reset() {
     setMember(null);
     setSlots([]);
@@ -75,6 +97,9 @@ export function MemberCodePayFlow({ lang, payEndpoint }: { lang: Lang; payEndpoi
   }
 
   const confirmSlot = slots.find((s) => s.slotId === confirmSlotId);
+
+  // Only show unpaid cotisations
+  const unpaidSlots = slots.filter((s) => !s.alreadyPaid);
 
   if (!member) {
     return (
@@ -93,7 +118,7 @@ export function MemberCodePayFlow({ lang, payEndpoint }: { lang: Lang; payEndpoi
         </div>
         {searchError && <p className="font-label-sm text-label-sm text-error">{searchError}</p>}
         <button
-          onClick={findMember}
+          onClick={() => findMember()}
           disabled={!code.trim() || searching}
           className="w-full py-3 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-60"
         >
@@ -135,7 +160,7 @@ export function MemberCodePayFlow({ lang, payEndpoint }: { lang: Lang; payEndpoi
 
       <div>
         <h2 className="font-label-md text-label-md text-on-surface mb-2">{t("whichContributionToFund")}</h2>
-        {slots.length === 0 ? (
+        {unpaidSlots.length === 0 ? (
           <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-5 text-center">
             <p className="font-body-md text-body-md text-on-surface-variant">
               {t("noAvailableContributionsForMember")}
@@ -143,7 +168,7 @@ export function MemberCodePayFlow({ lang, payEndpoint }: { lang: Lang; payEndpoi
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            {slots.map((s) => (
+            {unpaidSlots.map((s) => (
               <div
                 key={s.slotId}
                 className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4 flex items-center justify-between gap-3"
@@ -156,10 +181,9 @@ export function MemberCodePayFlow({ lang, payEndpoint }: { lang: Lang; payEndpoi
                 </div>
                 <button
                   onClick={() => setConfirmSlotId(s.slotId)}
-                  disabled={s.alreadyPaid}
-                  className="flex-shrink-0 px-3 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 disabled:opacity-50 disabled:bg-surface-variant disabled:text-on-surface-variant"
+                  className="flex-shrink-0 px-3 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90"
                 >
-                  {s.alreadyPaid ? t("alreadyContributed") : t("payViaFapshi")}
+                  {t("payViaFapshi")}
                 </button>
               </div>
             ))}

@@ -285,13 +285,13 @@ export function CredentialsForm({
             <h3 className="font-title-md text-title-md text-on-surface font-semibold">
               {t("forgotPasswordTitle")}
             </h3>
-            <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-              {resetStep === 1
-                ? t("forgotPasswordSubtitle")
-                : resetInfo?.channel === "WHATSAPP"
+            {resetStep === 2 && (
+              <p className="font-body-md text-body-md text-on-surface-variant mt-1">
+                {resetInfo?.channel === "WHATSAPP"
                   ? t("resetCodeSentWhatsApp", { destination: resetInfo.destination ?? "" })
                   : t("resetCodeSentEmail", { destination: resetInfo?.destination ?? "" })}
-            </p>
+              </p>
+            )}
           </div>
 
           {resetStep === 1 ? (

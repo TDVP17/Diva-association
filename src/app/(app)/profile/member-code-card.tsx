@@ -7,6 +7,10 @@ import { translate, type Lang } from "@/lib/i18n/translations";
  * A member's unique, permanent identifier — this is what relatives/friends
  * use on the "Contribute for a Relative" flow to find them and pay on their
  * behalf, so it needs to be trivially easy to copy and hand over.
+ *
+ * Sharing creates a direct link to `/pay?code=DIVA0001` so the recipient
+ * can click through, see only the member's unpaid cotisations, and pay
+ * immediately — no manual code entry needed.
  */
 export function MemberCodeCard({ code, lang }: { code: string | null; lang: Lang }) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
@@ -14,9 +18,14 @@ export function MemberCodeCard({ code, lang }: { code: string | null; lang: Lang
 
   if (!code) return null;
 
+  function getShareUrl() {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    return `${origin}/pay?code=${encodeURIComponent(code!)}`;
+  }
+
   async function copyCode() {
     try {
-      await navigator.clipboard.writeText(code!);
+      await navigator.clipboard.writeText(getShareUrl());
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -26,11 +35,13 @@ export function MemberCodeCard({ code, lang }: { code: string | null; lang: Lang
 
   async function shareCode() {
     if (!code) return;
+    const shareUrl = getShareUrl();
     if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
       try {
         await navigator.share({
           title: "DIVA Association",
-          text: code,
+          text: t("shareCodeMessage", { code: code! }),
+          url: shareUrl,
         });
       } catch (err) {
         if ((err as Error)?.name !== "AbortError") {
