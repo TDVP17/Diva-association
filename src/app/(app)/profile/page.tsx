@@ -134,7 +134,7 @@ export default async function ProfilePage() {
           inputType="email"
         />
         <InlineField
-          label={t("phoneLabel")}
+          label={t("whatsappPhoneLabel")}
           currentValue={user.phone ?? ""}
           fieldName="phone"
           purpose="PHONE_CHANGE"

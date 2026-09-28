@@ -70,7 +70,7 @@ export async function GET(request: Request) {
     );
     const estimatedAmount = Number(tontineSession.amount) * totalApprovedSlots;
 
-    const lang = membership.user.preferredLang === "fr" ? "fr" : "en";
+    const lang = membership.user.preferredLang === "en" ? "en" : "fr";
     const sessionLabel = tontineSession.title || TONTINE_TYPE_LABELS[tontineSession.type];
     const firstName = membership.user.name.trim().split(/\s+/)[0] ?? membership.user.name;
     const dateLabel = estimatedDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-GB", {

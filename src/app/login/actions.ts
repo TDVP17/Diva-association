@@ -3,9 +3,13 @@
 import { AuthError } from "next-auth";
 import { signIn } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getSupabaseAuthClient } from "@/lib/supabase-auth";
+import { getSupabaseAuthClient, getSupabaseAdminClient } from "@/lib/supabase-auth";
 import { isAdminRole } from "@/lib/constants";
 import { ensureMemberCode } from "@/lib/member-code";
+import { createOtpChallenge, verifyOtp } from "@/lib/otp";
+import { sendEmailSafe } from "@/lib/email/resend";
+import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
+import { translate, type Lang } from "@/lib/i18n/translations";
 
 export interface AuthFormState {
   error?: string;
@@ -23,37 +27,231 @@ function isRedirectSignal(err: unknown): boolean {
   );
 }
 
+export async function findUserByContact(identifier: string) {
+  const clean = identifier.trim();
+  if (!clean) return null;
+  if (clean.includes("@")) {
+    return prisma.user.findUnique({
+      where: { email: clean.toLowerCase() },
+      select: { id: true, name: true, email: true, phone: true, role: true, preferredLang: true },
+    });
+  }
+  const digits = clean.replace(/\D/g, "");
+  return prisma.user.findFirst({
+    where: {
+      OR: [
+        { phone: clean },
+        ...(digits ? [{ phone: digits }] : []),
+        ...(digits.startsWith("237") ? [{ phone: digits.slice(3) }] : []),
+        ...(!digits.startsWith("237") && digits.length === 9 ? [{ phone: `237${digits}` }] : []),
+      ],
+    },
+    select: { id: true, name: true, email: true, phone: true, role: true, preferredLang: true },
+  });
+}
+
 export async function signInAction(
   callbackUrl: string,
   _prevState: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
-  const email = String(formData.get("email") ?? "").trim();
+  const rawIdentifier = String(formData.get("email") ?? formData.get("identifier") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  if (!email || !password) {
-    return { error: "Email and password are required." };
+  if (!rawIdentifier || !password) {
+    return { error: "Email or phone number and password are required." };
   }
 
   try {
-    // The login form's callbackUrl defaults to the member dashboard, with no
-    // way to know in advance whether the signing-in account is an admin —
-    // admins never have a member dashboard to land on, so redirect them
-    // straight to /admin instead, unless a specific non-default page was
-    // being requested (e.g. a deep link that bounced through /login).
+    let emailToUse = rawIdentifier;
+    let userRole = null;
+
+    if (!rawIdentifier.includes("@")) {
+      const user = await findUserByContact(rawIdentifier);
+      if (!user) {
+        return { error: "Incorrect email, phone number, or password." };
+      }
+      emailToUse = user.email;
+      userRole = user.role;
+    } else {
+      const target = await prisma.user.findUnique({
+        where: { email: rawIdentifier.toLowerCase() },
+        select: { role: true },
+      });
+      userRole = target?.role;
+    }
+
     let redirectTo = callbackUrl;
     if (callbackUrl === "/dashboard") {
-      const target = await prisma.user.findUnique({ where: { email }, select: { role: true } });
-      if (isAdminRole(target?.role)) redirectTo = "/admin";
+      if (isAdminRole(userRole)) redirectTo = "/admin";
     }
-    await signIn("email-password", { email, password, redirectTo });
+    await signIn("email-password", { email: emailToUse, password, redirectTo });
     return {};
   } catch (err) {
     if (isRedirectSignal(err)) throw err; // successful sign-in — let the redirect happen
     if (err instanceof AuthError) {
-      return { error: "Incorrect email or password." };
+      return { error: "Incorrect email, phone number, or password." };
     }
     console.error("[signInAction] unexpected error:", err);
     return { error: "Something went wrong while signing you in. Please try again." };
+  }
+}
+
+export async function requestPasswordResetAction(
+  identifier: string,
+  lang: Lang,
+): Promise<{ error?: string; success?: boolean; channel?: "EMAIL" | "WHATSAPP"; destination?: string }> {
+  const trimmed = identifier.trim();
+  if (!trimmed) {
+    return { error: translate(lang, "userNotFoundByContact") };
+  }
+
+  const user = await findUserByContact(trimmed);
+  if (!user) {
+    return { error: translate(lang, "userNotFoundByContact") };
+  }
+
+  const isEmail = trimmed.includes("@");
+  if (!isEmail && !user.phone) {
+    return { error: translate(lang, "userNotFoundByContact") };
+  }
+
+  const challenge = await createOtpChallenge(user.id, "PASSWORD_CHANGE", null);
+  if (!challenge) {
+    return {
+      error:
+        lang === "fr"
+          ? "Veuillez patienter un instant avant de demander un nouveau code."
+          : "Please wait a moment before requesting another code.",
+    };
+  }
+
+  if (isEmail) {
+    const subject =
+      lang === "fr"
+        ? "DIVA Association — Code de réinitialisation de mot de passe"
+        : "DIVA Association — Password reset verification code";
+    const emailHtml = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1e293b; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="color: #003528; margin: 0;">DIVA Association</h2>
+        </div>
+        <h3 style="color: #0f172a; margin-top: 0;">${subject}</h3>
+        <p style="font-size: 15px; line-height: 1.6; color: #334155;">
+          ${lang === "fr"
+            ? `Bonjour <strong>${user.name}</strong>, voici votre code de vérification pour réinitialiser votre mot de passe :`
+            : `Hello <strong>${user.name}</strong>, here is your verification code to reset your password:`}
+        </p>
+        <div style="text-align: center; margin: 28px 0;">
+          <span style="display: inline-block; font-size: 32px; font-weight: bold; letter-spacing: 8px; padding: 14px 28px; background: #f0fdf4; color: #003528; border-radius: 10px; border: 1px solid #bbf7d0;">
+            ${challenge.code}
+          </span>
+        </div>
+        <p style="font-size: 13px; color: #64748b;">
+          ${lang === "fr"
+            ? "Ce code expire dans 10 minutes. Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email en toute sécurité."
+            : "This code expires in 10 minutes. If you did not request this, you can safely ignore this email."}
+        </p>
+      </div>
+    `;
+    await sendEmailSafe(user.email, subject, emailHtml);
+    const atIdx = user.email.indexOf("@");
+    const masked =
+      atIdx > 2
+        ? user.email.slice(0, 2) + "***" + user.email.slice(atIdx - 1)
+        : user.email;
+    return { success: true, channel: "EMAIL", destination: masked };
+  } else {
+    const waText =
+      lang === "fr"
+        ? `*DIVA Association — Réinitialisation du mot de passe*\n\nBonjour *${user.name}*,\nVotre code de vérification est : *${challenge.code}*\n\nCe code expire dans 10 minutes. Pour votre sécurité, ne le transmettez à personne.`
+        : `*DIVA Association — Password reset*\n\nHello *${user.name}*,\nYour verification code is: *${challenge.code}*\n\nThis code expires in 10 minutes. Do not share it with anyone.`;
+    await sendWhatsAppMessageSafe(user.phone, waText);
+    const maskedPhone = user.phone && user.phone.length > 4 ? `+***${user.phone.slice(-4)}` : "WhatsApp";
+    return { success: true, channel: "WHATSAPP", destination: maskedPhone };
+  }
+}
+
+export async function confirmPasswordResetAction(
+  identifier: string,
+  code: string,
+  newPassword: string,
+  confirmPassword: string,
+  lang: Lang,
+): Promise<{ error?: string; success?: boolean }> {
+  if (!code.trim() || !newPassword || !confirmPassword) {
+    return { error: lang === "fr" ? "Tous les champs sont obligatoires." : "All fields are required." };
+  }
+  if (newPassword.length < 6) {
+    return {
+      error:
+        lang === "fr"
+          ? "Le mot de passe doit comporter au moins 6 caractères."
+          : "Password must be at least 6 characters.",
+    };
+  }
+  if (newPassword !== confirmPassword) {
+    return {
+      error:
+        lang === "fr"
+          ? "Les mots de passe ne correspondent pas."
+          : "Passwords do not match.",
+    };
+  }
+
+  const user = await findUserByContact(identifier);
+  if (!user) {
+    return { error: translate(lang, "userNotFoundByContact") };
+  }
+
+  const verification = await verifyOtp(user.id, "PASSWORD_CHANGE", code.trim());
+  if (!verification.ok) {
+    return { error: translate(lang, "codeExpiredOrInvalid") };
+  }
+
+  try {
+    const supabaseAdmin = getSupabaseAdminClient();
+    const { data: list, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+    if (listError) {
+      console.error("[confirmPasswordResetAction] listUsers failed:", listError.message);
+      return {
+        error:
+          lang === "fr"
+            ? "Impossible de réinitialiser le mot de passe actuellement."
+            : "Could not reset password. Please try again.",
+      };
+    }
+
+    const authUser = list.users.find((u) => u.email === user.email);
+    if (authUser) {
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
+        password: newPassword,
+      });
+      if (updateError) {
+        console.error("[confirmPasswordResetAction] updateUserById failed:", updateError.message);
+        return { error: updateError.message };
+      }
+    } else {
+      const { error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email: user.email,
+        password: newPassword,
+        email_confirm: true,
+        user_metadata: { full_name: user.name },
+      });
+      if (createError) {
+        console.error("[confirmPasswordResetAction] createUser failed:", createError.message);
+        return { error: createError.message };
+      }
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error("[confirmPasswordResetAction] unexpected error:", err);
+    return {
+      error:
+        lang === "fr"
+          ? "Une erreur inattendue est survenue."
+          : "Something went wrong. Please try again.",
+    };
   }
 }
 

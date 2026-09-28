@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
@@ -211,25 +212,44 @@ export function ChatClient({
       // vh) so the fixed header/input bar don't drift when a mobile
       // browser's address bar shows/hides and changes the visual viewport.
       <div className="flex flex-col h-[calc(100dvh-64px-80px)] md:h-[calc(100dvh-64px)] bg-background">
-        <div className="flex items-center gap-3 px-4 py-3 bg-white shadow-sm border-b border-surface-container z-10 sticky top-0 flex-shrink-0">
-          {isAdmin && (
-            <button
-              className="p-2 -ml-2 text-primary hover:bg-surface-container-low rounded-full transition-colors"
-              onClick={() => setActive(null)}
-              aria-label={t("backToMessages")}
-            >
-              <span className="material-symbols-outlined">arrow_back</span>
-            </button>
-          )}
-          <div className="w-10 h-10 rounded-full bg-surface-container-high text-primary flex items-center justify-center font-title-md text-title-md overflow-hidden flex-shrink-0">
-            {active.avatar ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={active.avatar} alt={active.name} className="w-full h-full object-cover" />
+        <div className="flex items-center justify-between gap-2 px-4 py-3 bg-white shadow-sm border-b border-surface-container z-10 sticky top-0 flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            {isAdmin ? (
+              <button
+                className="p-2 -ml-2 text-primary hover:bg-surface-container-low rounded-full transition-colors flex items-center justify-center flex-shrink-0"
+                onClick={() => setActive(null)}
+                aria-label={t("backToMessages")}
+              >
+                <span className="material-symbols-outlined">arrow_back</span>
+              </button>
             ) : (
-              initials(active.name)
+              <Link
+                href="/dashboard"
+                className="p-2 -ml-2 text-primary hover:bg-surface-container-low rounded-full transition-colors flex items-center justify-center flex-shrink-0"
+                aria-label={t("navHome")}
+                title={t("navHome")}
+              >
+                <span className="material-symbols-outlined">arrow_back</span>
+              </Link>
             )}
+            <div className="w-10 h-10 rounded-full bg-surface-container-high text-primary flex items-center justify-center font-title-md text-title-md overflow-hidden flex-shrink-0">
+              {active.avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={active.avatar} alt={active.name} className="w-full h-full object-cover" />
+              ) : (
+                initials(active.name)
+              )}
+            </div>
+            <h2 className="font-label-md text-label-md font-bold text-on-surface truncate">{active.name}</h2>
           </div>
-          <h2 className="font-label-md text-label-md font-bold text-on-surface truncate">{active.name}</h2>
+
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container-low hover:bg-surface-container text-primary font-label-sm text-label-sm font-medium transition-colors flex-shrink-0 shadow-sm border border-surface-variant/60"
+          >
+            <span className="material-symbols-outlined text-[18px]">home</span>
+            <span>{t("navHome")}</span>
+          </Link>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 min-h-0">
@@ -291,9 +311,18 @@ export function ChatClient({
   // into their single Admin Support thread above as soon as contacts load.
   return (
     <main className="px-container-padding pt-4 pb-8 max-w-2xl lg:max-w-4xl mx-auto w-full">
-      <h1 className="sticky top-16 z-30 bg-background py-2 -mx-container-padding px-container-padding font-title-md text-title-md text-primary mb-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)]">
-        {t("myConversations")}
-      </h1>
+      <div className="sticky top-16 z-30 bg-background py-2 -mx-container-padding px-container-padding mb-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] flex items-center justify-between gap-3">
+        <h1 className="font-title-md text-title-md text-primary">
+          {t("myConversations")}
+        </h1>
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-surface-container text-primary font-label-sm text-label-sm font-medium transition-colors flex-shrink-0 shadow-sm border border-surface-variant/60"
+        >
+          <span className="material-symbols-outlined text-[18px]">home</span>
+          <span>{t("navHome")}</span>
+        </Link>
+      </div>
 
       <div className="relative mb-4">
         <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">

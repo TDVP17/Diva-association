@@ -24,6 +24,24 @@ export function MemberCodeCard({ code, lang }: { code: string | null; lang: Lang
     }
   }
 
+  async function shareCode() {
+    if (!code) return;
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: "DIVA Association",
+          text: code,
+        });
+      } catch (err) {
+        if ((err as Error)?.name !== "AbortError") {
+          await copyCode();
+        }
+      }
+    } else {
+      await copyCode();
+    }
+  }
+
   return (
     <div className="w-full bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4 flex items-center justify-between gap-3">
       <div className="min-w-0">
@@ -31,13 +49,25 @@ export function MemberCodeCard({ code, lang }: { code: string | null; lang: Lang
         <p className="font-numeric-data text-[18px] text-primary tracking-wide truncate">{code}</p>
         <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">{t("myPersonalCodeHelper")}</p>
       </div>
-      <button
-        onClick={copyCode}
-        className="flex-shrink-0 px-3 py-2 rounded-lg border border-outline-variant text-on-surface font-label-sm text-label-sm hover:bg-surface flex items-center gap-1"
-      >
-        <span className="material-symbols-outlined text-[16px]">{copied ? "check" : "content_copy"}</span>
-        {copied ? t("copied") : t("copy")}
-      </button>
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+        <button
+          type="button"
+          onClick={copyCode}
+          className="px-3 py-2 rounded-lg border border-outline-variant text-on-surface font-label-sm text-label-sm hover:bg-surface flex items-center gap-1 transition-colors"
+        >
+          <span className="material-symbols-outlined text-[16px]">{copied ? "check" : "content_copy"}</span>
+          {copied ? t("copied") : t("copy")}
+        </button>
+        <button
+          type="button"
+          onClick={shareCode}
+          aria-label={t("share")}
+          title={t("share")}
+          className="px-2.5 py-2 rounded-lg border border-outline-variant text-on-surface font-label-sm text-label-sm hover:bg-surface flex items-center justify-center transition-colors"
+        >
+          <span className="material-symbols-outlined text-[18px]">share</span>
+        </button>
+      </div>
     </div>
   );
 }

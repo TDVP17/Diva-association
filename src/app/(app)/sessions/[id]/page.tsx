@@ -15,6 +15,7 @@ import { PaymentSuccessBanner } from "./payment-success-banner";
 import { SwapRequestPanel } from "./swap-request-panel";
 import { getDesignatedSlot, assertPriorCyclePaidOut } from "@/lib/round-robin-lock";
 import { sessionStatusKey } from "@/lib/session-status-label";
+import { assertJoinable, sumRegisteredSlots } from "@/lib/session-joinability";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -81,6 +82,79 @@ export default async function SessionDetailPage({
   const sessionLabel = tontineSession.title || TONTINE_LABELS[tontineSession.type];
 
   if (!myMembership) {
+    const joinCheck = assertJoinable(
+      {
+        ...tontineSession,
+        maxSlots: tontineSession.maxSlots ? Number(tontineSession.maxSlots) : null,
+      },
+      sumRegisteredSlots(tontineSession.memberships),
+    );
+
+    if (!joinCheck.ok) {
+      const regSlots = sumRegisteredSlots(tontineSession.memberships);
+      const isFull = tontineSession.maxSlots !== null && regSlots >= Number(tontineSession.maxSlots);
+      return (
+        <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-5xl mx-auto w-full">
+          <section className="bg-surface rounded-xl p-6 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant flex flex-col items-center text-center gap-4">
+            <div className="w-14 h-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
+              <span className="material-symbols-outlined text-3xl">block</span>
+            </div>
+            <div>
+              <div className="inline-block px-2.5 py-1 mb-2 rounded bg-red-600 text-white font-bold text-xs uppercase tracking-wide">
+                {isFull ? t("tagFullStatus") : t("tagActiveStatus")}
+              </div>
+              <h1 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">
+                {sessionLabel}
+              </h1>
+              <p className="font-body-md text-body-md text-red-600 font-semibold mt-1 flex items-center justify-center gap-1">
+                <span className="material-symbols-outlined text-[18px]">block</span>
+                {t("newMemberNotAllowed")}
+              </p>
+              <p className="font-body-md text-body-md text-on-surface-variant mt-2 max-w-md mx-auto">
+                {t("sessionClosedToNewMembers")}
+              </p>
+            </div>
+
+            <div className="w-full max-w-md bg-surface-container-low rounded-xl p-4 border border-surface-variant text-left grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-on-surface-variant text-xs">{t("startsOn")}</p>
+                <p className="font-semibold text-on-surface">
+                  {tontineSession.startDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </p>
+              </div>
+              <div>
+                <p className="text-on-surface-variant text-xs">{t("contributionLabel")}</p>
+                <p className="font-semibold text-on-surface">{formatXAF(Number(tontineSession.amount))}</p>
+              </div>
+              <div>
+                <p className="text-on-surface-variant text-xs">{t("feeLabel")}</p>
+                <p className="font-semibold text-on-surface">{formatXAF(Number(tontineSession.fee))}</p>
+              </div>
+              <div>
+                <p className="text-on-surface-variant text-xs">{t("validatedMembersCount", { count: "" }).replace("{count}", "").trim()}</p>
+                <p className="font-semibold text-on-surface">
+                  {tontineSession.memberships.filter((m) => m.status === "APPROVED").length}
+                  {tontineSession.maxSlots ? ` / ${tontineSession.maxSlots}` : ""}
+                </p>
+              </div>
+            </div>
+
+            <Link
+              href="/sessions"
+              className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white font-label-md text-label-md hover:bg-primary/90 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+              {t("viewOpenCotisations")}
+            </Link>
+          </section>
+        </main>
+      );
+    }
+
     const latestVerification = await prisma.kycVerification.findFirst({
       where: { userId, tontineSessionId: id },
       orderBy: { createdAt: "desc" },

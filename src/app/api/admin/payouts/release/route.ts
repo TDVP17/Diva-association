@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/require-admin";
 import { computePayoutPreview } from "@/lib/payout-preview";
 import { sendPayout, FapshiPayoutError } from "@/lib/fapshi-payout";
 import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
+import { sendEmailSafe } from "@/lib/email/resend";
 import { payoutTurnMessage, payoutReleasedMessage } from "@/lib/whatsapp/templates";
 import { scheduleInAppNotifications, scheduleNotifications } from "@/lib/notifications/dispatch";
 import { getDesignatedSlot } from "@/lib/round-robin-lock";
@@ -83,16 +84,31 @@ export async function POST(request: Request) {
     }),
   ]);
 
-  await sendWhatsAppMessageSafe(
-    user.phone,
-    payoutReleasedMessage(
-      user.preferredLang === "fr" ? "fr" : "en",
-      user.name,
-      slot.beneficiaryName,
-      netPayout,
-      deducted,
-    ),
+  const lang = user.preferredLang === "en" ? "en" : "fr";
+  const releaseMsg = payoutReleasedMessage(
+    lang,
+    user.name,
+    slot.beneficiaryName,
+    netPayout,
+    deducted,
   );
+
+  await sendWhatsAppMessageSafe(user.phone, releaseMsg);
+  if (user.email) {
+    const emailHtml = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1e293b; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="color: #003528; margin: 0;">DIVA Association</h2>
+        </div>
+        <h3 style="color: #003528; margin-top: 0;">Virement de gain effectué</h3>
+        <p style="font-size: 15px; line-height: 1.6; white-space: pre-line;">${releaseMsg}</p>
+        <p style="margin-top: 24px;">
+          <a href="${process.env.NEXTAUTH_URL ?? "https://diva-association.vercel.app"}/profile" style="background-color: #003528; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Voir mon compte</a>
+        </p>
+      </div>
+    `;
+    await sendEmailSafe(user.email, "DIVA Association — Virement de gain effectué", emailHtml);
+  }
 
   // The round-robin just advanced — whoever getDesignatedSlot() now resolves
   // to (first slot by officialPosition with zero payout rows) is next in
@@ -118,7 +134,7 @@ export async function POST(request: Request) {
       const beneficiaryUser = newBeneficiaryMembership.user;
       const sessionLabel =
         claim.tontineSession.title || TONTINE_TYPE_LABELS[claim.tontineSession.type] || claim.tontineSession.type;
-      const beneficiaryLang = beneficiaryUser.preferredLang === "fr" ? "fr" : "en";
+      const beneficiaryLang = beneficiaryUser.preferredLang === "en" ? "en" : "fr";
       const firstName = beneficiaryUser.name.trim().split(/\s+/)[0] ?? beneficiaryUser.name;
       const dateLabel = nextDueDate.toLocaleDateString(beneficiaryLang === "fr" ? "fr-FR" : "en-GB", {
         timeZone: "Africa/Douala",

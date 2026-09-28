@@ -45,7 +45,7 @@ export async function GET(request: Request) {
       });
       if (!membership) continue;
 
-      const lang = membership.user.preferredLang === "fr" ? "fr" : "en";
+      const lang = membership.user.preferredLang === "en" ? "en" : "fr";
       const message = translate(lang, "foodTurnMessage", { name: membership.user.name });
 
       await sendWhatsAppMessageSafe(membership.user.phone, message);

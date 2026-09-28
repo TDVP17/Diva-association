@@ -22,12 +22,12 @@ export function NotificationBell({
         dark ? "hover:bg-white/10" : "hover:bg-surface-container-low"
       }`}
     >
-      <span className={`material-symbols-outlined ${dark ? "text-on-primary" : "text-on-surface"}`}>
+      <span className={`material-symbols-outlined text-[24px] ${dark ? "text-on-primary" : "text-on-surface"}`}>
         notifications
       </span>
       {unreadCount > 0 && (
-        <span className="absolute top-1 right-1 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-error text-on-error font-label-sm text-[10px] leading-none">
-          {unreadCount}
+        <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white font-bold text-[10px] leading-none shadow-sm ring-2 ring-white">
+          {unreadCount > 99 ? "99+" : unreadCount}
         </span>
       )}
     </Link>

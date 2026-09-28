@@ -143,7 +143,7 @@ describe("GET /api/crons/process-notifications — PUSH channel", () => {
     expect(sendEmail).toHaveBeenCalledWith("marie@example.com", "C'est ton tour !", expect.any(String));
   });
 
-  it("falls back to English when the recipient has no preferredLang on file", async () => {
+  it("falls back to French when the recipient has no preferredLang on file", async () => {
     findManyNotification.mockResolvedValue([
       {
         id: "notif-en",
@@ -160,7 +160,7 @@ describe("GET /api/crons/process-notifications — PUSH channel", () => {
 
     await GET(fakeCronRequest());
 
-    expect(sendEmail).toHaveBeenCalledWith("john@example.com", "It's Your Turn!", expect.any(String));
+    expect(sendEmail).toHaveBeenCalledWith("john@example.com", "C'est ton tour !", expect.any(String));
   });
 
   it("puts the recipient's own language subject on a PUSH notification's title too", async () => {

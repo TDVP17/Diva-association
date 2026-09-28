@@ -27,7 +27,7 @@ export async function settleFine(fine: FineWithSlot): Promise<void> {
   await prisma.fine.update({ where: { id: fine.id }, data: { status: "PAID" } });
 
   const { user, tontineSession } = fine.membershipSlot.membership;
-  const lang = user.preferredLang === "fr" ? "fr" : "en";
+  const lang = user.preferredLang === "en" ? "en" : "fr";
   const sessionLabel = tontineSession.title || TONTINE_LABELS[tontineSession.type] || tontineSession.type;
   const amount = Number(fine.amount);
 

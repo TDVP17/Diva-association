@@ -10,10 +10,10 @@ import { translate, type Lang } from "@/lib/i18n/translations";
  * goes live automatically. Until set, nothing is rendered rather than
  * shipping a dead/misleading link.
  */
-const ANDROID_APK_URL = process.env.NEXT_PUBLIC_ANDROID_APK_URL;
+const ANDROID_APK_URL = process.env.NEXT_PUBLIC_ANDROID_APK_URL || "/downloads/diva-association.apk";
 
 export function AndroidApkButton({ lang }: { lang: Lang }) {
-  if (!ANDROID_APK_URL) return null;
+
   const t = (key: Parameters<typeof translate>[1]) => translate(lang, key);
 
   return (

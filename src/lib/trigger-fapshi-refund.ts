@@ -28,7 +28,7 @@ async function loadRefundTarget(attempt: PaymentAttempt): Promise<RefundTarget |
     const payer = contribution.paidByUser ?? contribution.membershipSlot.membership.user;
     return {
       slotLabel: contribution.membershipSlot.beneficiaryName,
-      payerLang: payer.preferredLang === "fr" ? "fr" : "en",
+      payerLang: payer.preferredLang === "en" ? "en" : "fr",
     };
   }
   if (attempt.fineId) {
@@ -40,7 +40,7 @@ async function loadRefundTarget(attempt: PaymentAttempt): Promise<RefundTarget |
     const payer = fine.membershipSlot.membership.user;
     return {
       slotLabel: fine.membershipSlot.beneficiaryName,
-      payerLang: payer.preferredLang === "fr" ? "fr" : "en",
+      payerLang: payer.preferredLang === "en" ? "en" : "fr",
     };
   }
   return null;

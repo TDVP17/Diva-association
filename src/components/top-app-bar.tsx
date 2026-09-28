@@ -18,15 +18,17 @@ export async function TopAppBar({
   userImage: string | null;
   lang: Lang;
 }) {
-  const t = (key: Parameters<typeof translate>[1]) => translate(lang, key);
-  const [unreadMessages, unreadNotifications] = await Promise.all([
+  const [unreadMessages, unreadNotifications, unpaidFines, pendingCotisations] = await Promise.all([
     prisma.chatMessage.count({ where: { receiverId: userId, readAt: null } }),
     prisma.notification.count({ where: { userId, status: { in: ["SENT", "FAILED"] }, readAt: null } }),
+    prisma.fine.count({ where: { membershipSlot: { membership: { userId } }, status: "UNPAID" } }),
+    prisma.membership.count({ where: { userId, status: "APPROVED", slotCount: null } }),
   ]);
 
   const menuItems: TopRightMenuItem[] = [
-    { href: "/chat", label: t("messages"), icon: "chat_bubble", badge: unreadMessages },
-    { href: "/sessions", label: t("contributionsNavItem"), icon: "account_balance" },
+    { href: "/fines", label: t("finesNavItem"), icon: "receipt_long", badge: unpaidFines || undefined },
+    { href: "/chat", label: t("messages"), icon: "chat_bubble", badge: unreadMessages || undefined },
+    { href: "/sessions", label: t("contributionsNavItem"), icon: "account_balance", badge: pendingCotisations || undefined },
     { href: "/contribute-for-relative", label: t("contributeForRelativeNav"), icon: "volunteer_activism" },
   ];
 

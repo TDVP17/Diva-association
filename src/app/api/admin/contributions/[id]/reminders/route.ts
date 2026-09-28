@@ -47,7 +47,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (parsed.data.memberIds && !parsed.data.memberIds.includes(slot.userId)) continue;
       if (seen.has(slot.userId)) continue; // one reminder per member, not per slot
       seen.add(slot.userId);
-      const lang = slot.user.preferredLang === "fr" ? "fr" : "en";
+      const lang = slot.user.preferredLang === "en" ? "en" : "fr";
       recipients.push({
         userId: slot.userId,
         message: translate(lang, "contributionReminderMessage", { name: slot.user.name, cotisation: sessionLabel }),
@@ -69,7 +69,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       });
     }
     for (const [userId, { amount, user }] of totalByUser) {
-      const lang = user.preferredLang === "fr" ? "fr" : "en";
+      const lang = user.preferredLang === "en" ? "en" : "fr";
       recipients.push({
         userId,
         message: translate(lang, "fineReminderMessage", { name: user.name, amount: formatXAF(amount) }),

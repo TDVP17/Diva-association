@@ -12,6 +12,7 @@ import { TutorialPopup } from "@/components/tutorial-popup";
 import { NotificationBadgeSync } from "@/components/notification-badge-sync";
 import { PushPermissionPrompt } from "@/components/push-permission-prompt";
 import { OfflineDraftSync } from "@/components/offline-draft-sync";
+import { WhatsAppPhonePrompt } from "@/components/whatsapp-phone-prompt";
 import { isAdminRole } from "@/lib/constants";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -30,10 +31,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // the User.avatar column instead, which the JWT/session never reads. A
   // fresh DB read here (this layout re-runs every request) shows the
   // current photo immediately after upload, with no session refresh needed.
-  const dbUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { avatar: true, image: true },
-  });
+  const [dbUser, unreadMessages, unreadNotifications, unpaidFines, pendingCotisations] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { avatar: true, image: true, phone: true },
+    }),
+    prisma.chatMessage.count({ where: { receiverId: session.user.id, readAt: null } }),
+    prisma.notification.count({ where: { userId: session.user.id, status: { in: ["SENT", "FAILED"] }, readAt: null } }),
+    prisma.fine.count({ where: { membershipSlot: { membership: { userId: session.user.id } }, status: "UNPAID" } }),
+    prisma.membership.count({ where: { userId: session.user.id, status: "APPROVED", slotCount: null } }),
+  ]);
+
+  const navBadges: Record<string, number> = {
+    "/sessions": pendingCotisations,
+    "/fines": unpaidFines,
+    "/chat": unreadMessages,
+    "/notifications": unreadNotifications,
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -43,18 +57,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         userImage={dbUser?.avatar ?? dbUser?.image ?? null}
         lang={lang}
       />
-      <MemberSidebar lang={lang} />
+      <MemberSidebar lang={lang} badges={navBadges} />
       <div className="flex-1 pb-24 md:pb-8 md:pl-60">
         <BackBar lang={lang} area="member" />
         {children}
       </div>
-      <BottomNav lang={lang} />
+      <BottomNav lang={lang} badges={navBadges} />
       <IosInstallBanner lang={lang} />
       <InstallPromptModal lang={lang} />
       <TutorialPopup lang={lang} />
       <PushPermissionPrompt lang={lang} />
       <OfflineDraftSync lang={lang} />
       <NotificationBadgeSync />
+      <WhatsAppPhonePrompt lang={lang} hasPhone={!!dbUser?.phone} />
     </div>
   );
 }

@@ -100,16 +100,18 @@ describe("scheduleInAppNotifications", () => {
     updateMany.mockResolvedValue({ count: 0 });
   });
 
-  it("creates both an IN_APP row (immediately flipped to SENT) and a companion PUSH row (left SCHEDULED)", async () => {
+  it("creates IN_APP row (immediately flipped to SENT), companion PUSH row, companion WHATSAPP row, and companion EMAIL row", async () => {
     await scheduleInAppNotifications({
       tontineSessionId: "session-1",
       type: "PAYOUT_TURN",
       recipients: [{ userId: "u1", message: "it's your turn" }],
     });
 
-    expect(createMany).toHaveBeenCalledTimes(2);
+    expect(createMany).toHaveBeenCalledTimes(4);
     expect(createMany.mock.calls[0][0].data[0].channel).toBe("IN_APP");
     expect(createMany.mock.calls[1][0].data[0].channel).toBe("PUSH");
+    expect(createMany.mock.calls[2][0].data[0].channel).toBe("WHATSAPP");
+    expect(createMany.mock.calls[3][0].data[0].channel).toBe("EMAIL");
   });
 
   it("the SENT flip is scoped to channel: IN_APP — it must never also catch the companion PUSH row", async () => {

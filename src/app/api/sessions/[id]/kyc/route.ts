@@ -157,6 +157,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         { status: 400 },
       );
     }
+    const residenceCity = (formData.get("residenceCity") as string | null)?.trim() ?? "";
+    const residenceNeighborhood = (formData.get("residenceNeighborhood") as string | null)?.trim() ?? "";
 
     const combinedSize = documentFrontFile.size + (documentBackFile?.size ?? 0) + selfieFile.size;
     if (combinedSize > MAX_COMBINED_BYTES) {
@@ -305,6 +307,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
                 referrerPhone: referrerPhoneDigits,
               },
             });
+
+            const locationUpdate: { city?: string; neighborhood?: string } = {};
+            if (residenceCity) locationUpdate.city = residenceCity;
+            if (residenceNeighborhood) locationUpdate.neighborhood = residenceNeighborhood;
+
+            if (Object.keys(locationUpdate).length > 0 && typeof tx.user?.update === "function") {
+              await tx.user.update({
+                where: { id: session.user.id },
+                data: locationUpdate,
+              }).catch((err: unknown) => console.error("[sessions/kyc] failed to update user location:", err));
+            }
 
             return { alreadyPending: false as const };
           }),

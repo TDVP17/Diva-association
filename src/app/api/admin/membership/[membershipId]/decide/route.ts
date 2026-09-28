@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
 import { ensureMemberCode } from "@/lib/member-code";
 import { logAudit } from "@/lib/audit";
-import { scheduleNotifications } from "@/lib/notifications/dispatch";
+import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { translate } from "@/lib/i18n/translations";
 
 const bodySchema = z.object({
@@ -53,14 +53,13 @@ export async function POST(
       data: { status: approved ? "VERIFIED" : "FAILED", verifiedAt: new Date() },
     });
 
-    const lang = existing.user.preferredLang === "fr" ? "fr" : "en";
+    const lang = existing.user.preferredLang === "en" ? "en" : "fr";
     const message = approved
       ? translate(lang, "memberApprovedMessage")
       : translate(lang, "memberRejectedMessage") +
         (parsed.data.reason ? translate(lang, "memberRejectedReasonSuffix", { reason: parsed.data.reason }) : "");
-    await scheduleNotifications({
+    await scheduleInAppNotifications({
       tontineSessionId: membership.tontineSessionId,
-      channel: "IN_APP",
       type: approved ? "MEMBER_APPROVED" : "MEMBER_REJECTED",
       recipients: [
         {
@@ -73,12 +72,6 @@ export async function POST(
           actionUrl: approved ? `/sessions/${membership.tontineSessionId}` : undefined,
         },
       ],
-    });
-    // IN_APP has nothing for the cron to "send" — flip straight to SENT so
-    // it appears in the member's notification feed right away.
-    await prisma.notification.updateMany({
-      where: { userId: membership.userId, tontineSessionId: membership.tontineSessionId, status: "SCHEDULED", type: approved ? "MEMBER_APPROVED" : "MEMBER_REJECTED" },
-      data: { status: "SENT", sentAt: new Date() },
     });
 
     // On approval, snapshot everything about this member as it stood at

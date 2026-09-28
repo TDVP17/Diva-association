@@ -2,8 +2,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { translate } from "@/lib/i18n/translations";
+import { translate, type Lang } from "@/lib/i18n/translations";
+import { LANG_COOKIE } from "@/lib/i18n/lang-cookie";
 import { isAdminRole } from "@/lib/constants";
+import { sendPushToUser } from "@/lib/push/send";
+import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
+import { sendEmailSafe } from "@/lib/email/resend";
 
 const AUTO_REPLY_THROTTLE_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -89,6 +93,39 @@ export async function POST(request: Request) {
     },
   });
 
+  // Notify recipient on their phone via Web Push, WhatsApp (Evolution API), and Email (Resend)
+  try {
+    const senderName = session.user.name ?? "Diva Association";
+    const preview =
+      parsed.data.content.length > 70
+        ? parsed.data.content.slice(0, 70) + "..."
+        : parsed.data.content;
+    const chatUrl = `/chat?with=${session.user.id}`;
+    const baseUrl = process.env.NEXTAUTH_URL ?? "https://diva-association.vercel.app";
+
+    void sendPushToUser(receiver.id, {
+      title: `Nouveau message - ${senderName}`,
+      body: preview,
+      url: chatUrl,
+    }).catch((err) => console.error("[chat] Push notification failed:", err));
+
+    if (receiver.phone) {
+      const waText = `*DIVA Association - Nouveau message*\n\nDe : *${senderName}*\n« ${preview} »\n\nRépondre dans l'app : ${baseUrl}${chatUrl}`;
+      void sendWhatsAppMessageSafe(receiver.phone, waText).catch((err) =>
+        console.error("[chat] WhatsApp notification failed:", err),
+      );
+    }
+
+    if (receiver.email) {
+      const emailHtml = `<p>Bonjour,</p><p>Vous avez reçu un nouveau message de <strong>${senderName}</strong> :</p><p style="padding:12px;background:#f1f5f9;border-radius:8px;">« ${preview} »</p><p><a href="${baseUrl}${chatUrl}" style="display:inline-block;padding:10px 16px;background:#003528;color:#ffffff;text-decoration:none;border-radius:6px;">Répondre dans l'application</a></p>`;
+      void sendEmailSafe(receiver.email, `Nouveau message de ${senderName} — DIVA Association`, emailHtml).catch((err) =>
+        console.error("[chat] Email notification failed:", err),
+      );
+    }
+  } catch (err) {
+    console.error("[chat] Notification dispatch failed:", err);
+  }
+
   // A non-admin messaging an admin (the "Admin Support" thread) gets exactly
   // one automated acknowledgement per rolling 30 days — not on every message,
   // so an ongoing conversation doesn't get spammed with the bot reply.
@@ -100,6 +137,13 @@ export async function POST(request: Request) {
         where: { id: session.user.id },
         select: { name: true, preferredLang: true, lastAdminAutoReplyAt: true },
       });
+
+      const cookieHeader = request.headers?.get?.("cookie") ?? "";
+      const cookieLangMatch = cookieHeader.match(new RegExp(`${LANG_COOKIE}=(fr|en)`));
+      const activeLang: Lang =
+        (cookieLangMatch?.[1] as Lang) ??
+        (sender?.preferredLang === "en" ? "en" : "fr");
+
       const dueForAutoReply =
         sender &&
         (!sender.lastAdminAutoReplyAt ||
@@ -110,14 +154,17 @@ export async function POST(request: Request) {
             data: {
               senderId: receiver.id,
               receiverId: session.user.id,
-              content: translate(sender.preferredLang === "fr" ? "fr" : "en", "autoReplySupport", {
+              content: translate(activeLang, "autoReplySupport", {
                 name: sender.name,
               }),
             },
           }),
           prisma.user.update({
             where: { id: session.user.id },
-            data: { lastAdminAutoReplyAt: new Date() },
+            data: {
+              lastAdminAutoReplyAt: new Date(),
+              ...(sender.preferredLang !== activeLang ? { preferredLang: activeLang } : {}),
+            },
           }),
         ]);
       }

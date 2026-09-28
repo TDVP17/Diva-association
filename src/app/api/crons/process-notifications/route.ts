@@ -34,7 +34,7 @@ export async function GET(request: Request) {
 
   for (const n of due) {
     await prisma.notification.update({ where: { id: n.id }, data: { status: "PROCESSING" } });
-    const lang: Lang = n.user.preferredLang === "fr" ? "fr" : "en";
+    const lang: Lang = n.user.preferredLang === "en" ? "en" : "fr";
 
     try {
       if (n.channel === "EMAIL") {

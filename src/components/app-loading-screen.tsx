@@ -11,18 +11,24 @@ export function AppLoadingScreen({ lang }: { lang: Lang }) {
   const t = (key: Parameters<typeof translate>[1]) => translate(lang, key);
 
   return (
-    <main className="min-h-screen w-full flex flex-col items-center justify-center gap-4 bg-background px-container-padding text-center">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/icons/icon-512.png" alt="" className="w-32 h-32 sm:w-36 sm:h-36 rounded-3xl shadow-lg" />
-      <div className="flex flex-col items-center leading-tight">
-        <span className="font-display-lg text-display-lg text-primary tracking-tight">DIVA</span>
-        <span className="font-headline-lg text-headline-lg text-secondary tracking-wide -mt-1">Association</span>
+    <main className="min-h-screen w-full flex flex-col items-center justify-center bg-[#003528] px-container-padding text-center">
+      <div className="flex flex-col items-center justify-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/icons/brand-lockup.png"
+          alt="Diva Association"
+          className="w-64 sm:w-72 h-auto object-contain"
+        />
+        <div className="mt-8 flex flex-col items-center gap-3">
+          <span
+            aria-hidden
+            className="w-7 h-7 border-2 border-[#e9c349]/30 border-t-[#fed65b] rounded-full animate-spin"
+          />
+          <p className="font-label-sm text-[12px] text-[#fed65b]/80 tracking-wider">
+            {t("loadingEllipsis")}
+          </p>
+        </div>
       </div>
-      <span
-        aria-hidden
-        className="w-8 h-8 border-4 border-surface-variant border-t-primary rounded-full animate-spin mt-2"
-      />
-      <p className="font-label-sm text-label-sm text-on-surface-variant">{t("loadingEllipsis")}</p>
     </main>
   );
 }

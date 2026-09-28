@@ -36,18 +36,36 @@ const emailPasswordProvider = Credentials({
     password: { label: "Password", type: "password" },
   },
   async authorize(credentials) {
-    const email = typeof credentials?.email === "string" ? credentials.email : null;
+    const rawIdentifier = typeof credentials?.email === "string" ? credentials.email.trim() : null;
     const password = typeof credentials?.password === "string" ? credentials.password : null;
-    if (!email || !password) return null;
+    if (!rawIdentifier || !password) return null;
+
+    let targetEmail = rawIdentifier;
+    if (!rawIdentifier.includes("@")) {
+      const cleanDigits = rawIdentifier.replace(/\D/g, "");
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { phone: rawIdentifier },
+            { phone: cleanDigits },
+            ...(cleanDigits.startsWith("237") ? [{ phone: cleanDigits.slice(3) }] : []),
+            ...(!cleanDigits.startsWith("237") && cleanDigits.length === 9 ? [{ phone: `237${cleanDigits}` }] : []),
+          ],
+        },
+        select: { email: true },
+      });
+      if (!user?.email) return null;
+      targetEmail = user.email;
+    }
 
     try {
       const { data, error } = await getSupabaseAuthClient().auth.signInWithPassword({
-        email,
+        email: targetEmail,
         password,
       });
       if (error || !data.user) return null;
 
-      return await prisma.user.findUnique({ where: { email } });
+      return await prisma.user.findUnique({ where: { email: targetEmail } });
     } catch (err) {
       // Never let a network hiccup or unexpected Supabase/Prisma error
       // surface as an unhandled crash here — treat it as "not authorized"

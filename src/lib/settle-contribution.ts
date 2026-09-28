@@ -74,7 +74,7 @@ export async function settleContribution(
     Number(contribution.amountPaid) + Number(contribution.feePaid) + Number(contribution.finePaid) + paymentFee;
   const sessionLabel = tontineSession.title || TONTINE_TYPE_LABELS[tontineSession.type];
   const receiptUrl = `${options.origin}/api/files/${receiptKey}`;
-  const recipientLang: Lang = user.preferredLang === "fr" ? "fr" : "en";
+  const recipientLang: Lang = user.preferredLang === "en" ? "en" : "fr";
 
   await sendWhatsAppMessageSafe(
     user.phone,
@@ -119,7 +119,7 @@ export async function settleContribution(
   // beneficiary themselves (relative/friend paying via their own code) —
   // in their OWN preferredLang, not the beneficiary's.
   if (contribution.paidByUser && contribution.paidByUser.id !== user.id) {
-    const payerLang: Lang = contribution.paidByUser.preferredLang === "fr" ? "fr" : "en";
+    const payerLang: Lang = contribution.paidByUser.preferredLang === "en" ? "en" : "fr";
     await sendEmailSafe(
       contribution.paidByUser.email,
       translate(payerLang, "paymentSentEmailSubject", { session: sessionLabel }),
@@ -133,6 +133,18 @@ export async function settleContribution(
         receiptUrl,
       }),
     );
+    if (contribution.paidByUser.phone) {
+      await sendWhatsAppMessageSafe(
+        contribution.paidByUser.phone,
+        paymentSuccessMessage(
+          payerLang,
+          `${contribution.paidByUser.name} (pour ${contribution.membershipSlot.beneficiaryName})`,
+          totalPaid,
+          sessionLabel,
+          receiptUrl,
+        ),
+      );
+    }
   }
 }
 

@@ -19,7 +19,7 @@ const ITEMS = [
  * BottomNav stays for mobile (md:hidden), this covers md and up so the
  * member area doesn't feel like a stretched mobile layout on desktop.
  */
-export function MemberSidebar({ lang }: { lang: Lang }) {
+export function MemberSidebar({ lang, badges }: { lang: Lang; badges?: Record<string, number> }) {
   const t = (key: Parameters<typeof translate>[1]) => translate(lang, key);
   const pathname = usePathname();
 
@@ -27,18 +27,26 @@ export function MemberSidebar({ lang }: { lang: Lang }) {
     <nav className="hidden md:flex flex-col fixed top-16 left-0 bottom-0 w-60 bg-primary text-on-primary px-3 py-4 gap-1 z-30 overflow-y-auto">
       {ITEMS.map((item) => {
         const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+        const badgeCount = badges?.[item.href] ?? 0;
         return (
           <Link
             key={item.href}
             href={item.href}
             className={
               active
-                ? "flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/15 font-label-md text-label-md font-semibold transition-colors"
-                : "flex items-center gap-3 px-3 py-2.5 rounded-lg text-on-primary/80 hover:bg-white/10 font-label-md text-label-md transition-colors"
+                ? "flex items-center justify-between px-3 py-2.5 rounded-lg bg-white/15 font-label-md text-label-md font-semibold transition-colors"
+                : "flex items-center justify-between px-3 py-2.5 rounded-lg text-on-primary/80 hover:bg-white/10 font-label-md text-label-md transition-colors"
             }
           >
-            <span className="material-symbols-outlined">{item.icon}</span>
-            {t(item.label)}
+            <span className="flex items-center gap-3">
+              <span className="material-symbols-outlined">{item.icon}</span>
+              {t(item.label)}
+            </span>
+            {badgeCount > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-red-600 text-white font-bold text-[10px] leading-none shadow-sm">
+                {badgeCount > 99 ? "99+" : badgeCount}
+              </span>
+            )}
           </Link>
         );
       })}

@@ -106,10 +106,7 @@ export function SavedPaymentMethodsCard({ lang }: { lang: Lang }) {
 
   return (
     <section className="mb-stack-gap-lg bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
-      <h2 className="font-title-md text-title-md text-on-surface mb-1">{t("savedPayerNumbersTitle")}</h2>
-      <p className="font-label-sm text-label-sm text-on-surface-variant mb-stack-gap-md">
-        {t("savedPayerNumbersBody")}
-      </p>
+      <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-sm">{t("savedPayerNumbersTitle")}</h2>
 
       {methods === null ? (
         <LoadingSpinner />

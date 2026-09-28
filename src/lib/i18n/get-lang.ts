@@ -26,13 +26,14 @@ export async function getLang(): Promise<Lang> {
         where: { id: session.user.id },
         select: { preferredLang: true },
       });
+      if (user?.preferredLang === "en") return "en";
       if (user?.preferredLang === "fr") return "fr";
     }
   } catch {
     // Best-effort fallback only — never let this block rendering.
   }
 
-  return "en";
+  return "fr";
 }
 
 /** Returns a `t(key, vars?)` translator bound to a specific language. */

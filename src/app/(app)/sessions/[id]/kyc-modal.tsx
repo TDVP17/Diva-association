@@ -48,6 +48,8 @@ export function KycModal({
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
   const [referrerName, setReferrerName] = useState("");
   const [referrerPhone, setReferrerPhone] = useState("");
+  const [residenceCity, setResidenceCity] = useState("");
+  const [residenceNeighborhood, setResidenceNeighborhood] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,7 +60,9 @@ export function KycModal({
     (documentBackFile || !backRequired) &&
     selfieFile &&
     referrerName.trim() &&
-    referrerPhone.trim();
+    referrerPhone.trim() &&
+    residenceCity.trim() &&
+    residenceNeighborhood.trim();
 
   function changeDocumentType(next: DocumentType) {
     setDocumentType(next);
@@ -95,6 +99,14 @@ export function KycModal({
       setError(t("referrerPhoneRequired"));
       return;
     }
+    if (!residenceCity.trim()) {
+      setError(t("residenceCityRequired"));
+      return;
+    }
+    if (!residenceNeighborhood.trim()) {
+      setError(t("residenceNeighborhoodRequired"));
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -124,6 +136,8 @@ export function KycModal({
       });
       formData.append("referrerName", referrerName.trim());
       formData.append("referrerPhone", referrerPhoneDigits);
+      formData.append("residenceCity", residenceCity.trim());
+      formData.append("residenceNeighborhood", residenceNeighborhood.trim());
 
       const res = await fetch(`/api/sessions/${tontineSessionId}/kyc`, {
         method: "POST",
@@ -187,21 +201,19 @@ export function KycModal({
           </fieldset>
 
           {documentType === "CNI" ? (
-            <>
-              <p className="font-label-sm text-label-sm text-error mb-stack-gap-sm flex items-start gap-1.5">
-                <span className="material-symbols-outlined text-[16px] flex-shrink-0 mt-0.5">info</span>
-                {t("cniCountryWarning")}
+            <div className="bg-error/10 border border-error/20 rounded-lg p-2.5 mb-stack-gap-sm flex items-start gap-2">
+              <span className="material-symbols-outlined text-[18px] text-error flex-shrink-0 mt-0.5">info</span>
+              <p className="font-label-sm text-label-sm text-error leading-snug">
+                {t("cniWarningCompact")}
               </p>
-              <p className="font-label-sm text-label-sm text-error mb-stack-gap-md flex items-start gap-1.5 font-semibold">
-                <span className="material-symbols-outlined text-[16px] flex-shrink-0 mt-0.5">contact_page</span>
-                {t("cniBothSidesRequired")}
-              </p>
-            </>
+            </div>
           ) : (
-            <p className="font-label-sm text-label-sm text-on-surface-variant mb-stack-gap-md flex items-start gap-1.5">
-              <span className="material-symbols-outlined text-[16px] flex-shrink-0 mt-0.5">info</span>
-              {t("recepisseSingleSideNote")}
-            </p>
+            <div className="bg-surface-container-low border border-outline-variant/50 rounded-lg p-2.5 mb-stack-gap-sm flex items-start gap-2">
+              <span className="material-symbols-outlined text-[18px] text-on-surface-variant flex-shrink-0 mt-0.5">info</span>
+              <p className="font-label-sm text-label-sm text-on-surface-variant leading-snug">
+                {t("recepisseSingleSideNote")}
+              </p>
+            </div>
           )}
 
           <div className="flex flex-col gap-stack-gap-sm mb-stack-gap-md">
@@ -260,6 +272,34 @@ export function KycModal({
                 value={referrerPhone}
                 onChange={(e) => setReferrerPhone(e.target.value.replace(/\D/g, "").slice(0, 9))}
                 placeholder={t("referrerPhonePlaceholder")}
+                className="w-full border border-outline-variant rounded-lg px-3 py-2.5 font-body-md text-body-md text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+              />
+            </div>
+            <div>
+              <label htmlFor="residence-city" className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                {t("residenceCityLabel")} <span className="text-error font-bold">*</span>
+              </label>
+              <input
+                id="residence-city"
+                type="text"
+                required
+                value={residenceCity}
+                onChange={(e) => setResidenceCity(e.target.value)}
+                placeholder={t("residenceCityPlaceholder")}
+                className="w-full border border-outline-variant rounded-lg px-3 py-2.5 font-body-md text-body-md text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+              />
+            </div>
+            <div>
+              <label htmlFor="residence-neighborhood" className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
+                {t("residenceNeighborhoodLabel")} <span className="text-error font-bold">*</span>
+              </label>
+              <input
+                id="residence-neighborhood"
+                type="text"
+                required
+                value={residenceNeighborhood}
+                onChange={(e) => setResidenceNeighborhood(e.target.value)}
+                placeholder={t("residenceNeighborhoodPlaceholder")}
                 className="w-full border border-outline-variant rounded-lg px-3 py-2.5 font-body-md text-body-md text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
               />
             </div>

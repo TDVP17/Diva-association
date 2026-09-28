@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Please wait a moment before requesting another code" }, { status: 429 });
   }
 
-  const t = getTranslator(user.preferredLang === "fr" ? "fr" : "en");
+  const t = getTranslator(user.preferredLang === "en" ? "en" : "fr");
   try {
     await sendWhatsAppMessage(destinationPhone, t("otpMessage", { code: challenge.code }));
   } catch (err) {

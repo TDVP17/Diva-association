@@ -2,17 +2,12 @@ import type { PaymentProvider } from "@/generated/prisma/enums";
 
 /**
  * Fapshi's payment-processing fee, charged to the payer on top of the
- * contribution amount they already owe. Confirmed business rule:
+ * contribution amount they already owe: 3.1% of the amount.
  *
- *   Fapshi: 3.3% total = 3.0% Fapshi + 0.3% President
- *
- * The internal split (which slice goes to the gateway vs the President)
- * is never shown to ordinary users — only the combined total fee and the
- * total amount to be deducted. See requirePresident() in
- * src/lib/require-admin.ts for where the split itself is protected.
+ *   Fapshi: 3.1% total = 2.8% Fapshi + 0.3% President
  */
 export const PROVIDER_FEE_CONFIG: Record<PaymentProvider, { totalRate: number; presidentRate: number }> = {
-  FAPSHI: { totalRate: 0.033, presidentRate: 0.003 },
+  FAPSHI: { totalRate: 0.031, presidentRate: 0.003 },
 };
 
 export interface ProviderFeeBreakdown {
