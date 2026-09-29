@@ -9,8 +9,9 @@ import { PayButton } from "./pay-button";
 import { JoinButton } from "./join-button";
 import { VerificationPollingRefresh } from "./verification-status";
 import { SelectSlotsForm } from "./select-slots-form";
-import { MemberDraftManager } from "./member-draft-manager";
-import { PayoutOrderModal } from "./payout-order-modal";
+import { MemberNamesManager } from "./member-names-manager";
+import { PayoutOrderAccordion } from "./payout-order-accordion";
+import { MemberStatusAccordion } from "./member-status-accordion";
 import { PayoutTurnPanel } from "./payout-turn-panel";
 import { PaymentSuccessBanner } from "./payment-success-banner";
 import { SwapRequestPanel } from "./swap-request-panel";
@@ -341,11 +342,31 @@ export default async function SessionDetailPage({
       : tontineSession.maxSlots
         ? Number(tontineSession.maxSlots)
         : (allSlotsFlat.length || 1);
-  // Formule : montant total à bouffer = (N * cotisation) + 25% des frais (75% des frais pour l'admin)
   const totalPotAmount = Math.round(slotCountForPot * perSlotAmount + slotCountForPot * perSlotFee * 0.25);
-  const adminFeeShare = Math.round(slotCountForPot * perSlotFee * 0.75);
-  const winnerFeeShare = Math.round(slotCountForPot * perSlotFee * 0.25);
-  const currentCycleCollectedPot = Math.round(paidCount * perSlotAmount + paidCount * perSlotFee * 0.25);
+
+  const memberStatusSlots = allSlotsFlat.map((s) => {
+    const c = contributionBySlot.get(s.id);
+    const f = fineBySlot.get(s.id);
+    const paid = c?.status === "PAID";
+    const slotDateLabel = s.officialPosition
+      ? getCycleDateForRound(tontineSession.type, tontineSession.startDate, s.officialPosition).toLocaleDateString(
+          lang === "fr" ? "fr-FR" : "en-GB",
+          { timeZone: "Africa/Douala", day: "numeric", month: "short", year: "numeric" },
+        )
+      : null;
+    return {
+      id: s.id,
+      beneficiaryName: s.beneficiaryName,
+      ballDrawn: s.ballDrawn,
+      officialPosition: s.officialPosition,
+      isMine: s.isMine,
+      paid,
+      paidAtLabel: c?.paidAt ? c.paidAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : null,
+      paidByRelativeName: c?.paidByUser?.name ?? null,
+      fineAmount: f ? Number(f.amount) : null,
+      estimatedDateLabel: slotDateLabel,
+    };
+  });
 
   const mySlots = [...myMembership.slots].sort((a, b) =>
     a.beneficiaryName.localeCompare(b.beneficiaryName, "fr", { sensitivity: "base" }),
@@ -482,52 +503,24 @@ export default async function SessionDetailPage({
               {t("deadlineLabel")}: {tontineSession.limitTime}
             </p>
           </div>
-          <div className="text-right">
-            <div className="font-label-md text-label-md text-on-surface-variant mb-1">{t("totalRegisteredSlots")}</div>
-            <div className="font-numeric-data text-numeric-data text-primary">
-              {totalRegisteredSlots}
-              {tontineSession.maxSlots ? ` / ${Number(tontineSession.maxSlots)}` : ""}
+          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 sm:gap-6 text-right">
+            <div>
+              <div className="font-label-sm text-xs text-on-surface-variant mb-1">{t("totalRegisteredSlots")}</div>
+              <div className="font-numeric-data text-xl sm:text-2xl font-bold text-primary">
+                {totalRegisteredSlots}
+                {tontineSession.maxSlots ? ` / ${Number(tontineSession.maxSlots)}` : ""}
+              </div>
             </div>
-          </div>
-        </div>
-        {/* Montant total à bouffer (Gain du tour) */}
-        <div className="mt-4 pt-4 border-t border-surface-variant">
-          <div className="rounded-xl bg-gradient-to-br from-emerald-50 via-teal-50/60 to-emerald-100/50 border border-emerald-200/80 p-4 shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-1.5 text-emerald-800 font-semibold text-xs uppercase tracking-wider">
-                  <span className="material-symbols-outlined text-[20px] text-emerald-600">emoji_events</span>
-                  {t("totalPotToEat")}
+            {totalPotAmount > 0 && (
+              <div className="border-l border-surface-variant pl-4 sm:pl-6">
+                <div className="font-label-sm text-xs text-emerald-800 font-medium mb-1">
+                  {lang === "fr" ? "Montant total à bouffer" : "Total Pot"}
                 </div>
-                <div className="font-numeric-data text-2xl sm:text-3xl font-extrabold text-emerald-950 mt-1">
+                <div className="font-numeric-data text-xl sm:text-2xl font-extrabold text-emerald-700">
                   {formatXAF(totalPotAmount)}
                 </div>
-                <p className="font-label-sm text-xs text-emerald-800/80 mt-0.5">
-                  {t("totalPotToEatSubtitle")}
-                </p>
               </div>
-              <div className="sm:text-right bg-white/80 rounded-lg p-2.5 border border-emerald-200/60 shadow-xs">
-                <div className="text-[11px] font-medium text-emerald-900">
-                  {t("currentCycleCollected")}
-                </div>
-                <div className="font-numeric-data text-base font-bold text-emerald-700">
-                  {formatXAF(currentCycleCollectedPot)}
-                </div>
-                <div className="text-[11px] text-emerald-800/70">
-                  {paidCount}/{allSlotsFlat.length} {t("slotsPaidThisCycle")}
-                </div>
-              </div>
-            </div>
-            <div className="mt-3 pt-2.5 border-t border-emerald-200/60 text-[11px] sm:text-xs text-emerald-800/90">
-              <p>
-                {t("totalPotBreakdown", {
-                  count: String(slotCountForPot),
-                  subtotal: formatXAF(slotCountForPot * perSlotAmount),
-                  fees: formatXAF(winnerFeeShare),
-                  adminFees: formatXAF(adminFeeShare),
-                })}
-              </p>
-            </div>
+            )}
           </div>
         </div>
 
@@ -542,19 +535,17 @@ export default async function SessionDetailPage({
             />
           </div>
         </div>
-        <div className="mt-4 pt-4 border-t border-surface-variant flex items-center justify-end flex-wrap gap-2">
-          <PayoutOrderModal tontineSessionId={id} lang={lang} />
-        </div>
       </section>
 
-      {tontineSession.status === "DRAFT" && (
-        <MemberDraftManager
-          tontineSessionId={id}
-          lang={lang}
-          currentSlotCount={myMembership.slotCount ?? mySlots.length}
-          currentNames={mySlots.map((s) => s.beneficiaryName)}
-        />
-      )}
+      <MemberNamesManager
+        tontineSessionId={id}
+        lang={lang}
+        currentNames={mySlots.map((s) => s.beneficiaryName)}
+        sessionStatus={tontineSession.status}
+        maxSlots={tontineSession.maxSlots ? Number(tontineSession.maxSlots) : null}
+      />
+
+      <PayoutOrderAccordion tontineSessionId={id} lang={lang} />
 
       {tontineSession.status !== "ACTIVE" && tontineSession.status !== "CLOSED" && (
         <div className="mb-stack-gap-lg flex items-start gap-2 bg-secondary-container/15 text-on-secondary-container rounded-xl p-4 border border-secondary-fixed-dim/30">
@@ -687,92 +678,7 @@ export default async function SessionDetailPage({
         </div>
       </section>
 
-      <section>
-        <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md px-1">{t("memberStatus")}</h2>
-        <div className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant overflow-hidden">
-          {allSlotsFlat.map((s, index) => {
-            const c = contributionBySlot.get(s.id);
-            const f = fineBySlot.get(s.id);
-            const paid = c?.status === "PAID";
-            const slotDateLabel = s.officialPosition
-              ? getCycleDateForRound(tontineSession.type, tontineSession.startDate, s.officialPosition).toLocaleDateString(
-                  lang === "fr" ? "fr-FR" : "en-GB",
-                  { timeZone: "Africa/Douala", day: "numeric", month: "short", year: "numeric" },
-                )
-              : null;
-            return (
-              <div
-                key={s.id}
-                className={`flex items-center p-4 ${index < allSlotsFlat.length - 1 ? "border-b border-surface-variant" : ""} ${s.isMine ? "bg-primary/5" : ""}`}
-              >
-                <div className="flex-shrink-0 mr-2">
-                  {paid ? (
-                    <span className="material-symbols-outlined text-[#059669] text-xl font-bold" title={t("checkedPaid")}>
-                      check_circle
-                    </span>
-                  ) : (
-                    <span className="material-symbols-outlined text-slate-300 text-xl" title={t("notCheckedPending")}>
-                      radio_button_unchecked
-                    </span>
-                  )}
-                </div>
-                <div className="font-label-md text-label-md text-on-surface-variant w-7 text-center mr-2">
-                  {s.ballDrawn ?? "—"}
-                </div>
-                <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-label-md text-label-md font-bold mr-3 overflow-hidden flex-shrink-0 border border-primary/20">
-                  {s.beneficiaryName.slice(0, 2).toUpperCase()}
-                </div>
-                <div className="flex-grow min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-label-md text-label-md text-on-surface truncate font-semibold">{s.beneficiaryName}</span>
-                    {s.isMine && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/10 text-primary">
-                        {lang === "fr" ? "Votre part" : "Your slot"}
-                      </span>
-                    )}
-                    {paid && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#d1fae5] text-[#065f46]">
-                        {t("checkedPaid")}
-                      </span>
-                    )}
-                  </div>
-                  <div className="font-label-sm text-label-sm text-on-surface-variant truncate">
-                    {paid
-                      ? ` · ${c?.paidAt ? t("paidAtLabel", { time: c.paidAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) }) : t("paid")}`
-                      : ` · ${t("notYetPaid")}`}
-                  </div>
-                  <div className="font-label-sm text-[11px] text-on-surface-variant truncate">
-                    {slotDateLabel ? `${t("estimatedDateLabel")}: ${slotDateLabel}` : t("positionNotYetAssignedShort")}
-                  </div>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <span
-                    className={
-                      paid
-                        ? "inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#d1fae5] text-[#065f46] font-label-sm text-label-sm font-semibold"
-                        : f
-                          ? "inline-flex items-center px-2 py-1 rounded-md bg-error-container text-on-error-container font-label-sm text-label-sm"
-                          : "inline-flex items-center px-2 py-1 rounded-md bg-secondary-fixed text-on-secondary-fixed-variant font-label-sm text-label-sm"
-                    }
-                  >
-                    {paid ? (
-                      <>
-                        <span className="material-symbols-outlined text-[14px]">check</span>
-                        {t("checkedPaid")}
-                      </>
-                    ) : f ? t("late") : t("notCheckedPending")}
-                  </span>
-                  {f && (
-                    <div className="font-label-sm text-label-sm text-error mt-1">
-                      +{formatXAF(Number(f.amount))} {t("fineSuffix")}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      <MemberStatusAccordion slots={memberStatusSlots} lang={lang} />
       </div>
     </main>
   );

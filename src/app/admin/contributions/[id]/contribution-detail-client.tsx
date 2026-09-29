@@ -599,7 +599,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
           limitTime: editFields.limitTime,
           maxSlots: editFields.maxSlots ? Number(editFields.maxSlots) : null,
           status: editFields.status,
-          validatedMembersCount: Number(editFields.validatedMembersCount || 0),
+          validatedMembersCount: editFields.status === "ACTIVE" ? Number(editFields.validatedMembersCount || 0) : 0,
         }),
       });
       const body = await res.json();
@@ -1834,7 +1834,14 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                 </label>
                 <select
                   value={editFields.status}
-                  onChange={(e) => setEditFields({ ...editFields, status: e.target.value })}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setEditFields({
+                      ...editFields,
+                      status: next,
+                      validatedMembersCount: next === "ACTIVE" ? editFields.validatedMembersCount : "0",
+                    });
+                  }}
                   className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white font-medium"
                 >
                   <option value="DRAFT">{t("statusDraftOption")}</option>
@@ -1842,22 +1849,27 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                   <option value="DRAWING">{t("sessionStatusDrawing")}</option>
                   <option value="CLOSED">{t("sessionStatusClosed")}</option>
                 </select>
-              </div>
-              <div>
-                <label className="font-label-sm text-label-sm text-on-surface font-semibold block mb-1">
-                  {t("validatedMembersCountLabel")}
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={editFields.validatedMembersCount}
-                  onChange={(e) => setEditFields({ ...editFields, validatedMembersCount: e.target.value })}
-                  className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white font-medium"
-                />
                 <p className="font-label-sm text-xs text-on-surface-variant mt-1">
-                  {t("validatedMembersCountHelper")}
+                  {editFields.status === "ACTIVE" ? t("statusActiveHelper") : t("statusDraftHelper")}
                 </p>
               </div>
+              {editFields.status === "ACTIVE" && (
+                <div className="pt-2 border-t border-surface-variant animate-in fade-in duration-200">
+                  <label className="font-label-sm text-label-sm text-on-surface font-semibold block mb-1">
+                    {t("validatedMembersCountLabel")}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editFields.validatedMembersCount}
+                    onChange={(e) => setEditFields({ ...editFields, validatedMembersCount: e.target.value })}
+                    className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white font-medium"
+                  />
+                  <p className="font-label-sm text-xs text-on-surface-variant mt-1">
+                    {t("validatedMembersCountHelper")}
+                  </p>
+                </div>
+              )}
             </div>
             {editError && <p className="font-label-sm text-label-sm text-error">{editError}</p>}
             <button

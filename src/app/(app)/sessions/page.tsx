@@ -169,11 +169,13 @@ export default async function SessionsPage() {
                     const pot = Math.round(count * Number(s.amount) + count * Number(s.fee) * 0.25);
                     return (
                       <>
-                        <p className="font-label-sm text-label-sm text-primary mt-0.5">
-                          {t("validatedMembersCount", {
-                            count: String(membersCount),
-                          })}
-                        </p>
+                        {membersCount > 0 && (
+                          <p className="font-label-sm text-label-sm text-primary mt-0.5">
+                            {t("validatedMembersCount", {
+                              count: String(membersCount),
+                            })}
+                          </p>
+                        )}
                         <p className="font-label-sm text-label-sm text-on-surface-variant mt-1 flex items-center gap-1 flex-wrap">
                           <span className="font-numeric-data text-on-surface font-semibold">{formatXAF(Number(s.amount))}</span>
                           <span>{t("plusFeeSuffix", { fee: formatXAF(Number(s.fee)) })}</span>
