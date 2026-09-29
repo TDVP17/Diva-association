@@ -50,7 +50,7 @@ export function AdminMembershipRequestsClient({ lang }: { lang: Lang }) {
       .then((b) => setMembershipQueue(b.memberships ?? []));
   }, []);
 
-  async function decideMembership(request: MembershipRequest, action: "approve" | "reject", reason?: string) {
+  async function decideMembership(request: MembershipRequest, action: "approve" | "reject" | "ban", reason?: string) {
     setMembershipQueue((q) => (q ? q.filter((m) => m.id !== request.id) : q));
     const res = await fetch(`/api/admin/membership/${request.id}/decide`, {
       method: "POST",
@@ -108,6 +108,20 @@ export function AdminMembershipRequestsClient({ lang }: { lang: Lang }) {
                 className="px-2 py-1 rounded border border-outline-variant text-on-surface-variant font-label-sm text-label-sm hover:bg-surface"
               >
                 {t("reject")}
+              </button>
+              <button
+                onClick={() => {
+                  const confirmMsg =
+                    lang === "fr"
+                      ? `Voulez-vous vraiment bannir ${m.user.name} ? Cette personne sera bannie de l'application et ne pourra plus se connecter avec son email ou son numéro de téléphone.`
+                      : `Are you sure you want to ban ${m.user.name}? This user will be banned from the application and cannot log in with their email or phone number.`;
+                  if (window.confirm(confirmMsg)) {
+                    decideMembership(m, "ban");
+                  }
+                }}
+                className="px-2 py-1 rounded border border-error/30 text-error bg-error-container/20 font-label-sm text-label-sm hover:bg-error-container/40"
+              >
+                {lang === "fr" ? "Bannir" : "Ban"}
               </button>
               <button
                 onClick={() => decideMembership(m, "approve")}

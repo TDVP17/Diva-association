@@ -36,10 +36,14 @@ export default async function SessionsPage() {
     orderBy: { joinedAt: "desc" },
   });
 
+  const excludedSessionIds = memberships
+    .filter((m) => m.status === "APPROVED" || m.status === "PENDING" || m.status === "BANNED")
+    .map((m) => m.tontineSessionId);
+
   const candidates = await prisma.tontineSession.findMany({
     where: {
       status: { not: "CLOSED" },
-      id: { notIn: memberships.map((m) => m.tontineSessionId) },
+      id: { notIn: excludedSessionIds },
     },
     include: { memberships: { select: { status: true, slotCount: true } } },
     orderBy: { startDate: "asc" },
@@ -62,14 +66,17 @@ export default async function SessionsPage() {
   const activeCotisationsList = nonJoinable.map((s) => {
     const regSlots = sumRegisteredSlots(s.memberships);
     const isFull = s.maxSlots !== null && regSlots >= Number(s.maxSlots);
+    const approvedDbCount = s.memberships.filter((m) => m.status === "APPROVED").length;
+    const membersCount = Math.max(s.validatedMembersCount ?? 0, approvedDbCount);
     return {
       id: s.id,
       title: s.title || TONTINE_LABELS[s.type] || s.type,
       startDate: s.startDate,
-      membersCount: s.memberships.filter((m) => m.status === "APPROVED").length,
+      membersCount,
       amount: Number(s.amount),
       fee: Number(s.fee),
       isFull,
+      isActive: s.status === "ACTIVE",
     };
   });
 
@@ -112,7 +119,9 @@ export default async function SessionsPage() {
                         : `${m.slots.length} ${t("slotsRegistered")}`
                       : m.status === "PENDING"
                         ? t("awaitingApproval")
-                        : t("requestRejected")}
+                        : m.status === "BANNED"
+                          ? (lang === "fr" ? "Accès banni" : "Access banned")
+                          : (lang === "fr" ? "Demande refusée (cliquez pour redemander)" : "Rejected (tap to re-apply)")}
                   </p>
                 </div>
                 <div className="relative z-10 flex items-center gap-1 flex-shrink-0">
@@ -153,23 +162,27 @@ export default async function SessionsPage() {
                   <p className="font-label-sm text-label-sm text-on-surface-variant">
                     {t("startsOn")} {s.startDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short", year: "numeric" })}
                   </p>
-                  <p className="font-label-sm text-label-sm text-primary mt-0.5">
-                    {t("validatedMembersCount", {
-                      count: String(s.memberships.filter((m) => m.status === "APPROVED").length),
-                    })}
-                  </p>
-                  <p className="font-label-sm text-label-sm text-on-surface-variant mt-1 flex items-center gap-1 flex-wrap">
-                    <span className="font-numeric-data text-on-surface font-semibold">{formatXAF(Number(s.amount))}</span>
-                    <span>{t("plusFeeSuffix", { fee: formatXAF(Number(s.fee)) })}</span>
-                  </p>
                   {(() => {
-                    const count = s.memberships.filter((m) => m.status === "APPROVED").length || (s.maxSlots ? Number(s.maxSlots) : 1);
+                    const approvedDbCount = s.memberships.filter((m) => m.status === "APPROVED").length;
+                    const membersCount = Math.max(s.validatedMembersCount ?? 0, approvedDbCount);
+                    const count = membersCount || (s.maxSlots ? Number(s.maxSlots) : 1);
                     const pot = Math.round(count * Number(s.amount) + count * Number(s.fee) * 0.25);
                     return (
-                      <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold">
-                        <span className="material-symbols-outlined text-[14px] text-emerald-600">emoji_events</span>
-                        <span>{t("totalPotToEat")} : {formatXAF(pot)}</span>
-                      </div>
+                      <>
+                        <p className="font-label-sm text-label-sm text-primary mt-0.5">
+                          {t("validatedMembersCount", {
+                            count: String(membersCount),
+                          })}
+                        </p>
+                        <p className="font-label-sm text-label-sm text-on-surface-variant mt-1 flex items-center gap-1 flex-wrap">
+                          <span className="font-numeric-data text-on-surface font-semibold">{formatXAF(Number(s.amount))}</span>
+                          <span>{t("plusFeeSuffix", { fee: formatXAF(Number(s.fee)) })}</span>
+                        </p>
+                        <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 border border-slate-200 text-slate-600 text-[11px] font-medium">
+                          <span className="material-symbols-outlined text-[15px] text-primary">info</span>
+                          <span>{lang === "fr" ? "Le montant total dépend du nombre de membres (visible après validation)" : "Total pot depends on member count (visible once validated)"}</span>
+                        </div>
+                      </>
                     );
                   })()}
                 </div>
@@ -228,8 +241,8 @@ export default async function SessionsPage() {
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                    <span className="font-label-sm text-label-sm px-2.5 py-1 rounded bg-red-600 text-white font-bold tracking-wide uppercase shadow-sm">
-                      {c.isFull ? t("tagFullStatus") : t("tagActiveStatus")}
+                    <span className={`font-label-sm text-label-sm px-2.5 py-1 rounded font-bold tracking-wide uppercase shadow-sm ${c.isActive ? "bg-emerald-600 text-white" : "bg-red-600 text-white"}`}>
+                      {c.isActive ? t("tagActiveStatus") : (c.isFull ? t("tagFullStatus") : t("tagActiveStatus"))}
                     </span>
                   </div>
                 </div>

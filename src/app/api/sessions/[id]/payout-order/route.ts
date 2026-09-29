@@ -39,7 +39,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         ? getCycleDateForRound(tontineSession.type, tontineSession.startDate, s.officialPosition).toISOString()
         : null,
       beneficiaryName: s.beneficiaryName,
-      memberName: s.membership.user.name,
+      memberName: s.beneficiaryName,
       status: payout?.status ?? "pending",
       confirmedByAdmin: payout?.confirmedByAdmin ?? false,
       releasedAt: payout?.releasedAt?.toISOString() ?? null,

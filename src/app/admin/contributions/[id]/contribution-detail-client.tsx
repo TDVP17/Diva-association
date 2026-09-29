@@ -53,6 +53,7 @@ interface AdminSession {
   status: string;
   amount: number;
   fee: number;
+  validatedMembersCount?: number;
   fineAmountPerPeriod: number | null;
   fineIntervalHours: number | null;
   limitTime: string;
@@ -212,6 +213,8 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     drawDate: string;
     limitTime: string;
     maxSlots: string;
+    status: string;
+    validatedMembersCount: string;
   } | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
@@ -309,11 +312,18 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   }, [userQuery, selectedUser]);
   const visibleUserResults = !selectedUser && userQuery.trim() ? userResults : [];
 
-  async function decideMembership(request: MembershipRequest, action: "approve" | "reject") {
+  async function decideMembership(request: MembershipRequest, action: "approve" | "reject" | "ban") {
     let reason: string | null = null;
     if (action === "reject") {
       reason = window.prompt(t("rejectionReasonLabel"), "");
       if (reason === null) return;
+    } else if (action === "ban") {
+      const confirmMsg =
+        lang === "fr"
+          ? `Voulez-vous vraiment bannir ${request.user.name} de cette cotisation ? Ce membre ne pourra plus faire de demande.`
+          : `Are you sure you want to ban ${request.user.name} from this cotisation? They will not be able to re-apply.`;
+      if (!window.confirm(confirmMsg)) return;
+      reason = window.prompt(lang === "fr" ? "Motif du bannissement (optionnel) :" : "Ban reason (optional):", "") || null;
     }
     setMembershipQueue((q) => q.filter((m) => m.id !== request.id));
     const res = await fetch(`/api/admin/membership/${request.id}/decide`, {
@@ -562,6 +572,8 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
       drawDate: session.drawDate ? session.drawDate.slice(0, 10) : "",
       limitTime: session.limitTime,
       maxSlots: session.maxSlots !== null ? String(session.maxSlots) : "",
+      status: session.status,
+      validatedMembersCount: String(session.validatedMembersCount ?? 0),
     });
     setEditError(null);
     setShowEditModal(true);
@@ -586,6 +598,8 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
           drawDate: editFields.drawDate,
           limitTime: editFields.limitTime,
           maxSlots: editFields.maxSlots ? Number(editFields.maxSlots) : null,
+          status: editFields.status,
+          validatedMembersCount: Number(editFields.validatedMembersCount || 0),
         }),
       });
       const body = await res.json();
@@ -1017,11 +1031,42 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                           m.user.name.slice(0, 2).toUpperCase()
                         )}
                       </div>
-                      <p className="font-label-md text-label-md text-on-surface truncate">{m.user.name}</p>
+                      <Link
+                        href={`/admin/support?with=${encodeURIComponent(m.user.id)}&name=${encodeURIComponent(m.user.name)}`}
+                        className="font-label-md text-label-md text-on-surface hover:text-primary hover:underline truncate flex items-center gap-1.5 group"
+                        title={lang === "fr" ? `Écrire à ${m.user.name}` : `Message ${m.user.name}`}
+                      >
+                        <span className="truncate">{m.user.name}</span>
+                        <span className="material-symbols-outlined text-[15px] text-primary opacity-60 group-hover:opacity-100 flex-shrink-0">
+                          chat
+                        </span>
+                      </Link>
                     </div>
-                    <div className="flex gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <Link
+                        href={`/admin/support?with=${encodeURIComponent(m.user.id)}&name=${encodeURIComponent(m.user.name)}`}
+                        className="px-2 py-1 rounded border border-primary/30 text-primary hover:bg-primary/10 font-label-sm text-xs flex items-center gap-1"
+                        title={lang === "fr" ? `Écrire à ${m.user.name}` : `Message ${m.user.name}`}
+                      >
+                        <span className="material-symbols-outlined text-[15px]">chat</span>
+                        <span>{lang === "fr" ? "Écrire" : "Chat"}</span>
+                      </Link>
                       <button onClick={() => decideMembership(m, "reject")} className="px-2 py-1 rounded border border-outline-variant text-on-surface-variant font-label-sm text-label-sm hover:bg-surface">
                         {t("reject")}
+                      </button>
+                      <button
+                        onClick={() => {
+                          const confirmMsg =
+                            lang === "fr"
+                              ? `Voulez-vous vraiment bannir ${m.user.name} ? Cette personne ne pourra plus se connecter à l'application avec son email ou son numéro de téléphone.`
+                              : `Are you sure you want to ban ${m.user.name}? This user will not be able to log in to the application.`;
+                          if (window.confirm(confirmMsg)) {
+                            decideMembership(m, "ban");
+                          }
+                        }}
+                        className="px-2 py-1 rounded border border-error/30 text-error bg-error-container/20 font-label-sm text-label-sm hover:bg-error-container/40"
+                      >
+                        {lang === "fr" ? "Bannir" : "Ban"}
                       </button>
                       <button onClick={() => decideMembership(m, "approve")} className="px-2 py-1 rounded bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90">
                         {t("approve")}
@@ -1041,21 +1086,72 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
             <div className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-outline-variant/30 overflow-hidden">
               {session.slots.map((s, i) => (
                 <div key={s.id} className={`flex items-center justify-between p-3 ${i < session.slots.length - 1 ? "border-b border-outline-variant/30" : ""}`}>
-                  <div className="min-w-0">
-                    <p className="font-label-md text-label-md text-on-surface truncate">{s.beneficiaryName}</p>
-                    <p className="font-label-sm text-label-sm text-on-surface-variant truncate">
+                  <div className="min-w-0 flex-1 pr-2">
+                    <Link
+                      href={`/admin/support?with=${encodeURIComponent(s.userId)}&name=${encodeURIComponent(s.name)}`}
+                      className="font-label-md text-label-md text-on-surface hover:text-primary hover:underline font-semibold flex items-center gap-1.5 truncate group"
+                      title={lang === "fr" ? `Écrire à ${s.name}` : `Message ${s.name}`}
+                    >
+                      <span className="truncate">{s.beneficiaryName}</span>
+                      <span className="material-symbols-outlined text-[16px] text-primary opacity-60 group-hover:opacity-100 flex-shrink-0">
+                        chat
+                      </span>
+                    </Link>
+                    <Link
+                      href={`/admin/support?with=${encodeURIComponent(s.userId)}&name=${encodeURIComponent(s.name)}`}
+                      className="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors block truncate"
+                      title={lang === "fr" ? `Écrire à ${s.name}` : `Message ${s.name}`}
+                    >
                       {s.name}
                       {s.memberCode && ` · ${s.memberCode}`}
-                    </p>
+                    </Link>
                     <MemberArchivesToggle userId={s.userId} lang={lang} />
                   </div>
-                  <span
-                    className={`inline-flex items-center px-2 py-1 rounded-md font-label-sm text-label-sm flex-shrink-0 ml-2 ${
-                      s.paidThisCycle ? "bg-[#d1fae5] text-[#065f46]" : "bg-secondary-fixed text-on-secondary-fixed-variant"
-                    }`}
-                  >
-                    {s.paidThisCycle ? t("paidStatus") : t("unpaidStatus")}
-                  </span>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Link
+                      href={`/admin/support?with=${encodeURIComponent(s.userId)}&name=${encodeURIComponent(s.name)}`}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-primary/30 text-primary hover:bg-primary/10 font-label-sm text-xs font-semibold transition-colors"
+                      title={lang === "fr" ? `Envoyer un message à ${s.name}` : `Send message to ${s.name}`}
+                    >
+                      <span className="material-symbols-outlined text-[15px]">chat</span>
+                      <span>{lang === "fr" ? "Écrire" : "Chat"}</span>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const confirmMsg =
+                          lang === "fr"
+                            ? `Voulez-vous vraiment bannir ${s.name} ? Cette personne sera bannie de la plateforme et ne pourra plus se connecter avec son email ou son numéro de téléphone.`
+                            : `Are you sure you want to ban ${s.name}? They will be banned from the platform and unable to log in with their email or phone number.`;
+                        if (!window.confirm(confirmMsg)) return;
+                        try {
+                          const res = await fetch(`/api/admin/users/${s.userId}/ban`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ isBanned: true, reason: `Banni depuis la cotisation ${session?.title ?? session?.id}` }),
+                          });
+                          if (res.ok) {
+                            alert(lang === "fr" ? "Membre banni avec succès." : "Member successfully banned.");
+                            window.location.reload();
+                          }
+                        } catch (e) {
+                          console.error("Ban error:", e);
+                        }
+                      }}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-error/30 text-error bg-error/5 hover:bg-error/15 font-label-sm text-xs transition-colors"
+                      title={lang === "fr" ? `Bannir ${s.name}` : `Ban ${s.name}`}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">block</span>
+                      <span>{lang === "fr" ? "Bannir" : "Ban"}</span>
+                    </button>
+                    <span
+                      className={`inline-flex items-center px-2 py-1 rounded-md font-label-sm text-label-sm flex-shrink-0 ${
+                        s.paidThisCycle ? "bg-[#d1fae5] text-[#065f46]" : "bg-secondary-fixed text-on-secondary-fixed-variant"
+                      }`}
+                    >
+                      {s.paidThisCycle ? t("paidStatus") : t("unpaidStatus")}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1730,6 +1826,38 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                 onChange={(e) => setEditFields({ ...editFields, limitTime: e.target.value })}
                 className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
               />
+            </div>
+            <div className="p-3.5 rounded-xl bg-surface-container-low border border-surface-variant flex flex-col gap-2.5">
+              <div>
+                <label className="font-label-sm text-label-sm text-on-surface font-semibold block mb-1">
+                  {t("cotisationStatusLabel")}
+                </label>
+                <select
+                  value={editFields.status}
+                  onChange={(e) => setEditFields({ ...editFields, status: e.target.value })}
+                  className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white font-medium"
+                >
+                  <option value="DRAFT">{t("statusDraftOption")}</option>
+                  <option value="ACTIVE">{t("statusActiveOption")}</option>
+                  <option value="DRAWING">{t("sessionStatusDrawing")}</option>
+                  <option value="CLOSED">{t("sessionStatusClosed")}</option>
+                </select>
+              </div>
+              <div>
+                <label className="font-label-sm text-label-sm text-on-surface font-semibold block mb-1">
+                  {t("validatedMembersCountLabel")}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={editFields.validatedMembersCount}
+                  onChange={(e) => setEditFields({ ...editFields, validatedMembersCount: e.target.value })}
+                  className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white font-medium"
+                />
+                <p className="font-label-sm text-xs text-on-surface-variant mt-1">
+                  {t("validatedMembersCountHelper")}
+                </p>
+              </div>
             </div>
             {editError && <p className="font-label-sm text-label-sm text-error">{editError}</p>}
             <button

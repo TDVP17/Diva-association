@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { LoadingSpinner } from "@/components/loading-spinner";
 import { ROLE_KEY } from "@/lib/role-label";
@@ -16,6 +17,8 @@ interface AdminUserRow {
   city: string | null;
   neighborhood: string | null;
   membershipCount: number;
+  isBanned?: boolean;
+  bannedAt?: string | null;
   createdAt: string;
 }
 
@@ -86,10 +89,24 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <p className="font-label-md text-label-md text-on-surface truncate">{u.name}</p>
+                  <Link
+                    href={`/admin/support?with=${encodeURIComponent(u.id)}&name=${encodeURIComponent(u.name)}`}
+                    className="font-label-md text-label-md text-on-surface hover:text-primary hover:underline font-semibold truncate flex items-center gap-1 group"
+                    title={lang === "fr" ? `Écrire à ${u.name}` : `Message ${u.name}`}
+                  >
+                    <span>{u.name}</span>
+                    <span className="material-symbols-outlined text-[15px] text-primary opacity-60 group-hover:opacity-100 flex-shrink-0">
+                      chat
+                    </span>
+                  </Link>
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-md font-label-sm text-[11px] flex-shrink-0 ${ROLE_CLASS[u.role] ?? ""}`}>
                     {t(ROLE_KEY[u.role] ?? "roleMember")}
                   </span>
+                  {u.isBanned && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-md font-label-sm text-[11px] bg-error/15 text-error font-bold flex-shrink-0">
+                      {lang === "fr" ? "BANNI" : "BANNED"}
+                    </span>
+                  )}
                 </div>
                 <p className="font-label-sm text-label-sm text-on-surface-variant truncate">
                   {u.email}
@@ -100,6 +117,55 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
                   {t("membershipCountLabel", { count: String(u.membershipCount) })}
                   {u.city ? ` · ${[u.city, u.neighborhood].filter(Boolean).join(", ")}` : ""}
                 </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Link
+                  href={`/admin/support?with=${encodeURIComponent(u.id)}&name=${encodeURIComponent(u.name)}`}
+                  className="px-2.5 py-1.5 rounded-md border border-primary/30 text-primary hover:bg-primary/10 font-label-sm text-xs font-semibold flex items-center gap-1 transition-colors"
+                  title={lang === "fr" ? `Écrire à ${u.name}` : `Message ${u.name}`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">chat</span>
+                  <span>{lang === "fr" ? "Écrire" : "Chat"}</span>
+                </Link>
+
+                {u.role !== "ADMIN" && u.role !== "PRESIDENT" && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const nextState = !u.isBanned;
+                      const confirmMsg = nextState
+                        ? lang === "fr"
+                          ? `Voulez-vous vraiment bannir ${u.name} ? Cette personne ne pourra plus se connecter à l'application avec son email ou son numéro de téléphone.`
+                          : `Are you sure you want to ban ${u.name}? They will no longer be able to log in with their email or phone number.`
+                        : lang === "fr"
+                          ? `Voulez-vous réactiver / débannir le compte de ${u.name} ?`
+                          : `Are you sure you want to unban ${u.name}?`;
+                      if (!window.confirm(confirmMsg)) return;
+                      try {
+                        const res = await fetch(`/api/admin/users/${u.id}/ban`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ isBanned: nextState }),
+                        });
+                        if (res.ok) {
+                          setUsers((prev) =>
+                            prev ? prev.map((item) => (item.id === u.id ? { ...item, isBanned: nextState } : item)) : null
+                          );
+                        }
+                      } catch (e) {
+                        console.error("Ban toggle error:", e);
+                      }
+                    }}
+                    className={`px-2.5 py-1.5 rounded-md font-label-sm text-xs font-medium border transition-colors ${
+                      u.isBanned
+                        ? "border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100"
+                        : "border-error/30 text-error bg-error/5 hover:bg-error/15"
+                    }`}
+                  >
+                    {u.isBanned ? (lang === "fr" ? "Débannir" : "Unban") : (lang === "fr" ? "Bannir" : "Ban")}
+                  </button>
+                )}
               </div>
             </div>
           ))}

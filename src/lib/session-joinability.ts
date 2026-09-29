@@ -22,6 +22,9 @@ export function assertJoinable(
   if (session.status === "CLOSED") {
     return { ok: false, status: 409, error: "This session is closed and no longer accepting new members" };
   }
+  if (session.status === "ACTIVE") {
+    return { ok: false, status: 409, error: "This cotisation is already in progress and no longer accepting new members" };
+  }
   if (session.isPaused) {
     return { ok: false, status: 409, error: "This cotisation is temporarily paused and not accepting new members" };
   }

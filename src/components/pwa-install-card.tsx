@@ -26,11 +26,28 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
   const [pushSuccess, setPushSuccess] = useState(false);
 
   useEffect(() => {
+    const installedFromStorage =
+      typeof window !== "undefined" && localStorage.getItem("diva_pwa_installed") === "1";
     // Detect standalone mode
     const standalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+      (typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches) ||
+      (typeof window !== "undefined" &&
+        (window.navigator as Navigator & { standalone?: boolean }).standalone === true) ||
+      installedFromStorage;
+
     setIsStandalone(standalone);
+
+    if (typeof window !== "undefined" && "getInstalledRelatedApps" in navigator) {
+      (navigator as Navigator & { getInstalledRelatedApps?: () => Promise<unknown[]> })
+        .getInstalledRelatedApps?.()
+        .then((apps) => {
+          if (apps && apps.length > 0) {
+            localStorage.setItem("diva_pwa_installed", "1");
+            setIsStandalone(true);
+          }
+        })
+        .catch(() => {});
+    }
 
     // Detect iOS
     const ua = window.navigator.userAgent;
@@ -42,7 +59,15 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
     }
+
+    function onAppInstalled() {
+      localStorage.setItem("diva_pwa_installed", "1");
+      setIsStandalone(true);
+      setDeferredPrompt(null);
+    }
+
     window.addEventListener("beforeinstallprompt", onBeforeInstall);
+    window.addEventListener("appinstalled", onAppInstalled);
 
     // Check push support
     if (typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window) {
@@ -52,6 +77,7 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
 
     return () => {
       window.removeEventListener("beforeinstallprompt", onBeforeInstall);
+      window.removeEventListener("appinstalled", onAppInstalled);
     };
   }, []);
 
@@ -60,6 +86,8 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
       await deferredPrompt.prompt();
       const choice = await deferredPrompt.userChoice;
       if (choice.outcome === "accepted") {
+        localStorage.setItem("diva_pwa_installed", "1");
+        setIsStandalone(true);
         setDeferredPrompt(null);
       }
     } else {
@@ -291,13 +319,29 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowModal(false)}
-              className="w-full py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all text-center"
-            >
-              {lang === "fr" ? "J'ai compris" : "Got it"}
-            </button>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem("diva_pwa_installed", "1");
+                  }
+                  setIsStandalone(true);
+                  setShowModal(false);
+                }}
+                className="w-full py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all text-center"
+              >
+                {lang === "fr" ? "J'ai installé l'application" : "I installed the app"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="w-full py-1 text-on-surface-variant text-xs hover:underline text-center"
+              >
+                {lang === "fr" ? "Fermer" : "Close"}
+              </button>
+            </div>
           </div>
         </div>
       )}

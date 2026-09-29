@@ -28,6 +28,8 @@ export function CreateSessionForm({ lang }: { lang: Lang }) {
   const [drawDate, setDrawDate] = useState("");
   const [limitTime, setLimitTime] = useState("18:31");
   const [maxSlots, setMaxSlots] = useState("");
+  const [status, setStatus] = useState<"DRAFT" | "ACTIVE">("DRAFT");
+  const [validatedMembersCount, setValidatedMembersCount] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,6 +70,8 @@ export function CreateSessionForm({ lang }: { lang: Lang }) {
           drawDate,
           limitTime,
           maxSlots: maxSlots ? Number(maxSlots) : undefined,
+          status,
+          validatedMembersCount: validatedMembersCount ? Number(validatedMembersCount) : 0,
         }),
       });
       await parseJsonOrThrow(res, t("couldNotCreateCotisation"));
@@ -263,6 +267,78 @@ export function CreateSessionForm({ lang }: { lang: Lang }) {
           onChange={(e) => setLimitTime(e.target.value)}
           className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
         />
+      </div>
+
+      {/* Statut & Membres validés */}
+      <div className="p-4 rounded-xl bg-surface-container-low border border-surface-variant flex flex-col gap-3">
+        <div>
+          <label htmlFor="status" className="font-label-sm text-label-sm text-on-surface font-semibold block mb-1">
+            {t("cotisationStatusLabel")}
+          </label>
+          <select
+            id="status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value as "DRAFT" | "ACTIVE")}
+            className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white font-medium"
+          >
+            <option value="DRAFT">{t("statusDraftOption")}</option>
+            <option value="ACTIVE">{t("statusActiveOption")}</option>
+          </select>
+          <p className="font-label-sm text-xs text-on-surface-variant mt-1">
+            {status === "ACTIVE"
+              ? lang === "fr"
+                ? "La cotisation apparaîtra immédiatement dans la section « Cotisations en cours » pour tous les utilisateurs."
+                : "The cotisation will appear immediately under 'Ongoing Contributions' for everyone."
+              : lang === "fr"
+                ? "La cotisation sera en attente d'inscriptions avant démarrage."
+                : "The cotisation will be in draft / pending registrations."}
+          </p>
+        </div>
+
+        <div>
+          <label htmlFor="validatedMembersCount" className="font-label-sm text-label-sm text-on-surface font-semibold block mb-1">
+            {t("validatedMembersCountLabel")}
+          </label>
+          <input
+            id="validatedMembersCount"
+            type="number"
+            min="0"
+            value={validatedMembersCount}
+            onChange={(e) => setValidatedMembersCount(e.target.value)}
+            placeholder="0"
+            className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white font-medium"
+          />
+          <p className="font-label-sm text-xs text-on-surface-variant mt-1">
+            {t("validatedMembersCountHelper")}
+          </p>
+        </div>
+
+        {/* Live Calculation preview: Montant + Frais et Pot Total */}
+        {(() => {
+          const numAmount = Number(amount) || 0;
+          const numFee = Number(fee) || 0;
+          const count = Number(validatedMembersCount) || (maxSlots ? Number(maxSlots) : 0);
+          const pot = count > 0 ? Math.round(count * numAmount + count * numFee * 0.25) : 0;
+          return (
+            <div className="mt-1 pt-3 border-t border-surface-variant flex flex-col gap-1.5 text-xs">
+              <div className="flex justify-between items-center text-on-surface-variant">
+                <span>{t("totalAmountPerSlot")} :</span>
+                <span className="font-semibold text-on-surface font-numeric-data">
+                  {numAmount.toLocaleString("fr-FR")} FCFA + {numFee.toLocaleString("fr-FR")} FCFA ({t("feeLabel")}) = {(numAmount + numFee).toLocaleString("fr-FR")} FCFA
+                </span>
+              </div>
+              {count > 0 && (
+                <div className="flex justify-between items-center text-emerald-800 font-semibold bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200">
+                  <span className="flex items-center gap-1">
+                    <span className="material-symbols-outlined text-sm text-emerald-600">emoji_events</span>
+                    {t("totalPotToEat")} ({count} {t("validatedMembersCountLabel").toLowerCase()}) :
+                  </span>
+                  <span className="font-bold text-sm font-numeric-data">{pot.toLocaleString("fr-FR")} FCFA</span>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {error && <p className="font-label-sm text-label-sm text-error">{error}</p>}

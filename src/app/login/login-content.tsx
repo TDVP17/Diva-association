@@ -21,6 +21,8 @@ interface DevUser {
 // nothing or leaking a raw error code.
 function oauthErrorKey(code: string): TranslationKey {
   switch (code) {
+    case "AccountBanned":
+      return "accountBannedError";
     case "AccessDenied":
       return "oauthErrorAccessDenied";
     case "Configuration":

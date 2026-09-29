@@ -35,6 +35,8 @@ export async function GET(request: Request) {
         city: true,
         neighborhood: true,
         createdAt: true,
+        isBanned: true,
+        bannedAt: true,
         _count: { select: { memberships: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -59,6 +61,8 @@ export async function GET(request: Request) {
       city: u.city,
       neighborhood: u.neighborhood,
       membershipCount: u._count.memberships,
+      isBanned: u.isBanned,
+      bannedAt: u.bannedAt?.toISOString() ?? null,
       createdAt: u.createdAt.toISOString(),
     })),
   });

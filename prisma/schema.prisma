@@ -23,6 +23,7 @@ enum MembershipStatus {
   PENDING
   APPROVED
   REJECTED
+  BANNED
 }
 
 /// CNI (Cameroonian national ID card) and Récépissé (a temporary ID receipt
@@ -319,6 +320,9 @@ model User {
   /// relative/friend look the member up via "Contribute for a Relative"
   /// without exposing email/phone. Null until their first approval.
   memberCode           String?   @unique
+  isBanned             Boolean   @default(false)
+  bannedAt             DateTime?
+  bannedReason         String?
   createdAt            DateTime  @default(now())
 
   accounts                     Account[]
@@ -439,6 +443,10 @@ model TontineSession {
   amount              Decimal       @db.Decimal(12, 2)
   /// Per-slot service/platform fee.
   fee                 Decimal       @db.Decimal(12, 2)
+  /// Number of validated members manually specified or initialized by admin
+  /// (e.g. for already ongoing offline tontines). If null or 0, falls back
+  /// to approved database memberships count.
+  validatedMembersCount Int?        @default(0)
   status              TontineStatus @default(DRAFT)
   startDate           DateTime
   limitTime           String

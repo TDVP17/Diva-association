@@ -17,7 +17,9 @@ const devLoginProvider = Credentials({
   async authorize(credentials) {
     const email = typeof credentials?.email === "string" ? credentials.email : null;
     if (!email) return null;
-    return prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user || user.isBanned) return null;
+    return user;
   },
 });
 
@@ -65,7 +67,9 @@ const emailPasswordProvider = Credentials({
       });
       if (error || !data.user) return null;
 
-      return await prisma.user.findUnique({ where: { email: targetEmail } });
+      const dbUser = await prisma.user.findUnique({ where: { email: targetEmail } });
+      if (!dbUser || dbUser.isBanned) return null;
+      return dbUser;
     } catch (err) {
       // Never let a network hiccup or unexpected Supabase/Prisma error
       // surface as an unhandled crash here — treat it as "not authorized"
@@ -134,6 +138,18 @@ export const {
     },
   },
   callbacks: {
+    async signIn({ user }) {
+      if (user?.email) {
+        const dbUser = await prisma.user.findUnique({
+          where: { email: user.email.toLowerCase() },
+          select: { isBanned: true },
+        });
+        if (dbUser?.isBanned) {
+          return "/login?error=AccountBanned";
+        }
+      }
+      return true;
+    },
     async jwt({ token, user, trigger }) {
       const now = Math.floor(Date.now() / 1000);
       const THREE_MONTHS_SECONDS = 90 * 24 * 60 * 60;
@@ -153,12 +169,16 @@ export const {
 
       token.lastConnectedAt = now;
 
-      if (trigger === "update" && token.id) {
+      // Invalidate session if user has been banned
+      if (token.id) {
         const dbUser = await prisma.user.findUnique({
           where: { id: token.id as string },
-          select: { role: true },
+          select: { role: true, isBanned: true },
         });
-        if (dbUser) {
+        if (!dbUser || dbUser.isBanned) {
+          return null;
+        }
+        if (trigger === "update" || !token.role) {
           token.role = dbUser.role;
         }
       }

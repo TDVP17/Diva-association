@@ -8,7 +8,7 @@ import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { translate } from "@/lib/i18n/translations";
 
 const bodySchema = z.object({
-  action: z.enum(["approve", "reject"]),
+  action: z.enum(["approve", "reject", "ban"]),
   reason: z.string().trim().max(500).optional(),
 });
 
@@ -35,32 +35,54 @@ export async function POST(
       return NextResponse.json({ error: "Membership request not found" }, { status: 404 });
     }
 
-    const approved = parsed.data.action === "approve";
+    const action = parsed.data.action;
+    const isApproved = action === "approve";
+    const approved = isApproved;
+    const isBanned = action === "ban";
+    const nextStatus = isApproved ? "APPROVED" : isBanned ? "BANNED" : "REJECTED";
+    const lang = existing.user.preferredLang === "en" ? "en" : "fr";
+
     const membership = await prisma.membership.update({
       where: { id: membershipId },
       data: {
-        status: approved ? "APPROVED" : "REJECTED",
-        rejectionReason: approved ? null : (parsed.data.reason ?? null),
+        status: nextStatus,
+        rejectionReason: isApproved
+          ? null
+          : (parsed.data.reason ?? (isBanned ? (lang === "fr" ? "Banni par l'administrateur" : "Banned by administrator") : null)),
       },
     });
 
-    if (approved) {
+    if (isApproved) {
       await ensureMemberCode(membership.userId);
+    }
+
+    if (isBanned) {
+      await prisma.user.update({
+        where: { id: membership.userId },
+        data: {
+          isBanned: true,
+          bannedAt: new Date(),
+          bannedReason:
+            parsed.data.reason ??
+            (lang === "fr" ? "Banni par l'administrateur" : "Banned by administrator"),
+        },
+      });
     }
 
     await prisma.kycVerification.updateMany({
       where: { membershipId: membership.id },
-      data: { status: approved ? "VERIFIED" : "FAILED", verifiedAt: new Date() },
+      data: { status: isApproved ? "VERIFIED" : "FAILED", verifiedAt: new Date() },
     });
 
-    const lang = existing.user.preferredLang === "en" ? "en" : "fr";
-    const message = approved
+    const message = isApproved
       ? translate(lang, "memberApprovedMessage")
-      : translate(lang, "memberRejectedMessage") +
-        (parsed.data.reason ? translate(lang, "memberRejectedReasonSuffix", { reason: parsed.data.reason }) : "");
+      : isBanned
+        ? (lang === "fr" ? "Votre demande a été refusée et vous avez été banni de cette cotisation." : "Your request was rejected and you have been banned from this cotisation.")
+        : translate(lang, "memberRejectedMessage") +
+          (parsed.data.reason ? translate(lang, "memberRejectedReasonSuffix", { reason: parsed.data.reason }) : "");
     await scheduleInAppNotifications({
       tontineSessionId: membership.tontineSessionId,
-      type: approved ? "MEMBER_APPROVED" : "MEMBER_REJECTED",
+      type: isApproved ? "MEMBER_APPROVED" : "MEMBER_REJECTED",
       recipients: [
         {
           userId: membership.userId,

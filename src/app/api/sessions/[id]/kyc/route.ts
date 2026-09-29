@@ -204,8 +204,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         { status: 502 },
       );
     }
-    if (existingMembership && existingMembership.status !== "REJECTED") {
-      return NextResponse.json({ status: existingMembership.status });
+    if (existingMembership) {
+      if (existingMembership.status === "BANNED") {
+        return NextResponse.json(
+          { error: "Vous avez été banni de cette cotisation.", errorKey: "membershipBanned" },
+          { status: 403 },
+        );
+      }
+      if (existingMembership.status !== "REJECTED") {
+        return NextResponse.json({ status: existingMembership.status });
+      }
     }
 
     const stamp = Date.now();
@@ -281,14 +289,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             const fresh = await tx.membership.findUnique({
               where: { userId_tontineSessionId: { userId: session.user.id, tontineSessionId } },
             });
-            if (fresh && fresh.status !== "REJECTED") {
-              return { alreadyPending: true as const, status: fresh.status };
+            if (fresh) {
+              if (fresh.status === "BANNED") {
+                return { alreadyPending: true as const, status: "BANNED" };
+              }
+              if (fresh.status !== "REJECTED") {
+                return { alreadyPending: true as const, status: fresh.status };
+              }
             }
 
             const membership = await tx.membership.upsert({
               where: { userId_tontineSessionId: { userId: session.user.id, tontineSessionId } },
               create: { userId: session.user.id, tontineSessionId, status: "PENDING" },
-              update: { status: "PENDING" },
+              update: { status: "PENDING", rejectionReason: null },
             });
 
             await tx.kycVerification.create({

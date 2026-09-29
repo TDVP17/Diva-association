@@ -76,6 +76,8 @@ const createSessionSchema = z.object({
   limitTime: z.string().trim().min(1).max(100),
   maxSlots: z.coerce.number().positive().optional(),
   drawDate: z.coerce.date(),
+  status: z.enum(["DRAFT", "ACTIVE"]).optional().default("DRAFT"),
+  validatedMembersCount: z.coerce.number().int().nonnegative().optional().default(0),
 });
 
 export async function POST(request: Request) {
@@ -88,8 +90,13 @@ export async function POST(request: Request) {
   }
 
   try {
+    const { status, validatedMembersCount, ...rest } = parsed.data;
     const tontineSession = await prisma.tontineSession.create({
-      data: { ...parsed.data, status: "DRAFT" },
+      data: {
+        ...rest,
+        status: status ?? "DRAFT",
+        validatedMembersCount: validatedMembersCount ?? 0,
+      },
     });
     await logAudit({
       actorId: admin.user.id,

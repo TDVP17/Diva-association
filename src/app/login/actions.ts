@@ -33,7 +33,7 @@ export async function findUserByContact(identifier: string) {
   if (clean.includes("@")) {
     return prisma.user.findUnique({
       where: { email: clean.toLowerCase() },
-      select: { id: true, name: true, email: true, phone: true, role: true, preferredLang: true },
+      select: { id: true, name: true, email: true, phone: true, role: true, preferredLang: true, isBanned: true },
     });
   }
   const digits = clean.replace(/\D/g, "");
@@ -46,7 +46,7 @@ export async function findUserByContact(identifier: string) {
         ...(!digits.startsWith("237") && digits.length === 9 ? [{ phone: `237${digits}` }] : []),
       ],
     },
-    select: { id: true, name: true, email: true, phone: true, role: true, preferredLang: true },
+    select: { id: true, name: true, email: true, phone: true, role: true, preferredLang: true, isBanned: true },
   });
 }
 
@@ -65,19 +65,22 @@ export async function signInAction(
     let emailToUse = rawIdentifier;
     let userRole = null;
 
+    const user = await findUserByContact(rawIdentifier);
+    if (user?.isBanned) {
+      return {
+        error:
+          "Ce compte a été banni. Vous ne pouvez plus vous connecter à l'application avec cet email ou ce numéro de téléphone.",
+      };
+    }
+
     if (!rawIdentifier.includes("@")) {
-      const user = await findUserByContact(rawIdentifier);
       if (!user) {
         return { error: "Incorrect email, phone number, or password." };
       }
       emailToUse = user.email;
       userRole = user.role;
     } else {
-      const target = await prisma.user.findUnique({
-        where: { email: rawIdentifier.toLowerCase() },
-        select: { role: true },
-      });
-      userRole = target?.role;
+      userRole = user?.role ?? null;
     }
 
     let redirectTo = callbackUrl;
@@ -108,6 +111,14 @@ export async function requestPasswordResetAction(
   const user = await findUserByContact(trimmed);
   if (!user) {
     return { error: translate(lang, "userNotFoundByContact") };
+  }
+  if (user.isBanned) {
+    return {
+      error:
+        lang === "fr"
+          ? "Ce compte a été banni. Vous ne pouvez plus réinitialiser le mot de passe."
+          : "This account has been banned. Password reset is not permitted.",
+    };
   }
 
   const isEmail = trimmed.includes("@");
@@ -269,6 +280,14 @@ export async function signUpAction(
   }
   if (password.length < 6) {
     return { error: "Password must be at least 6 characters." };
+  }
+
+  const existingBanned = await prisma.user.findUnique({
+    where: { email: email.toLowerCase() },
+    select: { isBanned: true },
+  });
+  if (existingBanned?.isBanned) {
+    return { error: "Cet email est banni. Vous ne pouvez plus créer de compte avec cette adresse." };
   }
 
   try {

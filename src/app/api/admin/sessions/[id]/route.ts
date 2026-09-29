@@ -53,6 +53,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     maxSlots: s.maxSlots ? Number(s.maxSlots) : null,
     isPaused: s.isPaused,
     lockedAt: s.lockedAt ? s.lockedAt.toISOString() : null,
+    validatedMembersCount: s.validatedMembersCount ?? 0,
     registeredSlots,
     slots: s.memberships.flatMap((m) =>
       m.slots.map((slot) => ({
@@ -84,6 +85,7 @@ const patchSchema = z.object({
   maxSlots: z.coerce.number().positive().nullable().optional(),
   drawDate: z.coerce.date().optional(),
   status: z.enum(["DRAFT", "DRAWING", "ACTIVE", "CLOSED"]).optional(),
+  validatedMembersCount: z.coerce.number().int().nonnegative().optional(),
 });
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {

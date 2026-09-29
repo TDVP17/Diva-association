@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { translate, type Lang } from "@/lib/i18n/translations";
 
 const DISMISSED_SESSION_KEY = "diva_pwa_dismissed_session";
+const INSTALLED_KEY = "diva_pwa_installed";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -13,36 +14,82 @@ interface BeforeInstallPromptEvent extends Event {
 function isIosDevice(): boolean {
   if (typeof window === "undefined") return false;
   const ua = window.navigator.userAgent;
-  return /iPad|iPhone|iPod/.test(ua) || (ua.includes("Macintosh") && "ontouchend" in document);
+  return (
+    /iPad|iPhone|iPod/.test(ua) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
+function isAndroidDevice(): boolean {
+  if (typeof window === "undefined") return false;
+  return /Android/i.test(window.navigator.userAgent);
+}
+
+function isInAppBrowser(): boolean {
+  if (typeof window === "undefined") return false;
+  const ua = window.navigator.userAgent || "";
+  return /FBAN|FBAV|Instagram|WhatsApp|Line|Snapchat|Twitter|TikTok|MicroMessenger/i.test(ua);
 }
 
 function isStandaloneAlready(): boolean {
   if (typeof window === "undefined") return false;
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
-    (window.navigator as Navigator & { standalone?: boolean }).standalone === true
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true ||
+    document.referrer.includes("android-app://") ||
+    window.location.search.includes("mode=pwa")
   );
 }
 
 /**
- * Universal PWA Installation Prompt for both iPhone and Android.
- * Automatically prompts installation when accessed via browser, ensuring
- * users can install the application with 1 tap or clear native steps.
+ * Universal PWA Installation Component.
+ * - When application is already installed on the user's device, it is impossible to download again.
+ * - Checks standalone mode, localStorage flag, and getInstalledRelatedApps.
+ * - On Android / Chromium: triggers native prompt in 1-click.
+ * - On iOS Safari: presents an intuitive bottom sheet with an animated arrow pointing to Safari's Share button.
  */
 export function InstallPromptModal({ lang }: { lang: Lang }) {
   const t = (key: Parameters<typeof translate>[1]) => translate(lang, key);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
   const [ready, setReady] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [isIos, setIsIos] = useState(false);
-  const [showAndroidManualHelp, setShowAndroidManualHelp] = useState(false);
+  const [isAndroid, setIsAndroid] = useState(false);
+  const [inApp, setInApp] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (isStandaloneAlready()) return;
 
-    setIsIos(isIosDevice());
+    // 1. Direct check: already installed or running as standalone PWA
+    if (isStandaloneAlready() || localStorage.getItem(INSTALLED_KEY) === "1") {
+      localStorage.setItem(INSTALLED_KEY, "1");
+      setIsInstalled(true);
+      return;
+    }
+
+    // 2. Browser getInstalledRelatedApps API check (Chromium Android & Desktop)
+    if ("getInstalledRelatedApps" in navigator) {
+      (navigator as Navigator & { getInstalledRelatedApps?: () => Promise<unknown[]> })
+        .getInstalledRelatedApps?.()
+        .then((apps) => {
+          if (apps && apps.length > 0) {
+            localStorage.setItem(INSTALLED_KEY, "1");
+            setIsInstalled(true);
+          }
+        })
+        .catch(() => {});
+    }
+
+    const ios = isIosDevice();
+    const android = isAndroidDevice();
+    const inAppBrowser = isInAppBrowser();
+
+    setIsIos(ios);
+    setIsAndroid(android);
+    setInApp(inAppBrowser);
 
     if (sessionStorage.getItem(DISMISSED_SESSION_KEY)) {
       setDismissed(true);
@@ -50,23 +97,44 @@ export function InstallPromptModal({ lang }: { lang: Lang }) {
 
     function onBeforeInstallPrompt(e: Event) {
       e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      const promptEvent = e as BeforeInstallPromptEvent;
+      setDeferredPrompt(promptEvent);
+      deferredPromptRef.current = promptEvent;
+      // When browser fires this event, the app is confirmed NOT installed yet
+      setReady(true);
+    }
+
+    function onAppInstalled() {
+      localStorage.setItem(INSTALLED_KEY, "1");
+      setIsInstalled(true);
+      setDismissed(true);
+      setDeferredPrompt(null);
+      deferredPromptRef.current = null;
     }
 
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onAppInstalled);
 
-    // Auto-prompt quickly after page load
-    const timer = setTimeout(() => {
-      setReady(true);
-    }, 800);
+    // On iOS Safari, beforeinstallprompt never fires; trigger prompt if not dismissed
+    if (ios && !sessionStorage.getItem(DISMISSED_SESSION_KEY)) {
+      const timer = setTimeout(() => {
+        setReady(true);
+      }, 1500);
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+        window.removeEventListener("appinstalled", onAppInstalled);
+      };
+    }
 
     return () => {
-      clearTimeout(timer);
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onAppInstalled);
     };
   }, []);
 
-  if (typeof window !== "undefined" && isStandaloneAlready()) {
+  // If already installed, never show anything (impossible to download again)
+  if (isInstalled || (typeof window !== "undefined" && isStandaloneAlready())) {
     return null;
   }
 
@@ -77,191 +145,227 @@ export function InstallPromptModal({ lang }: { lang: Lang }) {
     setDismissed(true);
   }
 
-  function handleOpen() {
-    setDismissed(false);
+  function handleMarkAsAlreadyInstalled() {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(INSTALLED_KEY, "1");
+    }
+    setIsInstalled(true);
+    setDismissed(true);
   }
 
   async function handleInstallPwa() {
-    if (deferredPrompt) {
+    const promptEvent = deferredPrompt || deferredPromptRef.current;
+    if (promptEvent) {
       setInstalling(true);
       try {
-        await deferredPrompt.prompt();
-        const choice = await deferredPrompt.userChoice;
+        await promptEvent.prompt();
+        const choice = await promptEvent.userChoice;
         if (choice.outcome === "accepted") {
-          handleDismiss();
+          localStorage.setItem(INSTALLED_KEY, "1");
+          setIsInstalled(true);
+          setDismissed(true);
         }
       } catch (err) {
         console.error("[PWA] prompt error:", err);
       } finally {
         setInstalling(false);
       }
-    } else {
-      // If beforeinstallprompt hasn't fired or is not supported (e.g. Firefox Mobile)
-      setShowAndroidManualHelp(true);
     }
   }
 
-  const modalVisible = ready && !dismissed;
+  const modalVisible = ready && !dismissed && !isInstalled;
+  if (!modalVisible) return null;
 
   return (
-    <>
-      {/* Floating Re-Open Button when dismissed but not yet installed */}
-      {ready && dismissed && (
+    <div
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 p-0 sm:p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl bg-surface p-5 sm:p-6 shadow-2xl relative border-t sm:border border-surface-variant max-h-[92vh] overflow-y-auto">
+        {/* Close button */}
         <button
-          onClick={handleOpen}
-          aria-label={t("installApp")}
-          className="fixed bottom-20 md:bottom-6 right-4 z-40 bg-primary text-on-primary font-label-sm text-xs font-bold py-2.5 px-3.5 rounded-full shadow-lg border border-primary/20 flex items-center gap-1.5 hover:opacity-90 active:scale-95 transition-all"
+          onClick={handleDismiss}
+          aria-label={t("close")}
+          className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-variant/50 transition-colors"
         >
-          <span className="material-symbols-outlined text-[18px]">install_mobile</span>
-          <span>{lang === "fr" ? "Installer l'application" : "Install App"}</span>
+          <span className="material-symbols-outlined text-[20px]">close</span>
         </button>
-      )}
 
-      {/* Main Automatic Installation Modal */}
-      {modalVisible && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-container-padding backdrop-blur-sm animate-in fade-in duration-200"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-2xl relative border border-surface-variant max-h-[90vh] overflow-y-auto">
-            <button
-              onClick={handleDismiss}
-              aria-label={t("close")}
-              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-variant/50 transition-colors"
-            >
-              <span className="material-symbols-outlined text-[20px]">close</span>
-            </button>
-
-            <div className="flex flex-col items-center gap-2 mb-stack-gap-md text-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/icons/icon-192.png"
-                alt="DIVA Association"
-                className="w-20 h-20 object-contain rounded-2xl shadow-md border border-slate-100"
-              />
-              <h2 className="font-title-md text-title-md text-primary font-bold">
-                {t("browserInstallPromptTitle")}
-              </h2>
-              <p className="font-label-sm text-xs text-on-surface-variant leading-relaxed">
-                {t("browserInstallPromptBanner")}
-              </p>
-            </div>
-
-            {isIos ? (
-              /* Specific iOS / Safari Walkthrough */
-              <div className="flex flex-col gap-3">
-                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-left flex flex-col gap-2">
-                  <div className="flex items-center gap-1.5 text-primary font-bold text-xs">
-                    <span className="material-symbols-outlined text-[18px]">phone_iphone</span>
-                    <span>{t("iosInstallTitle")}</span>
-                  </div>
-                  <ol className="text-xs text-on-surface space-y-2 list-decimal list-inside leading-relaxed font-medium">
-                    <li>
-                      {lang === "fr" ? (
-                        <>
-                          Appuyez sur l&apos;icône <strong>Partager</strong>{" "}
-                          <span className="inline-flex align-middle text-primary">
-                            <span className="material-symbols-outlined text-[16px]">ios_share</span>
-                          </span>{" "}
-                          en bas de Safari.
-                        </>
-                      ) : (
-                        <>
-                          Tap the <strong>Share</strong> icon{" "}
-                          <span className="inline-flex align-middle text-primary">
-                            <span className="material-symbols-outlined text-[16px]">ios_share</span>
-                          </span>{" "}
-                          at the bottom of Safari.
-                        </>
-                      )}
-                    </li>
-                    <li>
-                      {lang === "fr" ? (
-                        <>
-                          Faites défiler et sélectionnez <strong>« Sur l&apos;écran d&apos;accueil »</strong>{" "}
-                          <span className="inline-flex align-middle text-primary">
-                            <span className="material-symbols-outlined text-[16px]">add_box</span>
-                          </span>.
-                        </>
-                      ) : (
-                        <>
-                          Scroll down and tap <strong>&quot;Add to Home Screen&quot;</strong>{" "}
-                          <span className="inline-flex align-middle text-primary">
-                            <span className="material-symbols-outlined text-[16px]">add_box</span>
-                          </span>.
-                        </>
-                      )}
-                    </li>
-                    <li>
-                      {lang === "fr" ? (
-                        <>
-                          Appuyez sur <strong>« Ajouter »</strong> en haut à droite.
-                        </>
-                      ) : (
-                        <>
-                          Tap <strong>&quot;Add&quot;</strong> in the top-right corner.
-                        </>
-                      )}
-                    </li>
-                  </ol>
-                  <p className="text-[11px] text-on-surface-variant italic mt-1">
-                    {lang === "fr"
-                      ? "L'icône DIVA Association s'installera sur votre écran comme une application native sans navigateur."
-                      : "DIVA Association will appear on your home screen as a full native app."}
-                  </p>
-                </div>
-
-                <button
-                  onClick={handleDismiss}
-                  className="w-full py-2.5 rounded-xl bg-primary text-on-primary font-label-md text-label-md font-semibold hover:opacity-90 active:scale-95 transition-all text-center"
-                >
-                  {lang === "fr" ? "J'ai compris" : "Got it"}
-                </button>
-              </div>
-            ) : (
-              /* Android / Chrome / Edge 1-Click Install */
-              <div className="flex flex-col gap-3">
-                <button
-                  onClick={handleInstallPwa}
-                  disabled={installing}
-                  className="w-full py-3.5 px-4 rounded-xl bg-primary text-on-primary font-label-md text-sm font-bold hover:opacity-95 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-60 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[22px]">install_mobile</span>
-                  <span>
-                    {installing
-                      ? lang === "fr"
-                        ? "Installation..."
-                        : "Installing..."
-                      : t("installApp")}
-                  </span>
-                </button>
-
-                {showAndroidManualHelp && !deferredPrompt && (
-                  <div className="p-3 rounded-xl bg-surface-container-low border border-surface-variant text-xs text-on-surface-variant leading-relaxed text-left">
-                    <p className="font-semibold text-primary mb-1 flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[16px]">info</span>
-                      {lang === "fr" ? "Installation manuelle :" : "Manual installation:"}
-                    </p>
-                    <p>
-                      {lang === "fr"
-                        ? "Appuyez sur le menu (les 3 points ⋮ en haut à droite de votre navigateur) puis choisissez « Installer l'application » ou « Ajouter à l'écran d'accueil »."
-                        : "Tap the menu (3 dots ⋮ at top right of your browser) and select 'Install app' or 'Add to Home Screen'."}
-                    </p>
-                  </div>
-                )}
-
-                <button
-                  onClick={handleDismiss}
-                  className="w-full py-2 text-on-surface-variant font-label-sm text-xs hover:bg-surface-variant/40 rounded-lg transition-colors"
-                >
-                  {t("notNow")}
-                </button>
-              </div>
-            )}
+        {/* App Icon + Title */}
+        <div className="flex items-center gap-3.5 mb-4 text-left">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/icons/icon-192.png"
+            alt="DIVA Association"
+            className="w-14 h-14 object-contain rounded-2xl shadow-md border border-slate-100 flex-shrink-0"
+          />
+          <div className="min-w-0">
+            <h2 className="font-title-md text-title-md text-primary font-bold leading-tight">
+              Diva Association
+            </h2>
+            <p className="font-label-sm text-xs text-on-surface-variant mt-0.5">
+              {lang === "fr"
+                ? "Application officielle"
+                : "Official Mobile Application"}
+            </p>
           </div>
         </div>
-      )}
-    </>
+
+        {/* In-App Browser Warning (WhatsApp / Facebook) */}
+        {inApp && (
+          <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-on-surface leading-relaxed text-left flex gap-2">
+            <span className="material-symbols-outlined text-amber-600 text-lg flex-shrink-0">
+              info
+            </span>
+            <div>
+              <strong className="block text-amber-800 font-semibold mb-0.5">
+                {lang === "fr" ? "Ouvert dans WhatsApp" : "Opened in WhatsApp"}
+              </strong>
+              {lang === "fr" ? (
+                isIos ? (
+                  <>
+                    Pour installer l&apos;application, touchez les <strong>⋯</strong> ou la boussole 🧭 en bas puis <strong>« Ouvrir dans Safari »</strong>.
+                  </>
+                ) : (
+                  <>
+                    Pour installer l&apos;application, touchez les <strong>⋮</strong> en haut à droite puis <strong>« Ouvrir dans Chrome »</strong>.
+                  </>
+                )
+              ) : (
+                <>
+                  Please tap the menu and choose <strong>&quot;Open in {isIos ? "Safari" : "Chrome"}&quot;</strong> to install.
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {isIos ? (
+          /* iOS Safari Installation: Visual guided bottom sheet */
+          <div className="flex flex-col gap-3">
+            <div className="p-3.5 rounded-2xl bg-surface-container-low border border-surface-variant text-left">
+              <p className="text-xs font-bold text-primary mb-2.5 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-base">phone_iphone</span>
+                <span>{lang === "fr" ? "Installation sur votre iPhone :" : "Install on your iPhone:"}</span>
+              </p>
+
+              <div className="space-y-2.5 text-xs text-on-surface">
+                <div className="flex items-center gap-2.5 p-2 rounded-xl bg-white shadow-xs border border-surface-variant">
+                  <span className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0 font-bold text-xs">
+                    1
+                  </span>
+                  <div className="leading-snug">
+                    {lang === "fr" ? (
+                      <>
+                        Touchez <strong>Partager</strong>{" "}
+                        <span className="inline-flex align-middle text-primary font-bold">
+                          <span className="material-symbols-outlined text-[17px]">ios_share</span>
+                        </span>{" "}
+                        <span className="text-on-surface-variant">(en bas de Safari)</span>
+                      </>
+                    ) : (
+                      <>
+                        Tap <strong>Share</strong>{" "}
+                        <span className="inline-flex align-middle text-primary font-bold">
+                          <span className="material-symbols-outlined text-[17px]">ios_share</span>
+                        </span>{" "}
+                        <span className="text-on-surface-variant">(bottom bar)</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5 p-2 rounded-xl bg-white shadow-xs border border-surface-variant">
+                  <span className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center flex-shrink-0 font-bold text-xs">
+                    2
+                  </span>
+                  <div className="leading-snug">
+                    {lang === "fr" ? (
+                      <>
+                        Sélectionnez <strong>« Sur l&apos;écran d&apos;accueil »</strong>{" "}
+                        <span className="inline-flex align-middle text-primary">
+                          <span className="material-symbols-outlined text-[17px]">add_box</span>
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        Select <strong>&quot;Add to Home Screen&quot;</strong>{" "}
+                        <span className="inline-flex align-middle text-primary">
+                          <span className="material-symbols-outlined text-[17px]">add_box</span>
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Animated pointing arrow toward bottom share bar in Safari */}
+              <div className="mt-3 pt-2 border-t border-surface-variant flex items-center justify-center gap-1.5 text-primary text-xs font-bold animate-bounce">
+                <span className="material-symbols-outlined text-base">arrow_downward</span>
+                <span>{lang === "fr" ? "Regardez en bas de votre écran" : "Look at the bottom of your screen"}</span>
+                <span className="material-symbols-outlined text-base">arrow_downward</span>
+              </div>
+            </div>
+
+            <button
+              onClick={handleMarkAsAlreadyInstalled}
+              className="w-full py-2.5 rounded-xl bg-primary text-on-primary font-label-md text-sm font-semibold hover:opacity-90 active:scale-95 transition-all text-center"
+            >
+              {lang === "fr" ? "J'ai ajouté l'application" : "I added the app"}
+            </button>
+
+            <button
+              onClick={handleMarkAsAlreadyInstalled}
+              className="w-full py-2 text-on-surface-variant text-xs hover:underline text-center"
+            >
+              {lang === "fr" ? "L'application est déjà sur mon iPhone" : "App is already on my iPhone"}
+            </button>
+          </div>
+        ) : (
+          /* Android & Chrome / Edge: 1-Click Direct Installation */
+          <div className="flex flex-col gap-2.5">
+            <button
+              onClick={handleInstallPwa}
+              disabled={installing}
+              className="w-full py-3.5 px-4 rounded-xl bg-primary text-on-primary font-label-md text-sm font-bold hover:opacity-95 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-60 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[22px]">
+                {installing ? "hourglass_top" : "install_mobile"}
+              </span>
+              <span>
+                {installing
+                  ? lang === "fr"
+                    ? "Installation en cours..."
+                    : "Installing..."
+                  : lang === "fr"
+                  ? "Installer l'application"
+                  : "Install Application"}
+              </span>
+            </button>
+
+            <p className="text-[11px] text-center text-on-surface-variant">
+              {lang === "fr"
+                ? "S'installe instantanément sur votre écran d'accueil sans passer par le Play Store."
+                : "Installs directly to your home screen without Play Store."}
+            </p>
+
+            <button
+              onClick={handleMarkAsAlreadyInstalled}
+              className="w-full py-2 text-primary font-label-sm text-xs font-semibold hover:bg-primary/5 rounded-lg transition-colors"
+            >
+              {lang === "fr" ? "L'application est déjà installée sur mon téléphone" : "App is already installed on my phone"}
+            </button>
+
+            <button
+              onClick={handleDismiss}
+              className="w-full py-1.5 text-on-surface-variant font-label-sm text-xs hover:bg-surface-variant/40 rounded-lg transition-colors"
+            >
+              {t("notNow")}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

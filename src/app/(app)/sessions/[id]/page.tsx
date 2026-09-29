@@ -138,7 +138,7 @@ export default async function SessionDetailPage({
               <div>
                 <p className="text-on-surface-variant text-xs">{t("validatedMembersCount", { count: "" }).replace("{count}", "").trim()}</p>
                 <p className="font-semibold text-on-surface">
-                  {tontineSession.memberships.filter((m) => m.status === "APPROVED").length}
+                  {Math.max(tontineSession.validatedMembersCount ?? 0, tontineSession.memberships.filter((m) => m.status === "APPROVED").length)}
                   {tontineSession.maxSlots ? ` / ${tontineSession.maxSlots}` : ""}
                 </p>
               </div>
@@ -225,16 +225,53 @@ export default async function SessionDetailPage({
     );
   }
 
+  if (myMembership.status === "BANNED") {
+    return (
+      <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-5xl mx-auto w-full">
+        <section className="bg-surface rounded-xl p-6 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant text-center flex flex-col items-center gap-3">
+          <div className="w-14 h-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
+            <span className="material-symbols-outlined text-3xl">block</span>
+          </div>
+          <h1 className="font-title-md text-title-md text-error">
+            {lang === "fr" ? "Accès banni" : "Access Banned"}
+          </h1>
+          <p className="font-body-md text-body-md text-on-surface-variant max-w-md">
+            {lang === "fr"
+              ? `Vous avez été banni de la cotisation « ${sessionLabel} » par l'administrateur. Vous ne pouvez plus faire de demande d'intégration.`
+              : `You have been banned from "${sessionLabel}" by the administrator. You cannot request to join.`}
+          </p>
+          {myMembership.rejectionReason && (
+            <p className="font-label-sm text-xs text-error bg-error-container/20 px-3 py-1.5 rounded-lg">
+              {lang === "fr" ? `Motif : ${myMembership.rejectionReason}` : `Reason: ${myMembership.rejectionReason}`}
+            </p>
+          )}
+          <Link
+            href="/sessions"
+            className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-surface-container-high text-on-surface font-label-md text-label-md hover:bg-surface-variant transition-colors"
+          >
+            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+            {t("viewOpenCotisations")}
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
   if (myMembership.status === "REJECTED") {
     return (
       <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-5xl mx-auto w-full">
         <section className="bg-surface rounded-xl p-6 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant text-center flex flex-col items-center gap-3">
-          <span className="material-symbols-outlined text-error text-4xl">cancel</span>
-          <h1 className="font-title-md text-title-md text-error">{t("requestRejectedTitle")}</h1>
+          <span className="material-symbols-outlined text-amber-600 text-4xl">warning</span>
+          <h1 className="font-title-md text-title-md text-on-surface">{t("requestRejectedTitle")}</h1>
           <p className="font-body-md text-body-md text-on-surface-variant">
             {t("requestRejectedBody", { session: sessionLabel })}
           </p>
-          <div className="w-full max-w-xs">
+          {myMembership.rejectionReason && (
+            <p className="font-label-sm text-xs text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
+              {lang === "fr" ? `Motif : ${myMembership.rejectionReason}` : `Reason: ${myMembership.rejectionReason}`}
+            </p>
+          )}
+          <div className="w-full max-w-xs mt-2">
             <JoinButton tontineSessionId={id} label={t("requestAgain")} lang={lang} />
           </div>
         </section>
@@ -401,7 +438,7 @@ export default async function SessionDetailPage({
       {paidContribution && (
         <PaymentSuccessBanner
           lang={lang}
-          beneficiaryName={`${paidContribution.membershipSlot.membership.user.name} — ${paidContribution.membershipSlot.beneficiaryName}`}
+          beneficiaryName={paidContribution.membershipSlot.beneficiaryName}
           sessionLabel={sessionLabel}
           amount={
             Number(paidContribution.amountPaid) + Number(paidContribution.feePaid) + Number(paidContribution.finePaid)
@@ -682,17 +719,17 @@ export default async function SessionDetailPage({
                 <div className="font-label-md text-label-md text-on-surface-variant w-7 text-center mr-2">
                   {s.ballDrawn ?? "—"}
                 </div>
-                <div className="w-10 h-10 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center font-label-md text-label-md mr-3 overflow-hidden flex-shrink-0">
-                  {s.member.avatar || s.member.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={s.member.avatar ?? s.member.image!} alt={s.member.name} className="w-full h-full object-cover" />
-                  ) : (
-                    s.member.name.slice(0, 2).toUpperCase()
-                  )}
+                <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-label-md text-label-md font-bold mr-3 overflow-hidden flex-shrink-0 border border-primary/20">
+                  {s.beneficiaryName.slice(0, 2).toUpperCase()}
                 </div>
                 <div className="flex-grow min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-label-md text-label-md text-on-surface truncate font-medium">{s.beneficiaryName}</span>
+                    <span className="font-label-md text-label-md text-on-surface truncate font-semibold">{s.beneficiaryName}</span>
+                    {s.isMine && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/10 text-primary">
+                        {lang === "fr" ? "Votre part" : "Your slot"}
+                      </span>
+                    )}
                     {paid && (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#d1fae5] text-[#065f46]">
                         {t("checkedPaid")}
@@ -700,10 +737,6 @@ export default async function SessionDetailPage({
                     )}
                   </div>
                   <div className="font-label-sm text-label-sm text-on-surface-variant truncate">
-                    {s.member.name}
-                    {c?.paidByUser && (
-                      <span className="text-primary font-medium"> · {t("paidByRelativeBadge", { name: c.paidByUser.name })}</span>
-                    )}
                     {paid
                       ? ` · ${c?.paidAt ? t("paidAtLabel", { time: c.paidAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) }) : t("paid")}`
                       : ` · ${t("notYetPaid")}`}

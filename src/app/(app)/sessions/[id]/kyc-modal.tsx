@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { translate, translateIfKnown, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 import { compressImage, formatImageSize, ImageTooLargeError, MAX_OUTPUT_BYTES } from "@/lib/compress-image";
+import { SelfieCameraModal } from "@/components/selfie-camera-modal";
 
 const FIELD_LABEL_KEY: Record<string, TranslationKey> = {
   selfieImage: "selfiePhotoLabel",
@@ -20,12 +21,24 @@ export function KycModal({
 }) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [showCameraModal, setShowCameraModal] = useState(false);
   const [applicantFullName, setApplicantFullName] = useState("");
   const [referrerName, setReferrerName] = useState("");
   const [residenceCity, setResidenceCity] = useState("");
   const [residenceNeighborhood, setResidenceNeighborhood] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selfieFile) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(selfieFile);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [selfieFile]);
 
   const canSubmit =
     selfieFile &&
@@ -177,7 +190,7 @@ export function KycModal({
               />
             </div>
 
-            {/* 5. Photo/Selfie — se filmer ou upload de la galerie */}
+            {/* 5. Photo selfie avec caméra avant et accès galerie intégré */}
             <div>
               <p className="font-label-sm text-label-sm text-on-surface-variant mb-1.5">
                 {t("selfiePhotoLabel")} <span className="text-error font-bold">*</span>
@@ -185,50 +198,75 @@ export function KycModal({
               <p className="font-label-sm text-[11px] text-on-surface-variant mb-2">
                 {t("selfiePhotoInstruction")}
               </p>
-              <div className="flex flex-col gap-2">
-                {/* Option 1: Se filmer directement (caméra selfie) */}
-                <label className="flex items-center justify-between gap-3 border border-outline-variant rounded-lg px-3 py-2.5 cursor-pointer hover:bg-surface-container-low transition-colors">
-                  <div className="min-w-0 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-primary flex-shrink-0">photo_camera</span>
+
+              {!selfieFile ? (
+                <button
+                  type="button"
+                  onClick={() => setShowCameraModal(true)}
+                  className="w-full flex items-center justify-between p-3.5 rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 active:scale-[0.99] transition-all cursor-pointer text-left group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-full bg-primary/15 text-primary flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                      <span className="material-symbols-outlined text-[24px]">photo_camera</span>
+                    </div>
                     <div>
-                      <p className="font-label-md text-label-md text-on-surface">{t("takePhotoAction")}</p>
-                      {selfieFile && (
-                        <p className="font-label-sm text-[11px] text-on-surface-variant truncate">{selfieFile.name}</p>
-                      )}
+                      <p className="font-label-md text-label-md text-primary font-bold">
+                        {t("takePhotoAction")}
+                      </p>
+                      <p className="text-[11px] text-on-surface-variant">
+                        {lang === "fr"
+                          ? "Caméra avant avec accès direct à votre galerie"
+                          : "Front camera with direct gallery access"}
+                      </p>
                     </div>
                   </div>
-                  <span className="material-symbols-outlined text-primary flex-shrink-0">
-                    {selfieFile ? "check_circle" : "add_a_photo"}
+                  <span className="material-symbols-outlined text-primary text-[20px] group-hover:translate-x-0.5 transition-transform">
+                    arrow_forward_ios
                   </span>
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    capture="user"
-                    className="hidden"
-                    onChange={(e) => setSelfieFile(e.target.files?.[0] ?? null)}
-                  />
-                </label>
-                {/* Option 2: Upload depuis la galerie */}
-                <label className="flex items-center justify-between gap-3 border border-outline-variant rounded-lg px-3 py-2.5 cursor-pointer hover:bg-surface-container-low transition-colors">
-                  <div className="min-w-0 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-primary flex-shrink-0">photo_library</span>
-                    <div>
-                      <p className="font-label-md text-label-md text-on-surface">{t("uploadFromGalleryAction")}</p>
+                </button>
+              ) : (
+                <div className="flex items-center justify-between gap-3 p-3 rounded-xl border border-emerald-200 bg-emerald-50/60 shadow-xs">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {previewUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={previewUrl}
+                        alt="Aperçu selfie"
+                        className="w-12 h-12 rounded-lg object-cover border border-emerald-300 flex-shrink-0 shadow-xs"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center flex-shrink-0">
+                        <span className="material-symbols-outlined text-2xl">check_circle</span>
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1 text-emerald-800 font-bold text-xs">
+                        <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                        <span>{t("photoReady")}</span>
+                      </div>
+                      <p className="text-[11px] text-on-surface-variant truncate max-w-[150px]">
+                        {selfieFile.name}
+                      </p>
                     </div>
                   </div>
-                  <span className="material-symbols-outlined text-primary flex-shrink-0">upload</span>
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    className="hidden"
-                    onChange={(e) => setSelfieFile(e.target.files?.[0] ?? null)}
-                  />
-                </label>
-              </div>
-              {selfieFile && (
-                <div className="mt-2 flex items-center gap-2 text-[#065f46] bg-[#d1fae5] rounded-lg px-3 py-2">
-                  <span className="material-symbols-outlined text-[18px]">check_circle</span>
-                  <span className="font-label-sm text-label-sm">{t("photoSelectedLabel")} — {selfieFile.name}</span>
+
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowCameraModal(true)}
+                      className="px-2.5 py-1.5 rounded-lg border border-primary/30 text-primary bg-white text-xs font-semibold hover:bg-primary/5 active:scale-95 transition-all"
+                    >
+                      {t("retakePhotoAction")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelfieFile(null)}
+                      className="w-7 h-7 rounded-lg text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors"
+                      title={t("cancel")}
+                    >
+                      <span className="material-symbols-outlined text-[18px]">delete</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -263,6 +301,14 @@ export function KycModal({
           </div>
         </div>
       </div>
+
+      {/* Camera capture modal with front camera and direct gallery access */}
+      <SelfieCameraModal
+        isOpen={showCameraModal}
+        onClose={() => setShowCameraModal(false)}
+        onPhotoSelected={(file) => setSelfieFile(file)}
+        lang={lang}
+      />
     </div>
   );
 }

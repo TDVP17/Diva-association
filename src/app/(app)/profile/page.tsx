@@ -24,6 +24,7 @@ const MEMBERSHIP_STATUS_CLASS: Record<string, string> = {
   PENDING: "bg-secondary-fixed text-on-secondary-fixed-variant",
   APPROVED: "bg-[#d1fae5] text-[#065f46]",
   REJECTED: "bg-error-container text-on-error-container",
+  BANNED: "bg-error text-white font-bold",
 };
 
 export default async function ProfilePage() {
@@ -35,6 +36,7 @@ export default async function ProfilePage() {
     PENDING: t("membershipStatusPending"),
     APPROVED: t("membershipStatusApproved"),
     REJECTED: t("membershipStatusRejected"),
+    BANNED: t("membershipStatusBanned"),
   };
 
   const [user, memberships, unreadNotifications, unpaidFinesAgg] = await Promise.all([

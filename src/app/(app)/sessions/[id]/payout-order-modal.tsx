@@ -80,12 +80,12 @@ export function PayoutOrderModal({ tontineSessionId, lang }: { tontineSessionId:
                         {r.position}
                       </div>
                       <div className="min-w-0">
-                        <p className="font-label-md text-label-md text-on-surface truncate">{r.beneficiaryName}</p>
-                        <p className="font-label-sm text-label-sm text-on-surface-variant truncate">
-                          {r.memberName}
-                          {r.estimatedDate &&
-                            ` — ~${new Date(r.estimatedDate).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "long", year: "numeric" })}`}
-                        </p>
+                        <p className="font-label-md text-label-md text-on-surface truncate font-semibold">{r.beneficiaryName}</p>
+                        {r.estimatedDate && (
+                          <p className="font-label-sm text-xs text-on-surface-variant truncate">
+                            {`~${new Date(r.estimatedDate).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "long", year: "numeric" })}`}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <span

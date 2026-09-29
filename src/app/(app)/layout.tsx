@@ -34,13 +34,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const [dbUser, unreadMessages, unreadNotifications, unpaidFines, pendingCotisations] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { avatar: true, image: true, phone: true },
+      select: { avatar: true, image: true, phone: true, isBanned: true },
     }),
     prisma.chatMessage.count({ where: { receiverId: session.user.id, readAt: null } }),
     prisma.notification.count({ where: { userId: session.user.id, status: { in: ["SENT", "FAILED"] }, readAt: null } }),
     prisma.fine.count({ where: { membershipSlot: { membership: { userId: session.user.id } }, status: "UNPAID" } }),
     prisma.membership.count({ where: { userId: session.user.id, status: "APPROVED", slotCount: null } }),
   ]);
+
+  if (dbUser?.isBanned) {
+    redirect("/login?error=AccountBanned");
+  }
 
   const navBadges: Record<string, number> = {
     "/sessions": pendingCotisations,
