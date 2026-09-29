@@ -184,9 +184,19 @@ export default async function SessionsPage() {
                     })}
                   </p>
                   <p className="font-label-sm text-label-sm text-on-surface-variant mt-1 flex items-center gap-1 flex-wrap">
-                    <span className="font-numeric-data text-on-surface">{formatXAF(Number(s.amount))}</span>
+                    <span className="font-numeric-data text-on-surface font-semibold">{formatXAF(Number(s.amount))}</span>
                     <span>{t("plusFeeSuffix", { fee: formatXAF(Number(s.fee)) })}</span>
                   </p>
+                  {(() => {
+                    const count = s.memberships.filter((m) => m.status === "APPROVED").length || (s.maxSlots ? Number(s.maxSlots) : 1);
+                    const pot = Math.round(count * Number(s.amount) + count * Number(s.fee) * 0.25);
+                    return (
+                      <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold">
+                        <span className="material-symbols-outlined text-[14px] text-emerald-600">emoji_events</span>
+                        <span>{t("totalPotToEat")} : {formatXAF(pot)}</span>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <span className="material-symbols-outlined text-outline">chevron_right</span>
               </Link>
@@ -217,9 +227,19 @@ export default async function SessionsPage() {
                     {t("validatedMembersCount", { count: String(c.membersCount) })}
                   </p>
                   <p className="font-label-sm text-label-sm text-on-surface-variant mt-1 flex items-center gap-1 flex-wrap">
-                    <span className="font-numeric-data text-on-surface">{formatXAF(c.amount)}</span>
+                    <span className="font-numeric-data text-on-surface font-semibold">{formatXAF(c.amount)}</span>
                     <span>{t("plusFeeSuffix", { fee: formatXAF(c.fee) })}</span>
                   </p>
+                  {(() => {
+                    const count = c.membersCount || 1;
+                    const pot = Math.round(count * c.amount + count * c.fee * 0.25);
+                    return (
+                      <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold">
+                        <span className="material-symbols-outlined text-[14px] text-emerald-600">emoji_events</span>
+                        <span>{t("totalPotToEat")} : {formatXAF(pot)}</span>
+                      </div>
+                    );
+                  })()}
                   <p className="font-label-sm text-label-sm text-red-600 font-semibold mt-1.5 flex items-center gap-1">
                     <span className="material-symbols-outlined text-[16px]">block</span>
                     {t("newMemberNotAllowed")}

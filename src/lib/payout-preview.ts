@@ -26,7 +26,7 @@ export async function computePayoutPreview(
   const [potAgg, unpaidFines] = await Promise.all([
     prisma.contribution.aggregate({
       where: { membershipSlot: { membership: { tontineSessionId: tontineSession.id } }, dueDate, status: "PAID" },
-      _sum: { amountPaid: true },
+      _sum: { amountPaid: true, feePaid: true },
     }),
     prisma.fine.findMany({
       where: { membershipSlotId: slot.id, status: "UNPAID" },
@@ -34,7 +34,10 @@ export async function computePayoutPreview(
     }),
   ]);
 
-  const pot = Number(potAgg._sum.amountPaid ?? 0);
+  const totalAmountPaid = Number(potAgg._sum.amountPaid ?? 0);
+  const totalFeesPaid = Number(potAgg._sum.feePaid ?? 0);
+  // Le montant à bouffer comprend la somme des cotisations + 25% des frais (les 75% restants vont à l'admin)
+  const pot = Math.round(totalAmountPaid + (totalFeesPaid * 0.25));
 
   let deducted = 0;
   const toDeductFineIds: string[] = [];

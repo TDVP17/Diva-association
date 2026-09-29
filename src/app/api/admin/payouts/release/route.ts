@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
 import { computePayoutPreview } from "@/lib/payout-preview";
 import { sendPayout, FapshiPayoutError } from "@/lib/fapshi-payout";
+import { detectMobileMoneyProvider, fapshiMediumFor } from "@/lib/mobile-money-provider";
 import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
 import { sendEmailSafe } from "@/lib/email/resend";
 import { payoutTurnMessage, payoutReleasedMessage } from "@/lib/whatsapp/templates";
@@ -50,14 +51,21 @@ export async function POST(request: Request) {
     claim.dueDate,
   );
 
+  const rawPhone = (claim.payoutPhone || "").replace(/\D/g, "");
+  const normalizedPhone = rawPhone.startsWith("237") && rawPhone.length === 12 ? rawPhone.slice(3) : rawPhone;
+  const provider = detectMobileMoneyProvider(normalizedPhone);
+  const medium = provider ? fapshiMediumFor(provider) : undefined;
+  const payoutName = (claim.payoutAccountName || slot.beneficiaryName).trim();
+
   let fapshiResult;
   try {
     fapshiResult = await sendPayout({
       amount: Math.round(netPayout),
-      phone: claim.payoutPhone,
-      name: claim.payoutAccountName,
+      phone: normalizedPhone,
+      medium,
+      name: payoutName,
       externalId: `${claim.tontineSessionId}:${slot.id}:${claim.dueDate.toISOString()}`,
-      message: "DIVA Association tontine payout",
+      message: `Cotisation DIVA - Gain de ${slot.beneficiaryName}`,
     });
   } catch (err) {
     if (err instanceof FapshiPayoutError) {
@@ -188,7 +196,15 @@ export async function POST(request: Request) {
     targetType: "Payout",
     targetId: payoutClaimId,
     tontineSessionId: claim.tontineSessionId,
-    metadata: { netPayout, deducted, membershipSlotId: slot.id },
+    metadata: {
+      netPayout,
+      deducted,
+      membershipSlotId: slot.id,
+      payoutPhone: normalizedPhone,
+      payoutAccountName: payoutName,
+      provider,
+      transId: fapshiResult.transId,
+    },
     request,
   });
 

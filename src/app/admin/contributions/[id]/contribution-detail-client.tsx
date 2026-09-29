@@ -74,6 +74,7 @@ interface Ledger {
 interface PayoutClaim {
   id: string;
   status: "DETAILS_SUBMITTED" | "RELEASED" | "CONFIRMED";
+  membershipSlotId?: string;
   beneficiaryName: string;
   memberName: string;
   payoutPhone: string;
@@ -139,6 +140,50 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   const [directPayoutLoading, setDirectPayoutLoading] = useState(false);
   const [directPayoutResult, setDirectPayoutResult] = useState<string | null>(null);
   const [directPayoutError, setDirectPayoutError] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  function handleCopy(text: string, key: string, e?: React.MouseEvent) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => {
+      setCopiedKey((cur) => (cur === key ? null : cur));
+    }, 2000);
+  }
+
+  function handleFillIntoDirectPayout(c: PayoutClaim) {
+    setActiveTab("foodTurn");
+    if (c.membershipSlotId) {
+      setDirectPayoutSlotId(c.membershipSlotId);
+    } else {
+      const found = session?.slots.find((s) => s.beneficiaryName === c.beneficiaryName || s.name === c.memberName);
+      if (found) setDirectPayoutSlotId(found.id);
+    }
+    setDirectPayoutName(c.payoutAccountName || c.beneficiaryName);
+    const cleanDigits = (c.payoutPhone || "").replace(/\D/g, "").replace(/^237/, "");
+    setDirectPayoutPhone(cleanDigits);
+    if (c.netPayout) {
+      setDirectPayoutAmount(String(c.netPayout));
+    } else {
+      const pot = (session?.amount ?? 0) * (session?.slots.length ?? 1);
+      setDirectPayoutAmount(String(pot));
+    }
+    setDirectPayoutError(null);
+    setDirectPayoutResult(null);
+
+    setTimeout(() => {
+      const formEl = document.getElementById("direct-payout-form-container");
+      if (formEl) {
+        formEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        formEl.classList.add("ring-4", "ring-emerald-500/40");
+        setTimeout(() => formEl.classList.remove("ring-4", "ring-emerald-500/40"), 2500);
+      }
+    }, 100);
+  }
   const [publishing, setPublishing] = useState(false);
   const [startingDraw, setStartingDraw] = useState(false);
   const [contributionSlotId, setContributionSlotId] = useState<string>("");
@@ -226,6 +271,31 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     fetch(`/api/admin/sessions/${tontineSessionId}/fines`)
       .then((r) => r.json())
       .then((b) => setFines(b.fines ?? []));
+
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (tabParam && TABS.includes(tabParam as Tab)) {
+        setActiveTab(tabParam as Tab);
+      }
+      const fillSlot = params.get("fillSlot");
+      const fillName = params.get("fillName");
+      const fillPhone = params.get("fillPhone");
+      if (fillSlot) setDirectPayoutSlotId(fillSlot);
+      if (fillName) setDirectPayoutName(fillName);
+      if (fillPhone) setDirectPayoutPhone(fillPhone);
+      if (fillSlot || fillName || fillPhone) {
+        setActiveTab("foodTurn");
+        setTimeout(() => {
+          const formEl = document.getElementById("direct-payout-form-container");
+          if (formEl) {
+            formEl.scrollIntoView({ behavior: "smooth", block: "center" });
+            formEl.classList.add("ring-4", "ring-emerald-500/40");
+            setTimeout(() => formEl.classList.remove("ring-4", "ring-emerald-500/40"), 2500);
+          }
+        }, 400);
+      }
+    }
   }, [tontineSessionId]);
 
   useEffect(() => {
@@ -1120,7 +1190,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
       {activeTab === "foodTurn" && (
         <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4 flex flex-col gap-6">
           {/* Formulaire de virement direct Fapshi */}
-          <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-sm">
+          <div id="direct-payout-form-container" className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-sm transition-all duration-300">
             <h4 className="font-title-md text-title-md text-primary flex items-center gap-2">
               <span className="material-symbols-outlined text-primary">send_money</span>
               {t("directPayoutTitle")}
@@ -1275,11 +1345,8 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                     )}
                     <div className="flex items-center justify-between">
                       <div className="min-w-0">
-                        <p className="font-label-md text-label-md text-on-surface truncate">
+                        <p className="font-label-md text-label-md text-on-surface truncate font-bold">
                           {c.beneficiaryName} ({c.memberName})
-                        </p>
-                        <p className="font-label-sm text-label-sm text-on-surface-variant truncate">
-                          {t("payoutAccountNameLabel")}: {c.payoutAccountName} — {c.payoutPhone}
                         </p>
                       </div>
                       <div className="text-right flex-shrink-0 ml-2">
@@ -1297,6 +1364,87 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                         )}
                       </div>
                     </div>
+
+                    {/* Coordonnees Fapshi avec boutons copier */}
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 flex flex-col gap-2.5 shadow-2xs">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2 flex-wrap text-sm">
+                          <span className="text-slate-500 font-medium">{t("payoutAccountNameLabel")}:</span>
+                          <span className="font-bold text-slate-900">{c.payoutAccountName}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => handleCopy(c.payoutAccountName, `claim-name-${c.id}`, e)}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition-colors ${
+                            copiedKey === `claim-name-${c.id}`
+                              ? "bg-emerald-600 text-white"
+                              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[14px]">
+                            {copiedKey === `claim-name-${c.id}` ? "check" : "content_copy"}
+                          </span>
+                          {copiedKey === `claim-name-${c.id}` ? t("copied") : t("copyAccountName")}
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2 flex-wrap text-sm">
+                          <span className="text-slate-500 font-medium">{t("payoutPhoneLabel")}:</span>
+                          <span className="font-bold font-numeric-data text-slate-900">{c.payoutPhone}</span>
+                          {(() => {
+                            const digits = (c.payoutPhone || "").replace(/\D/g, "").replace(/^237/, "");
+                            const p = detectMobileMoneyProvider(digits);
+                            if (p === "MTN") {
+                              return (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold bg-[#FFCC00] text-black">
+                                  MTN MoMo
+                                </span>
+                              );
+                            }
+                            if (p === "ORANGE") {
+                              return (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold bg-[#FF6600] text-white">
+                                  Orange Money
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            const digits = (c.payoutPhone || "").replace(/\D/g, "").replace(/^237/, "");
+                            handleCopy(digits, `claim-phone-${c.id}`, e);
+                          }}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-semibold transition-colors ${
+                            copiedKey === `claim-phone-${c.id}`
+                              ? "bg-emerald-600 text-white"
+                              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[14px]">
+                            {copiedKey === `claim-phone-${c.id}` ? "check" : "content_copy"}
+                          </span>
+                          {copiedKey === `claim-phone-${c.id}` ? t("copied") : t("copyAccountNumber")}
+                        </button>
+                      </div>
+
+                      {c.status !== "CONFIRMED" && (
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleFillIntoDirectPayout(c)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 text-xs font-semibold transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-[16px] text-emerald-600">input</span>
+                            {t("fillInPayoutForm")}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
                     {c.status === "DETAILS_SUBMITTED" && reviewingClaimId !== c.id && (
                       <button
                         onClick={() => reviewClaim(c.id)}
@@ -1316,26 +1464,91 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                       </button>
                     )}
                     {reviewingClaimId === c.id && payoutPreview && (
-                      <div className="bg-white rounded-lg p-3 flex flex-col gap-2 border border-outline-variant">
-                        <h4 className="font-label-md text-label-md text-on-surface">{t("payoutPreviewTitle")}</h4>
+                      <div className="bg-white rounded-lg p-4 flex flex-col gap-3 border border-outline-variant shadow-sm">
+                        <h4 className="font-label-md text-label-md font-bold text-on-surface">{t("payoutPreviewTitle")}</h4>
                         <div className="flex justify-between">
                           <span className="font-label-sm text-label-sm text-on-surface-variant">{t("beneficiaryOnFileLabel")}</span>
-                          <span className="font-label-md text-label-md text-on-surface">
+                          <span className="font-label-md text-label-md font-semibold text-on-surface">
                             {payoutPreview.beneficiaryName} ({payoutPreview.memberName})
                           </span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="font-label-sm text-label-sm text-on-surface-variant">{t("amountToSendLabel")}</span>
-                          <span className="font-numeric-data text-numeric-data text-primary">{formatXAF(payoutPreview.netPayout)}</span>
+                        <div className="flex items-center justify-between bg-slate-50 rounded-lg p-2.5 border border-slate-200">
+                          <div>
+                            <span className="text-xs text-slate-500 font-medium block">{t("payoutAccountNameLabel")}</span>
+                            <span className="text-sm font-bold text-slate-900">{payoutPreview.payoutAccountName}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => handleCopy(payoutPreview.payoutAccountName, `prev-name-${c.id}`, e)}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100"
+                          >
+                            <span className="material-symbols-outlined text-[13px]">
+                              {copiedKey === `prev-name-${c.id}` ? "check" : "content_copy"}
+                            </span>
+                            {copiedKey === `prev-name-${c.id}` ? t("copied") : t("copy")}
+                          </button>
                         </div>
-                        <p className="font-label-sm text-label-sm text-error">{t("onFileNotVerifiedNote")}</p>
-                        <button
-                          onClick={confirmReleasePayout}
-                          disabled={releasing}
-                          className="w-full bg-primary text-on-primary font-label-md text-label-md py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50 mt-1"
-                        >
-                          {releasing ? t("recordingEllipsis") : t("confirmAndSend")}
-                        </button>
+                        <div className="flex items-center justify-between bg-slate-50 rounded-lg p-2.5 border border-slate-200">
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs text-slate-500 font-medium">{t("payoutPhoneLabel")}</span>
+                              {(() => {
+                                const digits = (payoutPreview.payoutPhone || "").replace(/\D/g, "").replace(/^237/, "");
+                                const p = detectMobileMoneyProvider(digits);
+                                if (p === "MTN") return <span className="px-1 py-0.2 rounded text-[10px] font-bold bg-[#FFCC00] text-black">MTN</span>;
+                                if (p === "ORANGE") return <span className="px-1 py-0.2 rounded text-[10px] font-bold bg-[#FF6600] text-white">Orange</span>;
+                                return null;
+                              })()}
+                            </div>
+                            <span className="text-sm font-bold font-numeric-data text-slate-900">{payoutPreview.payoutPhone}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              const digits = (payoutPreview.payoutPhone || "").replace(/\D/g, "").replace(/^237/, "");
+                              handleCopy(digits, `prev-phone-${c.id}`, e);
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100"
+                          >
+                            <span className="material-symbols-outlined text-[13px]">
+                              {copiedKey === `prev-phone-${c.id}` ? "check" : "content_copy"}
+                            </span>
+                            {copiedKey === `prev-phone-${c.id}` ? t("copied") : t("copy")}
+                          </button>
+                        </div>
+                        <div className="flex justify-between items-center pt-1 border-t border-slate-200">
+                          <span className="font-label-sm text-label-sm text-on-surface-variant">{t("amountToSendLabel")}</span>
+                          <span className="font-numeric-data text-lg font-bold text-primary">{formatXAF(payoutPreview.netPayout)}</span>
+                        </div>
+                        <p className="font-label-sm text-xs text-slate-600 bg-amber-50 border border-amber-200 rounded p-2">
+                          {lang === "fr"
+                            ? "Fapshi débitera votre compte administrateur et transférera les fonds directement au nom et au numéro ci-dessus."
+                            : "Fapshi will debit your admin account and transfer the funds directly to the name and number above."}
+                        </p>
+                        <div className="flex flex-col gap-2 mt-1">
+                          <button
+                            onClick={confirmReleasePayout}
+                            disabled={releasing}
+                            className="w-full bg-primary text-on-primary font-label-md text-label-md py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 shadow-xs"
+                          >
+                            {releasing ? (
+                              <span>{t("recordingEllipsis")}</span>
+                            ) : (
+                              <>
+                                <span className="material-symbols-outlined text-[18px]">payments</span>
+                                <span>{t("confirmAndSend")}</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleFillIntoDirectPayout(c)}
+                            className="w-full border border-slate-300 bg-slate-50 text-slate-700 font-label-sm text-xs py-2 rounded-lg hover:bg-slate-100 flex items-center justify-center gap-1.5"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">edit_note</span>
+                            <span>{t("fillInPayoutForm")}</span>
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>

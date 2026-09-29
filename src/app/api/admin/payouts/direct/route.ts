@@ -9,6 +9,11 @@ import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
 import { payoutReleasedMessage } from "@/lib/whatsapp/templates";
 import { getNextDueDate } from "@/lib/tontine-engine";
 import { logAudit } from "@/lib/audit";
+import { getDesignatedSlot } from "@/lib/round-robin-lock";
+import { payoutTurnMessage } from "@/lib/whatsapp/templates";
+import { scheduleInAppNotifications, scheduleNotifications } from "@/lib/notifications/dispatch";
+import { TONTINE_TYPE_LABELS } from "@/lib/tontine-labels";
+import { formatXAF } from "@/lib/format-currency";
 
 const directPayoutSchema = z.object({
   tontineSessionId: z.string().min(1),
@@ -171,6 +176,76 @@ export async function POST(request: Request) {
       actionUrl: `/sessions/${tontineSessionId}`,
     },
   });
+
+  // Notify next designated beneficiary if the round-robin advances
+  const newDesignatedSlot = await getDesignatedSlot(tontineSessionId);
+  if (newDesignatedSlot) {
+    const newBeneficiaryMembership = await prisma.membership.findFirst({
+      where: { slots: { some: { id: newDesignatedSlot.id } } },
+      include: { user: true },
+    });
+    if (newBeneficiaryMembership) {
+      const approvedMemberships = await prisma.membership.findMany({
+        where: { tontineSessionId, status: "APPROVED" },
+        select: { slotCount: true },
+      });
+      const totalApprovedSlots = approvedMemberships.reduce(
+        (sum, m) => sum + (m.slotCount ? Number(m.slotCount) : 0),
+        0,
+      );
+      const estimatedPot = Number(session.amount) * totalApprovedSlots;
+      const nextDue = getNextDueDate(session.type, new Date());
+      const beneficiaryUser = newBeneficiaryMembership.user;
+      const sessionLabel = session.title || TONTINE_TYPE_LABELS[session.type] || session.type;
+      const beneficiaryLang = beneficiaryUser.preferredLang === "en" ? "en" : "fr";
+      const firstName = beneficiaryUser.name.trim().split(/\s+/)[0] ?? beneficiaryUser.name;
+      const dateLabel = nextDue.toLocaleDateString(beneficiaryLang === "fr" ? "fr-FR" : "en-GB", {
+        timeZone: "Africa/Douala",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+
+      const newDesignatedPosition = newDesignatedSlot.officialPosition ?? 1;
+      const fullPayoutTurnMessage = payoutTurnMessage(
+        beneficiaryLang,
+        firstName,
+        sessionLabel,
+        estimatedPot,
+        dateLabel,
+        newDesignatedPosition,
+      );
+
+      await sendWhatsAppMessageSafe(beneficiaryUser.phone, fullPayoutTurnMessage);
+      await scheduleNotifications({
+        tontineSessionId,
+        channel: "EMAIL",
+        type: "PAYOUT_TURN",
+        recipients: [{ userId: beneficiaryUser.id, message: fullPayoutTurnMessage }],
+      });
+      await scheduleInAppNotifications({
+        tontineSessionId,
+        type: "PAYOUT_TURN",
+        recipients: [
+          {
+            userId: beneficiaryUser.id,
+            message:
+              beneficiaryLang === "fr"
+                ? `C'est votre tour de bouffer la cagnotte de ${sessionLabel} ! Veuillez fournir votre numéro de compte Mobile Money et votre nom complet pour le virement.`
+                : `It's your turn to receive the ${sessionLabel} payout! Please provide your Mobile Money account number and account name so the admin can process your payout.`,
+            messageKey: "payoutTurnNotifMessage",
+            messageVars: {
+              cotisation: sessionLabel,
+              amount: formatXAF(estimatedPot),
+              date: dateLabel,
+              position: String(newDesignatedPosition),
+            },
+            actionUrl: `/sessions/${tontineSessionId}`,
+          },
+        ],
+      });
+    }
+  }
 
   await logAudit({
     actorId: admin.user.id,

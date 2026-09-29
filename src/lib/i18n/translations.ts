@@ -232,8 +232,22 @@ export const translations = {
     waDuplicateRefunded:
       "Your payment was received twice for the same name. The second payment of {amount} has been automatically refunded.",
     waPayoutTurn:
-      "Hello {name},\n\nWe're pleased to let you know that it's your turn to receive the {cotisation} payout (position #{position}).\n\n💰 Total amount: {amount}\n📅 Expected payout date: {date}\n\nPlease make sure your contact and payment details are up to date in your profile. If you have any questions, contact support from the app.\n\nThe DIVA Association team",
-    payoutTurnNotifMessage: "It's your turn to receive the {cotisation} payout (position #{position}) — estimated {amount}, expected around {date}.",
+      "Hello {name},\n\nWe're pleased to let you know that it's your turn to receive the {cotisation} payout (position #{position}).\n\n💰 Estimated amount: {amount}\n📅 Expected payout date: {date}\n\n👉 ACTION REQUIRED: Please log into the app and provide your Mobile Money phone number and the exact name on the account so the administrator can process your payout via Fapshi.\n\nThe DIVA Association team",
+    payoutTurnNotifMessage:
+      "It's your turn to receive the {cotisation} payout! Please provide your Mobile Money account number and account name so the admin can process your payout.",
+    payoutTurnBannerTitle: "It's your turn to receive the payout!",
+    payoutTurnBannerDesc:
+      "To receive your payout, you must provide your Mobile Money account number (MTN / Orange) and the exact name on your account below. The administrator will process your transfer directly via Fapshi.",
+    copyAccountName: "Copy Name",
+    copyAccountNumber: "Copy Number",
+    nameCopied: "Account name copied!",
+    numberCopied: "Account number copied!",
+    fillInPayoutForm: "Fill into payout form",
+    openAndFillPayout: "Open & Fill Payout",
+    payoutDetailsSubmittedNotice:
+      "Your payout details have been submitted to the administrator (Name: {name}, Phone: {phone}). The Fapshi transfer is being processed.",
+    payoutTurnAlertPrompt:
+      "Action required: You must provide your Mobile Money account number and exact account name to receive your payout.",
     waPayoutReleased:
       "🎉 Payout released — DIVA Association\n\nCongratulations {name} ({beneficiary})! Your payout of {amount} has been released. Confirm on the app once you've received it.",
     waPayoutReleasedWithDeduction:
@@ -243,6 +257,34 @@ export const translations = {
     turnReminderTomorrowNotifMessage: "Tomorrow ({date}) is your estimated turn to receive the {cotisation} payout — position #{position}, estimated {amount}.",
     notifTypeTurnReminderTomorrow: "Your Turn Is Tomorrow",
     myConversations: "My Conversations",
+
+    // Pot & Fee display & detailed history
+    totalPotToEat: "Total Pot to Win",
+    totalPotToEatSubtitle: "Total round pot given to the designated winner",
+    totalPotBreakdown: "Calculated for {count} person(s): {subtotal} + 25% of fees ({fees}) • 75% of fees ({adminFees}) for administration",
+    currentCycleCollected: "Collected this cycle",
+    checkedPaid: "Checked · Paid",
+    notCheckedPending: "Not checked · Unpaid",
+    paidByRelativeBadge: "Paid by relative: {name}",
+    reasonLabel: "Reason / Purpose",
+    dateAndTimeLabel: "Date & Time",
+    amountCotised: "Amount contributed",
+    pureContributionAmount: "Net contribution",
+    feeAmountLabel: "Service fee",
+    fineDetailLabel: "Late fine",
+    transactionRefLabel: "Transaction Ref",
+    payerPhoneLabel: "Payer Phone",
+    paidByLabelText: "Paid by",
+    youLabel: "You",
+    relativePaymentSuccessChecked: "Name checked & confirmed successfully!",
+    relativePaymentSuccessCheckedBody: "The payment went through. The name \"{name}\" is now checked in the cotisation.",
+    relativePaymentFailedNotChecked: "Payment failed — Name NOT checked",
+    relativePaymentFailedNotCheckedBody: "The payment did not go through. The name \"{name}\" is NOT checked in the cotisation.",
+    duplicateRefundTitle: "Duplicate refund (network issue)",
+    duplicateRefundStatusRefunded: "Refunded to Mobile Money",
+    duplicateRefundStatusPending: "Refund in progress",
+    relativeContributionReason: "Contribution for a relative",
+    cycleContributionReason: "Cycle contribution",
 
     // Slot selection form
     contributionSlots: "How many names?",
@@ -736,7 +778,7 @@ export const translations = {
     fineReminderMessage:
       "Hello {name} ❤️\nThis is a friendly reminder about your outstanding fine of {amount}. Please remember to settle it before the contribution closes so that you remain eligible to participate in future contributions. 🙏",
     foodTurnMessage:
-      "🎉 Great news, {name}! Today is YOUR payout day! 💰🎊\n\nIt's your turn to receive this cycle's pot — congratulations, and thank you for your regular contributions! ❤️\n\nEveryone is happy for you! 🥳",
+      "🎉 Congratulations {name}! It's your turn to receive the payout! 💰🎊\n\n👉 ACTION REQUIRED: Please log into the app now to provide your Mobile Money account number (MTN / Orange) and exact account holder name so the administrator can process your Fapshi payout!",
     notifTypeContributionReminder: "Contribution Reminder",
     notifTypeFineReminder: "Fine Reminder",
     notifTypeFoodTurn: "It's Your Turn!",
@@ -1181,8 +1223,22 @@ export const translations = {
     waDuplicateRefunded:
       "Votre paiement a été reçu deux fois pour le même nom. Le second paiement de {amount} a été automatiquement remboursé.",
     waPayoutTurn:
-      "Bonjour {name},\n\nNous avons le plaisir de vous informer que c'est votre tour de recevoir la cagnotte de la cotisation {cotisation} (position n°{position}).\n\n💰 Montant total : {amount}\n📅 Date de versement prévue : {date}\n\nAssurez-vous que vos informations de contact et de paiement sont à jour dans votre profil. En cas de question, contactez le support depuis l'application.\n\nL'équipe DIVA Association",
-    payoutTurnNotifMessage: "C'est votre tour de recevoir la cagnotte de {cotisation} (position n°{position}) — environ {amount}, prévu vers le {date}.",
+      "Bonjour {name},\n\nNous avons le plaisir de vous informer que c'est votre tour de recevoir la cagnotte de la cotisation {cotisation} (position n°{position}).\n\n💰 Montant total : {amount}\n📅 Date de versement prévue : {date}\n\n👉 ACTION REQUISE : Veuillez vous connecter à l'application et renseigner votre numéro de compte Mobile Money (MTN / Orange) et le nom complet exact sur le compte afin que l'administrateur effectue votre virement via Fapshi.\n\nL'équipe DIVA Association",
+    payoutTurnNotifMessage:
+      "C'est votre tour de bouffer la cagnotte de {cotisation} ! Veuillez fournir votre numéro de compte Mobile Money et votre nom complet pour le virement.",
+    payoutTurnBannerTitle: "C'est votre tour de bouffer la cagnotte !",
+    payoutTurnBannerDesc:
+      "Pour recevoir votre virement, vous devez impérativement renseigner ci-dessous votre numéro de compte Mobile Money (MTN / Orange) et le nom complet exact enregistré sur ce compte. L'administrateur effectuera votre versement directement via Fapshi.",
+    copyAccountName: "Copier le nom",
+    copyAccountNumber: "Copier le numéro",
+    nameCopied: "Nom du compte copié !",
+    numberCopied: "Numéro copié !",
+    fillInPayoutForm: "Remplir dans le formulaire de virement",
+    openAndFillPayout: "Ouvrir et remplir le virement",
+    payoutDetailsSubmittedNotice:
+      "Vos coordonnées ont été transmises à l'administrateur (Nom : {name}, Numéro : {phone}). Le virement Fapshi est en cours de traitement.",
+    payoutTurnAlertPrompt:
+      "Action requise : Vous devez fournir votre numéro de compte Mobile Money et votre nom pour recevoir votre virement.",
     waPayoutReleased:
       "🎉 Versement effectué — DIVA Association\n\nFélicitations {name} ({beneficiary}) ! Votre versement de {amount} a été effectué. Confirmez sur l'application dès que vous l'aurez reçu.",
     waPayoutReleasedWithDeduction:
@@ -1192,6 +1248,34 @@ export const translations = {
     turnReminderTomorrowNotifMessage: "Demain ({date}) est la date estimée de votre tour pour recevoir la cagnotte de {cotisation} — position n°{position}, environ {amount}.",
     notifTypeTurnReminderTomorrow: "Votre tour est demain",
     myConversations: "Mes conversations",
+
+    // Pot & Fee display & detailed history
+    totalPotToEat: "Montant total à bouffer (Gain du tour)",
+    totalPotToEatSubtitle: "Cagnotte totale du tour reversée au gagnant",
+    totalPotBreakdown: "Calculé pour {count} personne(s) : {subtotal} + 25% des frais ({fees}) • 75% des frais ({adminFees}) pour l'administration",
+    currentCycleCollected: "Collecté ce cycle",
+    checkedPaid: "Coché · Payé",
+    notCheckedPending: "Non coché · Impayé",
+    paidByRelativeBadge: "Payé par un proche : {name}",
+    reasonLabel: "Motif / Raison",
+    dateAndTimeLabel: "Date et heure",
+    amountCotised: "Montant cotisé",
+    pureContributionAmount: "Cotisation nette",
+    feeAmountLabel: "Frais de gestion",
+    fineDetailLabel: "Amende de retard",
+    transactionRefLabel: "Réf. transaction",
+    payerPhoneLabel: "Téléphone payeur",
+    paidByLabelText: "Payé par",
+    youLabel: "Vous",
+    relativePaymentSuccessChecked: "Nom coché et validé avec succès !",
+    relativePaymentSuccessCheckedBody: "Le paiement est bien passé. Le nom « {name} » est désormais coché et validé dans la cotisation.",
+    relativePaymentFailedNotChecked: "Paiement échoué — Nom NON coché",
+    relativePaymentFailedNotCheckedBody: "Le paiement n'a pas abouti. Le nom « {name} » n'est PAS coché dans la cotisation tant que le paiement n'est pas validé.",
+    duplicateRefundTitle: "Remboursement de doublon (problème réseau)",
+    duplicateRefundStatusRefunded: "Remboursé sur Mobile Money",
+    duplicateRefundStatusPending: "Remboursement en cours",
+    relativeContributionReason: "Cotisation pour un proche",
+    cycleContributionReason: "Cotisation de tour",
 
     // Slot selection form
     contributionSlots: "Combien de noms ?",
@@ -1688,7 +1772,7 @@ export const translations = {
     fineReminderMessage:
       "Bonjour {name} ❤️\nPetit rappel amical concernant votre amende impayée de {amount}. Merci de la régler avant la clôture de la cotisation pour rester éligible aux prochaines cotisations. 🙏",
     foodTurnMessage:
-      "🎉 Youpi {name} ! Aujourd'hui c'est TON tour de recevoir la cagnotte ! 💰🎊\n\nC'est ton grand jour ! Merci pour ta régularité dans les cotisations ! ❤️\n\nToute la communauté est contente pour toi ! 🥳",
+      "🎉 Bravo {name} ! C'est votre tour de bouffer la cotisation ! 💰🎊\n\n👉 ACTION REQUISE : Veuillez vous connecter à l'application dès maintenant pour fournir votre numéro de compte Mobile Money (MTN / Orange) et le nom exact associé au compte. L'administrateur en a besoin pour effectuer votre virement Fapshi !",
     notifTypeContributionReminder: "Rappel de cotisation",
     notifTypeFineReminder: "Rappel d'amende",
     notifTypeFoodTurn: "C'est ton tour !",

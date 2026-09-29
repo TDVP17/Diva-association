@@ -50,6 +50,12 @@ export function MemberCodePayFlow({
   const [member, setMember] = useState<FoundMember | null>(null);
   const [slots, setSlots] = useState<FundableSlot[]>([]);
   const [confirmSlotId, setConfirmSlotId] = useState<string | null>(null);
+  const [lastPaidConfirmation, setLastPaidConfirmation] = useState<{
+    slotId: string;
+    beneficiaryName: string;
+    tontineSessionTitle: string;
+    amount: number;
+  } | null>(null);
   const autoSearchDone = useRef(false);
 
   async function fetchSlots(memberCode: string) {
@@ -94,12 +100,14 @@ export function MemberCodePayFlow({
     setSlots([]);
     setCode("");
     setSearchError(null);
+    setLastPaidConfirmation(null);
   }
 
   const confirmSlot = slots.find((s) => s.slotId === confirmSlotId);
 
-  // Only show unpaid cotisations
+  // Slots already paid vs unpaid
   const unpaidSlots = slots.filter((s) => !s.alreadyPaid);
+  const alreadyPaidSlots = slots.filter((s) => s.alreadyPaid);
 
   if (!member) {
     return (
@@ -130,6 +138,38 @@ export function MemberCodePayFlow({
 
   return (
     <div className="flex flex-col gap-4">
+      {lastPaidConfirmation && (
+        <div className="bg-[#ecfdf5] border-2 border-[#10b981] rounded-2xl p-5 shadow-sm flex flex-col gap-3 animate-in fade-in duration-300">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-[#10b981] text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+              <span className="material-symbols-outlined text-2xl font-bold">check</span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#d1fae5] text-[#065f46] font-bold text-xs uppercase tracking-wide mb-1">
+                <span className="material-symbols-outlined text-[14px]">verified</span>
+                {t("checkedPaid")}
+              </div>
+              <h3 className="font-bold text-base text-[#064e3b]">
+                {t("relativePaymentSuccessChecked")}
+              </h3>
+              <p className="font-body-md text-sm text-[#065f46] mt-0.5">
+                {t("relativePaymentSuccessCheckedBody", { name: lastPaidConfirmation.beneficiaryName })}
+              </p>
+              <div className="mt-3 bg-white/90 rounded-xl p-3 border border-[#a7f3d0] flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div>
+                  <span className="text-slate-500 font-medium">{t("reasonLabel")} : </span>
+                  <span className="font-semibold text-slate-800">{lastPaidConfirmation.tontineSessionTitle}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 font-medium">{t("amountCotised")} : </span>
+                  <span className="font-bold text-[#065f46] font-numeric-data">{formatXAF(lastPaidConfirmation.amount)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4 flex items-center gap-3">
         <div className="w-10 h-10 rounded-full bg-tertiary-container text-on-tertiary flex items-center justify-center font-label-md text-label-md overflow-hidden flex-shrink-0">
           {member.avatar ? (
@@ -141,7 +181,7 @@ export function MemberCodePayFlow({
         </div>
         <div className="min-w-0">
           <p className="font-label-sm text-label-sm text-on-surface-variant">{t("contributingFor")}</p>
-          <p className="font-label-md text-label-md text-on-surface truncate">{member.name}</p>
+          <p className="font-label-md text-label-md text-on-surface truncate font-semibold">{member.name}</p>
         </div>
       </div>
 
@@ -162,7 +202,8 @@ export function MemberCodePayFlow({
         <h2 className="font-label-md text-label-md text-on-surface mb-2">{t("whichContributionToFund")}</h2>
         {unpaidSlots.length === 0 ? (
           <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-5 text-center">
-            <p className="font-body-md text-body-md text-on-surface-variant">
+            <span className="material-symbols-outlined text-emerald-600 text-3xl mb-1">task_alt</span>
+            <p className="font-body-md text-body-md text-on-surface font-medium">
               {t("noAvailableContributionsForMember")}
             </p>
           </div>
@@ -173,15 +214,20 @@ export function MemberCodePayFlow({
                 key={s.slotId}
                 className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4 flex items-center justify-between gap-3"
               >
-                <div className="min-w-0">
-                  <p className="font-label-md text-label-md text-on-surface truncate">{s.tontineSessionTitle}</p>
-                  <p className="font-label-sm text-label-sm text-on-surface-variant truncate">
-                    {s.beneficiaryName} — {formatXAF(s.amount)}
-                  </p>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="material-symbols-outlined text-slate-300 text-xl flex-shrink-0" title={t("notCheckedPending")}>
+                    radio_button_unchecked
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-label-md text-label-md text-on-surface truncate font-medium">{s.tontineSessionTitle}</p>
+                    <p className="font-label-sm text-label-sm text-on-surface-variant truncate">
+                      {s.beneficiaryName} — {formatXAF(s.amount)}
+                    </p>
+                  </div>
                 </div>
                 <button
                   onClick={() => setConfirmSlotId(s.slotId)}
-                  className="flex-shrink-0 px-3 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90"
+                  className="flex-shrink-0 px-3 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 active:scale-95 transition-all shadow-xs"
                 >
                   {t("payViaFapshi")}
                 </button>
@@ -190,6 +236,40 @@ export function MemberCodePayFlow({
           </div>
         )}
       </div>
+
+      {alreadyPaidSlots.length > 0 && (
+        <div className="mt-2">
+          <h3 className="font-label-sm text-xs font-semibold uppercase text-emerald-800 tracking-wider mb-2 flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[16px] text-emerald-600">verified</span>
+            {t("checkedPaid")} ({alreadyPaidSlots.length})
+          </h3>
+          <div className="flex flex-col gap-2">
+            {alreadyPaidSlots.map((s) => (
+              <div
+                key={s.slotId}
+                className="bg-[#f0fdf4] rounded-xl border border-emerald-200/80 p-3.5 flex items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="material-symbols-outlined text-emerald-600 text-xl font-bold flex-shrink-0">
+                    check_circle
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-label-md text-label-md text-emerald-950 font-medium truncate">{s.tontineSessionTitle}</p>
+                    <p className="font-label-sm text-xs text-emerald-800/80 truncate">
+                      {s.beneficiaryName} — {formatXAF(s.amount)}
+                    </p>
+                  </div>
+                </div>
+                <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#d1fae5] text-[#065f46] text-xs font-semibold">
+                  <span className="material-symbols-outlined text-[13px]">check</span>
+                  {t("checkedPaid")}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {confirmSlot && (
         <PaymentConfirmDialog
           lang={lang}
@@ -197,7 +277,16 @@ export function MemberCodePayFlow({
           payEndpoint={payEndpoint}
           description={`${t("paymentDescriptionPrefix")}: ${confirmSlot.tontineSessionTitle}`}
           onSettled={() => {
+            const confirmedSlot = confirmSlot;
             setConfirmSlotId(null);
+            if (confirmedSlot) {
+              setLastPaidConfirmation({
+                slotId: confirmedSlot.slotId,
+                beneficiaryName: confirmedSlot.beneficiaryName,
+                tontineSessionTitle: confirmedSlot.tontineSessionTitle,
+                amount: confirmedSlot.amount,
+              });
+            }
             fetchSlots(member.memberCode);
           }}
           onClose={() => setConfirmSlotId(null)}

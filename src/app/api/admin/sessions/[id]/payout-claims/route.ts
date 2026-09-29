@@ -18,6 +18,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     claims: claims.map((c) => ({
       id: c.id,
       status: c.status,
+      membershipSlotId: c.membershipSlotId,
       beneficiaryName: c.membershipSlot.beneficiaryName,
       memberName: c.membershipSlot.membership.user.name,
       payoutPhone: c.payoutPhone,

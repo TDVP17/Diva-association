@@ -242,7 +242,7 @@ async function flagDuplicate(attempt: PaymentAttempt, slotLabel: string): Promis
     where: { id: attempt.id },
     data: {
       status: "DUPLICATE_PAID",
-      refundReason: `Refund: Duplicate payment detected for slot ${slotLabel}`,
+      refundReason: `Remboursement automatique : Paiement en double détecté (problème réseau) pour ${slotLabel}`,
       nextRefundAttemptAt: new Date(),
     },
   });

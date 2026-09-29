@@ -10,8 +10,8 @@ const FAPSHI_API_KEY = process.env.FAPSHI_API_KEY ?? "";
 // payout-only service with its own credentials — never the collection
 // service above. Left unconfigured until that second service exists.
 const FAPSHI_PAYOUT_BASE_URL = process.env.FAPSHI_PAYOUT_BASE_URL ?? FAPSHI_BASE_URL;
-const FAPSHI_PAYOUT_API_USER = process.env.FAPSHI_PAYOUT_API_USER ?? "";
-const FAPSHI_PAYOUT_API_KEY = process.env.FAPSHI_PAYOUT_API_KEY ?? "";
+const FAPSHI_PAYOUT_API_USER = process.env.FAPSHI_PAYOUT_API_USER || process.env.FAPSHI_API_USER || "";
+const FAPSHI_PAYOUT_API_KEY = process.env.FAPSHI_PAYOUT_API_KEY || process.env.FAPSHI_API_KEY || "";
 
 export type FapshiPaymentStatus = "CREATED" | "PENDING" | "SUCCESSFUL" | "FAILED" | "EXPIRED";
 

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
+import { detectMobileMoneyProvider } from "@/lib/mobile-money-provider";
 
 type PayoutStatus = "DETAILS_SUBMITTED" | "RELEASED" | "CONFIRMED" | null;
 
@@ -26,15 +27,26 @@ export function PayoutTurnPanel({
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const cleanPhone = phone.replace(/\D/g, "").slice(0, 9);
+  const detectedProvider = detectMobileMoneyProvider(cleanPhone);
+
   async function submitDetails(e: React.FormEvent) {
     e.preventDefault();
+    if (!cleanPhone || cleanPhone.length < 9) {
+      setError(lang === "fr" ? "Veuillez entrer un numéro valide à 9 chiffres." : "Please enter a valid 9-digit number.");
+      return;
+    }
+    if (!accountName.trim()) {
+      setError(lang === "fr" ? "Veuillez entrer le nom du titulaire du compte." : "Please enter the account holder name.");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
       const res = await fetch("/api/payments/payout-claims", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ membershipSlotId, phone: phone.trim(), accountName: accountName.trim() }),
+        body: JSON.stringify({ membershipSlotId, phone: cleanPhone, accountName: accountName.trim() }),
       });
       await parseJsonOrThrow(res, t("couldNotSubmitPayoutDetails"));
       router.refresh();
@@ -61,61 +73,144 @@ export function PayoutTurnPanel({
   if (status === "CONFIRMED") return null;
 
   return (
-    <section className="mb-stack-gap-lg bg-primary/5 border border-primary/20 rounded-xl p-4">
+    <section className="mb-stack-gap-lg overflow-hidden rounded-2xl border-2 border-emerald-500/40 bg-gradient-to-br from-emerald-50 via-teal-50/40 to-white p-5 shadow-md">
       {status === null && (
-        <>
-          <p className="font-label-md text-label-md text-primary mb-3">{t("itsYourTurn")}</p>
-          <form onSubmit={submitDetails} className="flex flex-col gap-3">
-            <div>
-              <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
-                {t("payoutPhoneLabel")}
-              </label>
-              <input
-                type="tel"
-                inputMode="tel"
-                maxLength={9}
-                value={phone}
-                onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 9))}
-                required
-                className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
-              />
+        <div className="flex flex-col gap-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
+              <span className="material-symbols-outlined text-[24px]">emoji_events</span>
             </div>
-            <div>
-              <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
-                {t("payoutAccountNameLabel")}
-              </label>
-              <input
-                value={accountName}
-                onChange={(e) => setAccountName(e.target.value)}
-                required
-                className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
-              />
+            <div className="flex-1 min-w-0">
+              <h3 className="font-title-md text-title-md font-bold text-emerald-950 flex items-center gap-2">
+                {t("payoutTurnBannerTitle")}
+              </h3>
+              <p className="font-body-sm text-body-sm text-emerald-900/90 mt-1 leading-relaxed">
+                {t("payoutTurnBannerDesc")}
+              </p>
             </div>
-            {error && <p className="font-label-sm text-label-sm text-error">{error}</p>}
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 disabled:opacity-60"
-            >
-              {t("submitPayoutDetails")}
-            </button>
-          </form>
-        </>
+          </div>
+
+          <div className="rounded-xl border border-emerald-200 bg-white/90 p-4 shadow-xs">
+            <form onSubmit={submitDetails} className="flex flex-col gap-4">
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="font-label-sm text-label-sm font-semibold text-slate-800">
+                    {t("payoutPhoneLabel")} <span className="text-error">*</span>
+                  </label>
+                  {detectedProvider === "MTN" && (
+                    <span className="inline-flex items-center gap-1 rounded bg-[#FFCC00] px-2 py-0.5 text-[11px] font-bold text-black shadow-xs">
+                      MTN Mobile Money
+                    </span>
+                  )}
+                  {detectedProvider === "ORANGE" && (
+                    <span className="inline-flex items-center gap-1 rounded bg-[#FF6600] px-2 py-0.5 text-[11px] font-bold text-white shadow-xs">
+                      Orange Money
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-sm">
+                    +237
+                  </span>
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    maxLength={9}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 9))}
+                    placeholder="6XXXXXXXX"
+                    required
+                    className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-14 pr-3 font-numeric-data text-base text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
+                  />
+                </div>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {lang === "fr"
+                    ? "Numéro de compte MTN ou Orange Money sur lequel sera crédité le virement."
+                    : "MTN or Orange Mobile Money account number to receive your funds."}
+                </p>
+              </div>
+
+              <div>
+                <label className="font-label-sm text-label-sm font-semibold text-slate-800 block mb-1.5">
+                  {t("payoutAccountNameLabel")} <span className="text-error">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={accountName}
+                  onChange={(e) => setAccountName(e.target.value)}
+                  placeholder={lang === "fr" ? "Ex: Jean Paul Dupont (Nom sur le compte)" : "e.g. John Doe (Name on account)"}
+                  required
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 font-body-md text-base text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
+                />
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {lang === "fr"
+                    ? "Indiquez le nom officiel complet associé à ce compte pour la vérification Fapshi."
+                    : "Enter the exact official name registered on this account for Fapshi validation."}
+                </p>
+              </div>
+
+              {error && (
+                <div className="rounded-lg bg-red-50 border border-red-200 p-2.5 text-xs text-red-700 font-medium flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[16px]">error</span>
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting || cleanPhone.length < 9 || !accountName.trim()}
+                className="w-full py-3 rounded-lg bg-emerald-700 text-white font-label-md text-label-md font-semibold hover:bg-emerald-800 transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {submitting ? (
+                  <span>{lang === "fr" ? "Enregistrement..." : "Submitting..."}</span>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[20px]">send</span>
+                    <span>{t("submitPayoutDetails")}</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
       )}
 
       {status === "DETAILS_SUBMITTED" && (
-        <p className="font-label-md text-label-md text-on-surface">{t("payoutDetailsSubmitted")}</p>
+        <div className="flex items-start gap-3 bg-white/95 rounded-xl border border-emerald-300 p-4 shadow-xs">
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+            <span className="material-symbols-outlined text-[24px]">verified</span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <h4 className="font-label-md text-label-md font-bold text-emerald-950">
+              {t("payoutDetailsSubmitted")}
+            </h4>
+            <p className="font-body-sm text-body-sm text-emerald-800/90 mt-1">
+              {lang === "fr"
+                ? "Vos coordonnées (numéro de compte et nom) ont bien été transmises à l'administrateur. Dès qu'il valide le versement, votre virement Fapshi sera immédiatement effectué."
+                : "Your account number and name have been transmitted to the administrator. The Fapshi payout will be released directly to your account shortly."}
+            </p>
+          </div>
+        </div>
       )}
 
       {status === "RELEASED" && (
-        <div className="flex flex-col gap-3">
-          <p className="font-label-md text-label-md text-on-surface">{t("payoutSentToYou")}</p>
+        <div className="flex flex-col gap-3 bg-white/95 rounded-xl border border-emerald-400 p-4 shadow-sm">
+          <div className="flex items-center gap-2.5 text-emerald-800 font-bold">
+            <span className="material-symbols-outlined text-[24px] text-emerald-600">celebration</span>
+            <p className="font-label-md text-label-md">{t("payoutSentToYou")}</p>
+          </div>
+          <p className="text-xs text-slate-600">
+            {lang === "fr"
+              ? "Le virement Fapshi a été envoyé vers votre compte Mobile Money. Veuillez confirmer dès réception des fonds."
+              : "The Fapshi transfer was sent to your Mobile Money account. Please confirm once received."}
+          </p>
           {error && <p className="font-label-sm text-label-sm text-error">{error}</p>}
           <button
             onClick={confirmReceipt}
             disabled={confirming}
-            className="w-full py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 disabled:opacity-60"
+            className="w-full py-2.5 rounded-lg bg-emerald-700 text-white font-label-md text-label-md hover:bg-emerald-800 disabled:opacity-60 flex items-center justify-center gap-2 shadow-xs"
           >
+            <span className="material-symbols-outlined text-[18px]">check_circle</span>
             {t("iReceivedMyPayout")}
           </button>
         </div>

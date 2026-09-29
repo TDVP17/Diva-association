@@ -280,7 +280,10 @@ export default async function SessionDetailPage({
   const allSlotIds = approvedMemberships.flatMap((m) => m.slots.map((s) => s.id));
   const [contributions, fines] = allSlotIds.length
     ? await Promise.all([
-        prisma.contribution.findMany({ where: { membershipSlotId: { in: allSlotIds }, dueDate } }),
+        prisma.contribution.findMany({
+      where: { membershipSlotId: { in: allSlotIds }, dueDate },
+      include: { paidByUser: { select: { name: true } } },
+    }),
         prisma.fine.findMany({ where: { membershipSlotId: { in: allSlotIds }, dueDate, status: "UNPAID" } }),
       ])
     : [[], []];
@@ -292,6 +295,20 @@ export default async function SessionDetailPage({
     m.slots.map((s) => ({ ...s, member: m.user, isMine: m.userId === userId })),
   );
   const paidCount = allSlotsFlat.filter((s) => contributionBySlot.get(s.id)?.status === "PAID").length;
+
+  const perSlotAmount = Number(tontineSession.amount);
+  const perSlotFee = Number(tontineSession.fee);
+  const slotCountForPot =
+    totalRegisteredSlots > 0
+      ? totalRegisteredSlots
+      : tontineSession.maxSlots
+        ? Number(tontineSession.maxSlots)
+        : (allSlotsFlat.length || 1);
+  // Formule : montant total à bouffer = (N * cotisation) + 25% des frais (75% des frais pour l'admin)
+  const totalPotAmount = Math.round(slotCountForPot * perSlotAmount + slotCountForPot * perSlotFee * 0.25);
+  const adminFeeShare = Math.round(slotCountForPot * perSlotFee * 0.75);
+  const winnerFeeShare = Math.round(slotCountForPot * perSlotFee * 0.25);
+  const currentCycleCollectedPot = Math.round(paidCount * perSlotAmount + paidCount * perSlotFee * 0.25);
 
   const mySlots = [...myMembership.slots].sort((a, b) =>
     a.beneficiaryName.localeCompare(b.beneficiaryName, "fr", { sensitivity: "base" }),
@@ -436,13 +453,54 @@ export default async function SessionDetailPage({
             </div>
           </div>
         </div>
-        <div className="mt-5 pt-4 border-t border-surface-variant flex items-center justify-between">
+        {/* Montant total à bouffer (Gain du tour) */}
+        <div className="mt-4 pt-4 border-t border-surface-variant">
+          <div className="rounded-xl bg-gradient-to-br from-emerald-50 via-teal-50/60 to-emerald-100/50 border border-emerald-200/80 p-4 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-1.5 text-emerald-800 font-semibold text-xs uppercase tracking-wider">
+                  <span className="material-symbols-outlined text-[20px] text-emerald-600">emoji_events</span>
+                  {t("totalPotToEat")}
+                </div>
+                <div className="font-numeric-data text-2xl sm:text-3xl font-extrabold text-emerald-950 mt-1">
+                  {formatXAF(totalPotAmount)}
+                </div>
+                <p className="font-label-sm text-xs text-emerald-800/80 mt-0.5">
+                  {t("totalPotToEatSubtitle")}
+                </p>
+              </div>
+              <div className="sm:text-right bg-white/80 rounded-lg p-2.5 border border-emerald-200/60 shadow-xs">
+                <div className="text-[11px] font-medium text-emerald-900">
+                  {t("currentCycleCollected")}
+                </div>
+                <div className="font-numeric-data text-base font-bold text-emerald-700">
+                  {formatXAF(currentCycleCollectedPot)}
+                </div>
+                <div className="text-[11px] text-emerald-800/70">
+                  {paidCount}/{allSlotsFlat.length} {t("slotsPaidThisCycle")}
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 pt-2.5 border-t border-emerald-200/60 text-[11px] sm:text-xs text-emerald-800/90">
+              <p>
+                {t("totalPotBreakdown", {
+                  count: String(slotCountForPot),
+                  subtotal: formatXAF(slotCountForPot * perSlotAmount),
+                  fees: formatXAF(winnerFeeShare),
+                  adminFees: formatXAF(adminFeeShare),
+                })}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 pt-4 border-t border-surface-variant flex items-center justify-between">
           <div className="font-label-sm text-label-sm text-on-surface-variant">
             {paidCount}/{allSlotsFlat.length} {t("slotsPaidThisCycle")}
           </div>
-          <div className="w-24 h-2 bg-surface-variant rounded-full overflow-hidden">
+          <div className="w-28 h-2 bg-surface-variant rounded-full overflow-hidden">
             <div
-              className="h-full bg-primary rounded-full"
+              className="h-full bg-primary rounded-full transition-all duration-300"
               style={{ width: `${allSlotsFlat.length ? (paidCount / allSlotsFlat.length) * 100 : 0}%` }}
             />
           </div>
@@ -520,18 +578,54 @@ export default async function SessionDetailPage({
                 key={s.id}
                 className={`flex items-center p-4 ${index < mySlots.length - 1 ? "border-b border-surface-variant" : ""}`}
               >
-                <div className="flex-grow min-w-0">
-                  <div className="font-label-md text-label-md text-on-surface truncate">{s.beneficiaryName}</div>
-                  <div className="font-label-sm text-label-sm text-on-surface-variant">
-                    {t("positionLabel")} {s.ballDrawn ?? t("notYetRevealed")} ·{" "}
-                    {paid ? t("paid") : `${formatXAF(slotTotal)} ${t("due")}`}
+                <div className="flex items-center gap-3 flex-grow min-w-0 mr-2">
+                  <div className="flex-shrink-0">
+                    {paid ? (
+                      <div className="w-8 h-8 rounded-full bg-[#d1fae5] text-[#059669] flex items-center justify-center shadow-xs" title={t("checkedPaid")}>
+                        <span className="material-symbols-outlined text-[20px] font-bold">check_circle</span>
+                      </div>
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center border border-slate-200" title={t("notCheckedPending")}>
+                        <span className="material-symbols-outlined text-[20px]">radio_button_unchecked</span>
+                      </div>
+                    )}
                   </div>
-                  {slotDateLabel && (
-                    <div className="font-label-sm text-[11px] text-on-surface-variant flex items-center gap-1 mt-0.5">
-                      <span className="material-symbols-outlined text-[13px]">event</span>
-                      {t("estimatedDateLabel")}: {slotDateLabel}
+                  <div className="flex-grow min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-label-md text-label-md text-on-surface truncate font-semibold">
+                        {s.beneficiaryName}
+                      </span>
+                      {paid ? (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold bg-[#d1fae5] text-[#065f46]">
+                          <span className="material-symbols-outlined text-[13px]">check</span>
+                          {t("checkedPaid")}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600">
+                          {t("notCheckedPending")}
+                        </span>
+                      )}
                     </div>
-                  )}
+                    <div className="font-label-sm text-label-sm text-on-surface-variant">
+                      {t("positionLabel")} {s.ballDrawn ?? t("notYetRevealed")} ·{" "}
+                      {paid ? (
+                        <span>
+                          {c?.paidAt ? t("paidAtLabel", { time: c.paidAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) }) : t("paid")}
+                          {c?.paidByUser && (
+                            <span className="text-primary font-medium"> · {t("paidByRelativeBadge", { name: c.paidByUser.name })}</span>
+                          )}
+                        </span>
+                      ) : (
+                        <span>{formatXAF(slotTotal)} {t("due")}</span>
+                      )}
+                    </div>
+                    {slotDateLabel && (
+                      <div className="font-label-sm text-[11px] text-on-surface-variant flex items-center gap-1 mt-0.5">
+                        <span className="material-symbols-outlined text-[13px]">event</span>
+                        {t("estimatedDateLabel")}: {slotDateLabel}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 {!paid && (
                   <PayButton
@@ -574,10 +668,21 @@ export default async function SessionDetailPage({
                 key={s.id}
                 className={`flex items-center p-4 ${index < allSlotsFlat.length - 1 ? "border-b border-surface-variant" : ""} ${s.isMine ? "bg-primary/5" : ""}`}
               >
-                <div className="font-label-md text-label-md text-on-surface-variant w-8 text-center mr-2">
+                <div className="flex-shrink-0 mr-2">
+                  {paid ? (
+                    <span className="material-symbols-outlined text-[#059669] text-xl font-bold" title={t("checkedPaid")}>
+                      check_circle
+                    </span>
+                  ) : (
+                    <span className="material-symbols-outlined text-slate-300 text-xl" title={t("notCheckedPending")}>
+                      radio_button_unchecked
+                    </span>
+                  )}
+                </div>
+                <div className="font-label-md text-label-md text-on-surface-variant w-7 text-center mr-2">
                   {s.ballDrawn ?? "—"}
                 </div>
-                <div className="w-10 h-10 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center font-label-md text-label-md mr-4 overflow-hidden">
+                <div className="w-10 h-10 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center font-label-md text-label-md mr-3 overflow-hidden flex-shrink-0">
                   {s.member.avatar || s.member.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={s.member.avatar ?? s.member.image!} alt={s.member.name} className="w-full h-full object-cover" />
@@ -586,9 +691,19 @@ export default async function SessionDetailPage({
                   )}
                 </div>
                 <div className="flex-grow min-w-0">
-                  <div className="font-label-md text-label-md text-on-surface truncate">{s.beneficiaryName}</div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-label-md text-label-md text-on-surface truncate font-medium">{s.beneficiaryName}</span>
+                    {paid && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#d1fae5] text-[#065f46]">
+                        {t("checkedPaid")}
+                      </span>
+                    )}
+                  </div>
                   <div className="font-label-sm text-label-sm text-on-surface-variant truncate">
                     {s.member.name}
+                    {c?.paidByUser && (
+                      <span className="text-primary font-medium"> · {t("paidByRelativeBadge", { name: c.paidByUser.name })}</span>
+                    )}
                     {paid
                       ? ` · ${c?.paidAt ? t("paidAtLabel", { time: c.paidAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) }) : t("paid")}`
                       : ` · ${t("notYetPaid")}`}
@@ -597,17 +712,22 @@ export default async function SessionDetailPage({
                     {slotDateLabel ? `${t("estimatedDateLabel")}: ${slotDateLabel}` : t("positionNotYetAssignedShort")}
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right flex-shrink-0">
                   <span
                     className={
                       paid
-                        ? "inline-flex items-center px-2 py-1 rounded-md bg-[#d1fae5] text-[#065f46] font-label-sm text-label-sm"
+                        ? "inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#d1fae5] text-[#065f46] font-label-sm text-label-sm font-semibold"
                         : f
                           ? "inline-flex items-center px-2 py-1 rounded-md bg-error-container text-on-error-container font-label-sm text-label-sm"
                           : "inline-flex items-center px-2 py-1 rounded-md bg-secondary-fixed text-on-secondary-fixed-variant font-label-sm text-label-sm"
                     }
                   >
-                    {paid ? t("paid") : f ? t("late") : t("pending")}
+                    {paid ? (
+                      <>
+                        <span className="material-symbols-outlined text-[14px]">check</span>
+                        {t("checkedPaid")}
+                      </>
+                    ) : f ? t("late") : t("notCheckedPending")}
                   </span>
                   {f && (
                     <div className="font-label-sm text-label-sm text-error mt-1">
