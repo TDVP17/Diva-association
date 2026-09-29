@@ -232,12 +232,12 @@ export const translations = {
     waDuplicateRefunded:
       "Your payment was received twice for the same name. The second payment of {amount} has been automatically refunded.",
     waPayoutTurn:
-      "Hello {name},\n\nWe're pleased to let you know that it's your turn to receive the {cotisation} payout (position #{position}).\n\n💰 Estimated amount: {amount}\n📅 Expected payout date: {date}\n\n👉 ACTION REQUIRED: Please log into the app and provide your Mobile Money phone number and the exact name on the account so the administrator can process your payout via Fapshi.\n\nThe DIVA Association team",
+      "Hello {name},\n\nWe're pleased to let you know that it's your turn to receive the {cotisation} payout (position #{position}).\n\n💰 Estimated amount: {amount}\n📅 Expected payout date: {date}\n\n👉 ACTION REQUIRED: Please log into the app and provide your Mobile Money phone number and the exact name on the account so the administrator can process your payout.\n\nThe DIVA Association team",
     payoutTurnNotifMessage:
       "It's your turn to receive the {cotisation} payout! Please provide your Mobile Money account number and account name so the admin can process your payout.",
     payoutTurnBannerTitle: "It's your turn to receive the payout!",
     payoutTurnBannerDesc:
-      "To receive your payout, you must provide your Mobile Money account number (MTN / Orange) and the exact name on your account below. The administrator will process your transfer directly via Fapshi.",
+      "To receive your payout, you must provide your Mobile Money account number (MTN / Orange) and the exact name on your account below. The administrator will process your transfer directly.",
     copyAccountName: "Copy Name",
     copyAccountNumber: "Copy Number",
     nameCopied: "Account name copied!",
@@ -245,7 +245,7 @@ export const translations = {
     fillInPayoutForm: "Fill into payout form",
     openAndFillPayout: "Open & Fill Payout",
     payoutDetailsSubmittedNotice:
-      "Your payout details have been submitted to the administrator (Name: {name}, Phone: {phone}). The Fapshi transfer is being processed.",
+      "Your payout details have been submitted to the administrator (Name: {name}, Phone: {phone}). The transfer is being processed.",
     payoutTurnAlertPrompt:
       "Action required: You must provide your Mobile Money account number and exact account name to receive your payout.",
     waPayoutReleased:
@@ -778,7 +778,7 @@ export const translations = {
     fineReminderMessage:
       "Hello {name} ❤️\nThis is a friendly reminder about your outstanding fine of {amount}. Please remember to settle it before the contribution closes so that you remain eligible to participate in future contributions. 🙏",
     foodTurnMessage:
-      "🎉 Congratulations {name}! It's your turn to receive the payout! 💰🎊\n\n👉 ACTION REQUIRED: Please log into the app now to provide your Mobile Money account number (MTN / Orange) and exact account holder name so the administrator can process your Fapshi payout!",
+      "🎉 Congratulations {name}! It's your turn to receive the payout! 💰🎊\n\n👉 ACTION REQUIRED: Please log into the app now to provide your Mobile Money account number (MTN / Orange) and exact account holder name so the administrator can process your payout!",
     notifTypeContributionReminder: "Contribution Reminder",
     notifTypeFineReminder: "Fine Reminder",
     notifTypeFoodTurn: "It's Your Turn!",
@@ -1223,12 +1223,12 @@ export const translations = {
     waDuplicateRefunded:
       "Votre paiement a été reçu deux fois pour le même nom. Le second paiement de {amount} a été automatiquement remboursé.",
     waPayoutTurn:
-      "Bonjour {name},\n\nNous avons le plaisir de vous informer que c'est votre tour de recevoir la cagnotte de la cotisation {cotisation} (position n°{position}).\n\n💰 Montant total : {amount}\n📅 Date de versement prévue : {date}\n\n👉 ACTION REQUISE : Veuillez vous connecter à l'application et renseigner votre numéro de compte Mobile Money (MTN / Orange) et le nom complet exact sur le compte afin que l'administrateur effectue votre virement via Fapshi.\n\nL'équipe DIVA Association",
+      "Bonjour {name},\n\nNous avons le plaisir de vous informer que c'est votre tour de recevoir la cagnotte de la cotisation {cotisation} (position n°{position}).\n\n💰 Montant total : {amount}\n📅 Date de versement prévue : {date}\n\n👉 ACTION REQUISE : Veuillez vous connecter à l'application et renseigner votre numéro de compte Mobile Money (MTN / Orange) et le nom complet exact sur le compte afin que l'administrateur effectue votre virement.\n\nL'équipe DIVA Association",
     payoutTurnNotifMessage:
       "C'est votre tour de bouffer la cagnotte de {cotisation} ! Veuillez fournir votre numéro de compte Mobile Money et votre nom complet pour le virement.",
     payoutTurnBannerTitle: "C'est votre tour de bouffer la cagnotte !",
     payoutTurnBannerDesc:
-      "Pour recevoir votre virement, vous devez impérativement renseigner ci-dessous votre numéro de compte Mobile Money (MTN / Orange) et le nom complet exact enregistré sur ce compte. L'administrateur effectuera votre versement directement via Fapshi.",
+      "Pour recevoir votre virement, vous devez impérativement renseigner ci-dessous votre numéro de compte Mobile Money (MTN / Orange) et le nom complet exact enregistré sur ce compte. L'administrateur effectuera directement votre versement sur votre compte.",
     copyAccountName: "Copier le nom",
     copyAccountNumber: "Copier le numéro",
     nameCopied: "Nom du compte copié !",
@@ -1236,7 +1236,7 @@ export const translations = {
     fillInPayoutForm: "Remplir dans le formulaire de virement",
     openAndFillPayout: "Ouvrir et remplir le virement",
     payoutDetailsSubmittedNotice:
-      "Vos coordonnées ont été transmises à l'administrateur (Nom : {name}, Numéro : {phone}). Le virement Fapshi est en cours de traitement.",
+      "Vos coordonnées ont été transmises à l'administrateur (Nom : {name}, Numéro : {phone}). Le virement est en cours de traitement.",
     payoutTurnAlertPrompt:
       "Action requise : Vous devez fournir votre numéro de compte Mobile Money et votre nom pour recevoir votre virement.",
     waPayoutReleased:
@@ -1772,7 +1772,7 @@ export const translations = {
     fineReminderMessage:
       "Bonjour {name} ❤️\nPetit rappel amical concernant votre amende impayée de {amount}. Merci de la régler avant la clôture de la cotisation pour rester éligible aux prochaines cotisations. 🙏",
     foodTurnMessage:
-      "🎉 Bravo {name} ! C'est votre tour de bouffer la cotisation ! 💰🎊\n\n👉 ACTION REQUISE : Veuillez vous connecter à l'application dès maintenant pour fournir votre numéro de compte Mobile Money (MTN / Orange) et le nom exact associé au compte. L'administrateur en a besoin pour effectuer votre virement Fapshi !",
+      "🎉 Bravo {name} ! C'est votre tour de bouffer la cotisation ! 💰🎊\n\n👉 ACTION REQUISE : Veuillez vous connecter à l'application dès maintenant pour fournir votre numéro de compte Mobile Money (MTN / Orange) et le nom exact associé au compte. L'administrateur en a besoin pour effectuer votre virement !",
     notifTypeContributionReminder: "Rappel de cotisation",
     notifTypeFineReminder: "Rappel d'amende",
     notifTypeFoodTurn: "C'est ton tour !",

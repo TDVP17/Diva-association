@@ -144,8 +144,8 @@ export function PayoutTurnPanel({
                 />
                 <p className="mt-1 text-[11px] text-slate-500">
                   {lang === "fr"
-                    ? "Indiquez le nom officiel complet associé à ce compte pour la vérification Fapshi."
-                    : "Enter the exact official name registered on this account for Fapshi validation."}
+                    ? "Indiquez le nom officiel complet associé à ce compte pour la vérification du virement."
+                    : "Enter the exact official name registered on this account for transfer verification."}
                 </p>
               </div>
 
@@ -186,8 +186,8 @@ export function PayoutTurnPanel({
             </h4>
             <p className="font-body-sm text-body-sm text-emerald-800/90 mt-1">
               {lang === "fr"
-                ? "Vos coordonnées (numéro de compte et nom) ont bien été transmises à l'administrateur. Dès qu'il valide le versement, votre virement Fapshi sera immédiatement effectué."
-                : "Your account number and name have been transmitted to the administrator. The Fapshi payout will be released directly to your account shortly."}
+                ? "Vos coordonnées (numéro de compte et nom) ont bien été transmises à l'administrateur. Dès qu'il valide le versement, votre virement sera immédiatement effectué."
+                : "Your account number and name have been transmitted to the administrator. The payout will be released directly to your account shortly."}
             </p>
           </div>
         </div>
@@ -201,8 +201,8 @@ export function PayoutTurnPanel({
           </div>
           <p className="text-xs text-slate-600">
             {lang === "fr"
-              ? "Le virement Fapshi a été envoyé vers votre compte Mobile Money. Veuillez confirmer dès réception des fonds."
-              : "The Fapshi transfer was sent to your Mobile Money account. Please confirm once received."}
+              ? "Le virement a été envoyé vers votre compte Mobile Money. Veuillez confirmer dès réception des fonds."
+              : "The transfer was sent to your Mobile Money account. Please confirm once received."}
           </p>
           {error && <p className="font-label-sm text-label-sm text-error">{error}</p>}
           <button

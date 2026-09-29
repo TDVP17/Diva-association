@@ -129,7 +129,113 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     if (!before) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
-    await prisma.tontineSession.delete({ where: { id } });
+
+    // Comprehensive cascading clean-up inside a transaction to ensure
+    // no foreign keys, triggers, or child records ever block deletion:
+    await prisma.$transaction(async (tx) => {
+      // 1. Detach audit logs from this session so historical audit trail remains intact
+      await tx.$executeRawUnsafe(
+        `UPDATE "audit_logs" SET "tontineSessionId" = NULL WHERE "tontineSessionId" = $1`,
+        id
+      );
+
+      // 2. Unlink any payment_attempts tied to contributions/fines of this session
+      await tx.$executeRawUnsafe(
+        `UPDATE "payment_attempts" SET "contributionId" = NULL, "fineId" = NULL 
+         WHERE "contributionId" IN (
+           SELECT c.id FROM "contributions" c
+           JOIN "membership_slots" ms ON c."membershipSlotId" = ms.id
+           JOIN "memberships" m ON ms."membershipId" = m.id
+           WHERE m."tontineSessionId" = $1
+         ) OR "fineId" IN (
+           SELECT f.id FROM "fines" f
+           JOIN "membership_slots" ms ON f."membershipSlotId" = ms.id
+           JOIN "memberships" m ON ms."membershipId" = m.id
+           WHERE m."tontineSessionId" = $1
+         )`,
+        id
+      );
+
+      // 3. Delete notifications & notification logs for this session
+      await tx.$executeRawUnsafe(
+        `DELETE FROM "notifications" WHERE "tontineSessionId" = $1`,
+        id
+      );
+      await tx.$executeRawUnsafe(
+        `DELETE FROM "notification_logs" WHERE "tontineSessionId" = $1`,
+        id
+      );
+
+      // 4. Delete turn reminders & food turn logs for slots belonging to this session
+      await tx.$executeRawUnsafe(
+        `DELETE FROM "turn_reminder_logs" WHERE "membershipSlotId" IN (
+           SELECT ms.id FROM "membership_slots" ms
+           JOIN "memberships" m ON ms."membershipId" = m.id
+           WHERE m."tontineSessionId" = $1
+         )`,
+        id
+      );
+      await tx.$executeRawUnsafe(
+        `DELETE FROM "food_turn_logs" WHERE "membershipSlotId" IN (
+           SELECT ms.id FROM "membership_slots" ms
+           JOIN "memberships" m ON ms."membershipId" = m.id
+           WHERE m."tontineSessionId" = $1
+         )`,
+        id
+      );
+
+      // 5. Delete payouts for this session
+      await tx.$executeRawUnsafe(
+        `DELETE FROM "payouts" WHERE "tontineSessionId" = $1`,
+        id
+      );
+
+      // 6. Delete position swap requests for this session
+      await tx.$executeRawUnsafe(
+        `DELETE FROM "position_swap_requests" WHERE "tontineSessionId" = $1`,
+        id
+      );
+
+      // 7. Delete contributions & fines for slots in this session
+      await tx.$executeRawUnsafe(
+        `DELETE FROM "contributions" WHERE "membershipSlotId" IN (
+           SELECT ms.id FROM "membership_slots" ms
+           JOIN "memberships" m ON ms."membershipId" = m.id
+           WHERE m."tontineSessionId" = $1
+         )`,
+        id
+      );
+      await tx.$executeRawUnsafe(
+        `DELETE FROM "fines" WHERE "membershipSlotId" IN (
+           SELECT ms.id FROM "membership_slots" ms
+           JOIN "memberships" m ON ms."membershipId" = m.id
+           WHERE m."tontineSessionId" = $1
+         )`,
+        id
+      );
+
+      // 8. Delete kyc_verifications linked to this session
+      await tx.$executeRawUnsafe(
+        `DELETE FROM "kyc_verifications" WHERE "tontineSessionId" = $1`,
+        id
+      );
+
+      // 9. Delete membership slots and memberships
+      await tx.$executeRawUnsafe(
+        `DELETE FROM "membership_slots" WHERE "membershipId" IN (
+           SELECT m.id FROM "memberships" m WHERE m."tontineSessionId" = $1
+         )`,
+        id
+      );
+      await tx.$executeRawUnsafe(
+        `DELETE FROM "memberships" WHERE "tontineSessionId" = $1`,
+        id
+      );
+
+      // 10. Delete the tontine session itself
+      await tx.tontineSession.delete({ where: { id } });
+    });
+
     await logAudit({
       actorId: admin.user.id,
       actorRole: admin.user.role,
@@ -142,6 +248,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[admin/sessions DELETE] unexpected error:", err);
-    return NextResponse.json({ error: "Could not delete the cotisation. Please try again." }, { status: 500 });
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Could not delete the cotisation. Please try again." },
+      { status: 500 }
+    );
   }
 }
+

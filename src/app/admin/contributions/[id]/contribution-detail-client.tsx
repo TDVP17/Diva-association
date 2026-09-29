@@ -708,7 +708,10 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
         setDeleteError(body?.error || t("couldNotDeleteCotisation"));
         return;
       }
-      router.push("/admin");
+      router.refresh();
+      router.push("/admin/contributions");
+    } catch {
+      setDeleteError(t("couldNotDeleteCotisation"));
     } finally {
       setDeleting(false);
     }
@@ -751,25 +754,41 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   return (
     <main className="px-container-padding pt-stack-gap-lg pb-32 max-w-4xl mx-auto w-full flex flex-col gap-stack-gap-lg">
       <div>
-        <Link href="/admin" className="font-label-sm text-label-sm text-primary underline mb-2 inline-flex items-center gap-1">
+        <Link href="/admin/contributions" className="font-label-sm text-label-sm text-primary underline mb-2 inline-flex items-center gap-1">
           <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-          {t("backToDashboard")}
+          {t("myCotisationsCard")}
         </Link>
         <div className="flex items-start justify-between gap-2 flex-wrap">
           <div>
             <h2 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary">
               {sessionLabel}
             </h2>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-secondary-container/30 text-on-secondary-container font-label-sm text-label-sm mt-1">
-              {t(sessionStatusKey(session.status))}
-            </span>
-            {session.isPaused && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-secondary-container/40 text-on-secondary-container font-label-sm text-label-sm mt-1">
-                {t("pausedBadge")}
+            <div className="flex items-center gap-2 mt-1">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-secondary-container/30 text-on-secondary-container font-label-sm text-label-sm">
+                {t(sessionStatusKey(session.status))}
               </span>
-            )}
+              {session.isPaused && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-secondary-container/40 text-on-secondary-container font-label-sm text-label-sm">
+                  {t("pausedBadge")}
+                </span>
+              )}
+            </div>
           </div>
+          <button
+            onClick={deleteSession}
+            disabled={deleting}
+            className="px-3 py-1.5 rounded-lg border border-error/50 text-error hover:bg-error/5 text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+            title={t("delete")}
+          >
+            <span className="material-symbols-outlined text-[16px]">delete</span>
+            {deleting ? t("savingEllipsis") : t("delete")}
+          </button>
         </div>
+        {deleteError && (
+          <div className="p-3 rounded-lg bg-error-container/40 border border-error/30 text-error text-xs md:text-sm font-medium mt-3">
+            {deleteError}
+          </div>
+        )}
       </div>
 
       <div className="flex gap-1 overflow-x-auto border-b border-surface-variant">
