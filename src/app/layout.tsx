@@ -68,6 +68,17 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           rel="stylesheet"
         />
         <meta name="theme-color" content="#003528" />
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.__deferredInstallPrompt = null;
+              window.addEventListener('beforeinstallprompt', function(e) {
+                window.__deferredInstallPrompt = e;
+              });
+            `,
+          }}
+        />
       </head>
       <body className="min-h-full flex flex-col">
         <RegisterServiceWorker />
