@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { RegisterServiceWorker } from "@/components/register-service-worker";
+import { CookieConsent } from "@/components/cookie-consent";
 import { getLang } from "@/lib/i18n/get-lang";
 
 const inter = Inter({
@@ -84,6 +85,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <RegisterServiceWorker />
         {children}
+        <CookieConsent lang={lang} />
       </body>
     </html>
   );

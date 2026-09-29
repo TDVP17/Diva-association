@@ -4,7 +4,6 @@ import { useEffect, useState, useRef } from "react";
 import { type Lang } from "@/lib/i18n/translations";
 
 const DISMISSED_SESSION_KEY = "diva_pwa_dismissed_session";
-const INSTALLED_KEY = "diva_pwa_installed";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -26,14 +25,18 @@ function isIosDevice(): boolean {
   );
 }
 
-function isStandaloneAlready(): boolean {
+/**
+ * Determines if the current window is genuinely running inside the installed standalone PWA.
+ * We deliberately DO NOT use email, user profile, database, or persistent localStorage
+ * because a user can install, uninstall, and reinstall the application at any time.
+ */
+function isRunningInStandaloneApp(): boolean {
   if (typeof window === "undefined") return false;
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
     (window.navigator as Navigator & { standalone?: boolean }).standalone === true ||
     document.referrer.includes("android-app://") ||
-    window.location.search.includes("mode=pwa") ||
-    localStorage.getItem(INSTALLED_KEY) === "1"
+    window.location.search.includes("mode=pwa")
   );
 }
 
@@ -44,14 +47,19 @@ export function InstallPromptModal({ lang }: { lang: Lang }) {
   const [dismissed, setDismissed] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [isIos, setIsIos] = useState(false);
-  const [isInstalled, setIsInstalled] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // If currently running as installed standalone PWA, completely hide prompt
-    if (isStandaloneAlready()) {
-      setIsInstalled(true);
+    // Clear any obsolete permanent storage flag so users who uninstalled can always reinstall
+    try {
+      localStorage.removeItem("diva_pwa_installed");
+    } catch {}
+
+    // If currently running inside the installed standalone PWA window, hide modal
+    if (isRunningInStandaloneApp()) {
+      setIsStandalone(true);
       return;
     }
 
@@ -80,8 +88,7 @@ export function InstallPromptModal({ lang }: { lang: Lang }) {
     }
 
     function onAppInstalled() {
-      localStorage.setItem(INSTALLED_KEY, "1");
-      setIsInstalled(true);
+      // Installed for this instance
       setDismissed(true);
       setDeferredPrompt(null);
       deferredPromptRef.current = null;
@@ -103,8 +110,8 @@ export function InstallPromptModal({ lang }: { lang: Lang }) {
     };
   }, []);
 
-  // When already installed or running inside standalone app, do not allow installing again
-  if (isInstalled || (typeof window !== "undefined" && isStandaloneAlready())) {
+  // When already running inside the installed standalone window, don't show the prompt
+  if (isStandalone || (typeof window !== "undefined" && isRunningInStandaloneApp())) {
     return null;
   }
 
@@ -124,12 +131,8 @@ export function InstallPromptModal({ lang }: { lang: Lang }) {
 
     try {
       if (isIos) {
-        // iOS: Directly trigger the native Apple MobileConfig profile download
-        // iOS automatically displays the native system alert:
-        // "Ce site web essaie de télécharger un profil de configuration. Voulez-vous l'autoriser ? [Autoriser]"
-        // Zero tutorial text, 100% automated native trigger.
-        localStorage.setItem(INSTALLED_KEY, "1");
-        setIsInstalled(true);
+        // Direct iOS Apple WebClip MobileConfig profile download:
+        // Automatically triggers the native system download alert without instructions
         setDismissed(true);
         window.location.href = "/api/install/ios";
         return;
@@ -141,7 +144,6 @@ export function InstallPromptModal({ lang }: { lang: Lang }) {
         deferredPromptRef.current ||
         (typeof window !== "undefined" ? window.__deferredInstallPrompt : null);
 
-      // If prompt is not ready yet, wait briefly for it
       if (!promptEvent) {
         for (let i = 0; i < 5; i++) {
           await new Promise((resolve) => setTimeout(resolve, 150));
@@ -154,13 +156,10 @@ export function InstallPromptModal({ lang }: { lang: Lang }) {
         await promptEvent.prompt();
         const choice = await promptEvent.userChoice;
         if (choice.outcome === "accepted") {
-          localStorage.setItem(INSTALLED_KEY, "1");
-          setIsInstalled(true);
           setDismissed(true);
         }
       } else {
-        // Fallback for browsers without beforeinstallprompt: trigger iOS webclip or direct installation
-        localStorage.setItem(INSTALLED_KEY, "1");
+        // Fallback for browsers without beforeinstallprompt
         window.location.href = "/api/install/ios";
       }
     } catch (err) {
@@ -170,12 +169,12 @@ export function InstallPromptModal({ lang }: { lang: Lang }) {
     }
   }
 
-  const modalVisible = ready && !dismissed && !isInstalled;
+  const modalVisible = ready && !dismissed && !isStandalone;
 
   return (
     <>
-      {/* Floating install button if dismissed but not installed */}
-      {ready && dismissed && !isInstalled && (
+      {/* Floating install button if dismissed for the session but user is in web browser */}
+      {ready && dismissed && !isStandalone && (
         <button
           onClick={handleReopen}
           aria-label={lang === "fr" ? "Installer l'application" : "Install App"}
@@ -186,7 +185,7 @@ export function InstallPromptModal({ lang }: { lang: Lang }) {
         </button>
       )}
 
-      {/* Main Installation Modal: Immediate 1-click install, zero tutorial steps */}
+      {/* Main Installation Modal */}
       {modalVisible && (
         <div
           className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 p-0 sm:p-4"
@@ -221,7 +220,7 @@ export function InstallPromptModal({ lang }: { lang: Lang }) {
               </p>
             </div>
 
-            {/* 1-Click Install Action: Automatically triggers native install without any manual tutorial */}
+            {/* 1-Click Install Action */}
             <div className="flex flex-col gap-2.5 mt-2">
               <button
                 onClick={handleAutoInstall}

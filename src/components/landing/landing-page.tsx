@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { LanguageToggle } from "@/components/language-toggle";
 import { InstallPromptModal } from "@/components/install-prompt-modal";
+import { ManageCookiesButton } from "@/components/cookie-consent";
 import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 import type { PublicStats } from "@/lib/landing-stats";
 
@@ -178,13 +179,14 @@ export function LandingPage({ lang, stats }: { lang: Lang; stats: PublicStats })
               <p className="font-label-sm text-[11px] text-on-surface-variant">{t("landingFooterTagline")}</p>
             </div>
           </div>
-          <div className="flex items-center gap-stack-gap-md font-label-sm text-label-sm text-on-surface-variant">
+          <div className="flex items-center gap-stack-gap-md font-label-sm text-label-sm text-on-surface-variant flex-wrap justify-center">
             <Link href="/privacy-policy" className="hover:text-primary transition-colors">
               {t("landingFooterPrivacy")}
             </Link>
             <Link href="/terms-of-service" className="hover:text-primary transition-colors">
               {t("landingFooterTerms")}
             </Link>
+            <ManageCookiesButton lang={lang} />
           </div>
         </div>
         <p className="text-center font-label-sm text-[11px] text-on-surface-variant pb-stack-gap-md">

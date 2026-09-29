@@ -17,6 +17,16 @@ declare global {
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
+function isCurrentlyInStandalone(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true ||
+    document.referrer.includes("android-app://") ||
+    window.location.search.includes("mode=pwa")
+  );
+}
+
 export function PwaInstallCard({ lang }: { lang: Lang }) {
   const [isStandalone, setIsStandalone] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -30,28 +40,13 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
   const [pushSuccess, setPushSuccess] = useState(false);
 
   useEffect(() => {
-    const installedFromStorage =
-      typeof window !== "undefined" && localStorage.getItem("diva_pwa_installed") === "1";
-    // Detect standalone mode
-    const standalone =
-      (typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches) ||
-      (typeof window !== "undefined" &&
-        (window.navigator as Navigator & { standalone?: boolean }).standalone === true) ||
-      installedFromStorage;
+    // Clear any obsolete permanent storage flag so users who uninstalled can always reinstall
+    try {
+      localStorage.removeItem("diva_pwa_installed");
+    } catch {}
 
-    setIsStandalone(standalone);
-
-    if (typeof window !== "undefined" && "getInstalledRelatedApps" in navigator) {
-      (navigator as Navigator & { getInstalledRelatedApps?: () => Promise<unknown[]> })
-        .getInstalledRelatedApps?.()
-        .then((apps) => {
-          if (apps && apps.length > 0) {
-            localStorage.setItem("diva_pwa_installed", "1");
-            setIsStandalone(true);
-          }
-        })
-        .catch(() => {});
-    }
+    // Check if the current page is running inside the standalone installed app window
+    setIsStandalone(isCurrentlyInStandalone());
 
     // Detect iOS
     const ua = window.navigator.userAgent;
@@ -67,8 +62,7 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
     }
 
     function onAppInstalled() {
-      localStorage.setItem("diva_pwa_installed", "1");
-      setIsStandalone(true);
+      // Installed now
       setDeferredPrompt(null);
       window.__deferredInstallPrompt = null;
     }
@@ -99,8 +93,6 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
       if (isIos) {
         // Direct iOS native mobileconfig profile download:
         // Automatically triggers the native iOS dialog without any tutorial
-        localStorage.setItem("diva_pwa_installed", "1");
-        setIsStandalone(true);
         window.location.href = "/api/install/ios";
         return;
       }
@@ -122,13 +114,10 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
         await promptEvent.prompt();
         const choice = await promptEvent.userChoice;
         if (choice.outcome === "accepted") {
-          localStorage.setItem("diva_pwa_installed", "1");
-          setIsStandalone(true);
           setDeferredPrompt(null);
         }
       } else {
         // Fallback for browsers without beforeinstallprompt
-        localStorage.setItem("diva_pwa_installed", "1");
         window.location.href = "/api/install/ios";
       }
     } catch (err) {
@@ -176,12 +165,12 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
             </div>
             <div>
               <p className="font-label-md text-label-md text-on-surface font-semibold">
-                {lang === "fr" ? "Application installée" : "App Installed"}
+                {lang === "fr" ? "Application installée & active" : "App Installed & Active"}
               </p>
               <p className="font-label-sm text-label-sm text-on-surface-variant">
                 {lang === "fr"
-                  ? "DIVA est déjà installée sur votre appareil"
-                  : "DIVA is installed on your device"}
+                  ? "Vous utilisez DIVA en mode application mobile"
+                  : "You are running DIVA as an installed mobile app"}
               </p>
             </div>
           </div>

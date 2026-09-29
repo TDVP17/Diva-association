@@ -951,6 +951,26 @@ export const translations = {
     landingFooterRights: "© {year} DIVA Association. All rights reserved.",
     landingFooterPrivacy: "Privacy Policy",
     landingFooterTerms: "Terms of Service",
+    landingFooterCookies: "Cookies",
+
+    // Cookie Consent & Management
+    cookiesTitle: "Privacy & Cookies",
+    cookiesBannerDesc: "DIVA Association uses strictly necessary cookies for application security, authentication, and session handling, as well as optional cookies to improve your user experience and measure platform usage.",
+    cookiesAcceptAll: "Accept All",
+    cookiesRejectNonEssential: "Decline Non-Essential",
+    cookiesCustomize: "Customize",
+    cookiesModalTitle: "Cookie Preferences",
+    cookiesModalDesc: "Choose which categories of cookies you wish to allow. Strictly necessary cookies cannot be disabled as they are required for secure core operations.",
+    cookiesCatNecessaryTitle: "Strictly Necessary",
+    cookiesCatNecessaryBadge: "Always Active",
+    cookiesCatNecessaryDesc: "Essential for authentication sessions, anti-CSRF protection, security tokens, and language settings.",
+    cookiesCatPreferencesTitle: "Preferences & Features",
+    cookiesCatPreferencesDesc: "Remembers your display preferences, active filters, and offline PWA settings.",
+    cookiesCatAnalyticsTitle: "Performance & Analytics",
+    cookiesCatAnalyticsDesc: "Anonymous statistics to optimize page load speeds, transaction flows, and user comfort.",
+    cookiesSavePreferences: "Save Preferences",
+    cookiesManageButton: "Manage Cookie Preferences",
+    cookiesPolicyLink: "Learn more in our Cookie Policy",
 
     // Privacy Policy
     privacyPolicyTitle: "Privacy Policy",
@@ -1960,6 +1980,26 @@ export const translations = {
     landingFooterRights: "© {year} DIVA Association. Tous droits réservés.",
     landingFooterPrivacy: "Politique de confidentialité",
     landingFooterTerms: "Conditions d'utilisation",
+    landingFooterCookies: "Cookies",
+
+    // Cookie Consent & Management
+    cookiesTitle: "Respect de votre vie privée",
+    cookiesBannerDesc: "DIVA Association utilise des cookies strictement nécessaires au fonctionnement et à la sécurité de l'application (authentification, session), ainsi que des cookies facultatifs pour mesurer l'audience et personnaliser votre expérience.",
+    cookiesAcceptAll: "Tout accepter",
+    cookiesRejectNonEssential: "Refuser non-essentiels",
+    cookiesCustomize: "Personnaliser",
+    cookiesModalTitle: "Préférences des cookies",
+    cookiesModalDesc: "Choisissez les catégories de cookies que vous souhaitez autoriser. Les cookies indispensables ne peuvent pas être désactivés pour garantir le fonctionnement sécurisé du service.",
+    cookiesCatNecessaryTitle: "Strictement nécessaires",
+    cookiesCatNecessaryBadge: "Toujours actif",
+    cookiesCatNecessaryDesc: "Indispensables au maintien des sessions sécurisées, à la protection anti-CSRF, aux jetons de sécurité et à la langue choisie.",
+    cookiesCatPreferencesTitle: "Préférences & Fonctionnalités",
+    cookiesCatPreferencesDesc: "Mémorisent vos filtres de consultation, vos options d'affichage et l'état de l'application hors ligne.",
+    cookiesCatAnalyticsTitle: "Mesure d'audience & Performance",
+    cookiesCatAnalyticsDesc: "Statistiques anonymes permettant d'optimiser la vitesse de chargement, la stabilité des transactions et le confort d'utilisation.",
+    cookiesSavePreferences: "Enregistrer mes choix",
+    cookiesManageButton: "Gérer mes préférences de cookies",
+    cookiesPolicyLink: "En savoir plus dans notre Politique de cookies",
 
     // Privacy Policy
     privacyPolicyTitle: "Politique de confidentialité",

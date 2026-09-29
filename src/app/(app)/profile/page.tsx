@@ -9,6 +9,7 @@ import { InlineField } from "./inline-field";
 import { InlineLocationField } from "./inline-location-field";
 import { updatePhoneAction, updateEmailAction } from "./actions";
 import { PwaInstallCard } from "@/components/pwa-install-card";
+import { ManageCookiesButton } from "@/components/cookie-consent";
 import { MemberCodeCard } from "./member-code-card";
 import { SavedPaymentMethodsCard } from "./saved-payment-methods-card";
 import { ROLE_KEY } from "@/lib/role-label";
@@ -267,6 +268,18 @@ export default async function ProfilePage() {
           </span>
           <span className="material-symbols-outlined text-outline">chevron_right</span>
         </Link>
+        <ManageCookiesButton
+          lang={lang}
+          className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer text-left"
+        >
+          <span className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-primary">cookie</span>
+            <span className="font-label-md text-label-md text-on-surface">
+              {lang === "fr" ? "Préférences des cookies" : "Cookie Preferences"}
+            </span>
+          </span>
+          <span className="material-symbols-outlined text-outline">chevron_right</span>
+        </ManageCookiesButton>
       </section>
     </main>
   );
