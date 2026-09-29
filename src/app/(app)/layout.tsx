@@ -6,13 +6,13 @@ import { TopAppBar } from "@/components/top-app-bar";
 import { BackBar } from "@/components/back-bar";
 import { BottomNav } from "@/components/bottom-nav";
 import { MemberSidebar } from "@/components/member-sidebar";
-import { IosInstallBanner } from "@/components/ios-install-banner";
 import { InstallPromptModal } from "@/components/install-prompt-modal";
 import { TutorialPopup } from "@/components/tutorial-popup";
 import { NotificationBadgeSync } from "@/components/notification-badge-sync";
 import { PushPermissionPrompt } from "@/components/push-permission-prompt";
 import { OfflineDraftSync } from "@/components/offline-draft-sync";
 import { WhatsAppPhonePrompt } from "@/components/whatsapp-phone-prompt";
+import { InactivityAutoLogout } from "@/components/inactivity-auto-logout";
 import { isAdminRole } from "@/lib/constants";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -63,13 +63,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {children}
       </div>
       <BottomNav lang={lang} badges={navBadges} />
-      <IosInstallBanner lang={lang} />
       <InstallPromptModal lang={lang} />
       <TutorialPopup lang={lang} />
       <PushPermissionPrompt lang={lang} />
       <OfflineDraftSync lang={lang} />
       <NotificationBadgeSync />
       <WhatsAppPhonePrompt lang={lang} hasPhone={!!dbUser?.phone} />
+      <InactivityAutoLogout />
     </div>
   );
 }

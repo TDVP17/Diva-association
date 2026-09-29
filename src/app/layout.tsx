@@ -22,7 +22,11 @@ export const metadata: Metadata = {
   // reads this meta tag for the label under the home-screen icon. Kept in
   // sync with manifest.json's name/short_name below (both "Tontine") so the
   // installed name matches on every platform.
-  appleWebApp: { title: "Tontine" },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "DIVA Association",
+  },
   icons: {
     icon: [
       { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },

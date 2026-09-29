@@ -95,10 +95,27 @@ export const {
     emailPasswordProvider,
     ...(process.env.NODE_ENV !== "production" ? [devLoginProvider] : []),
   ],
-  // 90-day persistence per product requirement — a session only ends when
-  // the user explicitly logs out, or after 90 days of inactivity.
-  session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 90 },
-  jwt: { maxAge: 60 * 60 * 24 * 90 },
+  // 90-day (~3 months) persistence: the user stays logged in while actively using
+  // the app, but is automatically disconnected after more than 3 months of inactivity.
+  session: {
+    strategy: "jwt",
+    maxAge: 90 * 24 * 60 * 60, // 90 days = 3 months
+    updateAge: 24 * 60 * 60, // Updates sliding expiration at most once every 24h while active
+  },
+  jwt: {
+    maxAge: 90 * 24 * 60 * 60,
+  },
+  cookies: {
+    sessionToken: {
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 90 * 24 * 60 * 60,
+      },
+    },
+  },
   // Auto-detected on Vercel; explicit here so the Google OAuth callback
   // (which relies on Auth.js inferring the correct host from the request)
   // still works correctly behind a reverse proxy or on non-Vercel hosts.
@@ -118,14 +135,27 @@ export const {
   },
   callbacks: {
     async jwt({ token, user, trigger }) {
+      const now = Math.floor(Date.now() / 1000);
+      const THREE_MONTHS_SECONDS = 90 * 24 * 60 * 60;
+
       if (user?.id) {
         token.id = user.id;
         token.role = user.role;
+        token.lastConnectedAt = now;
       }
+
+      // If more than 3 months elapsed since last connection/activity, expire session
+      if (token.lastConnectedAt && typeof token.lastConnectedAt === "number") {
+        if (now - token.lastConnectedAt > THREE_MONTHS_SECONDS) {
+          return null;
+        }
+      }
+
+      token.lastConnectedAt = now;
 
       if (trigger === "update" && token.id) {
         const dbUser = await prisma.user.findUnique({
-          where: { id: token.id },
+          where: { id: token.id as string },
           select: { role: true },
         });
         if (dbUser) {
@@ -136,8 +166,11 @@ export const {
       return token;
     },
     async session({ session, token }) {
-      session.user.id = token.id;
-      session.user.role = token.role;
+      if (!token || !token.id) {
+        return null as unknown as typeof session;
+      }
+      session.user.id = token.id as string;
+      session.user.role = token.role as any;
       return session;
     },
   },

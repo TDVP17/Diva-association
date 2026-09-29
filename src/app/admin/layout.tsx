@@ -6,9 +6,10 @@ import { AdminTopBar } from "@/components/admin/admin-top-bar";
 import { AdminSidebar, type AdminNavCounts } from "@/components/admin/admin-sidebar";
 import { BackBar } from "@/components/back-bar";
 import { AdminBottomNav } from "@/components/admin/admin-bottom-nav";
-import { IosInstallBanner } from "@/components/ios-install-banner";
-import { NotificationBadgeSync } from "@/components/notification-badge-sync";
+import { InstallPromptModal } from "@/components/install-prompt-modal";
 import { PushPermissionPrompt } from "@/components/push-permission-prompt";
+import { NotificationBadgeSync } from "@/components/notification-badge-sync";
+import { InactivityAutoLogout } from "@/components/inactivity-auto-logout";
 import { isAdminRole } from "@/lib/constants";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -51,9 +52,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         {children}
       </div>
       <AdminBottomNav lang={lang} isPresident={isPresident} counts={counts} />
-      <IosInstallBanner lang={lang} />
+      <InstallPromptModal lang={lang} />
       <PushPermissionPrompt lang={lang} />
       <NotificationBadgeSync />
+      <InactivityAutoLogout />
     </div>
   );
 }

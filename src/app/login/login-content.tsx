@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { CredentialsForm } from "./credentials-form";
 import { LanguageToggle } from "@/components/language-toggle";
-import { IosInstallBanner } from "@/components/ios-install-banner";
+import { InstallPromptModal } from "@/components/install-prompt-modal";
 import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 import { getGoogleSignInUrl } from "./actions";
 
@@ -49,6 +49,7 @@ export function LoginContent({
   devUsers,
   isDev,
   oauthError,
+  sessionExpired,
   lang,
   initialMode,
 }: {
@@ -57,6 +58,7 @@ export function LoginContent({
   devUsers: DevUser[];
   isDev: boolean;
   oauthError?: string;
+  sessionExpired?: boolean;
   lang: Lang;
   initialMode?: "signin" | "signup";
 }) {
@@ -161,6 +163,16 @@ export function LoginContent({
 
         <OAuthErrorBanner error={oauthError} lang={lang} />
 
+        {sessionExpired && (
+          <div
+            role="alert"
+            className="relative z-10 mb-stack-gap-md rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-900 px-4 py-3 font-label-sm text-label-sm text-center flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined text-[18px] text-amber-700">schedule</span>
+            <span>{t("sessionExpiredNotice")}</span>
+          </div>
+        )}
+
         <CredentialsForm callbackUrl={callbackUrl} lang={lang} initialMode={initialMode} />
 
         <div className="relative z-10 flex items-center py-stack-gap-sm mt-stack-gap-lg">
@@ -254,7 +266,7 @@ export function LoginContent({
         </div>
       )}
 
-      <IosInstallBanner lang={lang} />
+      <InstallPromptModal lang={lang} />
     </main>
   );
 }

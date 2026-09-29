@@ -23,25 +23,6 @@ const STATUS_STYLES: Record<string, string> = {
   CLOSED: "bg-surface-container-high text-on-surface-variant",
 };
 
-const ONGOING_COTISATIONS = [
-  {
-    id: "ongoing-tontine-a",
-    title: "Tontine mensuelle A",
-    startDate: new Date("2026-08-28"),
-    membersCount: 15,
-    amount: 50000,
-    fee: 2500,
-  },
-  {
-    id: "ongoing-cotisation-b",
-    title: "Cotisation spéciale B",
-    startDate: new Date("2026-09-15"),
-    membersCount: 10,
-    amount: 100000,
-    fee: 5000,
-  },
-];
-
 export default async function SessionsPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
@@ -78,25 +59,19 @@ export default async function SessionsPage() {
       ).ok,
   );
 
-  const activeCotisationsList = [
-    ...nonJoinable.map((s) => {
-      const regSlots = sumRegisteredSlots(s.memberships);
-      const isFull = s.maxSlots !== null && regSlots >= Number(s.maxSlots);
-      return {
-        id: s.id,
-        title: s.title || TONTINE_LABELS[s.type] || s.type,
-        startDate: s.startDate,
-        membersCount: s.memberships.filter((m) => m.status === "APPROVED").length,
-        amount: Number(s.amount),
-        fee: Number(s.fee),
-        isFull,
-        isReal: true,
-      };
-    }),
-    ...(nonJoinable.length === 0
-      ? ONGOING_COTISATIONS.map((c) => ({ ...c, isFull: false, isReal: false }))
-      : []),
-  ];
+  const activeCotisationsList = nonJoinable.map((s) => {
+    const regSlots = sumRegisteredSlots(s.memberships);
+    const isFull = s.maxSlots !== null && regSlots >= Number(s.maxSlots);
+    return {
+      id: s.id,
+      title: s.title || TONTINE_LABELS[s.type] || s.type,
+      startDate: s.startDate,
+      membersCount: s.memberships.filter((m) => m.status === "APPROVED").length,
+      amount: Number(s.amount),
+      fee: Number(s.fee),
+      isFull,
+    };
+  });
 
   return (
     <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-6xl mx-auto w-full flex flex-col gap-section-margin">
@@ -207,61 +182,61 @@ export default async function SessionsPage() {
 
       <section>
         <h2 className="font-title-md text-title-md text-primary mb-stack-gap-md">{t("activeCotisations")}</h2>
-        <div className="flex flex-col gap-stack-gap-md lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-stack-gap-md">
-          {activeCotisationsList.map((c) => {
-            const cardInner = (
-              <div className="bg-white rounded-xl p-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant flex items-center justify-between hover:bg-surface-container-low transition-colors h-full">
-                <div>
-                  <h3 className="font-label-md text-label-md text-on-surface font-medium">
-                    {c.title}
-                  </h3>
-                  <p className="font-label-sm text-label-sm text-on-surface-variant">
-                    {t("startsOn")}{" "}
-                    {c.startDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </p>
-                  <p className="font-label-sm text-label-sm text-primary mt-0.5">
-                    {t("validatedMembersCount", { count: String(c.membersCount) })}
-                  </p>
-                  <p className="font-label-sm text-label-sm text-on-surface-variant mt-1 flex items-center gap-1 flex-wrap">
-                    <span className="font-numeric-data text-on-surface font-semibold">{formatXAF(c.amount)}</span>
-                    <span>{t("plusFeeSuffix", { fee: formatXAF(c.fee) })}</span>
-                  </p>
-                  {(() => {
-                    const count = c.membersCount || 1;
-                    const pot = Math.round(count * c.amount + count * c.fee * 0.25);
-                    return (
-                      <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold">
-                        <span className="material-symbols-outlined text-[14px] text-emerald-600">emoji_events</span>
-                        <span>{t("totalPotToEat")} : {formatXAF(pot)}</span>
-                      </div>
-                    );
-                  })()}
-                  <p className="font-label-sm text-label-sm text-red-600 font-semibold mt-1.5 flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[16px]">block</span>
-                    {t("newMemberNotAllowed")}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                  <span className="font-label-sm text-label-sm px-2.5 py-1 rounded bg-red-600 text-white font-bold tracking-wide uppercase shadow-sm">
-                    {c.isFull ? t("tagFullStatus") : t("tagActiveStatus")}
-                  </span>
-                </div>
-              </div>
-            );
-
-            return c.isReal ? (
+        {activeCotisationsList.length === 0 ? (
+          <div className="bg-white rounded-xl p-8 border border-surface-variant text-center">
+            <p className="font-label-sm text-label-sm text-on-surface-variant">
+              {t("noActiveCotisations")}
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-stack-gap-md lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-stack-gap-md">
+            {activeCotisationsList.map((c) => (
               <Link key={c.id} href={`/sessions/${c.id}`} className="block h-full">
-                {cardInner}
+                <div className="bg-white rounded-xl p-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant flex items-center justify-between hover:bg-surface-container-low transition-colors h-full">
+                  <div>
+                    <h3 className="font-label-md text-label-md text-on-surface font-medium">
+                      {c.title}
+                    </h3>
+                    <p className="font-label-sm text-label-sm text-on-surface-variant">
+                      {t("startsOn")}{" "}
+                      {c.startDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </p>
+                    <p className="font-label-sm text-label-sm text-primary mt-0.5">
+                      {t("validatedMembersCount", { count: String(c.membersCount) })}
+                    </p>
+                    <p className="font-label-sm text-label-sm text-on-surface-variant mt-1 flex items-center gap-1 flex-wrap">
+                      <span className="font-numeric-data text-on-surface font-semibold">{formatXAF(c.amount)}</span>
+                      <span>{t("plusFeeSuffix", { fee: formatXAF(c.fee) })}</span>
+                    </p>
+                    {(() => {
+                      const count = c.membersCount || 1;
+                      const pot = Math.round(count * c.amount + count * c.fee * 0.25);
+                      return (
+                        <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold">
+                          <span className="material-symbols-outlined text-[14px] text-emerald-600">emoji_events</span>
+                          <span>{t("totalPotToEat")} : {formatXAF(pot)}</span>
+                        </div>
+                      );
+                    })()}
+                    <p className="font-label-sm text-label-sm text-red-600 font-semibold mt-1.5 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[16px]">block</span>
+                      {t("newMemberNotAllowed")}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <span className="font-label-sm text-label-sm px-2.5 py-1 rounded bg-red-600 text-white font-bold tracking-wide uppercase shadow-sm">
+                      {c.isFull ? t("tagFullStatus") : t("tagActiveStatus")}
+                    </span>
+                  </div>
+                </div>
               </Link>
-            ) : (
-              <div key={c.id}>{cardInner}</div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
     </main>
   );
