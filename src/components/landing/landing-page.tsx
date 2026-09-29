@@ -3,7 +3,6 @@ import { LanguageToggle } from "@/components/language-toggle";
 import { InstallPromptModal } from "@/components/install-prompt-modal";
 import { ManageCookiesButton } from "@/components/cookie-consent";
 import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translations";
-import type { PublicStats } from "@/lib/landing-stats";
 
 const STEP_ICONS = ["person_add", "groups", "smartphone", "payments"] as const;
 const STEPS: { titleKey: TranslationKey; bodyKey: TranslationKey }[] = [
@@ -21,11 +20,7 @@ const BADGES: { titleKey: TranslationKey; bodyKey: TranslationKey }[] = [
   { titleKey: "landingBadgeTransparentTitle", bodyKey: "landingBadgeTransparentBody" },
 ];
 
-function formatCompact(n: number): string {
-  return n.toLocaleString("en-US");
-}
-
-export function LandingPage({ lang, stats }: { lang: Lang; stats: PublicStats }) {
+export function LandingPage({ lang }: { lang: Lang }) {
   const t = (key: TranslationKey, vars?: Record<string, string>) => translate(lang, key, vars);
   const year = new Date().getFullYear();
 
@@ -125,7 +120,7 @@ export function LandingPage({ lang, stats }: { lang: Lang; stats: PublicStats })
               <p className="font-body-md text-body-md text-on-primary/80">{t("landingTrustSubtitle")}</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-stack-gap-md mb-section-margin md:mb-16">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-stack-gap-md">
               {BADGES.map((badge, i) => (
                 <div key={badge.titleKey} className="bg-white/10 rounded-xl p-5 flex flex-col gap-2 backdrop-blur-sm">
                   <span className="material-symbols-outlined text-secondary-fixed-dim text-[24px]">{BADGE_ICONS[i]}</span>
@@ -133,23 +128,6 @@ export function LandingPage({ lang, stats }: { lang: Lang; stats: PublicStats })
                   <p className="font-label-md text-label-md text-on-primary/75">{t(badge.bodyKey)}</p>
                 </div>
               ))}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-stack-gap-lg text-center border-t border-white/15 pt-section-margin">
-              <div>
-                <p className="font-display-lg text-display-lg text-secondary-fixed-dim">{formatCompact(stats.memberCount)}</p>
-                <p className="font-label-md text-label-md text-on-primary/75 mt-1">{t("landingStatMembers")}</p>
-              </div>
-              <div>
-                <p className="font-display-lg text-display-lg text-secondary-fixed-dim">{formatCompact(stats.activeCotisationCount)}</p>
-                <p className="font-label-md text-label-md text-on-primary/75 mt-1">{t("landingStatCotisations")}</p>
-              </div>
-              <div>
-                <p className="font-display-lg text-display-lg text-secondary-fixed-dim">
-                  {formatCompact(stats.totalContributionsTracked)}
-                </p>
-                <p className="font-label-md text-label-md text-on-primary/75 mt-1">{t("landingStatContributions")}</p>
-              </div>
             </div>
           </div>
         </section>
