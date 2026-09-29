@@ -1068,9 +1068,15 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                       >
                         {lang === "fr" ? "Bannir" : "Ban"}
                       </button>
-                      <button onClick={() => decideMembership(m, "approve")} className="px-2 py-1 rounded bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90">
-                        {t("approve")}
-                      </button>
+                      {session.status === "DRAFT" ? (
+                        <button onClick={() => decideMembership(m, "approve")} className="px-2 py-1 rounded bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90">
+                          {t("approve")}
+                        </button>
+                      ) : (
+                        <span className="px-2 py-1 text-xs text-on-surface-variant italic">
+                          {lang === "fr" ? "Tirage déjà lancé" : "Draw started"}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1157,76 +1163,78 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
             </div>
           </section>
 
-          <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4">
-            <h3 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-4">
-              <span className="material-symbols-outlined">person_add</span>
-              {t("addMemberManually")}
-            </h3>
-            {!selectedUser ? (
-              <div className="relative mb-3">
-                <input
-                  value={userQuery}
-                  onChange={(e) => setUserQuery(e.target.value)}
-                  placeholder={t("searchUserPlaceholder")}
-                  className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
-                />
-                {visibleUserResults.length > 0 && (
-                  <div className="absolute z-10 mt-1 w-full bg-white border border-outline-variant rounded-lg shadow-md overflow-hidden">
-                    {visibleUserResults.map((u) => (
-                      <button
-                        key={u.id}
-                        onClick={() => {
-                          setSelectedUser(u);
-                          setUserResults([]);
-                        }}
-                        className="w-full text-left px-3 py-2 hover:bg-surface-container-low"
-                      >
-                        <p className="font-label-md text-label-md text-on-surface">{u.name}</p>
-                        <p className="font-label-sm text-label-sm text-on-surface-variant">{u.email}</p>
-                      </button>
-                    ))}
+          {session.status === "DRAFT" && (
+            <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4">
+              <h3 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-4">
+                <span className="material-symbols-outlined">person_add</span>
+                {t("addMemberManually")}
+              </h3>
+              {!selectedUser ? (
+                <div className="relative mb-3">
+                  <input
+                    value={userQuery}
+                    onChange={(e) => setUserQuery(e.target.value)}
+                    placeholder={t("searchUserPlaceholder")}
+                    className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
+                  />
+                  {visibleUserResults.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border border-outline-variant rounded-lg shadow-md overflow-hidden">
+                      {visibleUserResults.map((u) => (
+                        <button
+                          key={u.id}
+                          onClick={() => {
+                            setSelectedUser(u);
+                            setUserResults([]);
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-surface-container-low"
+                        >
+                          <p className="font-label-md text-label-md text-on-surface">{u.name}</p>
+                          <p className="font-label-sm text-label-sm text-on-surface-variant">{u.email}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3 mb-3">
+                  <div className="flex items-center justify-between bg-surface-container-lowest rounded-lg px-3 py-2">
+                    <span className="font-label-md text-label-md text-on-surface">{selectedUser.name}</span>
+                    <button onClick={() => setSelectedUser(null)} className="text-outline hover:text-error" aria-label={t("cancel")}>
+                      <span className="material-symbols-outlined text-[18px]">close</span>
+                    </button>
                   </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3 mb-3">
-                <div className="flex items-center justify-between bg-surface-container-lowest rounded-lg px-3 py-2">
-                  <span className="font-label-md text-label-md text-on-surface">{selectedUser.name}</span>
-                  <button onClick={() => setSelectedUser(null)} className="text-outline hover:text-error" aria-label={t("cancel")}>
-                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  <select
+                    value={addSlotCount}
+                    onChange={(e) => handleAddSlotCountChange(Number(e.target.value))}
+                    className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
+                  >
+                    {[1, 2, 3, 4, 5].map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt} {opt !== 1 ? t("slots") : t("slot")}
+                      </option>
+                    ))}
+                  </select>
+                  {addNames.map((name, i) => (
+                    <input
+                      key={i}
+                      value={name}
+                      onChange={(e) => setAddNames((current) => current.map((n, idx) => (idx === i ? e.target.value : n)))}
+                      placeholder={`${t("beneficiaryName")} — ${t("slot")} ${i + 1}`}
+                      className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
+                    />
+                  ))}
+                  <button
+                    onClick={addMemberManually}
+                    disabled={addingMember || addNames.some((n) => !n.trim())}
+                    className="w-full bg-primary text-on-primary font-label-md text-label-md py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50"
+                  >
+                    {addingMember ? t("recordingEllipsis") : t("addMemberManually")}
                   </button>
                 </div>
-                <select
-                  value={addSlotCount}
-                  onChange={(e) => handleAddSlotCountChange(Number(e.target.value))}
-                  className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
-                >
-                  {[1, 2, 3, 4, 5].map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt} {opt !== 1 ? t("slots") : t("slot")}
-                    </option>
-                  ))}
-                </select>
-                {addNames.map((name, i) => (
-                  <input
-                    key={i}
-                    value={name}
-                    onChange={(e) => setAddNames((current) => current.map((n, idx) => (idx === i ? e.target.value : n)))}
-                    placeholder={`${t("beneficiaryName")} — ${t("slot")} ${i + 1}`}
-                    className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
-                  />
-                ))}
-                <button
-                  onClick={addMemberManually}
-                  disabled={addingMember || addNames.some((n) => !n.trim())}
-                  className="w-full bg-primary text-on-primary font-label-md text-label-md py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50"
-                >
-                  {addingMember ? t("recordingEllipsis") : t("addMemberManually")}
-                </button>
-              </div>
-            )}
-            {addMemberResult && <p className="font-label-sm text-label-sm text-on-surface-variant">{addMemberResult}</p>}
-          </section>
+              )}
+              {addMemberResult && <p className="font-label-sm text-label-sm text-on-surface-variant">{addMemberResult}</p>}
+            </section>
+          )}
         </div>
       )}
 

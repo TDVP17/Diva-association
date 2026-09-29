@@ -21,9 +21,12 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
-    if (tontineSession.status !== "DRAFT" && tontineSession.status !== "CLOSED") {
+    if (tontineSession.status !== "DRAFT") {
       return NextResponse.json(
-        { error: "Cannot leave a cotisation that is already active or in drawing phase" },
+        {
+          error: "Impossible de quitter : le tirage au sort a déjà été lancé ou la cotisation est en cours.",
+          errorKey: "cannotLeaveOnceStarted",
+        },
         { status: 409 },
       );
     }

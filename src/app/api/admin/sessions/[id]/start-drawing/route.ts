@@ -26,6 +26,31 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
     await prisma.tontineSession.update({ where: { id }, data: { status: "DRAWING" } });
 
+    // Assign positions to any slots that do not have an official position yet
+    const slots = await prisma.membershipSlot.findMany({
+      where: { membership: { tontineSessionId: id, status: "APPROVED" } },
+      orderBy: [{ officialPosition: "asc" }, { createdAt: "asc" }],
+    });
+    const unassigned = slots.filter((s) => s.officialPosition === null);
+    if (unassigned.length > 0) {
+      const takenPositions = new Set(
+        slots.map((s) => s.officialPosition).filter((p): p is number => p !== null),
+      );
+      const availablePositions: number[] = [];
+      for (let i = 1; i <= slots.length; i++) {
+        if (!takenPositions.has(i)) availablePositions.push(i);
+      }
+      const shuffled = availablePositions.sort(() => Math.random() - 0.5);
+      await prisma.$transaction(
+        unassigned.map((slot, idx) =>
+          prisma.membershipSlot.update({
+            where: { id: slot.id },
+            data: { officialPosition: shuffled[idx] },
+          }),
+        ),
+      );
+    }
+
     const approvedMembers = await prisma.membership.findMany({
       where: { tontineSessionId: id, status: "APPROVED" },
       select: { userId: true },

@@ -29,7 +29,7 @@ export async function POST(
   try {
     const existing = await prisma.membership.findUnique({
       where: { id: membershipId },
-      include: { user: true, kycVerification: true },
+      include: { user: true, kycVerification: true, tontineSession: true },
     });
     if (!existing) {
       return NextResponse.json({ error: "Membership request not found" }, { status: 404 });
@@ -37,6 +37,13 @@ export async function POST(
 
     const action = parsed.data.action;
     const isApproved = action === "approve";
+
+    if (isApproved && existing.tontineSession.status !== "DRAFT") {
+      return NextResponse.json(
+        { error: "Impossible de valider ce membre : le tirage au sort a déjà été lancé ou la cotisation est en cours." },
+        { status: 409 },
+      );
+    }
     const approved = isApproved;
     const isBanned = action === "ban";
     const nextStatus = isApproved ? "APPROVED" : isBanned ? "BANNED" : "REJECTED";

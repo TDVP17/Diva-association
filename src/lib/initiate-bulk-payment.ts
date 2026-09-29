@@ -68,7 +68,10 @@ async function loadAndValidateSlots(userId: string, membershipSlotIds: string[],
     if (slot.membership.userId !== userId) {
       return { ok: false as const, status: 403, error: "You can only include your own names in a combined payment" };
     }
-    if (slot.membership.status !== "APPROVED" || slot.membership.tontineSession.status !== "ACTIVE") {
+    if (
+      slot.membership.status !== "APPROVED" ||
+      (slot.membership.tontineSession.status !== "ACTIVE" && slot.membership.tontineSession.status !== "DRAWING")
+    ) {
       return { ok: false as const, status: 409, error: `${slot.beneficiaryName} isn't currently accepting contributions` };
     }
     if (slot.membership.tontineSession.isPaused) {
@@ -117,7 +120,7 @@ export interface UnpaidSlotSummary {
 export async function listUnpaidSlotsForBulkPayment(userId: string): Promise<UnpaidSlotSummary[]> {
   const now = new Date();
   const memberships = await prisma.membership.findMany({
-    where: { userId, status: "APPROVED", tontineSession: { status: "ACTIVE" } },
+    where: { userId, status: "APPROVED", tontineSession: { status: { in: ["ACTIVE", "DRAWING"] } } },
     include: { tontineSession: true, slots: true },
   });
 

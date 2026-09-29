@@ -547,7 +547,7 @@ export default async function SessionDetailPage({
 
       <PayoutOrderAccordion tontineSessionId={id} lang={lang} />
 
-      {tontineSession.status !== "ACTIVE" && tontineSession.status !== "CLOSED" && (
+      {tontineSession.status === "DRAFT" && (
         <div className="mb-stack-gap-lg flex items-start gap-2 bg-secondary-container/15 text-on-secondary-container rounded-xl p-4 border border-secondary-fixed-dim/30">
           <span className="material-symbols-outlined text-[20px] flex-shrink-0 mt-0.5">info</span>
           <p className="font-body-md text-body-md">{t("paymentsAvailableAfterDraw")}</p>
@@ -600,7 +600,7 @@ export default async function SessionDetailPage({
                   { timeZone: "Africa/Douala", day: "numeric", month: "short", year: "numeric" },
                 )
               : null;
-            const notReadyForPayment = tontineSession.status !== "ACTIVE" || s.officialPosition === null;
+            const notReadyForPayment = tontineSession.status === "DRAFT";
             return (
               <div
                 key={s.id}
@@ -665,7 +665,7 @@ export default async function SessionDetailPage({
                     lang={lang}
                     lockedReason={
                       notReadyForPayment
-                        ? (s.officialPosition === null ? t("positionsNotYetAssigned") : t("paymentsAvailableAfterDraw"))
+                        ? t("paymentsAvailableAfterDraw")
                         : !roundLock.ok && currentBeneficiaryName
                           ? t("paymentsLockedUntilPayout", { name: currentBeneficiaryName })
                           : undefined

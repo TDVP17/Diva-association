@@ -290,36 +290,47 @@ export function MemberNamesManager({
             </div>
           )}
 
-          {/* Option to leave group */}
-          <div className="mt-2 pt-4 border-t border-surface-variant flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold text-on-surface">
-                {lang === "fr" ? "Quitter le groupe de cotisation" : "Leave Cotisation Group"}
-              </p>
-              <p className="text-[11px] text-on-surface-variant mt-0.5">
-                {lang === "fr"
-                  ? "Retirez votre participation de ce groupe de cotisation."
-                  : "Remove your participation from this contribution."}
-              </p>
+          {/* Option to leave group (only possible before draw / during DRAFT) */}
+          {sessionStatus === "DRAFT" ? (
+            <div className="mt-2 pt-4 border-t border-surface-variant flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold text-on-surface">
+                  {lang === "fr" ? "Quitter le groupe de cotisation" : "Leave Cotisation Group"}
+                </p>
+                <p className="text-[11px] text-on-surface-variant mt-0.5">
+                  {lang === "fr"
+                    ? "Retirez votre participation de ce groupe de cotisation."
+                    : "Remove your participation from this contribution."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleLeave}
+                disabled={leaving}
+                className="px-3.5 py-2 rounded-lg border border-error/30 text-error hover:bg-error/10 font-label-sm text-xs font-bold active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-60 flex-shrink-0"
+              >
+                <span className="material-symbols-outlined text-[16px]">logout</span>
+                <span>
+                  {leaving
+                    ? lang === "fr"
+                      ? "Déconnexion en cours..."
+                      : "Leaving..."
+                    : lang === "fr"
+                    ? "Quitter la cotisation"
+                    : "Leave Cotisation"}
+                </span>
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={handleLeave}
-              disabled={leaving}
-              className="px-3.5 py-2 rounded-lg border border-error/30 text-error hover:bg-error/10 font-label-sm text-xs font-bold active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-60 flex-shrink-0"
-            >
-              <span className="material-symbols-outlined text-[16px]">logout</span>
+          ) : (
+            <div className="mt-2 pt-4 border-t border-surface-variant flex items-center gap-2 text-xs text-on-surface-variant bg-surface-container-low p-2.5 rounded-lg">
+              <span className="material-symbols-outlined text-[18px] text-outline">lock</span>
               <span>
-                {leaving
-                  ? lang === "fr"
-                    ? "Déconnexion en cours..."
-                    : "Leaving..."
-                  : lang === "fr"
-                  ? "Quitter la cotisation"
-                  : "Leave Cotisation"}
+                {lang === "fr"
+                  ? "Le tirage au sort a été lancé : il n'est plus possible de quitter cette cotisation."
+                  : "The draw has been launched: leaving this cotisation is no longer possible."}
               </span>
-            </button>
-          </div>
+            </div>
+          )}
 
           {leaveError && (
             <p className="font-label-sm text-xs text-error bg-error/5 p-2 rounded-lg border border-error/20">

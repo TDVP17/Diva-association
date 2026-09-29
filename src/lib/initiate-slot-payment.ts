@@ -54,20 +54,15 @@ export async function getSlotPaymentQuote(
     where: { id: membershipSlotId },
     include: { membership: { include: { tontineSession: true } } },
   });
-  if (!slot || slot.membership.status !== "APPROVED" || slot.membership.tontineSession.status !== "ACTIVE") {
+  if (
+    !slot ||
+    slot.membership.status !== "APPROVED" ||
+    (slot.membership.tontineSession.status !== "ACTIVE" && slot.membership.tontineSession.status !== "DRAWING")
+  ) {
     return { ok: false, status: 404, error: "This slot isn't currently accepting contributions" };
   }
   if (slot.membership.tontineSession.isPaused) {
     return { ok: false, status: 409, error: "This cotisation is temporarily paused — payments will resume shortly" };
-  }
-  // Defense in depth: in practice the only route that ever flips a session
-  // to ACTIVE (publish-ranking) does so in the same transaction that
-  // assigns officialPosition to every slot, so this can't currently happen
-  // through the app's own routes — but the payment gate shouldn't rely on
-  // that being the only way ACTIVE ever gets set. A slot with no assigned
-  // position was never through the draw, regardless of session status.
-  if (slot.officialPosition === null) {
-    return { ok: false, status: 409, error: "This name hasn't been assigned a draw position yet" };
   }
 
   const { tontineSession } = slot.membership;
@@ -132,16 +127,15 @@ export async function initiateSlotPayment(
     where: { id: membershipSlotId },
     include: { membership: { include: { tontineSession: true } } },
   });
-  if (!slot || slot.membership.status !== "APPROVED" || slot.membership.tontineSession.status !== "ACTIVE") {
+  if (
+    !slot ||
+    slot.membership.status !== "APPROVED" ||
+    (slot.membership.tontineSession.status !== "ACTIVE" && slot.membership.tontineSession.status !== "DRAWING")
+  ) {
     return { ok: false, status: 404, error: "This slot isn't currently accepting contributions" };
   }
   if (slot.membership.tontineSession.isPaused) {
     return { ok: false, status: 409, error: "This cotisation is temporarily paused — payments will resume shortly" };
-  }
-  // See the identical check in getSlotPaymentQuote above for why this is
-  // enforced here independently of tontineSession.status.
-  if (slot.officialPosition === null) {
-    return { ok: false, status: 409, error: "This name hasn't been assigned a draw position yet" };
   }
 
   const { tontineSession } = slot.membership;

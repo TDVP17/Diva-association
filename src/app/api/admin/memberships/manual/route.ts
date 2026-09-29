@@ -28,6 +28,20 @@ export async function POST(request: Request) {
     );
   }
 
+  const tontineSession = await prisma.tontineSession.findUnique({
+    where: { id: tontineSessionId },
+    select: { status: true },
+  });
+  if (!tontineSession) {
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  }
+  if (tontineSession.status !== "DRAFT") {
+    return NextResponse.json(
+      { error: "Impossible d'ajouter un membre : le tirage au sort a déjà été lancé ou la cotisation est en cours." },
+      { status: 409 },
+    );
+  }
+
   const targetUser = await prisma.user.findUnique({ where: { id: userId } });
   if (!targetUser || targetUser.role !== "MEMBER") {
     return NextResponse.json({ error: "This user cannot be added as a member" }, { status: 400 });
