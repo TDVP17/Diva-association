@@ -110,9 +110,15 @@ export default async function SessionDetailPage({
                 {sessionLabel}
               </h1>
               {tontineSession.description && (
-                <p className="font-body-md text-body-md text-on-surface-variant mt-2 max-w-md mx-auto whitespace-pre-line bg-surface-container-low/70 p-3 rounded-lg border border-surface-variant">
-                  {tontineSession.description}
-                </p>
+                <details className="mt-2 max-w-md mx-auto w-full">
+                  <summary className="cursor-pointer font-label-sm text-label-sm text-primary flex items-center gap-1 justify-center hover:underline">
+                    <span className="material-symbols-outlined text-[16px]">info</span>
+                    {t("seeDescription")}
+                  </summary>
+                  <p className="font-body-md text-body-md text-on-surface-variant mt-2 whitespace-pre-line bg-surface-container-low/70 p-3 rounded-lg border border-surface-variant">
+                    {tontineSession.description}
+                  </p>
+                </details>
               )}
               <p className="font-body-md text-body-md text-red-600 font-semibold mt-1 flex items-center justify-center gap-1">
                 <span className="material-symbols-outlined text-[18px]">block</span>
@@ -211,9 +217,15 @@ export default async function SessionDetailPage({
             {sessionLabel}
           </h1>
           {tontineSession.description && (
-            <p className="font-body-md text-body-md text-on-surface-variant max-w-lg mx-auto bg-surface-container-low/80 p-3.5 rounded-lg border border-surface-variant text-left whitespace-pre-line">
-              {tontineSession.description}
-            </p>
+            <details className="max-w-lg mx-auto w-full">
+              <summary className="cursor-pointer font-label-sm text-label-sm text-primary flex items-center gap-1 justify-center hover:underline">
+                <span className="material-symbols-outlined text-[16px]">info</span>
+                {t("seeDescription")}
+              </summary>
+              <p className="font-body-md text-body-md text-on-surface-variant mt-2 bg-surface-container-low/80 p-3.5 rounded-lg border border-surface-variant text-left whitespace-pre-line">
+                {tontineSession.description}
+              </p>
+            </details>
           )}
           <p className="font-body-md text-body-md text-on-surface-variant">
             {t("notYetMemberBody")}
@@ -234,9 +246,15 @@ export default async function SessionDetailPage({
           <h1 className="font-title-md text-title-md text-primary">{t("approvalPending")}</h1>
           <h2 className="font-title-sm text-title-sm text-on-surface font-semibold">{sessionLabel}</h2>
           {tontineSession.description && (
-            <p className="font-body-md text-body-md text-on-surface-variant max-w-lg mx-auto bg-surface-container-low/80 p-3 rounded-lg border border-surface-variant text-left whitespace-pre-line mt-1">
-              {tontineSession.description}
-            </p>
+            <details className="max-w-lg mx-auto w-full">
+              <summary className="cursor-pointer font-label-sm text-label-sm text-primary flex items-center gap-1 justify-center hover:underline">
+                <span className="material-symbols-outlined text-[16px]">info</span>
+                {t("seeDescription")}
+              </summary>
+              <p className="font-body-md text-body-md text-on-surface-variant mt-2 bg-surface-container-low/80 p-3 rounded-lg border border-surface-variant text-left whitespace-pre-line">
+                {tontineSession.description}
+              </p>
+            </details>
           )}
           <p className="font-body-md text-body-md text-on-surface-variant">
             {t("approvalPendingBody", { session: sessionLabel })}
@@ -309,9 +327,15 @@ export default async function SessionDetailPage({
           <h1 className="font-title-md text-title-md text-primary">{t("selectYourSlots")}</h1>
           <h2 className="font-title-sm text-title-sm text-on-surface font-semibold">{sessionLabel}</h2>
           {tontineSession.description && (
-            <p className="font-body-md text-body-md text-on-surface-variant max-w-lg mx-auto bg-surface-container-low/80 p-3 rounded-lg border border-surface-variant text-left whitespace-pre-line">
-              {tontineSession.description}
-            </p>
+            <details className="max-w-lg mx-auto w-full">
+              <summary className="cursor-pointer font-label-sm text-label-sm text-primary flex items-center gap-1 justify-center hover:underline">
+                <span className="material-symbols-outlined text-[16px]">info</span>
+                {t("seeDescription")}
+              </summary>
+              <p className="font-body-md text-body-md text-on-surface-variant mt-2 bg-surface-container-low/80 p-3 rounded-lg border border-surface-variant text-left whitespace-pre-line">
+                {tontineSession.description}
+              </p>
+            </details>
           )}
           <p className="font-body-md text-body-md text-on-surface-variant">
             {t("selectYourSlotsBody", { session: sessionLabel })}
@@ -515,9 +539,15 @@ export default async function SessionDetailPage({
             </span>
             <h1 className="text-xl md:text-2xl font-bold text-on-surface">{sessionLabel}</h1>
             {tontineSession.description && (
-              <p className="font-body-md text-body-md text-on-surface-variant mt-2 whitespace-pre-line leading-relaxed max-w-2xl bg-surface-container-low/60 p-3 rounded-lg border border-surface-variant/70">
-                {tontineSession.description}
-              </p>
+              <details className="mt-2 max-w-2xl">
+                <summary className="cursor-pointer font-label-sm text-label-sm text-primary flex items-center gap-1 hover:underline">
+                  <span className="material-symbols-outlined text-[16px]">info</span>
+                  {t("seeDescription")}
+                </summary>
+                <p className="font-body-md text-body-md text-on-surface-variant mt-2 whitespace-pre-line leading-relaxed bg-surface-container-low/60 p-3 rounded-lg border border-surface-variant/70">
+                  {tontineSession.description}
+                </p>
+              </details>
             )}
             <p className="font-body-md text-body-md text-on-surface-variant flex items-center gap-1 mt-2">
               <span className="material-symbols-outlined text-sm">event</span>

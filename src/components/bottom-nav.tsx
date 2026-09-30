@@ -38,7 +38,7 @@ export function BottomNav({ lang, badges }: { lang: Lang; badges?: Record<string
                 {item.icon}
               </span>
               {badgeCount > 0 && (
-                <span className="absolute -top-1.5 -right-2.5 inline-flex items-center justify-center min-w-[17px] h-[17px] px-1 rounded-full bg-red-600 text-white font-bold text-[10px] leading-none shadow-sm ring-2 ring-white">
+                <span className={`absolute -top-1.5 -right-2.5 inline-flex items-center justify-center min-w-[17px] h-[17px] px-1 rounded-full text-white font-bold text-[10px] leading-none shadow-sm ring-2 ring-white ${item.href === "/sessions" ? "bg-primary" : "bg-red-600"}`}>
                   {badgeCount > 99 ? "99+" : badgeCount}
                 </span>
               )}

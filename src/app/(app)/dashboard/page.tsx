@@ -80,9 +80,15 @@ export default async function DashboardPage() {
                       {m.tontineSession.title || TONTINE_LABELS[m.tontineSession.type]}
                     </h3>
                     {m.tontineSession.description && (
-                      <p className="font-body-sm text-xs text-on-surface-variant line-clamp-1 mt-0.5 max-w-sm">
-                        {m.tontineSession.description}
-                      </p>
+                      <details className="mt-0.5 max-w-sm">
+                        <summary className="cursor-pointer font-label-sm text-[11px] text-primary flex items-center gap-0.5 hover:underline">
+                          <span className="material-symbols-outlined text-[13px]">info</span>
+                          {t("seeDescription")}
+                        </summary>
+                        <p className="font-body-sm text-xs text-on-surface-variant line-clamp-3 mt-1">
+                          {m.tontineSession.description}
+                        </p>
+                      </details>
                     )}
                     <p className="font-numeric-data text-numeric-data text-on-surface">{formatXAF(amount)}</p>
                     <p className="font-label-sm text-label-sm text-on-surface-variant">

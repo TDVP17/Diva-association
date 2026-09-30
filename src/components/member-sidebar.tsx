@@ -43,7 +43,7 @@ export function MemberSidebar({ lang, badges }: { lang: Lang; badges?: Record<st
               {t(item.label)}
             </span>
             {badgeCount > 0 && (
-              <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-red-600 text-white font-bold text-[10px] leading-none shadow-sm">
+              <span className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full font-bold text-[10px] leading-none shadow-sm ${item.href === "/sessions" ? "bg-white/90 text-primary" : "bg-red-600 text-white"}`}>
                 {badgeCount > 99 ? "99+" : badgeCount}
               </span>
             )}

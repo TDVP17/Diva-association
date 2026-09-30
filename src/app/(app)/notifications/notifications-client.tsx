@@ -112,7 +112,7 @@ export function NotificationsClient({ lang }: { lang: Lang }) {
       {notifications.map((n) => (
         <div
           key={n.id}
-          className={`relative bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border p-4 flex flex-col gap-1 transition-colors ${
+          className={`relative bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border p-3 flex flex-col gap-0.5 transition-colors ${
             n.readAt ? "border-surface-variant" : "border-primary bg-primary/5"
           }`}
         >
@@ -122,22 +122,22 @@ export function NotificationsClient({ lang }: { lang: Lang }) {
               dismiss(n.id);
             }}
             aria-label={t("dismissNotification")}
-            className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-low hover:text-error transition-colors"
+            className="absolute top-1.5 right-1.5 w-5 h-5 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-low hover:text-error transition-colors"
           >
-            <span className="material-symbols-outlined text-[16px]">close</span>
+            <span className="material-symbols-outlined text-[14px]">close</span>
           </button>
-          <button onClick={() => handleClick(n)} className="text-left flex flex-col gap-1 pr-6">
+          <button onClick={() => handleClick(n)} className="text-left flex flex-col gap-0.5 pr-5">
             <div className="flex items-center justify-between gap-2">
-              <span className="font-label-md text-label-md text-primary">{t(TYPE_KEY[n.type] ?? "notifTypeAdminBroadcast")}</span>
-              {!n.readAt && <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />}
+              <span className="font-label-sm text-[11px] text-primary font-semibold uppercase tracking-wide">{t(TYPE_KEY[n.type] ?? "notifTypeAdminBroadcast")}</span>
+              {!n.readAt && <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />}
             </div>
             {n.contributionLabel && (
-              <p className="font-label-sm text-label-sm text-on-surface-variant">{n.contributionLabel}</p>
+              <p className="font-label-sm text-[11px] text-on-surface-variant">{n.contributionLabel}</p>
             )}
-            <p className="font-body-md text-body-md text-on-surface whitespace-pre-wrap">
+            <p className="font-body-sm text-xs text-on-surface whitespace-pre-wrap leading-relaxed">
               {renderNotificationMessage(n, lang)}
             </p>
-            <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">
+            <p className="font-label-sm text-[10px] text-on-surface-variant/70 mt-0.5">
               {new Date(n.sentAt).toLocaleString("en-GB", { timeZone: "Africa/Douala" })}
             </p>
           </button>

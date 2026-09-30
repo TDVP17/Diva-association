@@ -68,6 +68,7 @@ export const translations = {
     sessionStatusDrawing: "Draw in progress",
     sessionStatusActive: "Contributions active",
     sessionStatusClosed: "Closed",
+    seeDescription: "See description",
     contributionStartDateLabel: "Contribution start date",
     paymentsAvailableAfterDraw:
       "Contributions will become available after the draw has been completed and member positions have been assigned.",
@@ -1096,6 +1097,7 @@ export const translations = {
     sessionStatusDrawing: "Tirage en cours",
     sessionStatusActive: "Cotisations actives",
     sessionStatusClosed: "Clôturée",
+    seeDescription: "Voir la description",
     contributionStartDateLabel: "Date de début de la cotisation",
     paymentsAvailableAfterDraw:
       "Les cotisations seront disponibles une fois le tirage terminé et les positions des membres attribuées.",

@@ -114,9 +114,15 @@ export default async function SessionsPage() {
                     {m.tontineSession.title || TONTINE_LABELS[m.tontineSession.type]}
                   </h3>
                   {m.tontineSession.description && (
-                    <p className="font-body-sm text-xs text-on-surface-variant/80 line-clamp-2 mt-0.5 max-w-md">
-                      {m.tontineSession.description}
-                    </p>
+                    <details className="mt-0.5 max-w-md">
+                      <summary className="cursor-pointer font-label-sm text-[11px] text-primary flex items-center gap-0.5 hover:underline">
+                        <span className="material-symbols-outlined text-[13px]">info</span>
+                        {t("seeDescription")}
+                      </summary>
+                      <p className="font-body-sm text-xs text-on-surface-variant/80 line-clamp-3 mt-1">
+                        {m.tontineSession.description}
+                      </p>
+                    </details>
                   )}
                   <p className="font-label-sm text-label-sm text-on-surface-variant">
                     {m.status === "APPROVED"
@@ -166,9 +172,15 @@ export default async function SessionsPage() {
                     {s.title || TONTINE_LABELS[s.type]}
                   </h3>
                   {s.description && (
-                    <p className="font-body-sm text-xs text-on-surface-variant/80 line-clamp-2 mt-0.5 max-w-md">
-                      {s.description}
-                    </p>
+                    <details className="mt-0.5 max-w-md">
+                      <summary className="cursor-pointer font-label-sm text-[11px] text-primary flex items-center gap-0.5 hover:underline">
+                        <span className="material-symbols-outlined text-[13px]">info</span>
+                        {t("seeDescription")}
+                      </summary>
+                      <p className="font-body-sm text-xs text-on-surface-variant/80 line-clamp-3 mt-1">
+                        {s.description}
+                      </p>
+                    </details>
                   )}
                   <p className="font-label-sm text-label-sm text-on-surface-variant">
                     {t("startsOn")} {s.startDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short", year: "numeric" })}
@@ -224,9 +236,15 @@ export default async function SessionsPage() {
                       {c.title}
                     </h3>
                     {c.description && (
-                      <p className="font-body-sm text-xs text-on-surface-variant/80 line-clamp-2 mt-0.5 max-w-md">
-                        {c.description}
-                      </p>
+                      <details className="mt-0.5 max-w-md">
+                        <summary className="cursor-pointer font-label-sm text-[11px] text-primary flex items-center gap-0.5 hover:underline">
+                          <span className="material-symbols-outlined text-[13px]">info</span>
+                          {t("seeDescription")}
+                        </summary>
+                        <p className="font-body-sm text-xs text-on-surface-variant/80 line-clamp-3 mt-1">
+                          {c.description}
+                        </p>
+                      </details>
                     )}
                     <p className="font-label-sm text-label-sm text-on-surface-variant">
                       {t("startsOn")}{" "}

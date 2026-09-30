@@ -11,6 +11,7 @@ interface MembershipRequest {
   user: {
     id: string;
     name: string;
+    email: string;
     avatar: string | null;
     image: string | null;
     latitude: number | null;
@@ -78,70 +79,39 @@ export function AdminMembershipRequestsClient({ lang }: { lang: Lang }) {
           key={m.id}
           className="flex flex-col gap-2 p-3 bg-surface-container-lowest border-b last:border-b-0 border-outline-variant/30"
         >
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 rounded-full bg-tertiary-container text-on-tertiary flex items-center justify-center font-label-md text-label-md overflow-hidden flex-shrink-0">
-                {m.user.avatar ?? m.user.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={m.user.avatar ?? m.user.image!} alt={m.user.name} className="w-full h-full object-cover" />
-                ) : (
-                  m.user.name.slice(0, 2).toUpperCase()
-                )}
-              </div>
-              <div className="min-w-0">
-                <p className="font-label-md text-label-md text-on-surface font-semibold truncate">
-                  {m.user.name}
-                </p>
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-500/10 text-amber-950 border border-amber-300/60 font-semibold text-xs mt-0.5">
-                  <span className="material-symbols-outlined text-[14px] text-amber-700">account_balance</span>
-                  <span>
-                    {lang === "fr" ? "Veut intégrer :" : "Wants to join:"}{" "}
-                    {m.tontineSession.title || TONTINE_LABELS[m.tontineSession.type] || m.tontineSession.type}
-                  </span>
-                </div>
-              </div>
+          {/* ── User info ── */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-full bg-tertiary-container text-on-tertiary flex items-center justify-center font-label-md text-label-md overflow-hidden flex-shrink-0">
+              {m.user.avatar ?? m.user.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={m.user.avatar ?? m.user.image!} alt={m.user.name} className="w-full h-full object-cover" />
+              ) : (
+                m.user.name.slice(0, 2).toUpperCase()
+              )}
             </div>
-            <div className="flex gap-2 flex-shrink-0">
-              <Link
-                href={`/admin/support?with=${encodeURIComponent(m.user.id)}&name=${encodeURIComponent(m.user.name)}`}
-                className="px-2 py-1 rounded border border-outline-variant text-on-surface-variant font-label-sm text-label-sm hover:bg-surface flex items-center gap-1"
-              >
-                <span className="material-symbols-outlined text-[16px]">chat_bubble</span>
-                {t("messageApplicant")}
-              </Link>
-              <button
-                onClick={() => setRejectTarget(m)}
-                className="px-2 py-1 rounded border border-outline-variant text-on-surface-variant font-label-sm text-label-sm hover:bg-surface"
-              >
-                {t("reject")}
-              </button>
-              <button
-                onClick={() => {
-                  const confirmMsg =
-                    lang === "fr"
-                      ? `Voulez-vous vraiment bannir ${m.user.name} ? Cette personne sera bannie de l'application et ne pourra plus se connecter avec son email ou son numéro de téléphone.`
-                      : `Are you sure you want to ban ${m.user.name}? This user will be banned from the application and cannot log in with their email or phone number.`;
-                  if (window.confirm(confirmMsg)) {
-                    decideMembership(m, "ban");
-                  }
-                }}
-                className="px-2 py-1 rounded border border-error/30 text-error bg-error-container/20 font-label-sm text-label-sm hover:bg-error-container/40"
-              >
-                {lang === "fr" ? "Bannir" : "Ban"}
-              </button>
-              <button
-                onClick={() => decideMembership(m, "approve")}
-                className="px-2 py-1 rounded bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90"
-              >
-                {t("approve")}
-              </button>
+            <div className="min-w-0">
+              <p className="font-label-md text-label-md text-on-surface font-semibold truncate">
+                {m.user.name}
+              </p>
+              <p className="font-label-sm text-xs text-on-surface-variant truncate">
+                {m.user.email}
+              </p>
             </div>
           </div>
-          <p className="font-label-sm text-label-sm text-on-surface-variant pl-12">
+
+          {/* ── Cotisation badge ── */}
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-950 border border-amber-300/60 font-semibold text-xs self-start">
+            <span className="material-symbols-outlined text-[14px] text-amber-700">account_balance</span>
+            <span>
+              {lang === "fr" ? "Veut intégrer :" : "Wants to join:"}{" "}
+              {m.tontineSession.title || TONTINE_LABELS[m.tontineSession.type] || m.tontineSession.type}
+            </span>
+          </div>
+          <p className="font-label-sm text-label-sm text-on-surface-variant">
             {t("submittedOnLabel")}: {new Date(m.joinedAt).toLocaleString("en-GB", { timeZone: "Africa/Douala" })}
           </p>
           {(m.user.latitude !== null && m.user.longitude !== null) || m.user.city ? (
-            <p className="font-label-sm text-label-sm text-on-surface-variant pl-12 flex items-center gap-1 flex-wrap">
+            <p className="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1 flex-wrap">
               <span className="material-symbols-outlined text-[16px] flex-shrink-0">location_on</span>
               {[m.user.city, m.user.neighborhood].filter(Boolean).join(", ") || t("gpsLocationLabel")}
               {m.user.latitude !== null && m.user.longitude !== null && (
@@ -157,7 +127,7 @@ export function AdminMembershipRequestsClient({ lang }: { lang: Lang }) {
             </p>
           ) : null}
           {m.kycVerification && (
-            <div className="pl-12">
+            <div>
               <p className="font-label-sm text-label-sm text-on-surface-variant mb-1.5 flex items-center gap-1.5 flex-wrap">
                 <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-secondary-container/30 text-on-secondary-container font-label-sm text-[10px] uppercase tracking-wide flex-shrink-0">
                   {t(m.kycVerification.documentType === "RECEPISSE" ? "documentTypeRecepisse" : "documentTypeCni")}
@@ -247,6 +217,43 @@ export function AdminMembershipRequestsClient({ lang }: { lang: Lang }) {
               )}
             </div>
           )}
+
+          {/* ── Action buttons ── */}
+          <div className="flex flex-wrap gap-2 pt-1 border-t border-outline-variant/20 mt-1">
+            <Link
+              href={`/admin/support?with=${encodeURIComponent(m.user.id)}&name=${encodeURIComponent(m.user.name)}`}
+              className="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-label-sm text-label-sm hover:bg-surface-container-low transition-colors flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-[16px]">chat_bubble</span>
+              {t("messageApplicant")}
+            </Link>
+            <button
+              onClick={() => setRejectTarget(m)}
+              className="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-label-sm text-label-sm hover:bg-surface-container-low transition-colors"
+            >
+              {t("reject")}
+            </button>
+            <button
+              onClick={() => {
+                const confirmMsg =
+                  lang === "fr"
+                    ? `Voulez-vous vraiment bannir ${m.user.name} ? Cette personne sera bannie de l'application et ne pourra plus se connecter avec son email ou son numéro de téléphone.`
+                    : `Are you sure you want to ban ${m.user.name}? This user will be banned from the application and cannot log in with their email or phone number.`;
+                if (window.confirm(confirmMsg)) {
+                  decideMembership(m, "ban");
+                }
+              }}
+              className="px-3 py-1.5 rounded-lg border border-error/30 text-error bg-error-container/20 font-label-sm text-label-sm hover:bg-error-container/40 transition-colors"
+            >
+              {lang === "fr" ? "Bannir" : "Ban"}
+            </button>
+            <button
+              onClick={() => decideMembership(m, "approve")}
+              className="px-3 py-1.5 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 transition-colors ml-auto"
+            >
+              {t("approve")}
+            </button>
+          </div>
         </div>
       ))}
       {rejectTarget && (

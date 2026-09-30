@@ -31,7 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // the User.avatar column instead, which the JWT/session never reads. A
   // fresh DB read here (this layout re-runs every request) shows the
   // current photo immediately after upload, with no session refresh needed.
-  const [dbUser, unreadMessages, unreadNotifList, unpaidFines, pendingCotisations] = await Promise.all([
+  const [dbUser, unreadMessages, unreadNotifList, unpaidFines, totalCotisations] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
       select: { avatar: true, image: true, phone: true, isBanned: true },
@@ -47,7 +47,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       select: { type: true, tontineSessionId: true, messageKey: true, message: true },
     }),
     prisma.fine.count({ where: { membershipSlot: { membership: { userId: session.user.id } }, status: "UNPAID" } }),
-    prisma.membership.count({ where: { userId: session.user.id, status: "APPROVED", slotCount: null } }),
+    prisma.tontineSession.count({ where: { status: { not: "CLOSED" } } }),
   ]);
 
   const seenNotif = new Set<string>();
@@ -65,7 +65,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   const navBadges: Record<string, number> = {
-    "/sessions": pendingCotisations,
+    "/sessions": totalCotisations,
     "/fines": unpaidFines,
     "/chat": unreadMessages,
     "/notifications": unreadNotifications,
