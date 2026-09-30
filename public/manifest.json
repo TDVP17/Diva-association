@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Diva Association",
-  "short_name": "Diva Association",
+  "name": "DIVA Association",
+  "short_name": "DIVA Association",
   "description": "Gestion automatisée de cotisations et tontines.",
   "start_url": "/dashboard",
   "scope": "/",

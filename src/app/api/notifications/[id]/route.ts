@@ -9,11 +9,22 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   }
 
   const { id } = await params;
-  const notification = await prisma.notification.findUnique({ where: { id }, select: { userId: true } });
+  const notification = await prisma.notification.findUnique({
+    where: { id },
+    select: { userId: true, type: true, tontineSessionId: true, message: true },
+  });
   if (!notification || notification.userId !== session.user.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  await prisma.notification.delete({ where: { id } });
+  // Delete this notification and any duplicate rows
+  await prisma.notification.deleteMany({
+    where: {
+      userId: session.user.id,
+      type: notification.type,
+      tontineSessionId: notification.tontineSessionId,
+      message: notification.message,
+    },
+  });
   return NextResponse.json({ ok: true });
 }

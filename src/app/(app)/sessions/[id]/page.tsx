@@ -537,23 +537,6 @@ export default async function SessionDetailPage({
         </div>
       </section>
 
-      <MemberNamesManager
-        tontineSessionId={id}
-        lang={lang}
-        currentNames={mySlots.map((s) => s.beneficiaryName)}
-        sessionStatus={tontineSession.status}
-        maxSlots={tontineSession.maxSlots ? Number(tontineSession.maxSlots) : null}
-      />
-
-      <PayoutOrderAccordion tontineSessionId={id} lang={lang} />
-
-      {tontineSession.status === "DRAFT" && (
-        <div className="mb-stack-gap-lg flex items-start gap-2 bg-secondary-container/15 text-on-secondary-container rounded-xl p-4 border border-secondary-fixed-dim/30">
-          <span className="material-symbols-outlined text-[20px] flex-shrink-0 mt-0.5">info</span>
-          <p className="font-body-md text-body-md">{t("paymentsAvailableAfterDraw")}</p>
-        </div>
-      )}
-
       {(tontineSession.status === "DRAWING" || tontineSession.status === "ACTIVE") &&
         myUndrawnSlots.length > 0 && (
           <Link
@@ -574,17 +557,8 @@ export default async function SessionDetailPage({
         />
       )}
 
-      <SwapRequestPanel
-        tontineSessionId={id}
-        currentUserId={userId}
-        myPosition={myPosition}
-        coMembers={coMembers}
-        pendingRequests={pendingSwapRequests}
-        lang={lang}
-      />
-
-      <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
-      <section className="mb-stack-gap-lg lg:mb-0">
+      {/* Vos noms : affiché en premier avant les noms enregistrés et l'ordre de versement */}
+      <section className="mb-stack-gap-lg">
         <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md px-1 flex items-center gap-2">
           {t("yourSlots")}
         </h2>
@@ -609,11 +583,11 @@ export default async function SessionDetailPage({
                 <div className="flex items-center gap-3 flex-grow min-w-0 mr-2">
                   <div className="flex-shrink-0">
                     {paid ? (
-                      <div className="w-8 h-8 rounded-full bg-[#d1fae5] text-[#059669] flex items-center justify-center shadow-xs" title={t("checkedPaid")}>
+                      <div className="w-8 h-8 rounded-full bg-[#d1fae5] text-[#059669] flex items-center justify-center shadow-xs" title={t("paid")}>
                         <span className="material-symbols-outlined text-[20px] font-bold">check_circle</span>
                       </div>
                     ) : (
-                      <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center border border-slate-200" title={t("notCheckedPending")}>
+                      <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center border border-slate-200" title={t("due")}>
                         <span className="material-symbols-outlined text-[20px]">radio_button_unchecked</span>
                       </div>
                     )}
@@ -623,14 +597,10 @@ export default async function SessionDetailPage({
                       <span className="font-label-md text-label-md text-on-surface truncate font-semibold">
                         {s.beneficiaryName}
                       </span>
-                      {paid ? (
+                      {paid && (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold bg-[#d1fae5] text-[#065f46]">
                           <span className="material-symbols-outlined text-[13px]">check</span>
-                          {t("checkedPaid")}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600">
-                          {t("notCheckedPending")}
+                          {t("paid")}
                         </span>
                       )}
                     </div>
@@ -678,8 +648,30 @@ export default async function SessionDetailPage({
         </div>
       </section>
 
+      {/* Mes noms enregistrés */}
+      <MemberNamesManager
+        tontineSessionId={id}
+        lang={lang}
+        currentNames={mySlots.map((s) => s.beneficiaryName)}
+        sessionStatus={tontineSession.status}
+        maxSlots={tontineSession.maxSlots ? Number(tontineSession.maxSlots) : null}
+      />
+
+      {/* Ordre de versement */}
+      <PayoutOrderAccordion tontineSessionId={id} lang={lang} />
+
+      {/* Statut des membres */}
       <MemberStatusAccordion slots={memberStatusSlots} lang={lang} />
-      </div>
+
+      {/* Demandes de permutation */}
+      <SwapRequestPanel
+        tontineSessionId={id}
+        currentUserId={userId}
+        myPosition={myPosition}
+        coMembers={coMembers}
+        pendingRequests={pendingSwapRequests}
+        lang={lang}
+      />
     </main>
   );
 }

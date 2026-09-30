@@ -31,16 +31,34 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // the User.avatar column instead, which the JWT/session never reads. A
   // fresh DB read here (this layout re-runs every request) shows the
   // current photo immediately after upload, with no session refresh needed.
-  const [dbUser, unreadMessages, unreadNotifications, unpaidFines, pendingCotisations] = await Promise.all([
+  const [dbUser, unreadMessages, unreadNotifList, unpaidFines, pendingCotisations] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
       select: { avatar: true, image: true, phone: true, isBanned: true },
     }),
     prisma.chatMessage.count({ where: { receiverId: session.user.id, readAt: null } }),
-    prisma.notification.count({ where: { userId: session.user.id, status: { in: ["SENT", "FAILED"] }, readAt: null } }),
+    prisma.notification.findMany({
+      where: {
+        userId: session.user.id,
+        channel: "IN_APP",
+        status: { in: ["SENT", "FAILED"] },
+        readAt: null,
+      },
+      select: { type: true, tontineSessionId: true, messageKey: true, message: true },
+    }),
     prisma.fine.count({ where: { membershipSlot: { membership: { userId: session.user.id } }, status: "UNPAID" } }),
     prisma.membership.count({ where: { userId: session.user.id, status: "APPROVED", slotCount: null } }),
   ]);
+
+  const seenNotif = new Set<string>();
+  let unreadNotifications = 0;
+  for (const n of unreadNotifList) {
+    const key = `${n.type}-${n.tontineSessionId ?? "global"}-${n.messageKey ?? n.message}`;
+    if (!seenNotif.has(key)) {
+      seenNotif.add(key);
+      unreadNotifications++;
+    }
+  }
 
   if (dbUser?.isBanned) {
     redirect("/login?error=AccountBanned");

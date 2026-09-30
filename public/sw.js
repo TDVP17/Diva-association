@@ -121,24 +121,26 @@ self.addEventListener("push", (event) => {
     return;
   }
 
-  const title = payload.title || "DIVA Association";
+  const title = payload.title || "DIVA";
   const options = {
     body: payload.body || "",
     icon: "/icons/icon-192.png",
-    badge: "/icons/icon-192.png",
+    badge: "/icons/refined-mark.png",
+    vibrate: [200, 100, 200],
+    tag: payload.tag || undefined,
+    renotify: true,
+    requireInteraction: false, // Allows swiping away / deleting in Android shade without opening app
     data: { url: payload.url || "/dashboard" },
   };
 
   event.waitUntil(
     (async () => {
       await self.registration.showNotification(title, options);
-      // Sets the home-screen icon badge directly from the count the server
-      // computed at send time — works even with the app fully closed, which
-      // the foreground-only polling in notification-badge-sync.tsx cannot
-      // do on its own. Unsupported browsers (iOS Safari) no-op safely.
-      if (typeof payload.badgeCount === "number" && "setAppBadge" in self.navigator) {
+      // Sets the home-screen icon badge (dot / counter) on the home screen icon (Android launchers like HiOS/Samsung)
+      const badgeNum = typeof payload.badgeCount === "number" ? payload.badgeCount : 1;
+      if ("setAppBadge" in self.navigator) {
         try {
-          if (payload.badgeCount > 0) await self.navigator.setAppBadge(payload.badgeCount);
+          if (badgeNum > 0) await self.navigator.setAppBadge(badgeNum);
           else await self.navigator.clearAppBadge();
         } catch (err) {
           console.error("[sw] setAppBadge failed:", err);

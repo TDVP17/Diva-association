@@ -15,14 +15,30 @@ export async function GET() {
   }
 
   const notifications = await prisma.notification.findMany({
-    where: { userId: session.user.id, status: { in: ["SENT", "FAILED"] } },
+    where: {
+      userId: session.user.id,
+      channel: "IN_APP",
+      status: { in: ["SENT", "FAILED"] },
+    },
     include: { tontineSession: { select: { title: true, type: true } } },
     orderBy: { sentAt: "desc" },
     take: 100,
   });
 
+  // Deduplicate identical notifications (same type, session, and message) so users never see doubled cards
+  const seen = new Set<string>();
+  const uniqueNotifications = [];
+
+  for (const n of notifications) {
+    const key = `${n.type}-${n.tontineSessionId ?? "global"}-${n.messageKey ?? n.message}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniqueNotifications.push(n);
+    }
+  }
+
   return NextResponse.json({
-    notifications: notifications.map((n) => ({
+    notifications: uniqueNotifications.map((n) => ({
       id: n.id,
       type: n.type,
       message: n.message,

@@ -41,9 +41,32 @@ export async function scheduleNotifications(params: {
 }): Promise<number> {
   if (params.recipients.length === 0) return 0;
 
+  // Deduplicate: ignore identical notifications scheduled within 10 minutes
+  let uniqueRecipients = params.recipients;
+  if (typeof prisma?.notification?.findMany === "function") {
+    const userIds = params.recipients.map((r) => r.userId);
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+
+    const existingRecent = await prisma.notification.findMany({
+      where: {
+        userId: { in: userIds },
+        tontineSessionId: params.tontineSessionId,
+        channel: params.channel,
+        type: params.type,
+        createdAt: { gte: tenMinutesAgo },
+      },
+      select: { userId: true },
+    });
+
+    const recentUserIds = new Set(existingRecent.map((n) => n.userId));
+    uniqueRecipients = params.recipients.filter((r) => !recentUserIds.has(r.userId));
+  }
+
+  if (uniqueRecipients.length === 0) return 0;
+
   const now = Date.now();
   await prisma.notification.createMany({
-    data: params.recipients.map((r, index) => ({
+    data: uniqueRecipients.map((r, index) => ({
       tontineSessionId: params.tontineSessionId,
       userId: r.userId,
       channel: params.channel,
@@ -57,7 +80,7 @@ export async function scheduleNotifications(params: {
     })),
   });
 
-  return params.recipients.length;
+  return uniqueRecipients.length;
 }
 
 /**
@@ -90,10 +113,18 @@ async function deliverInstantNotifications(params: {
 
         // 1. Deliver instant Web Push to phone
         try {
+          const badgeCount =
+            typeof prisma?.notification?.count === "function"
+              ? (await prisma.notification.count({
+                  where: { userId: r.userId, channel: "IN_APP", status: { in: ["SENT", "FAILED"] }, readAt: null },
+                })) || 1
+              : 1;
+
           await sendPushToUser(r.userId, {
             title,
             body: r.message,
             url: r.actionUrl,
+            badgeCount,
           });
         } catch (pushErr) {
           console.error("[push] instant delivery failed:", pushErr);

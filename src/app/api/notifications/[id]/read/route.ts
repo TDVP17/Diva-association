@@ -9,11 +9,24 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   }
 
   const { id } = await params;
-  const notification = await prisma.notification.findUnique({ where: { id }, select: { userId: true } });
+  const notification = await prisma.notification.findUnique({
+    where: { id },
+    select: { userId: true, type: true, tontineSessionId: true, message: true },
+  });
   if (!notification || notification.userId !== session.user.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  await prisma.notification.update({ where: { id }, data: { readAt: new Date() } });
+  // Mark this notification and any duplicate rows as read
+  await prisma.notification.updateMany({
+    where: {
+      userId: session.user.id,
+      type: notification.type,
+      tontineSessionId: notification.tontineSessionId,
+      message: notification.message,
+      readAt: null,
+    },
+    data: { readAt: new Date() },
+  });
   return NextResponse.json({ ok: true });
 }

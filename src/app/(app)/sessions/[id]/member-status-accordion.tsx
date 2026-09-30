@@ -78,11 +78,11 @@ export function MemberStatusAccordion({
             >
               <div className="flex-shrink-0 mr-2">
                 {s.paid ? (
-                  <span className="material-symbols-outlined text-[#059669] text-xl font-bold" title={t("checkedPaid")}>
+                  <span className="material-symbols-outlined text-[#059669] text-xl font-bold" title={t("paid")}>
                     check_circle
                   </span>
                 ) : (
-                  <span className="material-symbols-outlined text-slate-300 text-xl" title={t("notCheckedPending")}>
+                  <span className="material-symbols-outlined text-slate-300 text-xl" title={t("notYetPaid")}>
                     radio_button_unchecked
                   </span>
                 )}
@@ -105,7 +105,7 @@ export function MemberStatusAccordion({
                   )}
                   {s.paid && (
                     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#d1fae5] text-[#065f46]">
-                      {t("checkedPaid")}
+                      {t("paid")}
                     </span>
                   )}
                 </div>
@@ -138,12 +138,12 @@ export function MemberStatusAccordion({
                   {s.paid ? (
                     <>
                       <span className="material-symbols-outlined text-[14px]">check</span>
-                      {t("checkedPaid")}
+                      {t("paid")}
                     </>
                   ) : s.fineAmount ? (
                     t("late")
                   ) : (
-                    t("notCheckedPending")
+                    t("notYetPaid")
                   )}
                 </span>
                 {s.fineAmount && s.fineAmount > 0 && (

@@ -18,6 +18,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: { default: SITE_TITLE, template: `%s — ${SITE_TITLE}` },
   description: SITE_DESCRIPTION,
+  applicationName: "DIVA Association",
   manifest: "/manifest.json",
   // iOS Safari's "Add to Home Screen" ignores manifest.json entirely — it
   // reads this meta tag for the label under the home-screen icon. Kept in
@@ -69,6 +70,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           rel="stylesheet"
         />
         <meta name="theme-color" content="#003528" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="application-name" content="DIVA Association" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <script
           dangerouslySetInnerHTML={{

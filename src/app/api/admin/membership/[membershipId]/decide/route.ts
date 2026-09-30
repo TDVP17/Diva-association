@@ -47,6 +47,15 @@ export async function POST(
     const approved = isApproved;
     const isBanned = action === "ban";
     const nextStatus = isApproved ? "APPROVED" : isBanned ? "BANNED" : "REJECTED";
+
+    // Idempotency guard: prevent duplicate decisions and duplicate notifications
+    if (existing.status === nextStatus) {
+      return NextResponse.json({
+        ok: true,
+        message: isApproved ? "Ce membre est déjà validé." : "Décision déjà enregistrée.",
+      });
+    }
+
     const lang = existing.user.preferredLang === "en" ? "en" : "fr";
 
     const membership = await prisma.membership.update({

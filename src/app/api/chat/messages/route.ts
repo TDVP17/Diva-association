@@ -103,10 +103,16 @@ export async function POST(request: Request) {
     const chatUrl = `/chat?with=${session.user.id}`;
     const baseUrl = process.env.NEXTAUTH_URL ?? "https://diva-association.vercel.app";
 
+    const unreadChatCount =
+      (await prisma.chatMessage.count({
+        where: { receiverId: receiver.id, readAt: null },
+      })) || 1;
+
     void sendPushToUser(receiver.id, {
       title: `Nouveau message - ${senderName}`,
       body: preview,
       url: chatUrl,
+      badgeCount: unreadChatCount,
     }).catch((err) => console.error("[chat] Push notification failed:", err));
 
     if (receiver.phone) {
