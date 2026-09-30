@@ -11,6 +11,7 @@ interface MemberNamesManagerProps {
   currentNames: string[];
   sessionStatus: "DRAFT" | "ACTIVE" | "DRAWING" | "CLOSED";
   maxSlots?: number | null;
+  startDate?: string | Date | null;
 }
 
 export function MemberNamesManager({
@@ -19,6 +20,7 @@ export function MemberNamesManager({
   currentNames,
   sessionStatus,
   maxSlots,
+  startDate,
 }: MemberNamesManagerProps) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
   const router = useRouter();
@@ -35,8 +37,11 @@ export function MemberNamesManager({
   const [leaving, setLeaving] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
 
-  // Adding and deleting names is ONLY possible if the cotisation has not yet started
-  const canEditNames = sessionStatus === "DRAFT";
+  // Adding, deleting names, and leaving are ONLY possible if the cotisation has not yet started
+  const isStarted =
+    sessionStatus !== "DRAFT" || (startDate ? new Date() >= new Date(startDate) : false);
+  const canEditNames = !isStarted;
+  const canLeave = !isStarted;
   const slotLimit = maxSlots ? Math.min(Number(maxSlots), 10) : 5;
 
   function handleAddName() {
@@ -133,8 +138,7 @@ export function MemberNamesManager({
         setLeaveError(data.error || t("couldNotLeaveCotisation"));
         return;
       }
-      router.push("/sessions");
-      router.refresh();
+      window.location.href = "/sessions";
     } catch {
       setLeaveError(t("couldNotLeaveCotisation"));
     } finally {
@@ -290,8 +294,8 @@ export function MemberNamesManager({
             </div>
           )}
 
-          {/* Option to leave group (only possible before draw / during DRAFT) */}
-          {sessionStatus === "DRAFT" ? (
+          {/* Option to leave group (only possible before draw / before cotisation starts) */}
+          {canLeave ? (
             <div className="mt-2 pt-4 border-t border-surface-variant flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold text-on-surface">
@@ -299,8 +303,8 @@ export function MemberNamesManager({
                 </p>
                 <p className="text-[11px] text-on-surface-variant mt-0.5">
                   {lang === "fr"
-                    ? "Retirez votre participation de ce groupe de cotisation."
-                    : "Remove your participation from this contribution."}
+                    ? "Retirez votre participation de ce groupe avant le début de la cotisation."
+                    : "Remove your participation from this contribution before it starts."}
                 </p>
               </div>
               <button
@@ -313,7 +317,7 @@ export function MemberNamesManager({
                 <span>
                   {leaving
                     ? lang === "fr"
-                      ? "Déconnexion en cours..."
+                      ? "Départ en cours..."
                       : "Leaving..."
                     : lang === "fr"
                     ? "Quitter la cotisation"
@@ -325,9 +329,7 @@ export function MemberNamesManager({
             <div className="mt-2 pt-4 border-t border-surface-variant flex items-center gap-2 text-xs text-on-surface-variant bg-surface-container-low p-2.5 rounded-lg">
               <span className="material-symbols-outlined text-[18px] text-outline">lock</span>
               <span>
-                {lang === "fr"
-                  ? "Le tirage au sort a été lancé : il n'est plus possible de quitter cette cotisation."
-                  : "The draw has been launched: leaving this cotisation is no longer possible."}
+                {t("cannotLeaveCotisationStarted")}
               </span>
             </div>
           )}

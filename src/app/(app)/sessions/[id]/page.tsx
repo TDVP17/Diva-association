@@ -139,7 +139,10 @@ export default async function SessionDetailPage({
               <div>
                 <p className="text-on-surface-variant text-xs">{t("validatedMembersCount", { count: "" }).replace("{count}", "").trim()}</p>
                 <p className="font-semibold text-on-surface">
-                  {Math.max(tontineSession.validatedMembersCount ?? 0, tontineSession.memberships.filter((m) => m.status === "APPROVED").length)}
+                  {(() => {
+                    const approvedCount = tontineSession.memberships.filter((m) => m.status === "APPROVED").length;
+                    return approvedCount > 0 ? approvedCount : (tontineSession.validatedMembersCount ?? 0);
+                  })()}
                   {tontineSession.maxSlots ? ` / ${tontineSession.maxSlots}` : ""}
                 </p>
               </div>
@@ -655,6 +658,7 @@ export default async function SessionDetailPage({
         currentNames={mySlots.map((s) => s.beneficiaryName)}
         sessionStatus={tontineSession.status}
         maxSlots={tontineSession.maxSlots ? Number(tontineSession.maxSlots) : null}
+        startDate={tontineSession.startDate}
       />
 
       {/* Ordre de versement */}

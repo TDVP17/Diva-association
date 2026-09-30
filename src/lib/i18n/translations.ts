@@ -694,6 +694,7 @@ export const translations = {
       "Are you sure you want to leave this cotisation? Your names and membership will be removed.",
     leavingCotisation: "Leaving...",
     couldNotLeaveCotisation: "Could not leave the cotisation",
+    cannotLeaveCotisationStarted: "The cotisation has already started: leaving this cotisation is no longer possible.",
     leftCotisationSuccess: "You have left this cotisation.",
     existingMemberRelaunchNotice:
       "This cotisation is in preparation (or relaunched for a new cycle). As an existing approved member, you do not need to reapply! You can adjust your names (increase or reduce from 1 to 5) or leave the cotisation before the draw.",
@@ -1723,6 +1724,7 @@ export const translations = {
       "Êtes-vous sûr de vouloir quitter cette cotisation ? Vos noms et votre adhésion seront retirés.",
     leavingCotisation: "Sortie en cours...",
     couldNotLeaveCotisation: "Impossible de quitter la cotisation",
+    cannotLeaveCotisationStarted: "La cotisation a déjà commencé : il est impossible de quitter cette cotisation.",
     leftCotisationSuccess: "Vous avez quitté cette cotisation avec succès.",
     existingMemberRelaunchNotice:
       "Cette cotisation est en phase de préparation (ou relancée pour un nouveau cycle). En tant que membre déjà approuvé, vous n'avez pas besoin de refaire une demande ! Vous pouvez ajuster vos noms (augmenter ou réduire de 1 à 5) ou quitter la cotisation avant le tirage.",

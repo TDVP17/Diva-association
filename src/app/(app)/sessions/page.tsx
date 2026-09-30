@@ -67,7 +67,7 @@ export default async function SessionsPage() {
     const regSlots = sumRegisteredSlots(s.memberships);
     const isFull = s.maxSlots !== null && regSlots >= Number(s.maxSlots);
     const approvedDbCount = s.memberships.filter((m) => m.status === "APPROVED").length;
-    const membersCount = Math.max(s.validatedMembersCount ?? 0, approvedDbCount);
+    const membersCount = approvedDbCount > 0 ? approvedDbCount : (s.validatedMembersCount ?? 0);
     return {
       id: s.id,
       title: s.title || TONTINE_LABELS[s.type] || s.type,
@@ -164,7 +164,7 @@ export default async function SessionsPage() {
                   </p>
                   {(() => {
                     const approvedDbCount = s.memberships.filter((m) => m.status === "APPROVED").length;
-                    const membersCount = Math.max(s.validatedMembersCount ?? 0, approvedDbCount);
+                    const membersCount = approvedDbCount > 0 ? approvedDbCount : (s.validatedMembersCount ?? 0);
                     const count = membersCount || (s.maxSlots ? Number(s.maxSlots) : 1);
                     const pot = Math.round(count * Number(s.amount) + count * Number(s.fee) * 0.25);
                     return (
