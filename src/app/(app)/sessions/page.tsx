@@ -71,6 +71,7 @@ export default async function SessionsPage() {
     return {
       id: s.id,
       title: s.title || TONTINE_LABELS[s.type] || s.type,
+      description: s.description,
       startDate: s.startDate,
       membersCount,
       amount: Number(s.amount),
@@ -112,6 +113,11 @@ export default async function SessionsPage() {
                   <h3 className="font-label-md text-label-md text-on-surface">
                     {m.tontineSession.title || TONTINE_LABELS[m.tontineSession.type]}
                   </h3>
+                  {m.tontineSession.description && (
+                    <p className="font-body-sm text-xs text-on-surface-variant/80 line-clamp-2 mt-0.5 max-w-md">
+                      {m.tontineSession.description}
+                    </p>
+                  )}
                   <p className="font-label-sm text-label-sm text-on-surface-variant">
                     {m.status === "APPROVED"
                       ? m.slotCount === null
@@ -159,6 +165,11 @@ export default async function SessionsPage() {
                   <h3 className="font-label-md text-label-md text-on-surface">
                     {s.title || TONTINE_LABELS[s.type]}
                   </h3>
+                  {s.description && (
+                    <p className="font-body-sm text-xs text-on-surface-variant/80 line-clamp-2 mt-0.5 max-w-md">
+                      {s.description}
+                    </p>
+                  )}
                   <p className="font-label-sm text-label-sm text-on-surface-variant">
                     {t("startsOn")} {s.startDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short", year: "numeric" })}
                   </p>
@@ -212,6 +223,11 @@ export default async function SessionsPage() {
                     <h3 className="font-label-md text-label-md text-on-surface font-medium">
                       {c.title}
                     </h3>
+                    {c.description && (
+                      <p className="font-body-sm text-xs text-on-surface-variant/80 line-clamp-2 mt-0.5 max-w-md">
+                        {c.description}
+                      </p>
+                    )}
                     <p className="font-label-sm text-label-sm text-on-surface-variant">
                       {t("startsOn")}{" "}
                       {c.startDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {

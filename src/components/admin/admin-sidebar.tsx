@@ -6,6 +6,9 @@ import { translate, type Lang } from "@/lib/i18n/translations";
 
 const BASE_ITEMS = [
   { href: "/admin", label: "adminNavDashboard", icon: "space_dashboard" },
+  { href: "/admin/membership-requests", label: "cotisationMembershipRequestsCard", icon: "group_add" },
+  { href: "/admin/users", label: "allUsersCard", icon: "group" },
+  { href: "/admin/contributions", label: "myCotisationsCard", icon: "account_balance" },
   { href: "/admin/notifications", label: "adminNavNotifications", icon: "notifications" },
   { href: "/admin/support", label: "adminNavSupport", icon: "support_agent" },
   { href: "/admin/payment-issues", label: "paymentIssuesCard", icon: "shield_person" },
@@ -18,6 +21,7 @@ export interface AdminNavCounts {
   support?: number;
   notifications?: number;
   paymentIssues?: number;
+  membershipRequests?: number;
 }
 
 export function AdminSidebar({
@@ -44,7 +48,9 @@ export function AdminSidebar({
               ? counts?.notifications
               : item.href === "/admin/payment-issues"
                 ? counts?.paymentIssues
-                : undefined;
+                : item.href === "/admin/membership-requests"
+                  ? counts?.membershipRequests
+                  : undefined;
 
         return (
           <Link

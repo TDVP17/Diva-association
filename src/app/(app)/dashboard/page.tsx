@@ -79,6 +79,11 @@ export default async function DashboardPage() {
                     <h3 className="font-label-md text-label-md text-primary uppercase tracking-wide">
                       {m.tontineSession.title || TONTINE_LABELS[m.tontineSession.type]}
                     </h3>
+                    {m.tontineSession.description && (
+                      <p className="font-body-sm text-xs text-on-surface-variant line-clamp-1 mt-0.5 max-w-sm">
+                        {m.tontineSession.description}
+                      </p>
+                    )}
                     <p className="font-numeric-data text-numeric-data text-on-surface">{formatXAF(amount)}</p>
                     <p className="font-label-sm text-label-sm text-on-surface-variant">
                       {t("plusFeeSuffix", { fee: formatXAF(fee) })} &middot; {t(sessionStatusKey(m.tontineSession.status))}

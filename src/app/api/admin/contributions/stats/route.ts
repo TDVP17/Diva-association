@@ -72,6 +72,7 @@ export async function GET() {
       return {
         id: s.id,
         title: s.title || TONTINE_LABELS[s.type] || s.type,
+        description: s.description,
         type: s.type,
         status: s.status,
         totalMembers: slots.length,

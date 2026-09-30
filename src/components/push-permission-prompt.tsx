@@ -23,13 +23,37 @@ export function PushPermissionPrompt({ lang }: { lang: Lang }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const handle = setTimeout(() => {
+    const handle = setTimeout(async () => {
       if (!VAPID_PUBLIC_KEY) return;
       if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
-      if (typeof Notification === "undefined" || Notification.permission !== "default") return;
+      if (typeof Notification === "undefined") return;
+
+      // When notifications are already enabled on phone/browser, auto-register subscription to server
+      if (Notification.permission === "granted") {
+        try {
+          const registration = await navigator.serviceWorker.ready;
+          let subscription = await registration.pushManager.getSubscription();
+          if (!subscription) {
+            subscription = await registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as BufferSource,
+            });
+          }
+          await fetch("/api/push/subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(subscription.toJSON()),
+          });
+        } catch (err) {
+          console.warn("[push] background auto-subscribe error:", err);
+        }
+        return;
+      }
+
+      if (Notification.permission !== "default") return;
       if (localStorage.getItem(DISMISSED_KEY)) return;
       setVisible(true);
-    }, 0);
+    }, 500);
     return () => clearTimeout(handle);
   }, []);
 

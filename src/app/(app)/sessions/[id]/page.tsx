@@ -10,6 +10,7 @@ import { JoinButton } from "./join-button";
 import { VerificationPollingRefresh } from "./verification-status";
 import { SelectSlotsForm } from "./select-slots-form";
 import { MemberNamesManager } from "./member-names-manager";
+import { YourSlotsAccordion } from "./your-slots-accordion";
 import { PayoutOrderAccordion } from "./payout-order-accordion";
 import { MemberStatusAccordion } from "./member-status-accordion";
 import { PayoutTurnPanel } from "./payout-turn-panel";
@@ -108,6 +109,11 @@ export default async function SessionDetailPage({
               <h1 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">
                 {sessionLabel}
               </h1>
+              {tontineSession.description && (
+                <p className="font-body-md text-body-md text-on-surface-variant mt-2 max-w-md mx-auto whitespace-pre-line bg-surface-container-low/70 p-3 rounded-lg border border-surface-variant">
+                  {tontineSession.description}
+                </p>
+              )}
               <p className="font-body-md text-body-md text-red-600 font-semibold mt-1 flex items-center justify-center gap-1">
                 <span className="material-symbols-outlined text-[18px]">block</span>
                 {t("newMemberNotAllowed")}
@@ -204,6 +210,11 @@ export default async function SessionDetailPage({
           <h1 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">
             {sessionLabel}
           </h1>
+          {tontineSession.description && (
+            <p className="font-body-md text-body-md text-on-surface-variant max-w-lg mx-auto bg-surface-container-low/80 p-3.5 rounded-lg border border-surface-variant text-left whitespace-pre-line">
+              {tontineSession.description}
+            </p>
+          )}
           <p className="font-body-md text-body-md text-on-surface-variant">
             {t("notYetMemberBody")}
           </p>
@@ -221,6 +232,12 @@ export default async function SessionDetailPage({
         <section className="bg-surface rounded-xl p-6 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant text-center flex flex-col items-center gap-2">
           <span className="material-symbols-outlined text-primary text-4xl">hourglass_top</span>
           <h1 className="font-title-md text-title-md text-primary">{t("approvalPending")}</h1>
+          <h2 className="font-title-sm text-title-sm text-on-surface font-semibold">{sessionLabel}</h2>
+          {tontineSession.description && (
+            <p className="font-body-md text-body-md text-on-surface-variant max-w-lg mx-auto bg-surface-container-low/80 p-3 rounded-lg border border-surface-variant text-left whitespace-pre-line mt-1">
+              {tontineSession.description}
+            </p>
+          )}
           <p className="font-body-md text-body-md text-on-surface-variant">
             {t("approvalPendingBody", { session: sessionLabel })}
           </p>
@@ -290,6 +307,12 @@ export default async function SessionDetailPage({
         <section className="bg-surface rounded-xl p-6 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant text-center flex flex-col items-center gap-3 mb-stack-gap-lg">
           <span className="material-symbols-outlined text-primary text-4xl">confirmation_number</span>
           <h1 className="font-title-md text-title-md text-primary">{t("selectYourSlots")}</h1>
+          <h2 className="font-title-sm text-title-sm text-on-surface font-semibold">{sessionLabel}</h2>
+          {tontineSession.description && (
+            <p className="font-body-md text-body-md text-on-surface-variant max-w-lg mx-auto bg-surface-container-low/80 p-3 rounded-lg border border-surface-variant text-left whitespace-pre-line">
+              {tontineSession.description}
+            </p>
+          )}
           <p className="font-body-md text-body-md text-on-surface-variant">
             {t("selectYourSlotsBody", { session: sessionLabel })}
           </p>
@@ -491,7 +514,12 @@ export default async function SessionDetailPage({
               {t(sessionStatusKey(tontineSession.status))}
             </span>
             <h1 className="text-xl md:text-2xl font-bold text-on-surface">{sessionLabel}</h1>
-            <p className="font-body-md text-body-md text-on-surface-variant flex items-center gap-1 mt-1">
+            {tontineSession.description && (
+              <p className="font-body-md text-body-md text-on-surface-variant mt-2 whitespace-pre-line leading-relaxed max-w-2xl bg-surface-container-low/60 p-3 rounded-lg border border-surface-variant/70">
+                {tontineSession.description}
+              </p>
+            )}
+            <p className="font-body-md text-body-md text-on-surface-variant flex items-center gap-1 mt-2">
               <span className="material-symbols-outlined text-sm">event</span>
               {t("contributionStartDateLabel")}:{" "}
               {tontineSession.startDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-GB", {
@@ -560,12 +588,14 @@ export default async function SessionDetailPage({
         />
       )}
 
-      {/* Vos noms : affiché en premier avant les noms enregistrés et l'ordre de versement */}
-      <section className="mb-stack-gap-lg">
-        <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md px-1 flex items-center gap-2">
-          {t("yourSlots")}
-        </h2>
-        <div className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant overflow-hidden">
+      {/* Vos noms : fermé par défaut avec accordéon pour ouvrir comme les autres */}
+      <YourSlotsAccordion
+        lang={lang}
+        title={t("yourSlots")}
+        slotsCount={mySlots.length}
+        paidCount={mySlots.filter((s) => contributionBySlot.get(s.id)?.status === "PAID").length}
+      >
+        <div className="bg-surface overflow-hidden">
           {mySlots.map((s, index) => {
             const c = contributionBySlot.get(s.id);
             const f = fineBySlot.get(s.id);
@@ -649,7 +679,7 @@ export default async function SessionDetailPage({
             );
           })}
         </div>
-      </section>
+      </YourSlotsAccordion>
 
       {/* Mes noms enregistrés */}
       <MemberNamesManager

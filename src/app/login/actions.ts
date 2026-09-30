@@ -10,6 +10,7 @@ import { createOtpChallenge, verifyOtp } from "@/lib/otp";
 import { sendEmailSafe } from "@/lib/email/resend";
 import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { getLang } from "@/lib/i18n/get-lang";
 
 export interface AuthFormState {
   error?: string;
@@ -55,10 +56,16 @@ export async function signInAction(
   _prevState: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
+  const lang = await getLang();
   const rawIdentifier = String(formData.get("email") ?? formData.get("identifier") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   if (!rawIdentifier || !password) {
-    return { error: "Email or phone number and password are required." };
+    return {
+      error:
+        lang === "fr"
+          ? "L'e-mail ou le numéro de téléphone et le mot de passe sont requis."
+          : "Email or phone number and password are required.",
+    };
   }
 
   try {
@@ -69,18 +76,26 @@ export async function signInAction(
     if (user?.isBanned) {
       return {
         error:
-          "Ce compte a été banni. Vous ne pouvez plus vous connecter à l'application avec cet email ou ce numéro de téléphone.",
+          lang === "fr"
+            ? "Ce compte a été banni. Vous ne pouvez plus vous connecter à l'application avec cet email ou ce numéro de téléphone."
+            : "This account has been banned. You can no longer log in with this email or phone number.",
       };
     }
 
     if (!rawIdentifier.includes("@")) {
       if (!user) {
-        return { error: "Incorrect email, phone number, or password." };
+        return {
+          error:
+            lang === "fr"
+              ? "Email, numéro de téléphone ou mot de passe incorrect."
+              : "Incorrect email, phone number, or password.",
+        };
       }
       emailToUse = user.email;
       userRole = user.role;
     } else {
       userRole = user?.role ?? null;
+      emailToUse = rawIdentifier.toLowerCase();
     }
 
     let redirectTo = callbackUrl;
@@ -92,10 +107,20 @@ export async function signInAction(
   } catch (err) {
     if (isRedirectSignal(err)) throw err; // successful sign-in — let the redirect happen
     if (err instanceof AuthError) {
-      return { error: "Incorrect email, phone number, or password." };
+      return {
+        error:
+          lang === "fr"
+            ? "Email, numéro de téléphone ou mot de passe incorrect."
+            : "Incorrect email, phone number, or password.",
+      };
     }
     console.error("[signInAction] unexpected error:", err);
-    return { error: "Something went wrong while signing you in. Please try again." };
+    return {
+      error:
+        lang === "fr"
+          ? "Une erreur est survenue lors de la connexion. Veuillez réessayer."
+          : "Something went wrong while signing you in. Please try again.",
+    };
   }
 }
 
@@ -271,23 +296,40 @@ export async function signUpAction(
   _prevState: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
+  const lang = await getLang();
   const fullName = String(formData.get("fullName") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim();
+  const rawEmail = String(formData.get("email") ?? "").trim();
+  const email = rawEmail.toLowerCase();
   const password = String(formData.get("password") ?? "");
 
   if (!fullName || !email || !password) {
-    return { error: "All fields are required." };
+    return {
+      error:
+        lang === "fr"
+          ? "Tous les champs sont obligatoires."
+          : "All fields are required.",
+    };
   }
   if (password.length < 6) {
-    return { error: "Password must be at least 6 characters." };
+    return {
+      error:
+        lang === "fr"
+          ? "Le mot de passe doit comporter au moins 6 caractères."
+          : "Password must be at least 6 characters.",
+    };
   }
 
   const existingBanned = await prisma.user.findUnique({
-    where: { email: email.toLowerCase() },
+    where: { email },
     select: { isBanned: true },
   });
   if (existingBanned?.isBanned) {
-    return { error: "Cet email est banni. Vous ne pouvez plus créer de compte avec cette adresse." };
+    return {
+      error:
+        lang === "fr"
+          ? "Cet email est banni. Vous ne pouvez plus créer de compte avec cette adresse."
+          : "This email has been banned. You cannot create an account with this address.",
+    };
   }
 
   try {
@@ -297,26 +339,59 @@ export async function signUpAction(
       options: { data: { full_name: fullName } },
     });
 
+    const isAlreadyRegistered =
+      Boolean(
+        error &&
+          (error.message?.toLowerCase().includes("already registered") ||
+            error.message?.toLowerCase().includes("already exists") ||
+            error.message?.toLowerCase().includes("user already") ||
+            (error as { code?: string })?.code === "user_already_exists" ||
+            error.message?.toLowerCase().includes("already been registered"))
+      ) ||
+      Boolean(data?.user?.identities && data.user.identities.length === 0);
+
+    if (isAlreadyRegistered) {
+      return {
+        error:
+          lang === "fr"
+            ? "Un compte existe déjà avec cette adresse email. Deux personnes peuvent avoir le même nom, mais l'adresse email doit être unique pour chaque compte. Veuillez vous connecter ou utiliser une autre adresse email."
+            : "An account with this email address already exists. Multiple members can share the same name, but each account must have a unique email address. Please sign in or use another email address.",
+      };
+    }
+
     if (error) {
-      return { error: error.message };
+      if (error.message?.toLowerCase().includes("rate limit")) {
+        return {
+          error:
+            lang === "fr"
+              ? "Trop de tentatives. Veuillez patienter un instant avant de réessayer."
+              : "Too many attempts. Please wait a moment before trying again.",
+        };
+      }
+      return {
+        error:
+          lang === "fr"
+            ? `Erreur lors de la création du compte : ${error.message}`
+            : error.message,
+      };
     }
+
     if (!data.user) {
-      return { error: "Could not create your account. Please try again." };
-    }
-    if (data.user.identities && data.user.identities.length === 0) {
-      // Supabase's signal for "this email is already registered" when email
-      // enumeration protection is on: it returns a fake-success user instead
-      // of a clear error, to avoid leaking which emails already have accounts.
-      return { error: "An account with this email already exists. Try signing in instead." };
+      return {
+        error:
+          lang === "fr"
+            ? "Impossible de créer votre compte. Veuillez réessayer."
+            : "Could not create your account. Please try again.",
+      };
     }
 
     // Supabase Auth now owns the credential; mirror the account into our own
     // users table so the rest of the app (role, memberships, etc.) has
-    // something to attach to. A personal/sponsor code, if the user ever
-    // sets one, is added later — not required to create an account.
+    // something to attach to. Note that Prisma schema allows duplicate names,
+    // only email is unique across accounts.
     const user = await prisma.user.upsert({
       where: { email },
-      update: {},
+      update: { name: fullName },
       create: { email, name: fullName },
     });
     // Every member gets their unique code right away, not just once their
@@ -327,7 +402,10 @@ export async function signUpAction(
     if (!data.session) {
       // Email confirmation is required before the account can sign in.
       return {
-        success: "Account created! Check your email to confirm it, then sign in.",
+        success:
+          lang === "fr"
+            ? "Compte créé avec succès ! Vérifiez vos e-mails pour le confirmer, puis connectez-vous."
+            : "Account created! Check your email to confirm it, then sign in.",
       };
     }
 
@@ -336,10 +414,20 @@ export async function signUpAction(
   } catch (err) {
     if (isRedirectSignal(err)) throw err; // successful sign-in — let the redirect happen
     if (err instanceof AuthError) {
-      return { success: "Account created — please sign in." };
+      return {
+        success:
+          lang === "fr"
+            ? "Compte créé — veuillez vous connecter."
+            : "Account created — please sign in.",
+      };
     }
     console.error("[signUpAction] unexpected error:", err);
-    return { error: "Something went wrong while creating your account. Please try again." };
+    return {
+      error:
+        lang === "fr"
+          ? "Une erreur est survenue lors de la création de votre compte. Veuillez réessayer."
+          : "Something went wrong while creating your account. Please try again.",
+    };
   }
 }
 

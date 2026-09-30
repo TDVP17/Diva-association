@@ -10,6 +10,7 @@ import { sessionStatusKey } from "@/lib/session-status-label";
 interface ContributionCard {
   id: string;
   title: string;
+  description?: string | null;
   type: string;
   status: string;
   totalMembers: number;
@@ -103,6 +104,11 @@ export function AdminContributionsClient({ lang }: { lang: Lang }) {
                 </button>
               </div>
             </div>
+            {c.description && (
+              <p className="font-body-sm text-xs text-on-surface-variant line-clamp-2 -mt-1">
+                {c.description}
+              </p>
+            )}
             <Link href={`/admin/contributions/${c.id}`} className="grid grid-cols-2 gap-2">
               <Stat label={t("membersLabel")} value={`${c.paidMembers}/${c.totalMembers}`} />
               <Stat label={t("receivedLabel")} value={formatXAF(c.receivedAmount)} />

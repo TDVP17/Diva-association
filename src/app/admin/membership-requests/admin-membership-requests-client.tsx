@@ -88,12 +88,18 @@ export function AdminMembershipRequestsClient({ lang }: { lang: Lang }) {
                   m.user.name.slice(0, 2).toUpperCase()
                 )}
               </div>
-              <p className="font-label-md text-label-md text-on-surface truncate">
-                {t("wantsToJoin", {
-                  name: m.user.name,
-                  session: m.tontineSession.title || TONTINE_LABELS[m.tontineSession.type] || m.tontineSession.type,
-                })}
-              </p>
+              <div className="min-w-0">
+                <p className="font-label-md text-label-md text-on-surface font-semibold truncate">
+                  {m.user.name}
+                </p>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-500/10 text-amber-950 border border-amber-300/60 font-semibold text-xs mt-0.5">
+                  <span className="material-symbols-outlined text-[14px] text-amber-700">account_balance</span>
+                  <span>
+                    {lang === "fr" ? "Veut intégrer :" : "Wants to join:"}{" "}
+                    {m.tontineSession.title || TONTINE_LABELS[m.tontineSession.type] || m.tontineSession.type}
+                  </span>
+                </div>
+              </div>
             </div>
             <div className="flex gap-2 flex-shrink-0">
               <Link

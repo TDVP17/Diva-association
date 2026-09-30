@@ -777,7 +777,12 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
             <h2 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary">
               {sessionLabel}
             </h2>
-            <div className="flex items-center gap-2 mt-1">
+            {session.description && (
+              <p className="font-body-md text-sm text-on-surface-variant mt-1.5 max-w-2xl bg-surface-container-low/70 p-3 rounded-lg border border-surface-variant/70 whitespace-pre-line">
+                {session.description}
+              </p>
+            )}
+            <div className="flex items-center gap-2 mt-2">
               <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-secondary-container/30 text-on-secondary-container font-label-sm text-label-sm">
                 {t(sessionStatusKey(session.status))}
               </span>
