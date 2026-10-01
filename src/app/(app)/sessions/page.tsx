@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { assertJoinable, sumRegisteredSlots } from "@/lib/session-joinability";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
+import { getTontineConfig } from "@/lib/tontine-engine";
 import { HideClosedSessionButton } from "./hide-closed-session-button";
 import { formatXAF } from "@/lib/format-currency";
 import { sessionStatusKey } from "@/lib/session-status-label";
@@ -78,6 +79,10 @@ export default async function SessionsPage() {
       fee: Number(s.fee),
       isFull,
       isActive: s.status === "ACTIVE",
+      type: s.type,
+      limitTime: s.limitTime,
+      fineAmountPerPeriod: s.fineAmountPerPeriod ? Number(s.fineAmountPerPeriod) : null,
+      fineIntervalHours: s.fineIntervalHours,
     };
   });
 
@@ -114,12 +119,15 @@ export default async function SessionsPage() {
                     {m.tontineSession.title || TONTINE_LABELS[m.tontineSession.type]}
                   </h3>
                   {m.tontineSession.description && (
-                    <details className="mt-0.5 max-w-md">
-                      <summary className="cursor-pointer font-label-sm text-[11px] text-primary flex items-center gap-0.5 hover:underline">
-                        <span className="material-symbols-outlined text-[13px]">info</span>
-                        {t("seeDescription")}
+                    <details className="my-1 max-w-md pointer-events-auto relative z-10" onClick={(e) => e.stopPropagation()}>
+                      <summary
+                        className="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 font-medium text-[11px] hover:bg-emerald-100 transition-colors shadow-2xs list-none [&::-webkit-details-marker]:hidden"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <span className="text-[12px]">✨</span>
+                        <span>{t("seeDescription")}</span>
                       </summary>
-                      <p className="font-body-sm text-xs text-on-surface-variant/80 line-clamp-3 mt-1">
+                      <p className="font-body-sm text-xs text-on-surface-variant/80 line-clamp-3 mt-1.5 bg-surface-container-low/70 p-2.5 rounded-lg border border-surface-variant/60 leading-relaxed">
                         {m.tontineSession.description}
                       </p>
                     </details>
@@ -135,6 +143,33 @@ export default async function SessionsPage() {
                           ? (lang === "fr" ? "Accès banni" : "Access banned")
                           : (lang === "fr" ? "Demande refusée (cliquez pour redemander)" : "Rejected (tap to re-apply)")}
                   </p>
+                  {(() => {
+                    const fallback = getTontineConfig(m.tontineSession.type);
+                    const fAmount = m.tontineSession.fineAmountPerPeriod
+                      ? Number(m.tontineSession.fineAmountPerPeriod)
+                      : (fallback?.fineAmountPerPeriod ?? 500);
+                    const fInterval = m.tontineSession.fineIntervalHours ?? fallback?.fineIntervalHours ?? 24;
+                    const lTime = m.tontineSession.limitTime || "18:30";
+                    return (
+                      <details
+                        className="mt-1 max-w-md pointer-events-auto relative z-10"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <summary
+                          className="cursor-pointer font-label-sm text-[11px] text-amber-700 flex items-center gap-1 hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <span className="material-symbols-outlined text-[13px]">gavel</span>
+                          {lang === "fr" ? "Règles des amendes" : "Fine rules"} ({formatXAF(fAmount)})
+                        </summary>
+                        <p className="font-body-sm text-[11px] text-on-surface-variant/90 mt-1 bg-amber-50/70 p-2 rounded border border-amber-200/60 leading-relaxed">
+                          {lang === "fr"
+                            ? `Amende de ${formatXAF(fAmount)} après ${lTime}, puis toutes les ${fInterval}h si le paiement n'est pas fait.`
+                            : `Fine of ${formatXAF(fAmount)} after ${lTime}, then every ${fInterval}h if unpaid.`}
+                        </p>
+                      </details>
+                    );
+                  })()}
                 </div>
                 <div className="relative z-10 flex items-center gap-1 flex-shrink-0">
                   <span
@@ -172,12 +207,15 @@ export default async function SessionsPage() {
                     {s.title || TONTINE_LABELS[s.type]}
                   </h3>
                   {s.description && (
-                    <details className="mt-0.5 max-w-md">
-                      <summary className="cursor-pointer font-label-sm text-[11px] text-primary flex items-center gap-0.5 hover:underline">
-                        <span className="material-symbols-outlined text-[13px]">info</span>
-                        {t("seeDescription")}
+                    <details className="my-1 max-w-md relative z-10" onClick={(e) => e.stopPropagation()}>
+                      <summary
+                        className="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 font-medium text-[11px] hover:bg-emerald-100 transition-colors shadow-2xs list-none [&::-webkit-details-marker]:hidden"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <span className="text-[12px]">✨</span>
+                        <span>{t("seeDescription")}</span>
                       </summary>
-                      <p className="font-body-sm text-xs text-on-surface-variant/80 line-clamp-3 mt-1">
+                      <p className="font-body-sm text-xs text-on-surface-variant/80 line-clamp-3 mt-1.5 bg-surface-container-low/70 p-2.5 rounded-lg border border-surface-variant/60 leading-relaxed">
                         {s.description}
                       </p>
                     </details>
@@ -207,6 +245,33 @@ export default async function SessionsPage() {
                           <span className="material-symbols-outlined text-[15px] text-primary">info</span>
                           <span>{lang === "fr" ? "Le montant total dépend du nombre de membres (visible après validation)" : "Total pot depends on member count (visible once validated)"}</span>
                         </div>
+                        {(() => {
+                          const fallback = getTontineConfig(s.type);
+                          const fAmount = s.fineAmountPerPeriod
+                            ? Number(s.fineAmountPerPeriod)
+                            : (fallback?.fineAmountPerPeriod ?? 500);
+                          const fInterval = s.fineIntervalHours ?? fallback?.fineIntervalHours ?? 24;
+                          const lTime = s.limitTime || "18:30";
+                          return (
+                            <details
+                              className="mt-2 max-w-md relative z-10"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <summary
+                                className="cursor-pointer font-label-sm text-[11px] text-amber-700 flex items-center gap-1 hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <span className="material-symbols-outlined text-[13px]">gavel</span>
+                                {lang === "fr" ? "Règles des amendes" : "Fine rules"} ({formatXAF(fAmount)})
+                              </summary>
+                              <p className="font-body-sm text-[11px] text-on-surface-variant/90 mt-1 bg-amber-50/70 p-2 rounded border border-amber-200/60 leading-relaxed">
+                                {lang === "fr"
+                                  ? `Amende de ${formatXAF(fAmount)} après ${lTime}, puis toutes les ${fInterval}h si le paiement n'est pas fait.`
+                                  : `Fine of ${formatXAF(fAmount)} after ${lTime}, then every ${fInterval}h if unpaid.`}
+                              </p>
+                            </details>
+                          );
+                        })()}
                       </>
                     );
                   })()}
@@ -236,12 +301,15 @@ export default async function SessionsPage() {
                       {c.title}
                     </h3>
                     {c.description && (
-                      <details className="mt-0.5 max-w-md">
-                        <summary className="cursor-pointer font-label-sm text-[11px] text-primary flex items-center gap-0.5 hover:underline">
-                          <span className="material-symbols-outlined text-[13px]">info</span>
-                          {t("seeDescription")}
+                      <details className="my-1 max-w-md relative z-10" onClick={(e) => e.stopPropagation()}>
+                        <summary
+                          className="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 font-medium text-[11px] hover:bg-emerald-100 transition-colors shadow-2xs list-none [&::-webkit-details-marker]:hidden"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <span className="text-[12px]">✨</span>
+                          <span>{t("seeDescription")}</span>
                         </summary>
-                        <p className="font-body-sm text-xs text-on-surface-variant/80 line-clamp-3 mt-1">
+                        <p className="font-body-sm text-xs text-on-surface-variant/80 line-clamp-3 mt-1.5 bg-surface-container-low/70 p-2.5 rounded-lg border border-surface-variant/60 leading-relaxed">
                           {c.description}
                         </p>
                       </details>
@@ -275,6 +343,31 @@ export default async function SessionsPage() {
                       <span className="material-symbols-outlined text-[16px]">block</span>
                       {t("newMemberNotAllowed")}
                     </p>
+                    {(() => {
+                      const fallback = getTontineConfig(c.type);
+                      const fAmount = c.fineAmountPerPeriod ?? fallback?.fineAmountPerPeriod ?? 500;
+                      const fInterval = c.fineIntervalHours ?? fallback?.fineIntervalHours ?? 24;
+                      const lTime = c.limitTime || "18:30";
+                      return (
+                        <details
+                          className="mt-1.5 max-w-md relative z-10"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <summary
+                            className="cursor-pointer font-label-sm text-[11px] text-amber-700 flex items-center gap-1 hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <span className="material-symbols-outlined text-[13px]">gavel</span>
+                            {lang === "fr" ? "Règles des amendes" : "Fine rules"} ({formatXAF(fAmount)})
+                          </summary>
+                          <p className="font-body-sm text-[11px] text-on-surface-variant/90 mt-1 bg-amber-50/70 p-2 rounded border border-amber-200/60 leading-relaxed">
+                            {lang === "fr"
+                              ? `Amende de ${formatXAF(fAmount)} après ${lTime}, puis toutes les ${fInterval}h si le paiement n'est pas fait.`
+                              : `Fine of ${formatXAF(fAmount)} after ${lTime}, then every ${fInterval}h if unpaid.`}
+                          </p>
+                        </details>
+                      );
+                    })()}
                   </div>
                   <div className="flex flex-col items-end gap-1 flex-shrink-0">
                     <span className={`font-label-sm text-label-sm px-2.5 py-1 rounded font-bold tracking-wide uppercase shadow-sm ${c.isActive ? "bg-emerald-600 text-white" : "bg-red-600 text-white"}`}>

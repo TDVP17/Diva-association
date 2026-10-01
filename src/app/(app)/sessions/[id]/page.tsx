@@ -2,9 +2,10 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getContributionTotal, getNextDueDate, getCycleDateForRound } from "@/lib/tontine-engine";
+import { getContributionTotal, getNextDueDate, getCycleDateForRound, getTontineConfig } from "@/lib/tontine-engine";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { formatXAF } from "@/lib/format-currency";
+import { FinesInfoAccordion } from "./fines-info-accordion";
 import { PayButton } from "./pay-button";
 import { JoinButton } from "./join-button";
 import { VerificationPollingRefresh } from "./verification-status";
@@ -81,6 +82,13 @@ export default async function SessionDetailPage({
   });
   if (!tontineSession) notFound();
 
+  const fallbackConfig = getTontineConfig(tontineSession.type);
+  const fineAmount = tontineSession.fineAmountPerPeriod
+    ? Number(tontineSession.fineAmountPerPeriod)
+    : (fallbackConfig?.fineAmountPerPeriod ?? 500);
+  const fineIntervalHours = tontineSession.fineIntervalHours ?? fallbackConfig?.fineIntervalHours ?? 24;
+  const limitTime = tontineSession.limitTime || "18:30";
+
   const myMembership = tontineSession.memberships.find((m) => m.userId === userId);
   const sessionLabel = tontineSession.title || TONTINE_LABELS[tontineSession.type];
 
@@ -111,9 +119,9 @@ export default async function SessionDetailPage({
               </h1>
               {tontineSession.description && (
                 <details className="mt-2 max-w-md mx-auto w-full">
-                  <summary className="cursor-pointer font-label-sm text-label-sm text-primary flex items-center gap-1 justify-center hover:underline">
-                    <span className="material-symbols-outlined text-[16px]">info</span>
-                    {t("seeDescription")}
+                  <summary className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 font-medium text-xs hover:bg-emerald-100 transition-colors shadow-2xs list-none [&::-webkit-details-marker]:hidden mx-auto">
+                    <span className="text-[13px]">✨</span>
+                    <span>{t("seeDescription")}</span>
                   </summary>
                   <p className="font-body-md text-body-md text-on-surface-variant mt-2 whitespace-pre-line bg-surface-container-low/70 p-3 rounded-lg border border-surface-variant">
                     {tontineSession.description}
@@ -168,6 +176,14 @@ export default async function SessionDetailPage({
               {t("viewOpenCotisations")}
             </Link>
           </section>
+          <div className="mt-stack-gap-lg">
+            <FinesInfoAccordion
+              lang={lang}
+              fineAmount={fineAmount}
+              fineIntervalHours={fineIntervalHours}
+              limitTime={limitTime}
+            />
+          </div>
         </main>
       );
     }
@@ -218,9 +234,9 @@ export default async function SessionDetailPage({
           </h1>
           {tontineSession.description && (
             <details className="max-w-lg mx-auto w-full">
-              <summary className="cursor-pointer font-label-sm text-label-sm text-primary flex items-center gap-1 justify-center hover:underline">
-                <span className="material-symbols-outlined text-[16px]">info</span>
-                {t("seeDescription")}
+              <summary className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 font-medium text-xs hover:bg-emerald-100 transition-colors shadow-2xs list-none [&::-webkit-details-marker]:hidden mx-auto">
+                <span className="text-[13px]">✨</span>
+                <span>{t("seeDescription")}</span>
               </summary>
               <p className="font-body-md text-body-md text-on-surface-variant mt-2 bg-surface-container-low/80 p-3.5 rounded-lg border border-surface-variant text-left whitespace-pre-line">
                 {tontineSession.description}
@@ -234,6 +250,14 @@ export default async function SessionDetailPage({
             <JoinButton tontineSessionId={id} label={t("requestToJoin")} lang={lang} />
           </div>
         </section>
+        <div className="mt-stack-gap-lg">
+          <FinesInfoAccordion
+            lang={lang}
+            fineAmount={fineAmount}
+            fineIntervalHours={fineIntervalHours}
+            limitTime={limitTime}
+          />
+        </div>
       </main>
     );
   }
@@ -247,9 +271,9 @@ export default async function SessionDetailPage({
           <h2 className="font-title-sm text-title-sm text-on-surface font-semibold">{sessionLabel}</h2>
           {tontineSession.description && (
             <details className="max-w-lg mx-auto w-full">
-              <summary className="cursor-pointer font-label-sm text-label-sm text-primary flex items-center gap-1 justify-center hover:underline">
-                <span className="material-symbols-outlined text-[16px]">info</span>
-                {t("seeDescription")}
+              <summary className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 font-medium text-xs hover:bg-emerald-100 transition-colors shadow-2xs list-none [&::-webkit-details-marker]:hidden mx-auto">
+                <span className="text-[13px]">✨</span>
+                <span>{t("seeDescription")}</span>
               </summary>
               <p className="font-body-md text-body-md text-on-surface-variant mt-2 bg-surface-container-low/80 p-3 rounded-lg border border-surface-variant text-left whitespace-pre-line">
                 {tontineSession.description}
@@ -260,6 +284,14 @@ export default async function SessionDetailPage({
             {t("approvalPendingBody", { session: sessionLabel })}
           </p>
         </section>
+        <div className="mt-stack-gap-lg">
+          <FinesInfoAccordion
+            lang={lang}
+            fineAmount={fineAmount}
+            fineIntervalHours={fineIntervalHours}
+            limitTime={limitTime}
+          />
+        </div>
       </main>
     );
   }
@@ -328,9 +360,9 @@ export default async function SessionDetailPage({
           <h2 className="font-title-sm text-title-sm text-on-surface font-semibold">{sessionLabel}</h2>
           {tontineSession.description && (
             <details className="max-w-lg mx-auto w-full">
-              <summary className="cursor-pointer font-label-sm text-label-sm text-primary flex items-center gap-1 justify-center hover:underline">
-                <span className="material-symbols-outlined text-[16px]">info</span>
-                {t("seeDescription")}
+              <summary className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 font-medium text-xs hover:bg-emerald-100 transition-colors shadow-2xs list-none [&::-webkit-details-marker]:hidden mx-auto">
+                <span className="text-[13px]">✨</span>
+                <span>{t("seeDescription")}</span>
               </summary>
               <p className="font-body-md text-body-md text-on-surface-variant mt-2 bg-surface-container-low/80 p-3 rounded-lg border border-surface-variant text-left whitespace-pre-line">
                 {tontineSession.description}
@@ -342,6 +374,14 @@ export default async function SessionDetailPage({
           </p>
         </section>
         <SelectSlotsForm tontineSessionId={id} lang={lang} />
+        <div className="mt-stack-gap-lg">
+          <FinesInfoAccordion
+            lang={lang}
+            fineAmount={fineAmount}
+            fineIntervalHours={fineIntervalHours}
+            limitTime={limitTime}
+          />
+        </div>
       </main>
     );
   }
@@ -531,65 +571,73 @@ export default async function SessionDetailPage({
           receiptUrl={paidContribution.receiptPdfUrl ? `/api/files/${paidContribution.receiptPdfUrl}` : null}
         />
       )}
-      <section className="mb-stack-gap-lg bg-surface rounded-xl p-5 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant">
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary-container/20 text-on-secondary-container font-label-sm text-label-sm uppercase tracking-wider mb-2">
-              {t(sessionStatusKey(tontineSession.status))}
-            </span>
-            <h1 className="text-xl md:text-2xl font-bold text-on-surface">{sessionLabel}</h1>
+      <section className="mb-3.5 bg-surface rounded-xl p-3.5 sm:p-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant">
+        {/* En-tête : Titre, statut et stats clés */}
+        <div className="flex items-start justify-between gap-2.5">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 flex-wrap mb-1">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-secondary-container/20 text-on-secondary-container font-label-sm text-[10px] uppercase tracking-wider font-bold">
+                {t(sessionStatusKey(tontineSession.status))}
+              </span>
+              {totalPotAmount > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200/80 font-bold text-[11px]">
+                  <span>💰</span>
+                  <span>{formatXAF(totalPotAmount)}</span>
+                </span>
+              )}
+            </div>
+            <h1 className="text-base sm:text-lg font-bold text-on-surface truncate">{sessionLabel}</h1>
             {tontineSession.description && (
-              <details className="mt-2 max-w-2xl">
-                <summary className="cursor-pointer font-label-sm text-label-sm text-primary flex items-center gap-1 hover:underline">
-                  <span className="material-symbols-outlined text-[16px]">info</span>
-                  {t("seeDescription")}
+              <details className="mt-1 max-w-xl">
+                <summary className="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 font-medium text-[11px] hover:bg-emerald-100 transition-colors shadow-2xs list-none [&::-webkit-details-marker]:hidden">
+                  <span className="text-[12px]">✨</span>
+                  <span>{t("seeDescription")}</span>
                 </summary>
-                <p className="font-body-md text-body-md text-on-surface-variant mt-2 whitespace-pre-line leading-relaxed bg-surface-container-low/60 p-3 rounded-lg border border-surface-variant/70">
+                <p className="font-body-sm text-xs text-on-surface-variant mt-1.5 whitespace-pre-line leading-relaxed bg-surface-container-low/70 p-2.5 rounded-lg border border-surface-variant/70">
                   {tontineSession.description}
                 </p>
               </details>
             )}
-            <p className="font-body-md text-body-md text-on-surface-variant flex items-center gap-1 mt-2">
-              <span className="material-symbols-outlined text-sm">event</span>
-              {t("contributionStartDateLabel")}:{" "}
-              {tontineSession.startDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-GB", {
-                timeZone: "Africa/Douala",
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}
-            </p>
-            <p className="font-body-md text-body-md text-on-surface-variant flex items-center gap-1 mt-1">
-              <span className="material-symbols-outlined text-sm">schedule</span>
-              {t("deadlineLabel")}: {tontineSession.limitTime}
-            </p>
           </div>
-          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 sm:gap-6 text-right">
-            <div>
-              <div className="font-label-sm text-xs text-on-surface-variant mb-1">{t("totalRegisteredSlots")}</div>
-              <div className="font-numeric-data text-xl sm:text-2xl font-bold text-primary">
-                {totalRegisteredSlots}
-                {tontineSession.maxSlots ? ` / ${Number(tontineSession.maxSlots)}` : ""}
-              </div>
+
+          <div className="text-right flex-shrink-0 bg-primary/5 border border-primary/10 px-2.5 py-1.5 rounded-lg">
+            <div className="text-[10px] text-on-surface-variant font-medium leading-none mb-0.5">{t("totalRegisteredSlots")}</div>
+            <div className="font-numeric-data text-sm sm:text-base font-bold text-primary">
+              {totalRegisteredSlots}{tontineSession.maxSlots ? ` / ${Number(tontineSession.maxSlots)}` : ""}
             </div>
-            {totalPotAmount > 0 && (
-              <div className="border-l border-surface-variant pl-4 sm:pl-6">
-                <div className="font-label-sm text-xs text-emerald-800 font-medium mb-1">
-                  {lang === "fr" ? "Montant total à bouffer" : "Total Pot"}
-                </div>
-                <div className="font-numeric-data text-xl sm:text-2xl font-extrabold text-emerald-700">
-                  {formatXAF(totalPotAmount)}
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-surface-variant flex items-center justify-between">
-          <div className="font-label-sm text-label-sm text-on-surface-variant">
+        {/* Ligne compacte : Date et Échéance */}
+        <div className="mt-2.5 pt-2 border-t border-surface-variant/60 flex items-center justify-between text-xs text-on-surface-variant gap-2 flex-wrap">
+          <div className="flex items-center gap-1">
+            <span className="material-symbols-outlined text-[15px] text-primary">event</span>
+            <span>
+              {lang === "fr" ? "Début :" : "Starts:"}{" "}
+              <strong className="text-on-surface font-semibold">
+                {tontineSession.startDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-GB", {
+                  timeZone: "Africa/Douala",
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </strong>
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="material-symbols-outlined text-[15px] text-amber-600">schedule</span>
+            <span>
+              {t("deadlineLabel")}: <strong className="text-on-surface font-semibold">{tontineSession.limitTime}</strong>
+            </span>
+          </div>
+        </div>
+
+        {/* Barre de progression des paiements */}
+        <div className="mt-2 pt-2 border-t border-surface-variant/60 flex items-center justify-between gap-3">
+          <div className="font-label-sm text-xs text-on-surface-variant">
             {paidCount}/{allSlotsFlat.length} {t("slotsPaidThisCycle")}
           </div>
-          <div className="w-28 h-2 bg-surface-variant rounded-full overflow-hidden">
+          <div className="w-24 sm:w-32 h-1.5 bg-surface-variant rounded-full overflow-hidden flex-shrink-0">
             <div
               className="h-full bg-primary rounded-full transition-all duration-300"
               style={{ width: `${allSlotsFlat.length ? (paidCount / allSlotsFlat.length) * 100 : 0}%` }}
@@ -735,6 +783,14 @@ export default async function SessionDetailPage({
         coMembers={coMembers}
         pendingRequests={pendingSwapRequests}
         lang={lang}
+      />
+
+      {/* Explication du fonctionnement des amendes (fermé par défaut, à la fin) */}
+      <FinesInfoAccordion
+        lang={lang}
+        fineAmount={fineAmount}
+        fineIntervalHours={fineIntervalHours}
+        limitTime={limitTime}
       />
     </main>
   );

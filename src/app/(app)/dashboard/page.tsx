@@ -80,12 +80,18 @@ export default async function DashboardPage() {
                       {m.tontineSession.title || TONTINE_LABELS[m.tontineSession.type]}
                     </h3>
                     {m.tontineSession.description && (
-                      <details className="mt-0.5 max-w-sm">
-                        <summary className="cursor-pointer font-label-sm text-[11px] text-primary flex items-center gap-0.5 hover:underline">
-                          <span className="material-symbols-outlined text-[13px]">info</span>
-                          {t("seeDescription")}
+                      <details
+                        className="my-1 max-w-sm pointer-events-auto relative z-10"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <summary
+                          className="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 font-medium text-[11px] hover:bg-emerald-100 transition-colors shadow-2xs list-none [&::-webkit-details-marker]:hidden"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <span className="text-[12px]">✨</span>
+                          <span>{t("seeDescription")}</span>
                         </summary>
-                        <p className="font-body-sm text-xs text-on-surface-variant line-clamp-3 mt-1">
+                        <p className="font-body-sm text-xs text-on-surface-variant line-clamp-3 mt-1.5 bg-surface-container-low/80 p-2.5 rounded-lg border border-surface-variant/60 leading-relaxed">
                           {m.tontineSession.description}
                         </p>
                       </details>
