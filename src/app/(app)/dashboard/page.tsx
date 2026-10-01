@@ -6,6 +6,7 @@ import { getContributionTotal } from "@/lib/tontine-engine";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { formatXAF } from "@/lib/format-currency";
 import { sessionStatusKey } from "@/lib/session-status-label";
+import { DescriptionPill } from "@/components/description-pill";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -80,21 +81,10 @@ export default async function DashboardPage() {
                       {m.tontineSession.title || TONTINE_LABELS[m.tontineSession.type]}
                     </h3>
                     {m.tontineSession.description && (
-                      <details
-                        className="my-1 max-w-sm pointer-events-auto relative z-10"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <summary
-                          className="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 font-medium text-[11px] hover:bg-emerald-100 transition-colors shadow-2xs list-none [&::-webkit-details-marker]:hidden"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <span className="text-[12px]">✨</span>
-                          <span>{t("seeDescription")}</span>
-                        </summary>
-                        <p className="font-body-sm text-xs text-on-surface-variant line-clamp-3 mt-1.5 bg-surface-container-low/80 p-2.5 rounded-lg border border-surface-variant/60 leading-relaxed">
-                          {m.tontineSession.description}
-                        </p>
-                      </details>
+                      <DescriptionPill
+                        description={m.tontineSession.description}
+                        label={t("seeDescription")}
+                      />
                     )}
                     <p className="font-numeric-data text-numeric-data text-on-surface">{formatXAF(amount)}</p>
                     <p className="font-label-sm text-label-sm text-on-surface-variant">
