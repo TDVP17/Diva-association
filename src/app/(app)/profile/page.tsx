@@ -8,6 +8,7 @@ import { AvatarUpload } from "./avatar-upload";
 import { InlineField } from "./inline-field";
 import { InlineLocationField } from "./inline-location-field";
 import { updatePhoneAction, updateEmailAction } from "./actions";
+import { AppLockSettings } from "@/components/app-lock-settings";
 import { PwaInstallCard } from "@/components/pwa-install-card";
 import { ManageCookiesButton } from "@/components/cookie-consent";
 import { MemberCodeCard } from "./member-code-card";
@@ -212,6 +213,7 @@ export default async function ProfilePage() {
       </section>
 
       <section className="mb-stack-gap-lg flex flex-col gap-stack-gap-sm">
+        <AppLockSettings lang={lang} />
         <PwaInstallCard lang={lang} />
         <Link
           href="/contribute-for-relative"
