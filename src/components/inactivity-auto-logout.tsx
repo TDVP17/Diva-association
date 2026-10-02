@@ -16,12 +16,9 @@ export function InactivityAutoLogout() {
   const router = useRouter();
 
   useEffect(() => {
+    // Clean up legacy PIN code if present
     try {
-      localStorage.removeItem("diva_biometric_lock_enabled");
       localStorage.removeItem("diva_biometric_pin_hash");
-      localStorage.removeItem("diva_biometric_cred_id");
-      localStorage.removeItem("diva_biometric_last_active");
-      sessionStorage.removeItem("diva_biometric_session_unlocked");
     } catch {}
 
     function verifyInactivityAndTouch() {

@@ -1,20 +1,39 @@
 /**
  * Client-side WebAuthn Biometric Authentication helper for DIVA Association.
- * Supports Face ID, Touch ID, Android Biometrics (Fingerprint/Face Unlock),
- * Windows Hello, and platform authenticators with PIN backup.
+ * Directly triggers device native biometrics: Face ID, Touch ID, Android Fingerprint.
+ * Requires NO PIN code and NO passwords.
  */
 
-export type BiometricType = "face_id" | "touch_id" | "fingerprint" | "generic";
+export type BiometricType = "face_id" | "touch_id" | "fingerprint";
 
-const STORAGE_ENABLED = "diva_biometric_lock_enabled";
-const STORAGE_CRED_ID = "diva_biometric_cred_id";
-const STORAGE_PIN_HASH = "diva_biometric_pin_hash";
-const SESSION_UNLOCKED = "diva_biometric_session_unlocked";
-const STORAGE_LAST_ACTIVE = "diva_biometric_last_active";
+export const STORAGE_ENABLED = "diva_biometric_lock_enabled";
+export const STORAGE_CRED_ID = "diva_biometric_cred_id";
+export const SESSION_UNLOCKED = "diva_biometric_session_unlocked";
+export const STORAGE_LAST_ACTIVE = "diva_biometric_last_active";
+
+function uint8ArrayToBase64Url(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+}
+
+function base64UrlToUint8Array(base64url: string): Uint8Array {
+  let base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
+  while (base64.length % 4 !== 0) {
+    base64 += "=";
+  }
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
 
 export async function isPlatformBiometricAvailable(): Promise<boolean> {
-  if (typeof window === "undefined") return false;
-  if (!window.PublicKeyCredential) return false;
+  if (typeof window === "undefined" || !window.PublicKeyCredential) return false;
   try {
     if (typeof PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === "function") {
       return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
@@ -22,37 +41,29 @@ export async function isPlatformBiometricAvailable(): Promise<boolean> {
   } catch (err) {
     console.warn("[biometrics] check failed:", err);
   }
-  return false;
+  return true;
 }
 
 export function detectBiometricType(): BiometricType {
-  if (typeof navigator === "undefined") return "generic";
+  if (typeof navigator === "undefined") return "fingerprint";
   const ua = navigator.userAgent || "";
   const isIOS = /iPhone|iPad|iPod/i.test(ua);
-  const isAndroid = /Android/i.test(ua);
-  const isMac = /Macintosh/i.test(ua);
+  const isMacTouch = /Macintosh/i.test(ua) && typeof document !== "undefined" && "ontouchend" in document;
 
-  if (isIOS) {
-    // iPhones from X onwards (window.screen.height >= 812) typically use Face ID
+  if (isIOS || isMacTouch) {
+    // iPhone X and later have screen height >= 812 and use Face ID
     if (typeof window !== "undefined" && window.screen.height >= 812) {
       return "face_id";
     }
     return "touch_id";
   }
 
-  if (isAndroid) {
-    return "fingerprint";
-  }
-
-  if (isMac) {
-    return "touch_id";
-  }
-
-  return "generic";
+  return "fingerprint";
 }
 
 export function isBiometricLockEnabled(): boolean {
-  return false;
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(STORAGE_ENABLED) === "true";
 }
 
 export function isSessionUnlocked(): boolean {
@@ -80,40 +91,12 @@ export function touchLastActive() {
   localStorage.setItem(STORAGE_LAST_ACTIVE, String(Date.now()));
 }
 
-async function sha256(str: string): Promise<string> {
-  const enc = new TextEncoder();
-  const hash = await crypto.subtle.digest("SHA-256", enc.encode(str));
-  const bytes = new Uint8Array(hash);
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-export async function setBackupPin(pin: string): Promise<void> {
-  if (typeof window === "undefined") return;
-  const hash = await sha256(pin);
-  localStorage.setItem(STORAGE_PIN_HASH, hash);
-}
-
-export async function verifyBackupPin(pin: string): Promise<boolean> {
-  if (typeof window === "undefined") return false;
-  const stored = localStorage.getItem(STORAGE_PIN_HASH);
-  if (!stored) return false;
-  const hash = await sha256(pin);
-  return hash === stored;
-}
-
-export function hasBackupPin(): boolean {
-  if (typeof window === "undefined") return false;
-  return Boolean(localStorage.getItem(STORAGE_PIN_HASH));
-}
-
 /**
- * Register device biometric authenticator using WebAuthn Platform Authenticator.
+ * Register device biometric authenticator (Face ID / Fingerprint) in 1 tap without PIN code.
  */
-export async function registerBiometrics(userName: string): Promise<{ success: boolean; error?: string }> {
+export async function registerBiometrics(userName: string = "Membre"): Promise<{ success: boolean; error?: string }> {
   if (typeof window === "undefined" || !window.PublicKeyCredential) {
-    return { success: false, error: "WebAuthn unsupported" };
+    return { success: false, error: "La biométrie n'est pas supportée par ce navigateur." };
   }
 
   try {
@@ -131,17 +114,17 @@ export async function registerBiometrics(userName: string): Promise<{ success: b
         },
         user: {
           id: userIdBytes,
-          name: userName || "diva_member",
+          name: userName || "membre",
           displayName: userName || "Membre DIVA",
         },
         pubKeyCredParams: [
-          { type: "public-key", alg: -7 }, // ES256
+          { type: "public-key", alg: -7 },  // ES256
           { type: "public-key", alg: -257 }, // RS256
         ],
         authenticatorSelection: {
-          authenticatorAttachment: "platform",
-          userVerification: "required",
-          requireResidentKey: false,
+          authenticatorAttachment: "platform", // Direct device biometric sensor
+          userVerification: "required",        // Direct Fingerprint / Face ID prompt
+          residentKey: "preferred",
         },
         timeout: 60000,
         attestation: "none",
@@ -149,10 +132,13 @@ export async function registerBiometrics(userName: string): Promise<{ success: b
     })) as PublicKeyCredential | null;
 
     if (!credential) {
-      return { success: false, error: "Création d'empreinte annulée" };
+      return { success: false, error: "Scan biométrique annulé." };
     }
 
-    localStorage.setItem(STORAGE_CRED_ID, credential.id);
+    const rawId = new Uint8Array(credential.rawId);
+    const credIdBase64 = uint8ArrayToBase64Url(rawId);
+
+    localStorage.setItem(STORAGE_CRED_ID, credIdBase64);
     localStorage.setItem(STORAGE_ENABLED, "true");
     setSessionUnlocked(true);
 
@@ -160,16 +146,19 @@ export async function registerBiometrics(userName: string): Promise<{ success: b
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.warn("[biometrics] register error:", err);
+    if (message.includes("timed out") || message.includes("not allowed")) {
+      return { success: false, error: "Scan biométrique annulé." };
+    }
     return { success: false, error: message };
   }
 }
 
 /**
- * Authenticate with biometric (Face ID / Fingerprint / Touch ID).
+ * Authenticate directly with biometric (Face ID / Fingerprint / Touch ID).
  */
 export async function authenticateWithBiometrics(): Promise<{ success: boolean; error?: string }> {
   if (typeof window === "undefined" || !window.PublicKeyCredential) {
-    return { success: false, error: "Biométrie non disponible" };
+    return { success: false, error: "Biométrie non disponible sur ce navigateur." };
   }
 
   try {
@@ -177,28 +166,34 @@ export async function authenticateWithBiometrics(): Promise<{ success: boolean; 
     crypto.getRandomValues(challenge);
     const credId = localStorage.getItem(STORAGE_CRED_ID);
 
+    let allowCredentials: PublicKeyCredentialDescriptor[] | undefined;
+    if (credId) {
+      try {
+        allowCredentials = [
+          {
+            type: "public-key",
+            id: base64UrlToUint8Array(credId) as BufferSource,
+            transports: ["internal"],
+          },
+        ];
+      } catch {
+        // Continue without allowCredentials filter
+      }
+    }
+
     const options: CredentialRequestOptions = {
       publicKey: {
         challenge,
         timeout: 60000,
-        userVerification: "required",
+        userVerification: "required", // Prompts device Face ID or Fingerprint
         rpId: window.location.hostname,
-        ...(credId
-          ? {
-              allowCredentials: [
-                {
-                  type: "public-key",
-                  id: Uint8Array.from(atob(credId.replace(/_/g, "/").replace(/-/g, "+")), (c) => c.charCodeAt(0)),
-                },
-              ],
-            }
-          : {}),
+        ...(allowCredentials ? { allowCredentials } : {}),
       },
     };
 
     const assertion = await navigator.credentials.get(options);
     if (!assertion) {
-      return { success: false, error: "Authentification annulée" };
+      return { success: false, error: "Scan biométrique annulé." };
     }
 
     setSessionUnlocked(true);
@@ -206,18 +201,20 @@ export async function authenticateWithBiometrics(): Promise<{ success: boolean; 
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.warn("[biometrics] auth error:", err);
+    if (message.includes("timed out") || message.includes("not allowed")) {
+      return { success: false, error: "Scan biométrique annulé ou non reconnu." };
+    }
     return { success: false, error: message };
   }
 }
 
 /**
- * Disable biometric lock completely.
+ * Disable biometric lock completely in 1 tap without any code.
  */
 export function disableBiometricLock() {
   if (typeof window === "undefined") return;
   localStorage.removeItem(STORAGE_ENABLED);
   localStorage.removeItem(STORAGE_CRED_ID);
-  localStorage.removeItem(STORAGE_PIN_HASH);
   localStorage.removeItem(STORAGE_LAST_ACTIVE);
   sessionStorage.removeItem(SESSION_UNLOCKED);
 }

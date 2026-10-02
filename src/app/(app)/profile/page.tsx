@@ -213,7 +213,7 @@ export default async function ProfilePage() {
       </section>
 
       <section className="mb-stack-gap-lg flex flex-col gap-stack-gap-sm">
-        <AppLockSettings lang={lang} />
+        <AppLockSettings userName={user?.name ?? "Membre"} lang={lang} />
         <PwaInstallCard lang={lang} />
         <Link
           href="/contribute-for-relative"

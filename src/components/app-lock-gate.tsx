@@ -1,52 +1,93 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Image from "next/image";
 import { type Lang } from "@/lib/i18n/translations";
 import {
-  isAppLockEnabled,
-  STORAGE_APP_LAST_ACTIVE_KEY,
-  SESSION_APP_UNLOCKED_KEY,
-} from "./app-lock-settings";
+  isBiometricLockEnabled,
+  isSessionUnlocked,
+  setSessionUnlocked,
+  authenticateWithBiometrics,
+  detectBiometricType,
+  getLastActiveTimestamp,
+  touchLastActive,
+  type BiometricType,
+} from "@/lib/biometrics";
 
 const LOCK_GRACE_PERIOD_MS = 45 * 1000; // 45 seconds of backgrounding before re-lock
 
 export function AppLockGate({ lang }: { lang: Lang }) {
   const [isLocked, setIsLocked] = useState(false);
+  const [bioType, setBioType] = useState<BiometricType>("fingerprint");
+  const [authenticating, setAuthenticating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const autoTriggeredRef = useRef(false);
 
   const checkLockState = useCallback(() => {
-    if (!isAppLockEnabled()) {
+    if (!isBiometricLockEnabled()) {
       setIsLocked(false);
       return;
     }
 
     if (typeof window === "undefined") return;
 
-    const unlocked = sessionStorage.getItem(SESSION_APP_UNLOCKED_KEY) === "true";
-    const lastActiveStr = localStorage.getItem(STORAGE_APP_LAST_ACTIVE_KEY);
-    const lastActive = lastActiveStr ? Number(lastActiveStr) : 0;
+    const unlocked = isSessionUnlocked();
+    const lastActive = getLastActiveTimestamp();
     const now = Date.now();
 
     if (!unlocked || (lastActive > 0 && now - lastActive > LOCK_GRACE_PERIOD_MS)) {
-      sessionStorage.removeItem(SESSION_APP_UNLOCKED_KEY);
+      setSessionUnlocked(false);
       setIsLocked(true);
+      setError(null);
+      autoTriggeredRef.current = false;
     } else {
       setIsLocked(false);
-      localStorage.setItem(STORAGE_APP_LAST_ACTIVE_KEY, String(Date.now()));
+      touchLastActive();
     }
   }, []);
 
+  const triggerBiometricUnlock = useCallback(async () => {
+    if (authenticating) return;
+    setAuthenticating(true);
+    setError(null);
+
+    try {
+      const res = await authenticateWithBiometrics();
+      if (res.success) {
+        setIsLocked(false);
+        setSessionUnlocked(true);
+        touchLastActive();
+      } else {
+        setError(
+          res.error ||
+            (lang === "fr"
+              ? "Scan biométrique annulé ou non reconnu. Touchez pour réessayer."
+              : "Scan cancelled or not recognized. Tap to retry.")
+        );
+      }
+    } catch {
+      setError(
+        lang === "fr"
+          ? "Impossible d'accéder au capteur biométrique. Touchez pour réessayer."
+          : "Could not access biometric sensor. Tap to retry."
+      );
+    } finally {
+      setAuthenticating(false);
+    }
+  }, [authenticating, lang]);
+
   useEffect(() => {
     setMounted(true);
+    setBioType(detectBiometricType());
     checkLockState();
 
     function onVisibilityChange() {
       if (document.visibilityState === "visible") {
         checkLockState();
       } else {
-        if (isAppLockEnabled()) {
-          localStorage.setItem(STORAGE_APP_LAST_ACTIVE_KEY, String(Date.now()));
+        if (isBiometricLockEnabled()) {
+          touchLastActive();
         }
       }
     }
@@ -58,13 +99,9 @@ export function AppLockGate({ lang }: { lang: Lang }) {
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("focus", onFocus);
 
-    // Refresh last active timestamp periodically while active
     const interval = setInterval(() => {
-      if (isAppLockEnabled()) {
-        const unlocked = sessionStorage.getItem(SESSION_APP_UNLOCKED_KEY) === "true";
-        if (unlocked) {
-          localStorage.setItem(STORAGE_APP_LAST_ACTIVE_KEY, String(Date.now()));
-        }
+      if (isBiometricLockEnabled() && isSessionUnlocked()) {
+        touchLastActive();
       }
     }, 15000);
 
@@ -75,15 +112,29 @@ export function AppLockGate({ lang }: { lang: Lang }) {
     };
   }, [checkLockState]);
 
-  function handleUnlock() {
-    if (typeof window !== "undefined") {
-      sessionStorage.setItem(SESSION_APP_UNLOCKED_KEY, "true");
-      localStorage.setItem(STORAGE_APP_LAST_ACTIVE_KEY, String(Date.now()));
+  // Automatically prompt Face ID / Fingerprint on lock appearance
+  useEffect(() => {
+    if (isLocked && !autoTriggeredRef.current) {
+      autoTriggeredRef.current = true;
+      const timer = setTimeout(() => {
+        triggerBiometricUnlock();
+      }, 400);
+      return () => clearTimeout(timer);
     }
-    setIsLocked(false);
-  }
+  }, [isLocked, triggerBiometricUnlock]);
 
   if (!mounted || !isLocked) return null;
+
+  const bioLabel =
+    bioType === "face_id"
+      ? "Face ID"
+      : bioType === "touch_id"
+      ? "Touch ID"
+      : lang === "fr"
+      ? "Empreinte digitale"
+      : "Fingerprint";
+
+  const bioIcon = bioType === "face_id" ? "face" : "fingerprint";
 
   return (
     <div
@@ -115,19 +166,36 @@ export function AppLockGate({ lang }: { lang: Lang }) {
         </h2>
         <p className="text-xs text-slate-500 mb-6 max-w-xs leading-relaxed">
           {lang === "fr"
-            ? "Votre session Diva Association est protégée. Touchez le bouton ci-dessous pour reprendre."
-            : "Your Diva Association session is protected. Tap below to resume."}
+            ? `Veuillez scanner votre ${bioLabel} pour reprendre votre session.`
+            : `Please scan your ${bioLabel} to resume your session.`}
         </p>
 
-        {/* 1-Tap Unlock Action (No PIN code, no passkey) */}
+        {/* Biometric trigger button (Face ID / Fingerprint) */}
         <button
           type="button"
-          onClick={handleUnlock}
-          className="w-full py-3.5 px-4 rounded-xl bg-primary text-on-primary font-semibold text-sm hover:opacity-95 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+          onClick={triggerBiometricUnlock}
+          disabled={authenticating}
+          className="w-full py-3.5 px-4 rounded-xl bg-primary text-on-primary font-semibold text-sm hover:opacity-95 active:scale-95 transition-all flex items-center justify-center gap-2.5 shadow-lg cursor-pointer disabled:opacity-60"
         >
-          <span className="material-symbols-outlined text-[20px]">lock_open</span>
-          <span>{lang === "fr" ? "Déverrouiller l'application" : "Unlock Application"}</span>
+          <span className="material-symbols-outlined text-[24px]">
+            {authenticating ? "hourglass_top" : bioIcon}
+          </span>
+          <span>
+            {authenticating
+              ? lang === "fr"
+                ? "Scan en cours..."
+                : "Scanning..."
+              : lang === "fr"
+              ? `Déverrouiller avec ${bioLabel}`
+              : `Unlock with ${bioLabel}`}
+          </span>
         </button>
+
+        {error && (
+          <p className="mt-3 text-xs text-error font-medium leading-snug">
+            {error}
+          </p>
+        )}
       </div>
     </div>
   );
