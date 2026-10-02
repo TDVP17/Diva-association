@@ -136,27 +136,14 @@ export function BiometricLockSettings({
 
   return (
     <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4 mb-stack-gap-lg">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3 flex-1 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center flex-shrink-0 mt-0.5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center flex-shrink-0">
             <span className="material-symbols-outlined text-[24px]">{bioIcon}</span>
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-label-md text-label-md font-bold text-on-surface">
-                {lang === "fr" ? "Verrouillage de l'application" : "App Screen Lock"}
-              </h3>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <span className="material-symbols-outlined text-[12px]">{bioIcon}</span>
-                {bioLabel}
-              </span>
-            </div>
-            <p className="font-label-sm text-xs text-on-surface-variant mt-1 leading-relaxed">
-              {lang === "fr"
-                ? `Verrouillez l'accès avec votre ${bioLabel} dès que vous quittez ou ouvrez l'application.`
-                : `Protect your app access with ${bioLabel} when you open or resume the app.`}
-            </p>
-          </div>
+          <h3 className="font-label-md text-label-md font-bold text-on-surface truncate">
+            {lang === "fr" ? "Verrouillage de l'application" : "App Screen Lock"}
+          </h3>
         </div>
 
         {/* Toggle Switch */}
@@ -218,6 +205,7 @@ export function BiometricLockSettings({
                   type="password"
                   inputMode="numeric"
                   maxLength={4}
+                  autoComplete="new-password"
                   value={pin}
                   onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
                   placeholder="••••"
@@ -234,6 +222,7 @@ export function BiometricLockSettings({
                   type="password"
                   inputMode="numeric"
                   maxLength={4}
+                  autoComplete="new-password"
                   value={pinConfirm}
                   onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, "").slice(0, 4))}
                   placeholder="••••"
@@ -291,6 +280,7 @@ export function BiometricLockSettings({
                   type="password"
                   inputMode="numeric"
                   maxLength={4}
+                  autoComplete="current-password"
                   value={disablePin}
                   onChange={(e) => setDisablePin(e.target.value.replace(/\D/g, "").slice(0, 4))}
                   placeholder="••••"
