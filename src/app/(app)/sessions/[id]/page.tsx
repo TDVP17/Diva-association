@@ -708,12 +708,17 @@ export default async function SessionDetailPage({
                       <span className="font-label-md text-label-md text-on-surface truncate font-semibold">
                         {s.beneficiaryName}
                       </span>
-                      {paid && (
+                      {paid ? (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold bg-[#d1fae5] text-[#065f46]">
                           <span className="material-symbols-outlined text-[13px]">check</span>
                           {t("paid")}
                         </span>
-                      )}
+                      ) : myDesignatedSlot ? (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-900 border border-amber-300">
+                          <span className="material-symbols-outlined text-[13px] text-amber-700">redeem</span>
+                          {lang === "fr" ? "Tour de bouffe (déductible du gain)" : "Payout turn (deductible)"}
+                        </span>
+                      ) : null}
                     </div>
                     <div className="font-label-sm text-label-sm text-on-surface-variant">
                       {t("positionLabel")} {s.ballDrawn ?? t("notYetRevealed")} ·{" "}
@@ -723,6 +728,10 @@ export default async function SessionDetailPage({
                           {c?.paidByUser && (
                             <span className="text-primary font-medium"> · {t("paidByRelativeBadge", { name: c.paidByUser.name })}</span>
                           )}
+                        </span>
+                      ) : myDesignatedSlot ? (
+                        <span className="text-amber-900 font-medium">
+                          {formatXAF(slotTotal)} · {lang === "fr" ? "Paiement au choix (déduit du virement si non payé)" : "Optional (deducted if unpaid)"}
                         </span>
                       ) : (
                         <span>{formatXAF(slotTotal)} {t("due")}</span>
@@ -744,10 +753,11 @@ export default async function SessionDetailPage({
                     description={paymentDescription}
                     defaultPhone={myMembership.user.phone}
                     lang={lang}
+                    isBeneficiaryTurn={!!myDesignatedSlot}
                     lockedReason={
                       notReadyForPayment
                         ? t("paymentsAvailableAfterDraw")
-                        : !roundLock.ok && currentBeneficiaryName
+                        : !roundLock.ok && currentBeneficiaryName && !myDesignatedSlot
                           ? t("paymentsLockedUntilPayout", { name: currentBeneficiaryName })
                           : undefined
                     }

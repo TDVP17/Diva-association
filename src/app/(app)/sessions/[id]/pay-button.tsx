@@ -14,6 +14,7 @@ export function PayButton({
   defaultPhone,
   lang,
   lockedReason,
+  isBeneficiaryTurn = false,
 }: {
   membershipSlotId: string;
   /** Shown in the offline-draft banner (see OfflineDraftSync) so the member can tell which name it's for. */
@@ -25,6 +26,8 @@ export function PayButton({
   lang: Lang;
   /** Set when the round-robin lock blocks this cycle — disables the button up front instead of erroring after a tap. */
   lockedReason?: string;
+  /** True when it is this member's turn to receive the pot: payment is optional (deductible). */
+  isBeneficiaryTurn?: boolean;
 }) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
   const router = useRouter();
@@ -82,14 +85,29 @@ export function PayButton({
   }
 
   return (
-    <div>
+    <div className="flex flex-col items-end gap-1">
       <button
         onClick={handleTap}
-        className="px-3 py-1.5 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm flex items-center gap-1 hover:opacity-90 active:scale-95 transition-all"
+        className={`px-3 py-1.5 rounded-lg font-label-sm text-label-sm flex items-center gap-1 transition-all ${
+          isBeneficiaryTurn
+            ? "bg-amber-600 hover:bg-amber-700 text-white shadow-xs"
+            : "bg-primary text-on-primary hover:opacity-90 active:scale-95 shadow-xs"
+        }`}
       >
-        <span className="material-symbols-outlined text-[16px]">payments</span>
-        {t("payAmountButton", { amount: amountLabel })}
+        <span className="material-symbols-outlined text-[16px]">
+          {isBeneficiaryTurn ? "volunteer_activism" : "payments"}
+        </span>
+        {isBeneficiaryTurn
+          ? lang === "fr"
+            ? `Payer (au choix) ${amountLabel}`
+            : `Pay (optional) ${amountLabel}`
+          : t("payAmountButton", { amount: amountLabel })}
       </button>
+      {isBeneficiaryTurn && (
+        <span className="text-[10px] text-amber-800 font-medium text-right max-w-[150px] leading-tight">
+          {lang === "fr" ? "Déductible de votre cagnotte" : "Deductible from payout"}
+        </span>
+      )}
       {showConfirm && (
         <PaymentConfirmDialog
           lang={lang}

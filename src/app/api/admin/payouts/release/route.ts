@@ -45,7 +45,7 @@ export async function POST(request: Request) {
   const { user } = slot.membership;
 
   // Never trust a client-echoed amount — recompute server-side right before sending money.
-  const { pot, deducted, netPayout, toDeductFineIds } = await computePayoutPreview(
+  const { pot, deducted, netPayout, toDeductFineIds, toDeductContributions } = await computePayoutPreview(
     claim.tontineSession,
     slot,
     claim.dueDate,
@@ -78,6 +78,34 @@ export async function POST(request: Request) {
     ...(toDeductFineIds.length > 0
       ? [prisma.fine.updateMany({ where: { id: { in: toDeductFineIds } }, data: { status: "DEDUCTED" } })]
       : []),
+    ...toDeductContributions.map((item) =>
+      prisma.contribution.upsert({
+        where: {
+          membershipSlotId_dueDate: {
+            membershipSlotId: item.slotId,
+            dueDate: claim.dueDate,
+          },
+        },
+        create: {
+          membershipSlotId: item.slotId,
+          dueDate: claim.dueDate,
+          amountPaid: item.amount,
+          feePaid: item.fee,
+          finePaid: 0,
+          status: "PAID",
+          paidAt: new Date(),
+          failureReason: null,
+        },
+        update: {
+          amountPaid: item.amount,
+          feePaid: item.fee,
+          finePaid: 0,
+          status: "PAID",
+          paidAt: new Date(),
+          failureReason: null,
+        },
+      }),
+    ),
     prisma.payout.update({
       where: { id: payoutClaimId },
       data: {

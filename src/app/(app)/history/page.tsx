@@ -7,11 +7,12 @@ import { TONTINE_TYPE_LABELS } from "@/lib/tontine-labels";
 import { normalizeCameroonPhone } from "@/lib/fapshi";
 
 interface Row {
-  kind: "contribution" | "fine" | "relative_contribution" | "duplicate_refund";
+  kind: "contribution" | "fine" | "relative_contribution" | "duplicate_refund" | "payout";
   id: string;
   date: Date;
   sessionLabel: string;
   beneficiaryName: string;
+  position?: number | null;
   reason: string;
   totalAmount: number;
   pureAmount?: number;
@@ -37,7 +38,7 @@ export default async function HistoryPage() {
   });
   const userPhone = user?.phone ? normalizeCameroonPhone(user.phone) : null;
 
-  const [slots, archives, contributionsForOthers, duplicateAttempts] = await Promise.all([
+  const [slots, archives, contributionsForOthers, duplicateAttempts, payouts] = await Promise.all([
     prisma.membershipSlot.findMany({
       where: { membership: { userId: session.user.id } },
       include: {
@@ -81,6 +82,20 @@ export default async function HistoryPage() {
         },
       },
       orderBy: { createdAt: "desc" },
+    }),
+    prisma.payout.findMany({
+      where: {
+        membershipSlot: { membership: { userId: session.user.id } },
+        status: { in: ["RELEASED", "CONFIRMED"] },
+      },
+      include: {
+        membershipSlot: {
+          include: {
+            membership: { include: { tontineSession: true } },
+          },
+        },
+      },
+      orderBy: { releasedAt: "desc" },
     }),
   ]);
 
@@ -201,6 +216,39 @@ export default async function HistoryPage() {
     });
   }
 
+  // 5. Gains de tontine reçus ("bouffes")
+  for (const p of payouts) {
+    if (isArchived(p.releasedAt ?? p.dueDate)) continue;
+    const sessionLabel =
+      p.membershipSlot.membership.tontineSession.title ||
+      TONTINE_TYPE_LABELS[p.membershipSlot.membership.tontineSession.type] ||
+      p.membershipSlot.membership.tontineSession.type;
+    const netAmount = Number(p.netPayout ?? Number(p.pot ?? 0) - Number(p.deducted ?? 0));
+    const grossPot = Number(p.pot ?? 0);
+    const deductedAmount = Number(p.deducted ?? 0);
+
+    rows.push({
+      kind: "payout",
+      id: p.id,
+      date: p.releasedAt ?? p.detailsSubmittedAt,
+      sessionLabel,
+      beneficiaryName: p.membershipSlot.beneficiaryName,
+      position: p.membershipSlot.officialPosition,
+      reason:
+        lang === "fr"
+          ? `Gain de tontine reçu (Bouffe) — ${sessionLabel} (Tour N° ${p.membershipSlot.officialPosition ?? "?"})`
+          : `Payout received (Pot turn) — ${sessionLabel} (Turn #${p.membershipSlot.officialPosition ?? "?"})`,
+      totalAmount: netAmount,
+      pureAmount: grossPot,
+      fineAmount: deductedAmount > 0 ? deductedAmount : undefined,
+      status: p.status,
+      payerName: "DIVA Association (Cagnotte)",
+      payerPhone: p.payoutPhone,
+      txRef: p.fapshiTransId,
+      receiptPdfUrl: `/api/payouts/${p.id}/receipt`,
+    });
+  }
+
   // Trier par date décroissante
   rows.sort((a, b) => b.date.getTime() - a.date.getTime());
 
@@ -211,8 +259,8 @@ export default async function HistoryPage() {
           <h1 className="font-title-md text-title-md text-primary">{t("transactionHistory")}</h1>
           <p className="font-body-md text-xs sm:text-sm text-on-surface-variant mt-0.5">
             {lang === "fr"
-              ? "Historique détaillé et transparent de toutes vos cotisations, paiements pour proches et remboursements de doublons."
-              : "Detailed and transparent history of all your contributions, payments for relatives, and duplicate refunds."}
+              ? "Historique détaillé et transparent de toutes vos cotisations, gains de tontine reçus et remboursements."
+              : "Detailed and transparent history of all your contributions, payouts received, and refunds."}
           </p>
         </div>
       </div>
@@ -229,22 +277,30 @@ export default async function HistoryPage() {
             const isRefunded = r.status === "REFUNDED";
             const isRefundPending = r.status === "DUPLICATE_PAID" || r.status === "REFUND_INITIATED";
             const isFailed = r.status === "FAILED" || r.status === "REFUND_FAILED_MANUAL_REVIEW";
+            const isPayout = r.kind === "payout";
 
             return (
               <div
                 key={`${r.kind}-${r.id}`}
                 className={`bg-white rounded-xl p-4 sm:p-5 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border transition-all ${
-                  isRefunded || isRefundPending
-                    ? "border-cyan-200 bg-cyan-50/20"
-                    : isPaid
-                      ? "border-surface-variant hover:border-primary/30"
-                      : "border-red-200 bg-red-50/10"
+                  isPayout
+                    ? "border-emerald-300 bg-gradient-to-br from-emerald-50/40 via-white to-white"
+                    : isRefunded || isRefundPending
+                      ? "border-cyan-200 bg-cyan-50/20"
+                      : isPaid
+                        ? "border-surface-variant hover:border-primary/30"
+                        : "border-red-200 bg-red-50/10"
                 }`}
               >
                 {/* Entête de carte avec type, statut et montant */}
                 <div className="flex items-start justify-between gap-3 mb-2.5">
                   <div className="flex items-center gap-2 flex-wrap min-w-0">
-                    {r.kind === "duplicate_refund" ? (
+                    {r.kind === "payout" ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-emerald-700 text-white shadow-xs">
+                        <span className="material-symbols-outlined text-[15px]">emoji_events</span>
+                        {lang === "fr" ? "Gain de tontine (Bouffe)" : "Payout received"}
+                      </span>
+                    ) : r.kind === "duplicate_refund" ? (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-cyan-100 text-cyan-900 border border-cyan-300">
                         <span className="material-symbols-outlined text-[15px]">currency_exchange</span>
                         {t("duplicateRefundTitle")}
@@ -267,12 +323,23 @@ export default async function HistoryPage() {
                     )}
 
                     {/* Badge de statut vérifié / coché */}
-                    {isPaid && (
+                    {isPayout ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-[#d1fae5] text-[#065f46]">
+                        <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                        {r.status === "CONFIRMED"
+                          ? lang === "fr"
+                            ? "Reçu & Confirmé"
+                            : "Confirmed"
+                          : lang === "fr"
+                            ? "Virement envoyé"
+                            : "Sent"}
+                      </span>
+                    ) : isPaid ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-[#d1fae5] text-[#065f46]">
                         <span className="material-symbols-outlined text-[14px]">check_circle</span>
                         {t("checkedPaid")}
                       </span>
-                    )}
+                    ) : null}
                     {isRefunded && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-cyan-100 text-cyan-800">
                         <span className="material-symbols-outlined text-[14px]">check_circle</span>
@@ -294,8 +361,16 @@ export default async function HistoryPage() {
                   </div>
 
                   <div className="text-right flex-shrink-0">
-                    <div className="font-numeric-data text-lg sm:text-xl font-extrabold text-on-surface">
-                      {isRefunded ? `+${formatXAF(r.totalAmount)}` : formatXAF(r.totalAmount)}
+                    <div
+                      className={`font-numeric-data text-lg sm:text-xl font-extrabold ${
+                        isPayout
+                          ? "text-emerald-700 font-black"
+                          : isRefunded
+                            ? "text-cyan-700"
+                            : "text-on-surface"
+                      }`}
+                    >
+                      {isPayout || isRefunded ? `+${formatXAF(r.totalAmount)}` : formatXAF(r.totalAmount)}
                     </div>
                   </div>
                 </div>
@@ -332,6 +407,21 @@ export default async function HistoryPage() {
                       <strong className="text-on-surface">{t("beneficiaryName")} :</strong> {r.beneficiaryName}
                     </span>
                   </div>
+
+                  {/* Détails spécifiques pour les gains de tontine */}
+                  {r.kind === "payout" && (
+                    <div className="flex items-center gap-1.5 sm:col-span-2 text-emerald-950 font-semibold bg-emerald-50/80 p-2 rounded-lg border border-emerald-200">
+                      <span className="material-symbols-outlined text-[16px] text-emerald-700">stars</span>
+                      <span>
+                        {r.position ? (lang === "fr" ? `Position : Tour N° ${r.position}` : `Position: Turn #${r.position}`) : ""}
+                        {r.pureAmount !== undefined && r.pureAmount !== r.totalAmount && (
+                          <span className="ml-2 font-normal text-emerald-800 text-xs">
+                            (Cagnotte : {formatXAF(r.pureAmount)}{r.fineAmount ? ` · Déductions : -${formatXAF(r.fineAmount)}` : ""})
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Décomposition du montant cotisé */}
                   {(r.pureAmount !== undefined && r.feeAmount !== undefined) && (
@@ -378,13 +468,19 @@ export default async function HistoryPage() {
                 {r.receiptPdfUrl && (
                   <div className="mt-3 pt-2.5 border-t border-surface-variant flex items-center justify-end">
                     <a
-                      href={`/api/files/${r.receiptPdfUrl}`}
+                      href={r.receiptPdfUrl.startsWith("/") ? r.receiptPdfUrl : `/api/files/${r.receiptPdfUrl}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-colors shadow-xs"
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-semibold shadow-xs transition-colors ${
+                        r.kind === "payout"
+                          ? "bg-emerald-700 hover:bg-emerald-800"
+                          : "bg-primary hover:bg-primary/90"
+                      }`}
                     >
-                      <span className="material-symbols-outlined text-[16px]">download</span>
-                      {t("downloadReceiptPdf")}
+                      <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+                      {r.kind === "payout"
+                        ? (lang === "fr" ? "Télécharger le reçu de gain (PDF)" : "Download Payout Receipt (PDF)")
+                        : t("downloadReceiptPdf")}
                     </a>
                   </div>
                 )}

@@ -78,7 +78,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { pot, deducted, netPayout: computedNetPayout, toDeductFineIds } = await computePayoutPreview(
+  const { pot, deducted, netPayout: computedNetPayout, toDeductFineIds, toDeductContributions } = await computePayoutPreview(
     session,
     slot,
     dueDate,
@@ -148,6 +148,39 @@ export async function POST(request: Request) {
       where: { id: { in: toDeductFineIds } },
       data: { status: "DEDUCTED" },
     });
+  }
+
+  if (toDeductContributions.length > 0) {
+    await Promise.all(
+      toDeductContributions.map((item) =>
+        prisma.contribution.upsert({
+          where: {
+            membershipSlotId_dueDate: {
+              membershipSlotId: item.slotId,
+              dueDate,
+            },
+          },
+          create: {
+            membershipSlotId: item.slotId,
+            dueDate,
+            amountPaid: item.amount,
+            feePaid: item.fee,
+            finePaid: 0,
+            status: "PAID",
+            paidAt: new Date(),
+            failureReason: null,
+          },
+          update: {
+            amountPaid: item.amount,
+            feePaid: item.fee,
+            finePaid: 0,
+            status: "PAID",
+            paidAt: new Date(),
+            failureReason: null,
+          },
+        }),
+      ),
+    );
   }
 
   // Send notifications

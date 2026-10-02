@@ -32,6 +32,9 @@ export async function GET(request: Request) {
   return NextResponse.json({
     pot: preview.pot,
     deducted: preview.deducted,
+    deductedFines: preview.deductedFines,
+    deductedContributions: preview.deductedContributions,
+    toDeductContributions: preview.toDeductContributions,
     netPayout: preview.netPayout,
     dueDate: preview.dueDate.toISOString(),
     beneficiaryName: slot.beneficiaryName,
