@@ -12,7 +12,6 @@ import { PwaInstallCard } from "@/components/pwa-install-card";
 import { ManageCookiesButton } from "@/components/cookie-consent";
 import { MemberCodeCard } from "./member-code-card";
 import { SavedPaymentMethodsCard } from "./saved-payment-methods-card";
-import { BiometricLockSettings } from "@/components/biometric-lock-settings";
 import { ROLE_KEY } from "@/lib/role-label";
 import { formatXAF } from "@/lib/format-currency";
 
@@ -213,7 +212,6 @@ export default async function ProfilePage() {
       </section>
 
       <section className="mb-stack-gap-lg flex flex-col gap-stack-gap-sm">
-        <BiometricLockSettings userName={user.name} lang={lang} />
         <PwaInstallCard lang={lang} />
         <Link
           href="/contribute-for-relative"

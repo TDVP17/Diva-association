@@ -48,6 +48,7 @@ export function InstallPromptModal({ lang }: { lang: Lang }) {
   const [installing, setInstalling] = useState(false);
   const [isIos, setIsIos] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
+  const [manualGuide, setManualGuide] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -131,10 +132,7 @@ export function InstallPromptModal({ lang }: { lang: Lang }) {
 
     try {
       if (isIos) {
-        // Direct iOS Apple WebClip MobileConfig profile download:
-        // Automatically triggers the native system download alert without instructions
-        setDismissed(true);
-        window.location.href = "/api/install/ios";
+        // On iOS, native Safari Home Screen shortcut is the official friction-free method
         return;
       }
 
@@ -159,8 +157,8 @@ export function InstallPromptModal({ lang }: { lang: Lang }) {
           setDismissed(true);
         }
       } else {
-        // Fallback for browsers without beforeinstallprompt
-        window.location.href = "/api/install/ios";
+        // Fallback for browsers where beforeinstallprompt was already consumed or not fired
+        setManualGuide(true);
       }
     } catch (err) {
       console.warn("[PWA] auto install error:", err);
@@ -203,7 +201,7 @@ export function InstallPromptModal({ lang }: { lang: Lang }) {
             </button>
 
             {/* App Icon + Title */}
-            <div className="flex flex-col items-center mb-4">
+            <div className="flex flex-col items-center mb-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/icons/icon-192.png"
@@ -220,34 +218,175 @@ export function InstallPromptModal({ lang }: { lang: Lang }) {
               </p>
             </div>
 
-            {/* 1-Click Install Action */}
-            <div className="flex flex-col gap-2.5 mt-2">
-              <button
-                onClick={handleAutoInstall}
-                disabled={installing}
-                className="w-full py-3.5 px-4 rounded-xl bg-primary text-on-primary font-label-md text-sm font-bold hover:opacity-95 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-60 cursor-pointer animate-pulse"
-              >
-                <span className="material-symbols-outlined text-[22px]">
-                  {installing ? "hourglass_top" : "install_mobile"}
-                </span>
-                <span>
-                  {installing
-                    ? lang === "fr"
-                      ? "Lancement de l'installation..."
-                      : "Starting installation..."
-                    : lang === "fr"
-                    ? "Installer l'application"
-                    : "Install Application"}
-                </span>
-              </button>
+            {/* iOS specific visual 3-step guide: No profile download, no iPhone Settings! */}
+            {isIos ? (
+              <div className="flex flex-col gap-2.5 text-left mt-2">
+                <div className="bg-primary/5 border border-primary/20 rounded-xl p-2.5 text-center">
+                  <p className="text-xs font-semibold text-primary">
+                    {lang === "fr"
+                      ? "📲 Installation directe sur iPhone"
+                      : "📲 Direct install on iPhone"}
+                  </p>
+                  <p className="text-[11px] text-on-surface-variant mt-0.5">
+                    {lang === "fr"
+                      ? "Sans configuration dans les Réglages de l'iPhone !"
+                      : "No setup needed in iPhone Settings!"}
+                  </p>
+                </div>
 
-              <button
-                onClick={handleDismiss}
-                className="w-full py-2 text-on-surface-variant font-label-sm text-xs hover:bg-surface-variant/40 rounded-lg transition-colors cursor-pointer"
-              >
-                {lang === "fr" ? "Plus tard" : "Not now"}
-              </button>
-            </div>
+                <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-surface-container-low border border-surface-variant">
+                  <span className="w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                    1
+                  </span>
+                  <div className="text-xs">
+                    <p className="font-semibold text-on-surface">
+                      {lang === "fr" ? "Touchez Partager" : "Tap Share"}
+                    </p>
+                    <p className="text-on-surface-variant text-[11px] mt-0.5 leading-snug">
+                      {lang === "fr" ? (
+                        <>
+                          En bas dans Safari, appuyez sur l&apos;icône <strong>Partager</strong> (le carré avec la flèche vers le haut <span className="material-symbols-outlined text-[14px] align-middle text-primary font-bold">ios_share</span>).
+                        </>
+                      ) : (
+                        <>
+                          At the bottom of Safari, tap the <strong>Share</strong> icon (<span className="material-symbols-outlined text-[14px] align-middle text-primary font-bold">ios_share</span>).
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-surface-container-low border border-surface-variant">
+                  <span className="w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                    2
+                  </span>
+                  <div className="text-xs">
+                    <p className="font-semibold text-on-surface">
+                      {lang === "fr" ? "« Sur l'écran d'accueil »" : "« Add to Home Screen »"}
+                    </p>
+                    <p className="text-on-surface-variant text-[11px] mt-0.5 leading-snug">
+                      {lang === "fr" ? (
+                        <>
+                          Faites défiler la liste vers le bas et touchez <strong>« Sur l&apos;écran d&apos;accueil »</strong> (avec le symbole <strong>+</strong>).
+                        </>
+                      ) : (
+                        <>
+                          Scroll down and tap <strong>« Add to Home Screen »</strong> (with the <strong>+</strong> icon).
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-surface-container-low border border-surface-variant">
+                  <span className="w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                    3
+                  </span>
+                  <div className="text-xs">
+                    <p className="font-semibold text-on-surface">
+                      {lang === "fr" ? "Touchez « Ajouter »" : "Tap « Add »"}
+                    </p>
+                    <p className="text-on-surface-variant text-[11px] mt-0.5 leading-snug">
+                      {lang === "fr" ? (
+                        <>
+                          En haut à droite, appuyez sur <strong>« Ajouter »</strong>. L&apos;icône Diva s&apos;affiche directement sur votre écran !
+                        </>
+                      ) : (
+                        <>
+                          In the top right, tap <strong>« Add »</strong>. Diva icon is added directly to your home screen!
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleDismiss}
+                  className="w-full mt-1.5 py-3 px-4 rounded-xl bg-primary text-on-primary font-label-md text-sm font-bold hover:opacity-95 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                  <span>{lang === "fr" ? "J'ai compris" : "Got it"}</span>
+                </button>
+              </div>
+            ) : manualGuide ? (
+              <div className="flex flex-col gap-2.5 text-left mt-2">
+                <div className="bg-primary/5 border border-primary/20 rounded-xl p-2.5 text-center">
+                  <p className="text-xs font-semibold text-primary">
+                    {lang === "fr"
+                      ? "Installation dans votre navigateur"
+                      : "Install via your browser"}
+                  </p>
+                </div>
+                <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-surface-container-low border border-surface-variant text-xs">
+                  <span className="w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                    1
+                  </span>
+                  <p className="text-on-surface leading-relaxed">
+                    {lang === "fr" ? (
+                      <>
+                        Touchez le menu <strong>⋮</strong> (3 petits points en haut à droite de votre navigateur).
+                      </>
+                    ) : (
+                      <>
+                        Tap the <strong>⋮</strong> menu (3 dots at the top right of your browser).
+                      </>
+                    )}
+                  </p>
+                </div>
+                <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-surface-container-low border border-surface-variant text-xs">
+                  <span className="w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                    2
+                  </span>
+                  <p className="text-on-surface leading-relaxed">
+                    {lang === "fr" ? (
+                      <>
+                        Sélectionnez <strong>« Installer l&apos;application »</strong> ou <strong>« Ajouter à l&apos;écran d&apos;accueil »</strong>.
+                      </>
+                    ) : (
+                      <>
+                        Select <strong>« Install app »</strong> or <strong>« Add to Home screen »</strong>.
+                      </>
+                    )}
+                  </p>
+                </div>
+                <button
+                  onClick={handleDismiss}
+                  className="w-full mt-1.5 py-3 px-4 rounded-xl bg-primary text-on-primary font-label-md text-sm font-bold hover:opacity-95 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                  <span>{lang === "fr" ? "J'ai compris" : "Got it"}</span>
+                </button>
+              </div>
+            ) : (
+              /* 1-Click Install Action for Android / Chromium */
+              <div className="flex flex-col gap-2.5 mt-2">
+                <button
+                  onClick={handleAutoInstall}
+                  disabled={installing}
+                  className="w-full py-3.5 px-4 rounded-xl bg-primary text-on-primary font-label-md text-sm font-bold hover:opacity-95 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-md disabled:opacity-60 cursor-pointer animate-pulse"
+                >
+                  <span className="material-symbols-outlined text-[22px]">
+                    {installing ? "hourglass_top" : "install_mobile"}
+                  </span>
+                  <span>
+                    {installing
+                      ? lang === "fr"
+                        ? "Lancement de l'installation..."
+                        : "Starting installation..."
+                      : lang === "fr"
+                      ? "Installer l'application"
+                      : "Install Application"}
+                  </span>
+                </button>
+
+                <button
+                  onClick={handleDismiss}
+                  className="w-full py-2 text-on-surface-variant font-label-sm text-xs hover:bg-surface-variant/40 rounded-lg transition-colors cursor-pointer"
+                >
+                  {lang === "fr" ? "Plus tard" : "Not now"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

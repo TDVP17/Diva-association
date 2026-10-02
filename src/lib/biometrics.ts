@@ -52,8 +52,7 @@ export function detectBiometricType(): BiometricType {
 }
 
 export function isBiometricLockEnabled(): boolean {
-  if (typeof window === "undefined") return false;
-  return localStorage.getItem(STORAGE_ENABLED) === "true";
+  return false;
 }
 
 export function isSessionUnlocked(): boolean {

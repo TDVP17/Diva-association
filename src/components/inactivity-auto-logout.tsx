@@ -16,6 +16,14 @@ export function InactivityAutoLogout() {
   const router = useRouter();
 
   useEffect(() => {
+    try {
+      localStorage.removeItem("diva_biometric_lock_enabled");
+      localStorage.removeItem("diva_biometric_pin_hash");
+      localStorage.removeItem("diva_biometric_cred_id");
+      localStorage.removeItem("diva_biometric_last_active");
+      sessionStorage.removeItem("diva_biometric_session_unlocked");
+    } catch {}
+
     function verifyInactivityAndTouch() {
       const now = Date.now();
       const raw = localStorage.getItem(STORAGE_KEY);

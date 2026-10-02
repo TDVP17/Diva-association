@@ -13,7 +13,6 @@ import { PushPermissionPrompt } from "@/components/push-permission-prompt";
 import { OfflineDraftSync } from "@/components/offline-draft-sync";
 import { WhatsAppPhonePrompt } from "@/components/whatsapp-phone-prompt";
 import { InactivityAutoLogout } from "@/components/inactivity-auto-logout";
-import { BiometricLockGate } from "@/components/biometric-lock-gate";
 import { isAdminRole } from "@/lib/constants";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -93,7 +92,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <NotificationBadgeSync />
       <WhatsAppPhonePrompt lang={lang} hasPhone={!!dbUser?.phone} />
       <InactivityAutoLogout />
-      <BiometricLockGate lang={lang} />
     </div>
   );
 }
