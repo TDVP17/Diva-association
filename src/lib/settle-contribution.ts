@@ -38,7 +38,7 @@ export async function settleContribution(
   const receiptBytes = await generateReceiptPdf({
     memberName: `${user.name} — ${contribution.membershipSlot.beneficiaryName}`,
     paidByName,
-    paymentMethod: contribution.recordedByAdminId ? "Recorded by admin" : "Mobile Money (Fapshi)",
+    paymentMethod: contribution.recordedByAdminId ? "Recorded by admin" : "Mobile Money / Orange Money (Fapshi)",
     tontineType: tontineSession.type,
     amount: Number(contribution.amountPaid),
     fee: Number(contribution.feePaid),

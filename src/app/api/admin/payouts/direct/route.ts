@@ -264,8 +264,8 @@ export async function POST(request: Request) {
             userId: beneficiaryUser.id,
             message:
               beneficiaryLang === "fr"
-                ? `C'est votre tour de bouffer la cagnotte de ${sessionLabel} ! Veuillez fournir votre numéro de compte Mobile Money et votre nom complet pour le virement.`
-                : `It's your turn to receive the ${sessionLabel} payout! Please provide your Mobile Money account number and account name so the admin can process your payout.`,
+                ? `C'est votre tour de bouffer la cagnotte de ${sessionLabel} ! Veuillez fournir votre numéro de compte Mobile Money ou Orange Money et votre nom complet pour le virement.`
+                : `It's your turn to receive the ${sessionLabel} payout! Please provide your Mobile Money / Orange Money account number and account name so the admin can process your payout.`,
             messageKey: "payoutTurnNotifMessage",
             messageVars: {
               cotisation: sessionLabel,

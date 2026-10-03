@@ -84,7 +84,7 @@ export async function generateReceiptPdf(data: ReceiptData): Promise<Buffer> {
     row("Paid by", data.paidByName);
   }
   row("Tontine", TONTINE_LABELS[data.tontineType]);
-  row("Payment method", data.paymentMethod ?? "Mobile Money (Fapshi)");
+  row("Payment method", data.paymentMethod ?? "Mobile Money / Orange Money (Fapshi)");
   row("Date", data.paidAt.toLocaleString("en-GB", { timeZone: "Africa/Douala" }));
   row("Transaction Ref", data.transRef);
   row("Status", "Successful");

@@ -128,7 +128,7 @@ export const translations = {
     confirmedByAdminLabel: "(confirmed by admin)",
     itsYourTurn: "It's your turn to receive your payout — enter your details below.",
     enterPayoutDetails: "Enter Payout Details",
-    payoutPhoneLabel: "Mobile Money / Bank phone number",
+    payoutPhoneLabel: "Mobile Money / Orange Money phone number",
     payoutAccountNameLabel: "Full account name for the transfer",
     submitPayoutDetails: "Submit Details",
     payoutDetailsSubmitted: "Your payout details have been submitted. The admin will process your transfer soon.",
@@ -237,12 +237,12 @@ export const translations = {
     waDuplicateRefunded:
       "Your payment was received twice for the same name. The second payment of {amount} has been automatically refunded.",
     waPayoutTurn:
-      "Hello {name},\n\nWe're pleased to let you know that it's your turn to receive the {cotisation} payout (position #{position}).\n\n💰 Estimated amount: {amount}\n📅 Expected payout date: {date}\n\n👉 ACTION REQUIRED: Please log into the app and provide your Mobile Money phone number and the exact name on the account so the administrator can process your payout.\n\nThe DIVA Asso team",
+      "Hello {name},\n\nWe're pleased to let you know that it's your turn to receive the {cotisation} payout (position #{position}).\n\n💰 Estimated amount: {amount}\n📅 Expected payout date: {date}\n\n👉 ACTION REQUIRED: Please log into the app and provide your Mobile Money / Orange Money phone number and the exact name on the account so the administrator can process your payout.\n\nThe DIVA Asso team",
     payoutTurnNotifMessage:
-      "It's your turn to receive the {cotisation} payout! Please provide your Mobile Money account number and account name so the admin can process your payout.",
+      "It's your turn to receive the {cotisation} payout! Please provide your Mobile Money / Orange Money account number and account name so the admin can process your payout.",
     payoutTurnBannerTitle: "It's your turn to receive the payout!",
     payoutTurnBannerDesc:
-      "To receive your payout, you must provide your Mobile Money account number (MTN / Orange) and the exact name on your account below. The administrator will process your transfer directly.",
+      "To receive your payout, you must provide your Mobile Money or Orange Money account number (MTN / Orange) and the exact name on your account below. The administrator will process your transfer directly.",
     copyAccountName: "Copy Name",
     copyAccountNumber: "Copy Number",
     nameCopied: "Account name copied!",
@@ -252,13 +252,13 @@ export const translations = {
     payoutDetailsSubmittedNotice:
       "Your payout details have been submitted to the administrator (Name: {name}, Phone: {phone}). The transfer is being processed.",
     payoutTurnAlertPrompt:
-      "Action required: You must provide your Mobile Money account number and exact account name to receive your payout.",
+      "Action required: You must provide your Mobile Money / Orange Money account number and exact account name to receive your payout.",
     waPayoutReleased:
       "🎉 Payout released — DIVA Asso\n\nCongratulations {name} ({beneficiary})! Your payout of {amount} has been released. Confirm on the app once you've received it.",
     waPayoutReleasedWithDeduction:
       "🎉 Payout released — DIVA Asso\n\nCongratulations {name} ({beneficiary})! Your payout of {amount} has been released after deducting {deducted} in outstanding fines. Confirm on the app once you've received it.",
     waTurnReminderTomorrow:
-      "⏰ Reminder — DIVA Asso\n\nHello {name},\n\nTomorrow ({date}) is your estimated turn to receive the {cotisation} payout (position #{position}).\n\n💰 Estimated amount: {amount}\n\nPlease make sure your contact and payment details are up to date in your profile. If you have any questions, contact support from the app.\n\nThe DIVA Asso team",
+      "⏰ Reminder — DIVA Asso\n\nHello {name},\n\nTomorrow ({date}) is your estimated turn to receive the {cotisation} payout (position #{position}).\n\n💰 Estimated amount: {amount}\n\nPlease make sure your Mobile / Orange Money details are up to date in your profile. If you have any questions, contact support from the app.\n\nThe DIVA Asso team",
     turnReminderTomorrowNotifMessage: "Tomorrow ({date}) is your estimated turn to receive the {cotisation} payout — position #{position}, estimated {amount}.",
     notifTypeTurnReminderTomorrow: "Your Turn Is Tomorrow",
     myConversations: "My Conversations",

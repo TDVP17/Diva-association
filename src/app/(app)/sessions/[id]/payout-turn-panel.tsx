@@ -131,8 +131,8 @@ export function PayoutTurnPanel({
                 </div>
                 <p className="mt-1 text-[11px] text-slate-500">
                   {lang === "fr"
-                    ? "Numéro de compte MTN ou Orange Money sur lequel sera crédité le virement."
-                    : "MTN or Orange Mobile Money account number to receive your funds."}
+                    ? "Numéro de compte Mobile Money ou Orange Money (au choix) sur lequel sera crédité le virement."
+                    : "Mobile Money or Orange Money account number to receive your funds."}
                 </p>
               </div>
 
@@ -207,8 +207,8 @@ export function PayoutTurnPanel({
           </div>
           <p className="text-xs text-slate-600">
             {lang === "fr"
-              ? "Le virement a été envoyé vers votre compte Mobile Money. Veuillez confirmer dès réception des fonds."
-              : "The transfer was sent to your Mobile Money account. Please confirm once received."}
+              ? "Le virement a été envoyé vers votre compte Mobile Money / Orange Money. Veuillez confirmer dès réception des fonds."
+              : "The transfer was sent to your Mobile Money / Orange Money account. Please confirm once received."}
           </p>
           {error && <p className="font-label-sm text-label-sm text-error">{error}</p>}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">

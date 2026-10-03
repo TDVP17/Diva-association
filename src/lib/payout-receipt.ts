@@ -152,7 +152,7 @@ export async function generatePayoutReceiptPdf(data: PayoutReceiptData): Promise
   });
   y -= 18;
 
-  row("Numéro Mobile Money crédité", `+237 ${data.payoutPhone}`);
+  row("Numéro Mobile Money / Orange Money crédité", `+237 ${data.payoutPhone}`);
   row("Titulaire du compte", data.payoutAccountName);
   if (data.fapshiTransId) {
     row("Référence de transaction (Fapshi)", data.fapshiTransId);
