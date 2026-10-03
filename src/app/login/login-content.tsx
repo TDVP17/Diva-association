@@ -152,7 +152,7 @@ export function LoginContent({
           <img src="/icons/icon-512.png" alt="" className="w-24 h-24 rounded-2xl shadow-md" />
           <div className="flex flex-col items-center leading-tight">
             <span className="font-headline-lg text-headline-lg text-primary tracking-tight">DIVA</span>
-            <span className="font-title-md text-title-md text-secondary tracking-wide -mt-0.5">Association</span>
+            <span className="font-title-md text-title-md text-secondary tracking-wide -mt-0.5">Asso</span>
           </div>
         </div>
 

@@ -79,6 +79,36 @@ export function NotificationsTab({
     }
   }
 
+  async function sendBroadcastAlert() {
+    if (!emailSubject.trim() || !emailBody.trim()) return;
+    setSendingEmail(true);
+    setEmailResult(null);
+    try {
+      const res = await fetch("/api/admin/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          target: "GROUP",
+          tontineSessionId,
+          title: emailSubject.trim(),
+          message: emailBody.trim(),
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        if (body?.error) console.error("[sendBroadcastAlert] server error:", body.error);
+        setEmailResult(t("adminAlertErrorMessage"));
+        return;
+      }
+      setEmailResult(t("adminAlertSuccessMessage", { count: String(body.count ?? 0) }));
+      setEmailSubject("");
+      setEmailBody("");
+      refreshNotifications();
+    } finally {
+      setSendingEmail(false);
+    }
+  }
+
   async function sendMassEmail() {
     if (!emailSubject.trim() || !emailBody.trim()) return;
     setSendingEmail(true);
@@ -146,32 +176,46 @@ export function NotificationsTab({
 
       <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4">
         <h3 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-4">
-          <span className="material-symbols-outlined">mail</span>
-          {t("massEmailTitle")}
+          <span className="material-symbols-outlined">campaign</span>
+          {t("adminAlertModalTitle")}
         </h3>
-        <div className="flex flex-col gap-2 mb-3">
+        <p className="font-label-sm text-label-sm text-on-surface-variant mb-3">
+          {t("adminAlertChannelsNotice")}
+        </p>
+        <div className="flex flex-col gap-2.5 mb-3">
           <input
             value={emailSubject}
             onChange={(e) => setEmailSubject(e.target.value)}
-            placeholder={t("emailSubjectLabel")}
+            placeholder={t("adminAlertTitlePlaceholder")}
             className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
           />
           <textarea
             value={emailBody}
             onChange={(e) => setEmailBody(e.target.value)}
-            placeholder={t("emailBodyLabel")}
+            placeholder={t("adminAlertBodyPlaceholder")}
             rows={4}
             className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
           />
-          <button
-            onClick={sendMassEmail}
-            disabled={sendingEmail || !emailSubject.trim() || !emailBody.trim()}
-            className="bg-primary text-on-primary font-label-md text-label-md px-4 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50"
-          >
-            {sendingEmail ? t("recordingEllipsis") : t("sendToAllMembers")}
-          </button>
+          <div className="flex gap-2 flex-wrap pt-1">
+            <button
+              onClick={sendBroadcastAlert}
+              disabled={sendingEmail || !emailSubject.trim() || !emailBody.trim()}
+              className="bg-primary text-on-primary font-label-md text-label-md px-4 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5 shadow-sm"
+            >
+              <span className="material-symbols-outlined text-[18px]">campaign</span>
+              {sendingEmail ? t("adminAlertSendingAction") : t("adminAlertSendAction")}
+            </button>
+            <button
+              onClick={sendMassEmail}
+              disabled={sendingEmail || !emailSubject.trim() || !emailBody.trim()}
+              className="border border-outline-variant text-on-surface font-label-md text-label-md px-4 py-2.5 rounded-lg hover:bg-surface disabled:opacity-50 inline-flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-[18px]">mail</span>
+              {t("sendToAllMembers")} (Email)
+            </button>
+          </div>
         </div>
-        {emailResult && <p className="font-label-sm text-label-sm text-on-surface-variant">{emailResult}</p>}
+        {emailResult && <p className="font-label-sm text-label-sm text-primary font-medium">{emailResult}</p>}
       </section>
 
       <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4">

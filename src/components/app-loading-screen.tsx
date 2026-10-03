@@ -15,10 +15,13 @@ export function AppLoadingScreen({ lang }: { lang: Lang }) {
       <div className="flex flex-col items-center justify-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/icons/brand-lockup.png"
-          alt="Diva Association"
-          className="w-64 sm:w-72 h-auto object-contain"
+          src="/icons/icon-512.png"
+          alt="DIVA Asso"
+          className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl shadow-2xl object-contain mb-3"
         />
+        <h1 className="font-headline-sm sm:font-headline-md text-2xl sm:text-3xl font-bold tracking-tight text-[#fed65b]">
+          DIVA Asso
+        </h1>
         <div className="mt-8 flex flex-col items-center gap-3">
           <span
             aria-hidden

@@ -46,7 +46,7 @@ export async function generatePayoutReceiptPdf(data: PayoutReceiptData): Promise
     const logoImage = await doc.embedPng(logoBytes);
     const logoSize = 42;
     page.drawImage(logoImage, { x: left, y: y - logoSize + 10, width: logoSize, height: logoSize });
-    page.drawText("DIVA Association", { x: left + logoSize + 12, y, size: 20, font: bold, color: primary });
+    page.drawText("DIVA Asso", { x: left + logoSize + 12, y, size: 20, font: bold, color: primary });
     page.drawText("Reçu Officiel de Versement — Gain de Tontine", {
       x: left + logoSize + 12,
       y: y - 18,
@@ -55,7 +55,7 @@ export async function generatePayoutReceiptPdf(data: PayoutReceiptData): Promise
       color: emeraldAccent,
     });
   } catch {
-    page.drawText("DIVA Association", { x: left, y, size: 20, font: bold, color: primary });
+    page.drawText("DIVA Asso", { x: left, y, size: 20, font: bold, color: primary });
     page.drawText("Reçu Officiel de Versement — Gain de Tontine", {
       x: left,
       y: y - 18,
@@ -232,7 +232,7 @@ export async function generatePayoutReceiptPdf(data: PayoutReceiptData): Promise
     color: muted,
   });
   y -= 14;
-  page.drawText("Document généré électroniquement par DIVA Association — Fait foi d'attestation de gain.", {
+  page.drawText("Document généré électroniquement par DIVA Asso — Fait foi d'attestation de gain.", {
     x: left,
     y,
     size: 8,

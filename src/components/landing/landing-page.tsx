@@ -32,8 +32,8 @@ export function LandingPage({ lang }: { lang: Lang }) {
         <div className="max-w-6xl mx-auto px-container-padding h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 min-w-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/icon-512.png" alt="DIVA Association" className="w-8 h-8 rounded-lg flex-shrink-0" />
-            <span className="font-title-md text-title-md text-primary tracking-tight truncate">DIVA Association</span>
+            <img src="/icons/icon-512.png" alt="DIVA Asso" className="w-8 h-8 rounded-lg flex-shrink-0" />
+            <span className="font-title-md text-title-md text-primary tracking-tight truncate">DIVA Asso</span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <LanguageToggle currentLang={lang} />
@@ -153,7 +153,7 @@ export function LandingPage({ lang }: { lang: Lang }) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icons/icon-512.png" alt="" className="w-6 h-6 rounded-md" />
             <div>
-              <p className="font-label-md text-label-md text-on-surface">DIVA Association</p>
+              <p className="font-label-md text-label-md text-on-surface">DIVA Asso</p>
               <p className="font-label-sm text-[11px] text-on-surface-variant">{t("landingFooterTagline")}</p>
             </div>
           </div>

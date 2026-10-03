@@ -93,7 +93,7 @@ export async function GET(request: Request) {
 /** Reuses the same type→label map the in-app feed renders with, so an email/push subject is never stuck in the wrong language for the recipient. */
 function subjectFor(type: string, lang: Lang): string {
   const key = NOTIFICATION_TYPE_KEY[type];
-  return key ? translate(lang, key) : "DIVA Association";
+  return key ? translate(lang, key) : "DIVA Asso";
 }
 
 /** ADMIN_BROADCAST messages are stored as "subject\n\nbody" (see broadcast-email/route.ts) — every other type has no admin-chosen subject, so it falls back to a type label. */

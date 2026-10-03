@@ -19,8 +19,8 @@ export function LegalPageShell({
         <div className="max-w-3xl mx-auto px-container-padding h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 min-w-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/icon-512.png" alt="DIVA Association" className="w-8 h-8 rounded-lg flex-shrink-0" />
-            <span className="font-title-md text-title-md text-primary tracking-tight truncate">DIVA Association</span>
+            <img src="/icons/icon-512.png" alt="DIVA Asso" className="w-8 h-8 rounded-lg flex-shrink-0" />
+            <span className="font-title-md text-title-md text-primary tracking-tight truncate">DIVA Asso</span>
           </Link>
           <LanguageToggle currentLang={lang} />
         </div>
@@ -37,7 +37,7 @@ export function LegalPageShell({
       <footer className="border-t border-outline-variant/30 bg-surface py-stack-gap-lg">
         <div className="max-w-3xl mx-auto px-container-padding text-center">
           <Link href="/" className="font-label-sm text-label-sm text-primary hover:underline">
-            ← DIVA Association
+            ← DIVA Asso
           </Link>
         </div>
       </footer>

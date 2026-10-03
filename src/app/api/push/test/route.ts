@@ -9,7 +9,7 @@ export async function POST() {
   }
 
   const result = await sendPushToUser(session.user.id, {
-    title: "DIVA Association",
+    title: "DIVA Asso",
     body: "🔔 Notification de test réussie ! Les notifications push et les alertes fonctionnent sur votre téléphone.",
     url: "/notifications",
     badgeCount: 1,

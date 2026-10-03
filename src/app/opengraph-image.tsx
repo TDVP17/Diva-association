@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import { join } from "node:path";
 import { readFile } from "node:fs/promises";
 
-export const alt = "DIVA Association — Automated tontine management";
+export const alt = "DIVA Asso — Automated tontine management";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -27,7 +27,7 @@ export default async function Image() {
         {/* eslint-disable-next-line @next/next/no-img-element -- next/og's ImageResponse renders via Satori, not the DOM; next/image doesn't apply here */}
         <img src={logoSrc} width={160} height={160} alt="" style={{ borderRadius: 32 }} />
         <div style={{ display: "flex", fontSize: 64, fontWeight: 700, color: "#ffffff", letterSpacing: -1 }}>
-          DIVA Association
+          DIVA Asso
         </div>
         <div style={{ display: "flex", fontSize: 28, color: "#e9c349", fontWeight: 500 }}>
           Automated management for traditional tontines

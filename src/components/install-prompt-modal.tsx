@@ -205,11 +205,11 @@ export function InstallPromptModal({ lang }: { lang: Lang }) {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/icons/icon-192.png"
-                alt="DIVA Association"
+                alt="DIVA Asso"
                 className="w-16 h-16 object-contain rounded-2xl shadow-md border border-slate-100 mb-2.5"
               />
               <h2 className="font-title-md text-title-md text-primary font-bold leading-tight">
-                Diva Association
+                DIVA Asso
               </h2>
               <p className="font-label-sm text-xs text-on-surface-variant mt-0.5">
                 {lang === "fr"

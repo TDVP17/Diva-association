@@ -21,7 +21,7 @@ export function FriendlyError({ error, reset }: { error: Error & { digest?: stri
   return (
     <main className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background px-container-padding text-center">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/icons/icon-512.png" alt="DIVA Association" className="w-16 h-16 rounded-2xl shadow-md" />
+      <img src="/icons/icon-512.png" alt="DIVA Asso" className="w-16 h-16 rounded-2xl shadow-md" />
       <span className="material-symbols-outlined text-error text-4xl">error</span>
       <p className="font-body-md text-body-md text-on-surface-variant max-w-sm">{t("somethingWentWrong")}</p>
       <button

@@ -157,16 +157,16 @@ export const translations = {
     helpQ5: "How do I reach an admin if I have a problem?",
     helpA5:
       "Use the Messages tab — send a message describing your issue and an admin will follow up. You'll get an automatic acknowledgement the first time you reach out.",
-    howDivaAssociationWorks: "How DIVA Association Works",
+    howDivaAssociationWorks: "How DIVA Asso Works",
     watchTutorial: "Watch tutorial",
     notNow: "Not now",
-    tutorialWelcomeTitle: "Welcome to DIVA Association",
+    tutorialWelcomeTitle: "Welcome to DIVA Asso",
     tutorialWelcomeBody: "Would you like to watch a short video explaining how the application works?",
-    tutorialNudgeTitle: "Need help understanding DIVA Association?",
+    tutorialNudgeTitle: "Need help understanding DIVA Asso?",
     tutorialNudgeBody: "Watch our short tutorial to learn how the application works.",
     tutorialVideoUnavailable: "This video could not be loaded.",
     installApp: "Install App",
-    installAppDescription: "Add DIVA Association to your home screen for quick, app-like access.",
+    installAppDescription: "Add DIVA Asso to your home screen for quick, app-like access.",
     offlineBannerText: "You're offline — showing your last-seen data.",
     draftContributionsReady: "{count} contribution draft(s) ready to submit",
     reviewDraftsAction: "Review",
@@ -180,10 +180,10 @@ export const translations = {
     installModalTitle: "Welcome! Get the full DIVA experience",
     installModalBody: "Install the app for faster access, offline support, and notifications.",
     downloadAndroidApk: "Download Android App (.apk)",
-    downloadAndroidApkDescription: "Install DIVA Association directly, without the Play Store.",
+    downloadAndroidApkDescription: "Install DIVA Asso directly, without the Play Store.",
     iosInstallTitle: "Install this app on your iPhone",
-    iosInstallSteps: "Tap the Share icon, then \"Add to Home Screen\" — DIVA Association will open full-screen, just like a native app.",
-    otpMessage: "Your DIVA Association verification code is {code}. It expires in 10 minutes.",
+    iosInstallSteps: "Tap the Share icon, then \"Add to Home Screen\" — DIVA Asso will open full-screen, just like a native app.",
+    otpMessage: "Your DIVA Asso verification code is {code}. It expires in 10 minutes.",
     save: "Save",
     verifyCode: "Verify code",
     locationLabel: "Location",
@@ -227,17 +227,17 @@ export const translations = {
     sendToAllMembers: "Send to All Members",
     emailSentSummary: "Sent to {count} member(s).",
     waReminderNoon:
-      "Hi {name}, this is a friendly reminder from DIVA Association 🌿\n\nYour contribution of {amount} for the {cotisation} is due today. You have until 18:30 to pay before a late fine applies.\n\nThank you for staying on track with the community!",
+      "Hi {name}, this is a friendly reminder from DIVA Asso 🌿\n\nYour contribution of {amount} for the {cotisation} is due today. You have until 18:30 to pay before a late fine applies.\n\nThank you for staying on track with the community!",
     waReminderUrgent:
-      "⚠️ URGENT — DIVA Association\n\n{name}, your {amount} contribution for the {cotisation} is still unpaid. The 18:30 deadline is approaching — after 18:31 a late fine will automatically apply.\n\nPlease complete your payment now to avoid the fine.",
+      "⚠️ URGENT — DIVA Asso\n\n{name}, your {amount} contribution for the {cotisation} is still unpaid. The 18:30 deadline is approaching — after 18:31 a late fine will automatically apply.\n\nPlease complete your payment now to avoid the fine.",
     waPaymentSuccess:
       "✅ You have successfully contributed {amount} for {cotisation}.\n\nThank you, {name}!\n\nDownload your receipt: {receiptUrl}",
     waFineNotice:
-      "🔴 Late payment notice — DIVA Association\n\n{name}, your contribution for the {cotisation} was not received before the 18:30 deadline. A late fine of {amount} has been applied to your account.\n\nPlease settle your contribution and fine as soon as possible.",
+      "🔴 Late payment notice — DIVA Asso\n\n{name}, your contribution for the {cotisation} was not received before the 18:30 deadline. A late fine of {amount} has been applied to your account.\n\nPlease settle your contribution and fine as soon as possible.",
     waDuplicateRefunded:
       "Your payment was received twice for the same name. The second payment of {amount} has been automatically refunded.",
     waPayoutTurn:
-      "Hello {name},\n\nWe're pleased to let you know that it's your turn to receive the {cotisation} payout (position #{position}).\n\n💰 Estimated amount: {amount}\n📅 Expected payout date: {date}\n\n👉 ACTION REQUIRED: Please log into the app and provide your Mobile Money phone number and the exact name on the account so the administrator can process your payout.\n\nThe DIVA Association team",
+      "Hello {name},\n\nWe're pleased to let you know that it's your turn to receive the {cotisation} payout (position #{position}).\n\n💰 Estimated amount: {amount}\n📅 Expected payout date: {date}\n\n👉 ACTION REQUIRED: Please log into the app and provide your Mobile Money phone number and the exact name on the account so the administrator can process your payout.\n\nThe DIVA Asso team",
     payoutTurnNotifMessage:
       "It's your turn to receive the {cotisation} payout! Please provide your Mobile Money account number and account name so the admin can process your payout.",
     payoutTurnBannerTitle: "It's your turn to receive the payout!",
@@ -254,11 +254,11 @@ export const translations = {
     payoutTurnAlertPrompt:
       "Action required: You must provide your Mobile Money account number and exact account name to receive your payout.",
     waPayoutReleased:
-      "🎉 Payout released — DIVA Association\n\nCongratulations {name} ({beneficiary})! Your payout of {amount} has been released. Confirm on the app once you've received it.",
+      "🎉 Payout released — DIVA Asso\n\nCongratulations {name} ({beneficiary})! Your payout of {amount} has been released. Confirm on the app once you've received it.",
     waPayoutReleasedWithDeduction:
-      "🎉 Payout released — DIVA Association\n\nCongratulations {name} ({beneficiary})! Your payout of {amount} has been released after deducting {deducted} in outstanding fines. Confirm on the app once you've received it.",
+      "🎉 Payout released — DIVA Asso\n\nCongratulations {name} ({beneficiary})! Your payout of {amount} has been released after deducting {deducted} in outstanding fines. Confirm on the app once you've received it.",
     waTurnReminderTomorrow:
-      "⏰ Reminder — DIVA Association\n\nHello {name},\n\nTomorrow ({date}) is your estimated turn to receive the {cotisation} payout (position #{position}).\n\n💰 Estimated amount: {amount}\n\nPlease make sure your contact and payment details are up to date in your profile. If you have any questions, contact support from the app.\n\nThe DIVA Association team",
+      "⏰ Reminder — DIVA Asso\n\nHello {name},\n\nTomorrow ({date}) is your estimated turn to receive the {cotisation} payout (position #{position}).\n\n💰 Estimated amount: {amount}\n\nPlease make sure your contact and payment details are up to date in your profile. If you have any questions, contact support from the app.\n\nThe DIVA Asso team",
     turnReminderTomorrowNotifMessage: "Tomorrow ({date}) is your estimated turn to receive the {cotisation} payout — position #{position}, estimated {amount}.",
     notifTypeTurnReminderTomorrow: "Your Turn Is Tomorrow",
     myConversations: "My Conversations",
@@ -725,13 +725,13 @@ export const translations = {
     perCotisationBreakdown: "Per-Cotisation Breakdown",
     noRevenueYet: "No revenue recorded yet.",
     myPersonalCode: "My Personal Code",
-    myPersonalCodeHelper: "Share this link so a relative or friend can directly contribute on your behalf.",
-    shareCodeMessage: "Contribute for me on DIVA Association with my code {code}. Click the link to pay:",
+    myPersonalCodeHelper: "Partagez ce code pour qu'un proche puisse cotiser pour vous.",
+    shareCodeMessage: "Partagez ce code pour qu'un proche puisse cotiser pour vous.",
     copy: "Copy",
     copied: "Copied!",
     share: "Share",
     loadingProfile: "Loading your profile...",
-    browserInstallPromptTitle: "Install DIVA Association",
+    browserInstallPromptTitle: "Install DIVA Asso",
     browserInstallPromptBanner: "Install the official app on your phone (iPhone or Android) for instant 1-tap access and notifications.",
     contributeForRelativeNav: "Contribute for a Relative",
     myNotificationsNav: "My Notifications",
@@ -926,7 +926,7 @@ export const translations = {
     landingHeroEyebrow: "Trusted Tontine Management",
     landingHeroTitle: "Manage Your Tontine, Automatically",
     landingHeroSubtitle:
-      "DIVA Association brings your traditional savings group online — automated contributions, verified members, and transparent payouts, all tracked in one place.",
+      "DIVA Asso brings your traditional savings group online — automated contributions, verified members, and transparent payouts, all tracked in one place.",
     landingHeroCtaPrimary: "Create a Free Account",
     landingHeroCtaSecondary: "Sign In",
     landingHowItWorksTitle: "How It Works",
@@ -953,14 +953,14 @@ export const translations = {
     landingStatCotisations: "Active Cotisations",
     landingStatContributions: "FCFA in Tracked Contributions",
     landingFooterTagline: "Automated management for traditional tontines.",
-    landingFooterRights: "© {year} DIVA Association. All rights reserved.",
+    landingFooterRights: "© {year} DIVA Asso. All rights reserved.",
     landingFooterPrivacy: "Privacy Policy",
     landingFooterTerms: "Terms of Service",
     landingFooterCookies: "Cookies",
 
     // Cookie Consent & Management
     cookiesTitle: "Privacy & Cookies",
-    cookiesBannerDesc: "DIVA Association uses strictly necessary cookies for application security, authentication, and session handling, as well as optional cookies to improve your user experience and measure platform usage.",
+    cookiesBannerDesc: "DIVA Asso uses strictly necessary cookies for application security, authentication, and session handling, as well as optional cookies to improve your user experience and measure platform usage.",
     cookiesAcceptAll: "Accept All",
     cookiesRejectNonEssential: "Decline Non-Essential",
     cookiesCustomize: "Customize",
@@ -981,7 +981,7 @@ export const translations = {
     privacyPolicyTitle: "Privacy Policy",
     privacyPolicyLastUpdated: "Last updated: {date}",
     privacyPolicyIntro:
-      "This Privacy Policy explains what information DIVA Association collects, why we collect it, and how it is used and protected when you use our platform to manage tontine (cotisation) savings groups.",
+      "This Privacy Policy explains what information DIVA Asso collects, why we collect it, and how it is used and protected when you use our platform to manage tontine (cotisation) savings groups.",
     privacyPolicySectionDataTitle: "Information We Collect",
     privacyPolicySectionDataBody:
       "Account information (name, email, phone number, preferred language); identity verification documents (Cameroonian national ID card, a selfie photo, and the result of an automated face-match/liveness check) required to join a cotisation; location information (city, neighborhood, and GPS coordinates) if you choose to share it; payment information related to your Mobile Money/Orange Money contributions (phone number and transaction status — we never see or store your Mobile Money PIN); and messages you send through the in-app chat.",
@@ -1005,16 +1005,16 @@ export const translations = {
     termsOfServiceTitle: "Terms of Service",
     termsOfServiceLastUpdated: "Last updated: {date}",
     termsOfServiceIntro:
-      "These Terms of Service govern your use of the DIVA Association platform. By creating an account, you agree to these terms.",
+      "These Terms of Service govern your use of the DIVA Asso platform. By creating an account, you agree to these terms.",
     termsSectionServiceTitle: "About the Service",
     termsSectionServiceBody:
-      "DIVA Association is software that helps traditional tontine (cotisation) savings groups organize contributions, track payout order, and communicate. DIVA Association is not a bank, a licensed financial institution, or a payment processor — Mobile Money and Orange Money payments are processed by our third-party payment partner, and DIVA Association is not liable for outages or delays caused by that provider or by mobile network operators.",
+      "DIVA Asso is software that helps traditional tontine (cotisation) savings groups organize contributions, track payout order, and communicate. DIVA Asso is not a bank, a licensed financial institution, or a payment processor — Mobile Money and Orange Money payments are processed by our third-party payment partner, and DIVA Asso is not liable for outages or delays caused by that provider or by mobile network operators.",
     termsSectionEligibilityTitle: "Eligibility & Verification",
     termsSectionEligibilityBody:
       "To join a cotisation, you must complete identity verification (KYC) with a valid Cameroonian national ID card and a matching selfie. An administrator may reject or remove a member who fails verification, provides false information, or violates a group's own rules (Règlement Général).",
     termsSectionResponsibilitiesTitle: "Member Responsibilities",
     termsSectionResponsibilitiesBody:
-      "You are responsible for making your contributions on time, for keeping your account information accurate, and for the confidentiality of your login credentials and Mobile Money PIN (which DIVA Association never asks for and never stores). Late contributions may incur a fine as configured by your group's administrator.",
+      "You are responsible for making your contributions on time, for keeping your account information accurate, and for the confidentiality of your login credentials and Mobile Money PIN (which DIVA Asso never asks for and never stores). Late contributions may incur a fine as configured by your group's administrator.",
     termsSectionPaymentsTitle: "Payments & Fees",
     termsSectionPaymentsBody:
       "Contributions are collected via Mobile Money/Orange Money through our payment partner, which charges a processing fee shown to you before you confirm any payment. Payouts follow the order configured for your cotisation (random draw or admin-assigned) and are recorded once confirmed.",
@@ -1023,12 +1023,30 @@ export const translations = {
       "An administrator may suspend or remove a member for non-payment, fraud, or violation of a group's rules. You may close your account at any time by contacting your administrator.",
     termsSectionLiabilityTitle: "Limitation of Liability",
     termsSectionLiabilityBody:
-      "DIVA Association provides record-keeping and coordination tools for tontines organized and run by their own members and administrators. We are not a party to, and are not liable for, the tontine agreement between members. To the fullest extent permitted by law, DIVA Association is not liable for indirect or consequential damages arising from use of the platform.",
+      "DIVA Asso provides record-keeping and coordination tools for tontines organized and run by their own members and administrators. We are not a party to, and are not liable for, the tontine agreement between members. To the fullest extent permitted by law, DIVA Asso is not liable for indirect or consequential damages arising from use of the platform.",
     termsSectionChangesTitle: "Changes to These Terms",
     termsSectionChangesBody:
       "We may update these terms from time to time. Continued use of the platform after a change constitutes acceptance of the updated terms.",
     termsSectionContactTitle: "Contact Us",
     termsSectionContactBody: "Questions about these terms can be directed to your association's administrator through the in-app Support chat.",
+
+    // Admin Broadcast Alerts
+    adminAlertNav: "Alerts & Announcements",
+    adminAlertModalTitle: "Broadcast an Alert",
+    adminAlertModalSubtitle: "Send a direct notification via In-App, Push, WhatsApp and Email.",
+    adminAlertTargetLabel: "Recipient Audience",
+    adminAlertTargetAll: "All users of the system",
+    adminAlertTargetGroup: "Members of a specific cotisation group",
+    adminAlertSelectGroupPrompt: "Select a cotisation group...",
+    adminAlertTitleLabel: "Alert Title / Subject",
+    adminAlertTitlePlaceholder: "e.g. Important notice regarding Sunday's tontine",
+    adminAlertBodyLabel: "Message",
+    adminAlertBodyPlaceholder: "Write your message to the members here...",
+    adminAlertSendAction: "Broadcast Alert",
+    adminAlertSendingAction: "Broadcasting...",
+    adminAlertSuccessMessage: "Alert broadcast successfully to {count} recipient(s)!",
+    adminAlertErrorMessage: "Could not send alert. Please try again.",
+    adminAlertChannelsNotice: "Alerts are delivered immediately via In-App, Push notification, WhatsApp, and Email.",
   },
   fr: {
     // Login
@@ -1184,19 +1202,19 @@ export const translations = {
     helpQ4: "Quelqu'un d'autre peut-il payer pour mon nom ?",
     helpA4:
       "Oui — chaque cotisation a un lien public (affiché sur la page de la cotisation) qui permet à quelqu'un d'autre de payer pour un nom impayé spécifique, sans compte requis. Vous pouvez aussi utiliser « Contribuer pour un proche » depuis votre propre compte.",
-    howDivaAssociationWorks: "Comment fonctionne DIVA Association",
+    howDivaAssociationWorks: "Comment fonctionne DIVA Asso",
     watchTutorial: "Voir le tutoriel",
     notNow: "Plus tard",
-    tutorialWelcomeTitle: "Bienvenue sur DIVA Association",
+    tutorialWelcomeTitle: "Bienvenue sur DIVA Asso",
     tutorialWelcomeBody: "Souhaitez-vous regarder une courte vidéo expliquant le fonctionnement de l'application ?",
-    tutorialNudgeTitle: "Besoin d'aide pour comprendre DIVA Association ?",
+    tutorialNudgeTitle: "Besoin d'aide pour comprendre DIVA Asso ?",
     tutorialNudgeBody: "Regardez notre court tutoriel pour découvrir le fonctionnement de l'application.",
     tutorialVideoUnavailable: "Cette vidéo n'a pas pu être chargée.",
     helpQ5: "Comment contacter un admin en cas de problème ?",
     helpA5:
       "Utilisez l'onglet Messages — envoyez un message décrivant votre problème et un admin vous répondra. Vous recevrez un accusé de réception automatique la première fois que vous nous contactez.",
     installApp: "Installer l'application",
-    installAppDescription: "Ajoutez DIVA Association à votre écran d'accueil pour un accès rapide, comme une app.",
+    installAppDescription: "Ajoutez DIVA Asso à votre écran d'accueil pour un accès rapide, comme une app.",
     offlineBannerText: "Vous êtes hors ligne — affichage de vos dernières données connues.",
     draftContributionsReady: "{count} brouillon(s) de cotisation prêt(s) à soumettre",
     reviewDraftsAction: "Examiner",
@@ -1210,10 +1228,10 @@ export const translations = {
     installModalTitle: "Bienvenue ! Profitez de l'expérience DIVA complète",
     installModalBody: "Installez l'application pour un accès plus rapide, une utilisation hors ligne et les notifications.",
     downloadAndroidApk: "Télécharger l'app Android (.apk)",
-    downloadAndroidApkDescription: "Installez DIVA Association directement, sans passer par le Play Store.",
+    downloadAndroidApkDescription: "Installez DIVA Asso directement, sans passer par le Play Store.",
     iosInstallTitle: "Installez cette app sur votre iPhone",
-    iosInstallSteps: "Appuyez sur l'icône de partage, puis « Sur l'écran d'accueil » — DIVA Association s'ouvrira en plein écran, comme une app native.",
-    otpMessage: "Votre code de vérification DIVA Association est {code}. Il expire dans 10 minutes.",
+    iosInstallSteps: "Appuyez sur l'icône de partage, puis « Sur l'écran d'accueil » — DIVA Asso s'ouvrira en plein écran, comme une app native.",
+    otpMessage: "Votre code de vérification DIVA Asso est {code}. Il expire dans 10 minutes.",
     save: "Enregistrer",
     verifyCode: "Vérifier le code",
     locationLabel: "Localisation",
@@ -1258,17 +1276,17 @@ export const translations = {
     sendToAllMembers: "Envoyer à tous les membres",
     emailSentSummary: "Envoyé à {count} membre(s).",
     waReminderNoon:
-      "Bonjour {name}, ceci est un rappel amical de DIVA Association 🌿\n\nVotre contribution de {amount} pour la {cotisation} est due aujourd'hui. Vous avez jusqu'à 18h30 pour payer avant qu'une amende de retard ne s'applique.\n\nMerci de rester à jour avec la communauté !",
+      "Bonjour {name}, ceci est un rappel amical de DIVA Asso 🌿\n\nVotre contribution de {amount} pour la {cotisation} est due aujourd'hui. Vous avez jusqu'à 18h30 pour payer avant qu'une amende de retard ne s'applique.\n\nMerci de rester à jour avec la communauté !",
     waReminderUrgent:
-      "⚠️ URGENT — DIVA Association\n\n{name}, votre contribution de {amount} pour la {cotisation} est toujours impayée. L'échéance de 18h30 approche — après 18h31, une amende de retard s'appliquera automatiquement.\n\nVeuillez effectuer votre paiement maintenant pour éviter l'amende.",
+      "⚠️ URGENT — DIVA Asso\n\n{name}, votre contribution de {amount} pour la {cotisation} est toujours impayée. L'échéance de 18h30 approche — après 18h31, une amende de retard s'appliquera automatiquement.\n\nVeuillez effectuer votre paiement maintenant pour éviter l'amende.",
     waPaymentSuccess:
       "✅ Vous avez contribué avec succès {amount} pour {cotisation}.\n\nMerci, {name} !\n\nTéléchargez votre reçu : {receiptUrl}",
     waFineNotice:
-      "🔴 Avis de retard de paiement — DIVA Association\n\n{name}, votre contribution pour la {cotisation} n'a pas été reçue avant l'échéance de 18h30. Une amende de retard de {amount} a été appliquée à votre compte.\n\nVeuillez régler votre contribution et votre amende dès que possible.",
+      "🔴 Avis de retard de paiement — DIVA Asso\n\n{name}, votre contribution pour la {cotisation} n'a pas été reçue avant l'échéance de 18h30. Une amende de retard de {amount} a été appliquée à votre compte.\n\nVeuillez régler votre contribution et votre amende dès que possible.",
     waDuplicateRefunded:
       "Votre paiement a été reçu deux fois pour le même nom. Le second paiement de {amount} a été automatiquement remboursé.",
     waPayoutTurn:
-      "Bonjour {name},\n\nNous avons le plaisir de vous informer que c'est votre tour de recevoir la cagnotte de la cotisation {cotisation} (position n°{position}).\n\n💰 Montant total : {amount}\n📅 Date de versement prévue : {date}\n\n👉 ACTION REQUISE : Veuillez vous connecter à l'application et renseigner votre numéro de compte Mobile Money (MTN / Orange) et le nom complet exact sur le compte afin que l'administrateur effectue votre virement.\n\nL'équipe DIVA Association",
+      "Bonjour {name},\n\nNous avons le plaisir de vous informer que c'est votre tour de recevoir la cagnotte de la cotisation {cotisation} (position n°{position}).\n\n💰 Montant total : {amount}\n📅 Date de versement prévue : {date}\n\n👉 ACTION REQUISE : Veuillez vous connecter à l'application et renseigner votre numéro de compte Mobile Money (MTN / Orange) et le nom complet exact sur le compte afin que l'administrateur effectue votre virement.\n\nL'équipe DIVA Asso",
     payoutTurnNotifMessage:
       "C'est votre tour de bouffer la cagnotte de {cotisation} ! Veuillez fournir votre numéro de compte Mobile Money et votre nom complet pour le virement.",
     payoutTurnBannerTitle: "C'est votre tour de bouffer la cagnotte !",
@@ -1285,11 +1303,11 @@ export const translations = {
     payoutTurnAlertPrompt:
       "Action requise : Vous devez fournir votre numéro de compte Mobile Money et votre nom pour recevoir votre virement.",
     waPayoutReleased:
-      "🎉 Versement effectué — DIVA Association\n\nFélicitations {name} ({beneficiary}) ! Votre versement de {amount} a été effectué. Confirmez sur l'application dès que vous l'aurez reçu.",
+      "🎉 Versement effectué — DIVA Asso\n\nFélicitations {name} ({beneficiary}) ! Votre versement de {amount} a été effectué. Confirmez sur l'application dès que vous l'aurez reçu.",
     waPayoutReleasedWithDeduction:
-      "🎉 Versement effectué — DIVA Association\n\nFélicitations {name} ({beneficiary}) ! Votre versement de {amount} a été effectué après déduction de {deducted} d'amendes impayées. Confirmez sur l'application dès que vous l'aurez reçu.",
+      "🎉 Versement effectué — DIVA Asso\n\nFélicitations {name} ({beneficiary}) ! Votre versement de {amount} a été effectué après déduction de {deducted} d'amendes impayées. Confirmez sur l'application dès que vous l'aurez reçu.",
     waTurnReminderTomorrow:
-      "⏰ Rappel — DIVA Association\n\nBonjour {name},\n\nDemain ({date}) est la date estimée de votre tour pour recevoir la cagnotte de {cotisation} (position n°{position}).\n\n💰 Montant estimé : {amount}\n\nAssurez-vous que vos informations de contact et de paiement sont à jour dans votre profil. En cas de question, contactez le support depuis l'application.\n\nL'équipe DIVA Association",
+      "⏰ Rappel — DIVA Asso\n\nBonjour {name},\n\nDemain ({date}) est la date estimée de votre tour pour recevoir la cagnotte de {cotisation} (position n°{position}).\n\n💰 Montant estimé : {amount}\n\nAssurez-vous que vos informations de contact et de paiement sont à jour dans votre profil. En cas de question, contactez le support depuis l'application.\n\nL'équipe DIVA Asso",
     turnReminderTomorrowNotifMessage: "Demain ({date}) est la date estimée de votre tour pour recevoir la cagnotte de {cotisation} — position n°{position}, environ {amount}.",
     notifTypeTurnReminderTomorrow: "Votre tour est demain",
     myConversations: "Mes conversations",
@@ -1758,13 +1776,13 @@ export const translations = {
     perCotisationBreakdown: "Détail par cotisation",
     noRevenueYet: "Aucun revenu enregistré pour le moment.",
     myPersonalCode: "Mon code personnel",
-    myPersonalCodeHelper: "Partagez ce lien pour qu'un proche ou un ami puisse directement contribuer en votre nom.",
-    shareCodeMessage: "Contribue pour moi sur DIVA Association avec mon code {code}. Clique sur le lien pour payer :",
+    myPersonalCodeHelper: "Partagez ce code pour qu'un proche puisse cotiser pour vous.",
+    shareCodeMessage: "Partagez ce code pour qu'un proche puisse cotiser pour vous.",
     copy: "Copier",
     copied: "Copié !",
     share: "Partager",
     loadingProfile: "Chargement de votre profil...",
-    browserInstallPromptTitle: "Installer DIVA Association",
+    browserInstallPromptTitle: "Installer DIVA Asso",
     browserInstallPromptBanner: "Installez l'application officielle sur votre téléphone (iPhone ou Android) pour un accès direct et recevoir toutes vos notifications.",
     contributeForRelativeNav: "Contribuer pour un proche",
     myNotificationsNav: "Mes notifications",
@@ -1960,7 +1978,7 @@ export const translations = {
     landingHeroEyebrow: "Gestion de tontine de confiance",
     landingHeroTitle: "Gérez votre tontine, automatiquement",
     landingHeroSubtitle:
-      "DIVA Association met votre groupe d'épargne traditionnel en ligne — cotisations automatisées, membres vérifiés et versements transparents, le tout suivi au même endroit.",
+      "DIVA Asso met votre groupe d'épargne traditionnel en ligne — cotisations automatisées, membres vérifiés et versements transparents, le tout suivi au même endroit.",
     landingHeroCtaPrimary: "Créer un compte gratuit",
     landingHeroCtaSecondary: "Se connecter",
     landingHowItWorksTitle: "Comment ça marche",
@@ -1987,14 +2005,14 @@ export const translations = {
     landingStatCotisations: "Cotisations actives",
     landingStatContributions: "FCFA de cotisations suivies",
     landingFooterTagline: "Gestion automatisée pour les tontines traditionnelles.",
-    landingFooterRights: "© {year} DIVA Association. Tous droits réservés.",
+    landingFooterRights: "© {year} DIVA Asso. Tous droits réservés.",
     landingFooterPrivacy: "Politique de confidentialité",
     landingFooterTerms: "Conditions d'utilisation",
     landingFooterCookies: "Cookies",
 
     // Cookie Consent & Management
     cookiesTitle: "Respect de votre vie privée",
-    cookiesBannerDesc: "DIVA Association utilise des cookies strictement nécessaires au fonctionnement et à la sécurité de l'application (authentification, session), ainsi que des cookies facultatifs pour mesurer l'audience et personnaliser votre expérience.",
+    cookiesBannerDesc: "DIVA Asso utilise des cookies strictement nécessaires au fonctionnement et à la sécurité de l'application (authentification, session), ainsi que des cookies facultatifs pour mesurer l'audience et personnaliser votre expérience.",
     cookiesAcceptAll: "Tout accepter",
     cookiesRejectNonEssential: "Refuser non-essentiels",
     cookiesCustomize: "Personnaliser",
@@ -2015,7 +2033,7 @@ export const translations = {
     privacyPolicyTitle: "Politique de confidentialité",
     privacyPolicyLastUpdated: "Dernière mise à jour : {date}",
     privacyPolicyIntro:
-      "Cette politique de confidentialité explique quelles informations DIVA Association collecte, pourquoi nous les collectons, et comment elles sont utilisées et protégées lorsque vous utilisez notre plateforme pour gérer des groupes d'épargne tontine (cotisation).",
+      "Cette politique de confidentialité explique quelles informations DIVA Asso collecte, pourquoi nous les collectons, et comment elles sont utilisées et protégées lorsque vous utilisez notre plateforme pour gérer des groupes d'épargne tontine (cotisation).",
     privacyPolicySectionDataTitle: "Informations que nous collectons",
     privacyPolicySectionDataBody:
       "Informations de compte (nom, email, numéro de téléphone, langue préférée) ; documents de vérification d'identité (carte nationale d'identité camerounaise, une photo selfie, et le résultat d'une vérification automatique de correspondance faciale/détection de vivacité) requis pour rejoindre une cotisation ; informations de localisation (ville, quartier et coordonnées GPS) si vous choisissez de les partager ; informations de paiement liées à vos cotisations Mobile Money/Orange Money (numéro de téléphone et statut de transaction — nous ne voyons ni ne stockons jamais votre code secret Mobile Money) ; et les messages que vous envoyez via le chat intégré.",
@@ -2039,16 +2057,16 @@ export const translations = {
     termsOfServiceTitle: "Conditions d'utilisation",
     termsOfServiceLastUpdated: "Dernière mise à jour : {date}",
     termsOfServiceIntro:
-      "Ces conditions d'utilisation régissent votre usage de la plateforme DIVA Association. En créant un compte, vous acceptez ces conditions.",
+      "Ces conditions d'utilisation régissent votre usage de la plateforme DIVA Asso. En créant un compte, vous acceptez ces conditions.",
     termsSectionServiceTitle: "À propos du service",
     termsSectionServiceBody:
-      "DIVA Association est un logiciel qui aide les groupes d'épargne tontine (cotisation) traditionnels à organiser les cotisations, suivre l'ordre des versements et communiquer. DIVA Association n'est pas une banque, un établissement financier agréé ou un prestataire de services de paiement — les paiements Mobile Money et Orange Money sont traités par notre partenaire de paiement tiers, et DIVA Association n'est pas responsable des interruptions ou retards causés par ce prestataire ou par les opérateurs de réseaux mobiles.",
+      "DIVA Asso est un logiciel qui aide les groupes d'épargne tontine (cotisation) traditionnels à organiser les cotisations, suivre l'ordre des versements et communiquer. DIVA Asso n'est pas une banque, un établissement financier agréé ou un prestataire de services de paiement — les paiements Mobile Money et Orange Money sont traités par notre partenaire de paiement tiers, et DIVA Asso n'est pas responsable des interruptions ou retards causés par ce prestataire ou par les opérateurs de réseaux mobiles.",
     termsSectionEligibilityTitle: "Éligibilité et vérification",
     termsSectionEligibilityBody:
       "Pour rejoindre une cotisation, vous devez compléter une vérification d'identité (KYC) avec une carte nationale d'identité camerounaise valide et un selfie correspondant. Un administrateur peut rejeter ou retirer un membre qui échoue à la vérification, fournit de fausses informations, ou viole le règlement propre à un groupe (Règlement Général).",
     termsSectionResponsibilitiesTitle: "Responsabilités des membres",
     termsSectionResponsibilitiesBody:
-      "Vous êtes responsable du paiement de vos cotisations à temps, de l'exactitude des informations de votre compte, et de la confidentialité de vos identifiants de connexion et de votre code secret Mobile Money (que DIVA Association ne demande ni ne stocke jamais). Les cotisations en retard peuvent entraîner une amende telle que configurée par l'administrateur de votre groupe.",
+      "Vous êtes responsable du paiement de vos cotisations à temps, de l'exactitude des informations de votre compte, et de la confidentialité de vos identifiants de connexion et de votre code secret Mobile Money (que DIVA Asso ne demande ni ne stocke jamais). Les cotisations en retard peuvent entraîner une amende telle que configurée par l'administrateur de votre groupe.",
     termsSectionPaymentsTitle: "Paiements et frais",
     termsSectionPaymentsBody:
       "Les cotisations sont collectées via Mobile Money/Orange Money par l'intermédiaire de notre partenaire de paiement, qui applique des frais de traitement affichés avant que vous ne confirmiez tout paiement. Les versements suivent l'ordre configuré pour votre cotisation (tirage au sort ou attribution par l'admin) et sont enregistrés une fois confirmés.",
@@ -2057,12 +2075,30 @@ export const translations = {
       "Un administrateur peut suspendre ou retirer un membre en cas de non-paiement, de fraude ou de violation du règlement d'un groupe. Vous pouvez fermer votre compte à tout moment en contactant votre administrateur.",
     termsSectionLiabilityTitle: "Limitation de responsabilité",
     termsSectionLiabilityBody:
-      "DIVA Association fournit des outils de tenue de registres et de coordination pour des tontines organisées et gérées par leurs propres membres et administrateurs. Nous ne sommes pas partie à l'accord de tontine entre membres et n'en sommes pas responsables. Dans toute la mesure permise par la loi, DIVA Association n'est pas responsable des dommages indirects ou consécutifs résultant de l'utilisation de la plateforme.",
+      "DIVA Asso fournit des outils de tenue de registres et de coordination pour des tontines organisées et gérées par leurs propres membres et administrateurs. Nous ne sommes pas partie à l'accord de tontine entre membres et n'en sommes pas responsables. Dans toute la mesure permise par la loi, DIVA Asso n'est pas responsable des dommages indirects ou consécutifs résultant de l'utilisation de la plateforme.",
     termsSectionChangesTitle: "Modifications de ces conditions",
     termsSectionChangesBody:
       "Nous pouvons mettre à jour ces conditions de temps à autre. La poursuite de l'utilisation de la plateforme après une modification vaut acceptation des conditions mises à jour.",
     termsSectionContactTitle: "Nous contacter",
     termsSectionContactBody: "Pour toute question concernant ces conditions, veuillez contacter l'administrateur de votre association via le chat d'assistance de l'application.",
+
+    // Admin Broadcast Alerts
+    adminAlertNav: "Alertes et Annonces",
+    adminAlertModalTitle: "Diffuser une alerte",
+    adminAlertModalSubtitle: "Envoyez une alerte directe par In-App, Notification push, WhatsApp et E-mail.",
+    adminAlertTargetLabel: "Destinataires ciblés",
+    adminAlertTargetAll: "Tous les utilisateurs du système",
+    adminAlertTargetGroup: "Membres d'un groupe de cotisation",
+    adminAlertSelectGroupPrompt: "Sélectionner un groupe de cotisation...",
+    adminAlertTitleLabel: "Titre de l'alerte / Objet",
+    adminAlertTitlePlaceholder: "ex. Avis important concernant la tontine de dimanche",
+    adminAlertBodyLabel: "Message",
+    adminAlertBodyPlaceholder: "Rédigez votre message à l'attention des membres...",
+    adminAlertSendAction: "Diffuser l'alerte",
+    adminAlertSendingAction: "Diffusion en cours...",
+    adminAlertSuccessMessage: "Alerte diffusée avec succès à {count} destinataire(s) !",
+    adminAlertErrorMessage: "Impossible d'envoyer l'alerte. Veuillez réessayer.",
+    adminAlertChannelsNotice: "Les alertes sont transmises immédiatement par In-App, Notification push, WhatsApp et E-mail.",
   },
 } as const satisfies Record<Lang, Record<string, string>>;
 

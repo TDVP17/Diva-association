@@ -51,7 +51,7 @@ export async function GET(request: Request) {
         const emailHtml = `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1e293b; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0;">
             <div style="text-align: center; margin-bottom: 20px;">
-              <h2 style="color: #003528; margin: 0;">DIVA Association</h2>
+              <h2 style="color: #003528; margin: 0;">DIVA Asso</h2>
             </div>
             <h3 style="color: #dc2626; margin-top: 0;">${subject}</h3>
             <p style="font-size: 15px; line-height: 1.6; white-space: pre-line;">${message}</p>

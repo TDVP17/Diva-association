@@ -53,7 +53,7 @@ export async function TopAppBar({
         <span className="flex flex-col leading-[1.05] min-w-0">
           <span className="font-label-md text-label-md font-bold text-primary tracking-tight truncate">DIVA</span>
           <span className="font-label-sm text-label-sm font-bold text-secondary tracking-tight truncate">
-            Association
+            Asso
           </span>
         </span>
       </Link>

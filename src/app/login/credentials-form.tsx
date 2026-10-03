@@ -269,10 +269,6 @@ export function CredentialsForm({
               {t("email")}
             </label>
           </div>
-          <p className="text-xs text-on-surface-variant flex items-center gap-1.5 px-1 -mt-2">
-            <span className="material-symbols-outlined text-[15px] text-primary shrink-0">info</span>
-            <span>{t("signupEmailUniqueNotice")}</span>
-          </p>
           <PasswordField id="signup-password" label={t("password")} minLength={6} lang={lang} autoComplete="new-password" />
           {signUpState.error && (
             <p className="font-label-sm text-label-sm text-error text-center">{signUpState.error}</p>

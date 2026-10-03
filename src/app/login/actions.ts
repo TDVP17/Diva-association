@@ -164,12 +164,12 @@ export async function requestPasswordResetAction(
   if (isEmail) {
     const subject =
       lang === "fr"
-        ? "DIVA Association — Code de réinitialisation de mot de passe"
-        : "DIVA Association — Password reset verification code";
+        ? "DIVA Asso — Code de réinitialisation de mot de passe"
+        : "DIVA Asso — Password reset verification code";
     const emailHtml = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1e293b; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0;">
         <div style="text-align: center; margin-bottom: 20px;">
-          <h2 style="color: #003528; margin: 0;">DIVA Association</h2>
+          <h2 style="color: #003528; margin: 0;">DIVA Asso</h2>
         </div>
         <h3 style="color: #0f172a; margin-top: 0;">${subject}</h3>
         <p style="font-size: 15px; line-height: 1.6; color: #334155;">
@@ -199,8 +199,8 @@ export async function requestPasswordResetAction(
   } else {
     const waText =
       lang === "fr"
-        ? `*DIVA Association — Réinitialisation du mot de passe*\n\nBonjour *${user.name}*,\nVotre code de vérification est : *${challenge.code}*\n\nCe code expire dans 10 minutes. Pour votre sécurité, ne le transmettez à personne.`
-        : `*DIVA Association — Password reset*\n\nHello *${user.name}*,\nYour verification code is: *${challenge.code}*\n\nThis code expires in 10 minutes. Do not share it with anyone.`;
+        ? `*DIVA Asso — Réinitialisation du mot de passe*\n\nBonjour *${user.name}*,\nVotre code de vérification est : *${challenge.code}*\n\nCe code expire dans 10 minutes. Pour votre sécurité, ne le transmettez à personne.`
+        : `*DIVA Asso — Password reset*\n\nHello *${user.name}*,\nYour verification code is: *${challenge.code}*\n\nThis code expires in 10 minutes. Do not share it with anyone.`;
     await sendWhatsAppMessageSafe(user.phone, waText);
     const maskedPhone = user.phone && user.phone.length > 4 ? `+***${user.phone.slice(-4)}` : "WhatsApp";
     return { success: true, channel: "WHATSAPP", destination: maskedPhone };

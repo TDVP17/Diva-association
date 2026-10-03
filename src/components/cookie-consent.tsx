@@ -211,7 +211,7 @@ export function CookieConsent({ lang }: { lang: Lang }) {
                     {t("cookiesModalTitle")}
                   </h2>
                   <p className="font-label-sm text-[11px] text-on-surface-variant">
-                    DIVA Association
+                    DIVA Asso
                   </p>
                 </div>
               </div>

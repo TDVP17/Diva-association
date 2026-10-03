@@ -39,8 +39,8 @@ export function MemberCodeCard({ code, lang }: { code: string | null; lang: Lang
     if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
       try {
         await navigator.share({
-          title: "DIVA Association",
-          text: t("shareCodeMessage", { code: code! }),
+          title: "DIVA Asso",
+          text: t("shareCodeMessage"),
           url: shareUrl,
         });
       } catch (err) {

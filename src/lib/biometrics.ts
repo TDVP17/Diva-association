@@ -1,5 +1,5 @@
 /**
- * Client-side WebAuthn Biometric Authentication helper for DIVA Association.
+ * Client-side WebAuthn Biometric Authentication helper for DIVA Asso.
  * Directly triggers device native biometrics: Face ID, Touch ID, Android Fingerprint.
  * Requires NO PIN code and NO passwords.
  */
@@ -109,7 +109,7 @@ export async function registerBiometrics(userName: string = "Membre"): Promise<{
       publicKey: {
         challenge,
         rp: {
-          name: "DIVA Association",
+          name: "DIVA Asso",
           id: window.location.hostname,
         },
         user: {

@@ -11,23 +11,21 @@ const inter = Inter({
 });
 
 const APP_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-const SITE_TITLE = "DIVA Association";
+const SITE_TITLE = "DIVA Asso";
 const SITE_DESCRIPTION = "Automated, secure management for traditional tontine (cotisation) savings groups.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: { default: SITE_TITLE, template: `%s — ${SITE_TITLE}` },
   description: SITE_DESCRIPTION,
-  applicationName: "DIVA Association",
+  applicationName: "DIVA Asso",
   manifest: "/manifest.json",
   // iOS Safari's "Add to Home Screen" ignores manifest.json entirely — it
-  // reads this meta tag for the label under the home-screen icon. Kept in
-  // sync with manifest.json's name/short_name below (both "Tontine") so the
-  // installed name matches on every platform.
+  // reads this meta tag for the label under the home-screen icon.
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "DIVA Association",
+    title: "DIVA Asso",
   },
   icons: {
     icon: [
@@ -71,7 +69,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         />
         <meta name="theme-color" content="#003528" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="application-name" content="DIVA Association" />
+        <meta name="application-name" content="DIVA Asso" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <script
           dangerouslySetInnerHTML={{

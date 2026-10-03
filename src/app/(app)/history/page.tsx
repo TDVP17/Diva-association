@@ -242,7 +242,7 @@ export default async function HistoryPage() {
       pureAmount: grossPot,
       fineAmount: deductedAmount > 0 ? deductedAmount : undefined,
       status: p.status,
-      payerName: "DIVA Association (Cagnotte)",
+      payerName: "DIVA Asso (Cagnotte)",
       payerPhone: p.payoutPhone,
       txRef: p.fapshiTransId,
       receiptPdfUrl: `/api/payouts/${p.id}/receipt`,

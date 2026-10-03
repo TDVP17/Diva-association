@@ -148,7 +148,7 @@ export function AppLockGate({ lang }: { lang: Lang }) {
           <div className="w-20 h-20 rounded-2xl bg-white shadow-md border border-slate-100 flex items-center justify-center p-2">
             <Image
               src="/icons/icon-192.png"
-              alt="Diva Association"
+              alt="DIVA Asso"
               width={64}
               height={64}
               className="w-16 h-16 object-contain rounded-xl"
@@ -160,8 +160,11 @@ export function AppLockGate({ lang }: { lang: Lang }) {
           </div>
         </div>
 
+        {/* Brand under logo */}
+        <p className="font-bold text-base text-primary tracking-tight mb-1">DIVA Asso</p>
+
         {/* Lock Info */}
-        <h2 className="font-bold text-xl text-slate-900 mb-1">
+        <h2 className="font-semibold text-lg text-slate-800 mb-1">
           {lang === "fr" ? "Application verrouillée" : "Application Locked"}
         </h2>
         <p className="text-xs text-slate-500 mb-6 max-w-xs leading-relaxed">

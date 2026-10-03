@@ -95,7 +95,7 @@ export async function POST(request: Request) {
 
   // Notify recipient on their phone via Web Push, WhatsApp (Evolution API), and Email (Resend)
   try {
-    const senderName = session.user.name ?? "Diva Association";
+    const senderName = session.user.name ?? "DIVA Asso";
     const preview =
       parsed.data.content.length > 70
         ? parsed.data.content.slice(0, 70) + "..."
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
     }).catch((err) => console.error("[chat] Push notification failed:", err));
 
     if (receiver.phone) {
-      const waText = `*DIVA Association - Nouveau message*\n\nDe : *${senderName}*\n« ${preview} »\n\nRépondre dans l'app : ${baseUrl}${chatUrl}`;
+      const waText = `*DIVA Asso - Nouveau message*\n\nDe : *${senderName}*\n« ${preview} »\n\nRépondre dans l'app : ${baseUrl}${chatUrl}`;
       void sendWhatsAppMessageSafe(receiver.phone, waText).catch((err) =>
         console.error("[chat] WhatsApp notification failed:", err),
       );
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
 
     if (receiver.email) {
       const emailHtml = `<p>Bonjour,</p><p>Vous avez reçu un nouveau message de <strong>${senderName}</strong> :</p><p style="padding:12px;background:#f1f5f9;border-radius:8px;">« ${preview} »</p><p><a href="${baseUrl}${chatUrl}" style="display:inline-block;padding:10px 16px;background:#003528;color:#ffffff;text-decoration:none;border-radius:6px;">Répondre dans l'application</a></p>`;
-      void sendEmailSafe(receiver.email, `Nouveau message de ${senderName} — DIVA Association`, emailHtml).catch((err) =>
+      void sendEmailSafe(receiver.email, `Nouveau message de ${senderName} — DIVA Asso`, emailHtml).catch((err) =>
         console.error("[chat] Email notification failed:", err),
       );
     }

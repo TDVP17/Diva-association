@@ -6,8 +6,8 @@ import { ManageCookiesButton } from "@/components/cookie-consent";
 const LAST_UPDATED = "2026-09-29";
 
 export const metadata: Metadata = {
-  title: "Politique des Cookies — DIVA Association",
-  description: "Politique relative à l'utilisation des cookies et traceurs sur la plateforme DIVA Association.",
+  title: "Politique des Cookies — DIVA Asso",
+  description: "Politique relative à l'utilisation des cookies et traceurs sur la plateforme DIVA Asso.",
 };
 
 export default async function CookiesPolicyPage() {
