@@ -48,7 +48,7 @@ export async function AdminTopBar({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/icons/icon-512.png" alt="DIVA Asso" className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex-shrink-0" />
         <div className="min-w-0">
-          <p className="font-label-md text-label-md sm:font-title-md sm:text-title-md leading-none truncate">
+          <p className="font-title-sm sm:font-title-md font-bold leading-none truncate text-white">
             {translate(lang, "adminBrand")}
           </p>
           <p className="font-label-sm text-label-sm text-on-primary/70 leading-none mt-1 truncate">

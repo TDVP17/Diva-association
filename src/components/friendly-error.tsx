@@ -19,10 +19,11 @@ export function FriendlyError({ error, reset }: { error: Error & { digest?: stri
   }, [error]);
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background px-container-padding text-center">
+    <main className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background px-container-padding text-center">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/icons/icon-512.png" alt="DIVA Asso" className="w-16 h-16 rounded-2xl shadow-md" />
-      <span className="material-symbols-outlined text-error text-4xl">error</span>
+      <p className="font-bold text-xl text-primary tracking-tight">DIVA Asso</p>
+      <span className="material-symbols-outlined text-error text-4xl mt-2">error</span>
       <p className="font-body-md text-body-md text-on-surface-variant max-w-sm">{t("somethingWentWrong")}</p>
       <button
         onClick={reset}

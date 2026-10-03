@@ -346,7 +346,7 @@ export const translations = {
     redirectingToFapshi: "Redirecting to Fapshi...",
 
     // Admin
-    adminBrand: "DIVA Admin",
+    adminBrand: "DIVA Asso",
     adminNavDashboard: "Dashboard",
     adminNavNotifications: "Notifications",
     adminNavSupport: "Support",
@@ -927,7 +927,7 @@ export const translations = {
     landingHeroTitle: "Manage Your Tontine, Automatically",
     landingHeroSubtitle:
       "DIVA Asso brings your traditional savings group online — automated contributions, verified members, and transparent payouts, all tracked in one place.",
-    landingHeroCtaPrimary: "Create a Free Account",
+    landingHeroCtaPrimary: "Create an Account",
     landingHeroCtaSecondary: "Sign In",
     landingHowItWorksTitle: "How It Works",
     landingHowItWorksSubtitle: "From sign-up to payout, every step is tracked and verified.",
@@ -1395,7 +1395,7 @@ export const translations = {
     redirectingToFapshi: "Redirection vers Fapshi...",
 
     // Admin
-    adminBrand: "DIVA Admin",
+    adminBrand: "DIVA Asso",
     adminNavDashboard: "Tableau de bord",
     adminNavNotifications: "Notifications",
     adminNavSupport: "Support",
@@ -1979,7 +1979,7 @@ export const translations = {
     landingHeroTitle: "Gérez votre tontine, automatiquement",
     landingHeroSubtitle:
       "DIVA Asso met votre groupe d'épargne traditionnel en ligne — cotisations automatisées, membres vérifiés et versements transparents, le tout suivi au même endroit.",
-    landingHeroCtaPrimary: "Créer un compte gratuit",
+    landingHeroCtaPrimary: "Créer un compte",
     landingHeroCtaSecondary: "Se connecter",
     landingHowItWorksTitle: "Comment ça marche",
     landingHowItWorksSubtitle: "De l'inscription au versement, chaque étape est suivie et vérifiée.",

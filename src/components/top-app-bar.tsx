@@ -47,14 +47,11 @@ export async function TopAppBar({
         </div>
         <span className="font-title-md text-title-md text-primary hidden sm:block truncate">{userName}</span>
       </Link>
-      <Link href="/dashboard" className="flex items-center gap-1.5 sm:hidden min-w-0">
+      <Link href="/dashboard" className="flex items-center gap-2 sm:hidden min-w-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/icons/icon-512.png" alt="" className="w-9 h-9 rounded-lg flex-shrink-0" />
-        <span className="flex flex-col leading-[1.05] min-w-0">
-          <span className="font-label-md text-label-md font-bold text-primary tracking-tight truncate">DIVA</span>
-          <span className="font-label-sm text-label-sm font-bold text-secondary tracking-tight truncate">
-            Asso
-          </span>
+        <img src="/icons/icon-512.png" alt="DIVA Asso" className="w-9 h-9 rounded-lg flex-shrink-0" />
+        <span className="font-title-sm text-title-sm font-bold text-primary tracking-tight truncate">
+          DIVA Asso
         </span>
       </Link>
       <div className="flex items-center gap-1 flex-shrink-0">
