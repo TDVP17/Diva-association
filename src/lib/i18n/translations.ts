@@ -286,7 +286,7 @@ export const translations = {
     relativePaymentFailedNotChecked: "Payment failed — Name NOT checked",
     relativePaymentFailedNotCheckedBody: "The payment did not go through. The name \"{name}\" is NOT checked in the cotisation.",
     duplicateRefundTitle: "Duplicate refund (network issue)",
-    duplicateRefundStatusRefunded: "Refunded to Mobile Money",
+    duplicateRefundStatusRefunded: "Refunded to Mobile Money / Orange Money",
     duplicateRefundStatusPending: "Refund in progress",
     relativeContributionReason: "Contribution for a relative",
     cycleContributionReason: "Cycle contribution",
@@ -605,7 +605,7 @@ export const translations = {
     stillWaitingForConfirmation: "Still waiting — you can leave this open, or check back later from your history.",
     globalPaymentNavLabel: "Global Payment",
     globalPaymentTitle: "Global Payment",
-    globalPaymentSubtitle: "Pay for several of your names in one combined Mobile Money payment.",
+    globalPaymentSubtitle: "Pay for several of your names in one combined Mobile Money / Orange Money payment.",
     globalPaymentSelectAll: "Select all",
     globalPaymentDeselectAll: "Deselect all",
     globalPaymentNoUnpaidSlots: "You have no outstanding contributions to pay right now.",
@@ -707,8 +707,8 @@ export const translations = {
     directPayoutSubtitle:
       "Send the transfer directly from your Fapshi account to the beneficiary's MTN or Orange Money account.",
     selectBeneficiarySlot: "Select turn beneficiary",
-    payoutAccountNameInput: "Name on Mobile Money Account",
-    payoutPhoneInput: "MTN / Orange Money Number",
+    payoutAccountNameInput: "Name on Mobile Money / Orange Money Account",
+    payoutPhoneInput: "Mobile Money / Orange Money Number",
     payoutAmountInput: "Amount to Transfer (XAF)",
     sendFapshiPayout: "Send Fapshi Transfer",
     sendingPayout: "Sending transfer...",
@@ -794,7 +794,7 @@ export const translations = {
     fineReminderMessage:
       "Hello {name} ❤️\nThis is a friendly reminder about your outstanding fine of {amount}. Please remember to settle it before the contribution closes so that you remain eligible to participate in future contributions. 🙏",
     foodTurnMessage:
-      "🎉 Congratulations {name}! It's your turn to receive the payout! 💰🎊\n\n👉 ACTION REQUIRED: Please log into the app now to provide your Mobile Money account number (MTN / Orange) and exact account holder name so the administrator can process your payout!",
+      "🎉 Congratulations {name}! It's your turn to receive the payout! 💰🎊\n\n👉 ACTION REQUIRED: Please log into the app now to provide your Mobile Money or Orange Money account number (MTN / Orange) and exact account holder name so the administrator can process your payout!",
     notifTypeContributionReminder: "Contribution Reminder",
     notifTypeFineReminder: "Fine Reminder",
     notifTypeFoodTurn: "It's Your Turn!",
@@ -935,7 +935,7 @@ export const translations = {
     landingStep1Body: "Sign up and verify your identity with a quick KYC check, for everyone's security.",
     landingStep2Title: "Join a Cotisation",
     landingStep2Body: "Join an existing tontine group, or let an admin create one for your community.",
-    landingStep3Title: "Contribute via Mobile Money",
+    landingStep3Title: "Contribute via Mobile Money / Orange Money",
     landingStep3Body: "Pay your contribution directly from your phone — Mobile Money or Orange Money, no cash handling.",
     landingStep4Title: "Get Paid on Your Turn",
     landingStep4Body: "Payout order is tracked automatically, and every contribution and payout is recorded.",
@@ -945,7 +945,7 @@ export const translations = {
     landingBadgeEncryptedBody: "Your data is protected in transit and at rest.",
     landingBadgeKycTitle: "Identity Verification",
     landingBadgeKycBody: "Every member completes identity verification before joining a group.",
-    landingBadgeMobileMoneyTitle: "Mobile Money Payments",
+    landingBadgeMobileMoneyTitle: "Mobile Money & Orange Money",
     landingBadgeMobileMoneyBody: "Secure contributions via Mobile Money and Orange Money.",
     landingBadgeTransparentTitle: "Transparent Records",
     landingBadgeTransparentBody: "Every contribution, fine, and payout is logged and auditable.",
@@ -1176,7 +1176,7 @@ export const translations = {
     confirmedByAdminLabel: "(confirmé par l'admin)",
     itsYourTurn: "C'est votre tour de recevoir votre paiement — entrez vos coordonnées ci-dessous.",
     enterPayoutDetails: "Entrer les coordonnées de paiement",
-    payoutPhoneLabel: "Numéro Mobile Money / téléphone bancaire",
+    payoutPhoneLabel: "Numéro Mobile Money / Orange Money",
     payoutAccountNameLabel: "Nom complet du compte pour le virement",
     submitPayoutDetails: "Soumettre",
     payoutDetailsSubmitted: "Vos coordonnées de paiement ont été soumises. L'admin traitera votre virement bientôt.",
@@ -1286,12 +1286,12 @@ export const translations = {
     waDuplicateRefunded:
       "Votre paiement a été reçu deux fois pour le même nom. Le second paiement de {amount} a été automatiquement remboursé.",
     waPayoutTurn:
-      "Bonjour {name},\n\nNous avons le plaisir de vous informer que c'est votre tour de recevoir la cagnotte de la cotisation {cotisation} (position n°{position}).\n\n💰 Montant total : {amount}\n📅 Date de versement prévue : {date}\n\n👉 ACTION REQUISE : Veuillez vous connecter à l'application et renseigner votre numéro de compte Mobile Money (MTN / Orange) et le nom complet exact sur le compte afin que l'administrateur effectue votre virement.\n\nL'équipe DIVA Asso",
+      "Bonjour {name},\n\nNous avons le plaisir de vous informer que c'est votre tour de recevoir la cagnotte de la cotisation {cotisation} (position n°{position}).\n\n💰 Montant total : {amount}\n📅 Date de versement prévue : {date}\n\n👉 ACTION REQUISE : Veuillez vous connecter à l'application et renseigner votre numéro de compte Mobile Money ou Orange Money (au choix : MTN ou Orange) et le nom complet exact sur le compte afin que l'administrateur effectue votre virement.\n\nL'équipe DIVA Asso",
     payoutTurnNotifMessage:
-      "C'est votre tour de bouffer la cagnotte de {cotisation} ! Veuillez fournir votre numéro de compte Mobile Money et votre nom complet pour le virement.",
+      "C'est votre tour de bouffer la cagnotte de {cotisation} ! Veuillez fournir votre numéro de compte Mobile Money ou Orange Money et votre nom complet pour le virement.",
     payoutTurnBannerTitle: "C'est votre tour de bouffer la cagnotte !",
     payoutTurnBannerDesc:
-      "Pour recevoir votre virement, vous devez impérativement renseigner ci-dessous votre numéro de compte Mobile Money (MTN / Orange) et le nom complet exact enregistré sur ce compte. L'administrateur effectuera directement votre versement sur votre compte.",
+      "Pour recevoir votre virement, vous devez impérativement renseigner ci-dessous votre numéro de compte Mobile Money ou Orange Money (au choix : MTN ou Orange) et le nom complet exact enregistré sur ce compte. L'administrateur effectuera directement votre versement sur votre compte.",
     copyAccountName: "Copier le nom",
     copyAccountNumber: "Copier le numéro",
     nameCopied: "Nom du compte copié !",
@@ -1301,13 +1301,13 @@ export const translations = {
     payoutDetailsSubmittedNotice:
       "Vos coordonnées ont été transmises à l'administrateur (Nom : {name}, Numéro : {phone}). Le virement est en cours de traitement.",
     payoutTurnAlertPrompt:
-      "Action requise : Vous devez fournir votre numéro de compte Mobile Money et votre nom pour recevoir votre virement.",
+      "Action requise : Vous devez fournir votre numéro de compte Mobile Money ou Orange Money et votre nom pour recevoir votre virement.",
     waPayoutReleased:
       "🎉 Versement effectué — DIVA Asso\n\nFélicitations {name} ({beneficiary}) ! Votre versement de {amount} a été effectué. Confirmez sur l'application dès que vous l'aurez reçu.",
     waPayoutReleasedWithDeduction:
       "🎉 Versement effectué — DIVA Asso\n\nFélicitations {name} ({beneficiary}) ! Votre versement de {amount} a été effectué après déduction de {deducted} d'amendes impayées. Confirmez sur l'application dès que vous l'aurez reçu.",
     waTurnReminderTomorrow:
-      "⏰ Rappel — DIVA Asso\n\nBonjour {name},\n\nDemain ({date}) est la date estimée de votre tour pour recevoir la cagnotte de {cotisation} (position n°{position}).\n\n💰 Montant estimé : {amount}\n\nAssurez-vous que vos informations de contact et de paiement sont à jour dans votre profil. En cas de question, contactez le support depuis l'application.\n\nL'équipe DIVA Asso",
+      "⏰ Rappel — DIVA Asso\n\nBonjour {name},\n\nDemain ({date}) est la date estimée de votre tour pour recevoir la cagnotte de {cotisation} (position n°{position}).\n\n💰 Montant estimé : {amount}\n\nAssurez-vous que vos coordonnées Mobile / Orange Money sont à jour dans votre profil. En cas de question, contactez le support depuis l'application.\n\nL'équipe DIVA Asso",
     turnReminderTomorrowNotifMessage: "Demain ({date}) est la date estimée de votre tour pour recevoir la cagnotte de {cotisation} — position n°{position}, environ {amount}.",
     notifTypeTurnReminderTomorrow: "Votre tour est demain",
     myConversations: "Mes conversations",
@@ -1335,7 +1335,7 @@ export const translations = {
     relativePaymentFailedNotChecked: "Paiement échoué — Nom NON coché",
     relativePaymentFailedNotCheckedBody: "Le paiement n'a pas abouti. Le nom « {name} » n'est PAS coché dans la cotisation tant que le paiement n'est pas validé.",
     duplicateRefundTitle: "Remboursement de doublon (problème réseau)",
-    duplicateRefundStatusRefunded: "Remboursé sur Mobile Money",
+    duplicateRefundStatusRefunded: "Remboursé sur Mobile Money / Orange Money",
     duplicateRefundStatusPending: "Remboursement en cours",
     relativeContributionReason: "Cotisation pour un proche",
     cycleContributionReason: "Cotisation de tour",
@@ -1655,7 +1655,7 @@ export const translations = {
       "Toujours en attente — vous pouvez laisser cette fenêtre ouverte, ou revenir plus tard depuis votre historique.",
     globalPaymentNavLabel: "Paiement global",
     globalPaymentTitle: "Paiement global",
-    globalPaymentSubtitle: "Payez plusieurs de vos noms en un seul paiement Mobile Money combiné.",
+    globalPaymentSubtitle: "Payez plusieurs de vos noms en un seul paiement Mobile Money / Orange Money combiné.",
     globalPaymentSelectAll: "Tout sélectionner",
     globalPaymentDeselectAll: "Tout désélectionner",
     globalPaymentNoUnpaidSlots: "Vous n'avez aucune cotisation en attente à payer pour le moment.",
@@ -1757,8 +1757,8 @@ export const translations = {
     directPayoutSubtitle:
       "Effectuez le virement directement depuis votre compte Fapshi vers le compte MTN ou Orange Money du bénéficiaire.",
     selectBeneficiarySlot: "Sélectionner le bénéficiaire du tour",
-    payoutAccountNameInput: "Nom sur le compte Mobile Money",
-    payoutPhoneInput: "Numéro MTN / Orange Money",
+    payoutAccountNameInput: "Nom sur le compte Mobile Money / Orange Money",
+    payoutPhoneInput: "Numéro Mobile Money / Orange Money",
     payoutAmountInput: "Montant à transférer (FCFA)",
     sendFapshiPayout: "Envoyer le virement Fapshi",
     sendingPayout: "Envoi du virement en cours...",
@@ -1846,7 +1846,7 @@ export const translations = {
     fineReminderMessage:
       "Bonjour {name} ❤️\nPetit rappel amical concernant votre amende impayée de {amount}. Merci de la régler avant la clôture de la cotisation pour rester éligible aux prochaines cotisations. 🙏",
     foodTurnMessage:
-      "🎉 Bravo {name} ! C'est votre tour de bouffer la cotisation ! 💰🎊\n\n👉 ACTION REQUISE : Veuillez vous connecter à l'application dès maintenant pour fournir votre numéro de compte Mobile Money (MTN / Orange) et le nom exact associé au compte. L'administrateur en a besoin pour effectuer votre virement !",
+      "🎉 Bravo {name} ! C'est votre tour de bouffer la cotisation ! 💰🎊\n\n👉 ACTION REQUISE : Veuillez vous connecter à l'application dès maintenant pour fournir votre numéro de compte Mobile Money ou Orange Money (au choix : MTN ou Orange) et le nom exact associé au compte. L'administrateur en a besoin pour effectuer votre virement !",
     notifTypeContributionReminder: "Rappel de cotisation",
     notifTypeFineReminder: "Rappel d'amende",
     notifTypeFoodTurn: "C'est ton tour !",
@@ -1987,7 +1987,7 @@ export const translations = {
     landingStep1Body: "Inscrivez-vous et vérifiez votre identité avec un contrôle KYC rapide, pour la sécurité de tous.",
     landingStep2Title: "Rejoignez une cotisation",
     landingStep2Body: "Rejoignez une tontine existante, ou laissez un admin en créer une pour votre communauté.",
-    landingStep3Title: "Cotisez via Mobile Money",
+    landingStep3Title: "Cotisez via Mobile Money / Orange Money",
     landingStep3Body: "Payez votre cotisation directement depuis votre téléphone — Mobile Money ou Orange Money, sans manipulation d'espèces.",
     landingStep4Title: "Recevez votre versement à votre tour",
     landingStep4Body: "L'ordre de versement est suivi automatiquement, et chaque cotisation et versement est enregistré.",
@@ -1997,7 +1997,7 @@ export const translations = {
     landingBadgeEncryptedBody: "Vos données sont protégées en transit et au repos.",
     landingBadgeKycTitle: "Vérification d'identité",
     landingBadgeKycBody: "Chaque membre effectue une vérification d'identité avant de rejoindre un groupe.",
-    landingBadgeMobileMoneyTitle: "Paiements Mobile Money",
+    landingBadgeMobileMoneyTitle: "Paiements Mobile Money & Orange Money",
     landingBadgeMobileMoneyBody: "Cotisations sécurisées via Mobile Money et Orange Money.",
     landingBadgeTransparentTitle: "Registres transparents",
     landingBadgeTransparentBody: "Chaque cotisation, amende et versement est enregistré et vérifiable.",

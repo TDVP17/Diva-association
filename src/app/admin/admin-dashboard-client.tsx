@@ -42,7 +42,6 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
   const [membershipCount, setMembershipCount] = useState<number | null>(null);
   const [contributionsCount, setContributionsCount] = useState<number | null>(null);
-  const [swapCount, setSwapCount] = useState<number | null>(null);
   const [paymentIssueCount, setPaymentIssueCount] = useState<number | null>(null);
   const [totalUsersCount, setTotalUsersCount] = useState<number | null>(null);
   const [supportCount, setSupportCount] = useState<number | null>(null);
@@ -55,9 +54,6 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
     fetch("/api/admin/contributions/stats")
       .then((r) => r.json())
       .then((b) => setContributionsCount((b.contributions ?? []).length));
-    fetch("/api/admin/swap-requests")
-      .then((r) => r.json())
-      .then((b) => setSwapCount((b.requests ?? []).length));
     fetch("/api/admin/payment-issues")
       .then((r) => r.json())
       .then((b) => setPaymentIssueCount((b.issues ?? []).filter((i: { status: string }) => i.status !== "REFUNDED").length));
@@ -120,13 +116,6 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
           title={t("myCotisationsCard")}
           body={t("myCotisationsCardBody")}
           count={contributionsCount}
-        />
-        <DashboardCard
-          href="/admin/swap-requests"
-          icon="swap_horiz"
-          title={t("positionChangeRequestsCard")}
-          body={t("positionChangeRequestsCardBody")}
-          count={swapCount}
         />
         <DashboardCard
           href="/admin/payment-issues"
