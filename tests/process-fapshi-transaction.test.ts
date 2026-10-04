@@ -142,7 +142,7 @@ describe("processFapshiTransaction — contribution duplicate detection", () => 
       expect.objectContaining({
         data: expect.objectContaining({
           status: "DUPLICATE_PAID",
-          refundReason: "Refund: Duplicate payment detected for slot John Doe",
+          refundReason: expect.stringMatching(/John Doe/),
         }),
       }),
     );

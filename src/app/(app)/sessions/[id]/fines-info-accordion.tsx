@@ -141,12 +141,12 @@ export function FinesInfoAccordion({
                   {isFr ? "Règlement des amendes" : "Fine Settlement"}
                 </p>
                 <p className="text-emerald-700 font-bold mt-0.5 text-sm">
-                  {isFr ? "Automatique ou déduit" : "Automatic or deducted"}
+                  {isFr ? "Non obligatoire sur-le-champ" : "Not required on the spot"}
                 </p>
                 <p className="text-on-surface-variant mt-1 leading-relaxed">
                   {isFr
-                    ? "Payer votre cotisation règle automatiquement l'amende du cycle. Toute amende restante sera déduite de votre cagnotte lors de votre versement."
-                    : "Paying your contribution automatically settles the cycle's fine. Any outstanding fines are deducted from your pot on your payout round."}
+                    ? "Les amendes ne sont pas obligées d'être payées à l'instant : vous pouvez cotiser seul. Vos amendes peuvent être réglées à tout moment ou déduites de votre cagnotte lors de votre versement. Attention : à la fin de la cotisation, si vous avez des amendes impayées, vous ne pourrez pas intégrer une autre cotisation sans avoir tout régularisé."
+                    : "Fines do not have to be paid immediately: you can pay your contribution alone. Fines can be settled anytime or will be deducted from your pot on your payout round. Note: At the end of the cotisation, if you have outstanding fines, you cannot join another cotisation without settling them."}
                 </p>
               </div>
             </div>

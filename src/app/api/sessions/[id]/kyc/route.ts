@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma, withTransientRetry } from "@/lib/prisma";
 import { assertJoinable, sumRegisteredSlots } from "@/lib/session-joinability";
+import { checkUserFinesForJoining } from "@/lib/unsettled-fines-gate";
 import { isAdminRole } from "@/lib/constants";
 import { saveFile } from "@/lib/storage";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
@@ -145,7 +146,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
     const referrerPhoneRaw = (formData.get("referrerPhone") as string | null)?.trim() ?? "";
     const referrerPhoneDigits = referrerPhoneRaw.replace(/\D/g, "");
-    // Phone is now optional for the simplified SELFIE flow but kept for backward compat
+    if (referrerPhoneDigits && (referrerPhoneDigits.length < 8 || referrerPhoneDigits.length > 15)) {
+      return NextResponse.json(
+        { error: "Invalid referrer phone number", errorKey: "kycInvalidReferrerPhone" },
+        { status: 400 },
+      );
+    }
+    // Phone is optional for the simplified SELFIE flow but validated if provided
     const applicantFullName = (formData.get("applicantFullName") as string | null)?.trim() ?? "";
     const residenceCity = (formData.get("residenceCity") as string | null)?.trim() ?? "";
     const residenceNeighborhood = (formData.get("residenceNeighborhood") as string | null)?.trim() ?? "";
@@ -190,6 +197,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     );
     if (!joinable.ok) {
       return NextResponse.json({ error: joinable.error }, { status: joinable.status });
+    }
+
+    const finesCheck = await checkUserFinesForJoining(session.user.id, tontineSessionId);
+    if (!finesCheck.canJoin) {
+      return NextResponse.json(
+        {
+          error: finesCheck.error,
+          errorKey: "unsettledFinesBlockJoin",
+          totalUnpaid: finesCheck.totalUnpaidAmount,
+        },
+        { status: 403 },
+      );
     }
 
     let existingMembership;

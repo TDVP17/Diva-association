@@ -125,8 +125,8 @@ describe("initiateBulkPayment", () => {
     expect(txCreateBulkPayment).not.toHaveBeenCalled();
   });
 
-  it("rejects when one slot's session isn't ACTIVE", async () => {
-    findManySlot.mockResolvedValue([makeSlot("slot-1", { sessionStatus: "DRAWING" })]);
+  it("rejects when one slot's session isn't ACTIVE or DRAWING", async () => {
+    findManySlot.mockResolvedValue([makeSlot("slot-1", { sessionStatus: "CLOSED" })]);
     const result = await initiateBulkPayment("member-1", ["slot-1"], VALID_PHONE);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.status).toBe(409);

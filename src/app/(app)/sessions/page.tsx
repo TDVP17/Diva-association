@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { assertJoinable, sumRegisteredSlots } from "@/lib/session-joinability";
+import { checkUserFinesForJoining } from "@/lib/unsettled-fines-gate";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { getTontineConfig } from "@/lib/tontine-engine";
 import { HideClosedSessionButton } from "./hide-closed-session-button";
@@ -88,6 +89,8 @@ export default async function SessionsPage() {
     };
   });
 
+  const finesCheck = await checkUserFinesForJoining(session.user.id);
+
   return (
     <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-6xl mx-auto w-full flex flex-col gap-section-margin">
       <section>
@@ -172,6 +175,30 @@ export default async function SessionsPage() {
 
       <section>
         <h2 className="font-title-md text-title-md text-primary mb-stack-gap-md">{t("openCotisations")}</h2>
+        {!finesCheck.canJoin && (
+          <div className="mb-stack-gap-md bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <span className="material-symbols-outlined text-amber-700 text-2xl flex-shrink-0 mt-0.5">warning</span>
+              <div>
+                <p className="font-label-md text-label-md font-bold text-amber-900">
+                  {lang === "fr" ? "Amendes impayées à régulariser" : "Outstanding Fines to Settle"}
+                </p>
+                <p className="font-body-sm text-body-sm text-amber-800">
+                  {lang === "fr"
+                    ? `Vous avez des amendes impayées (${formatXAF(finesCheck.totalUnpaidAmount)}). Selon les règles de l'association, toutes vos amendes doivent être impérativement soldées avant de pouvoir intégrer une nouvelle cotisation.`
+                    : `You have unpaid fines (${formatXAF(finesCheck.totalUnpaidAmount)}). All fines must be settled before joining a new cotisation.`}
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/fines"
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-label-sm text-label-sm transition-colors flex-shrink-0 shadow-sm"
+            >
+              <span className="material-symbols-outlined text-[16px]">payments</span>
+              {lang === "fr" ? "Régulariser mes amendes" : "Settle My Fines"}
+            </Link>
+          </div>
+        )}
         {browsable.length === 0 ? (
           <div className="bg-white rounded-xl p-8 text-center shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant flex flex-col items-center gap-stack-gap-sm">
             <span className="material-symbols-outlined text-outline text-[40px]">event_busy</span>

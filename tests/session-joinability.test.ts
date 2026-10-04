@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { assertJoinable, sumRegisteredSlots } from "@/lib/session-joinability";
 
 const baseSession = {
-  status: "ACTIVE",
+  status: "DRAFT",
   startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // a week out
   maxSlots: null as number | null,
   isPaused: false,
@@ -16,6 +16,16 @@ describe("assertJoinable", () => {
 
   it("blocks joining a CLOSED session", () => {
     const result = assertJoinable({ ...baseSession, status: "CLOSED" }, 0);
+    expect(result.ok).toBe(false);
+  });
+
+  it("blocks joining a DRAWING session", () => {
+    const result = assertJoinable({ ...baseSession, status: "DRAWING" }, 0);
+    expect(result.ok).toBe(false);
+  });
+
+  it("blocks joining an ACTIVE session", () => {
+    const result = assertJoinable({ ...baseSession, status: "ACTIVE" }, 0);
     expect(result.ok).toBe(false);
   });
 

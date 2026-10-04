@@ -79,8 +79,8 @@ export async function GET(request: Request) {
       memberCode: u.memberCode,
       city: u.city,
       neighborhood: u.neighborhood,
-      membershipCount: u.memberships.length,
-      memberships: u.memberships.map((m) => ({
+      membershipCount: (u.memberships || []).length,
+      memberships: (u.memberships || []).map((m) => ({
         id: m.id,
         status: m.status,
         slotCount: m.slotCount ? Number(m.slotCount) : null,

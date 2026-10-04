@@ -64,6 +64,9 @@ export async function getSlotPaymentQuote(
   if (slot.membership.tontineSession.isPaused) {
     return { ok: false, status: 409, error: "This cotisation is temporarily paused — payments will resume shortly" };
   }
+  if (slot.membership.tontineSession.status === "ACTIVE" && slot.officialPosition === null) {
+    return { ok: false, status: 409, error: "This name hasn't been assigned a draw position yet" };
+  }
 
   const { tontineSession } = slot.membership;
   const dueDate = getNextDueDate(tontineSession.type, new Date());
@@ -80,13 +83,8 @@ export async function getSlotPaymentQuote(
     fee: Number(tontineSession.fee),
   });
 
-  const outstandingFine = await prisma.fine.findUnique({
-    where: { membershipSlotId_dueDate: { membershipSlotId, dueDate } },
-  });
-  const fineAmount =
-    outstandingFine && outstandingFine.status === "UNPAID" ? Number(outstandingFine.amount) : 0;
-
-  const baseTotal = amount + fee + fineAmount;
+  // Les amendes ne sont pas obligatoires sur-le-champ lors du paiement de cotisation.
+  const baseTotal = amount + fee;
   const providerFee = computeProviderFee(provider, baseTotal);
 
   return {
@@ -94,7 +92,7 @@ export async function getSlotPaymentQuote(
     quote: {
       amount,
       fee,
-      fineAmount,
+      fineAmount: 0,
       baseTotal,
       provider,
       providerFeeAmount: providerFee.providerFeeAmount,
@@ -137,6 +135,9 @@ export async function initiateSlotPayment(
   if (slot.membership.tontineSession.isPaused) {
     return { ok: false, status: 409, error: "This cotisation is temporarily paused — payments will resume shortly" };
   }
+  if (slot.membership.tontineSession.status === "ACTIVE" && slot.officialPosition === null) {
+    return { ok: false, status: 409, error: "This name hasn't been assigned a draw position yet" };
+  }
 
   const { tontineSession } = slot.membership;
   const now = new Date();
@@ -157,12 +158,8 @@ export async function initiateSlotPayment(
     fee: Number(tontineSession.fee),
   });
 
-  const outstandingFine = await prisma.fine.findUnique({
-    where: { membershipSlotId_dueDate: { membershipSlotId, dueDate } },
-  });
-  const fineAmount =
-    outstandingFine && outstandingFine.status === "UNPAID" ? Number(outstandingFine.amount) : 0;
-  const baseTotal = amount + fee + fineAmount;
+  // Les amendes ne sont pas obligatoires à l'instant : cotisation seule.
+  const baseTotal = amount + fee;
 
   const provider: PaymentProvider = "FAPSHI";
   const providerFee = computeProviderFee(provider, baseTotal);
@@ -174,7 +171,7 @@ export async function initiateSlotPayment(
   // the freshly-claimed PENDING row and is rejected below. The slow Fapshi
   // HTTP call happens after this transaction commits, never while the lock
   // is held.
-  let contribution: { id: string };
+  let contribution: { id: string } | undefined;
   try {
     contribution = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM membership_slots WHERE id = ${membershipSlotId} FOR UPDATE`;
@@ -192,7 +189,7 @@ export async function initiateSlotPayment(
       const data = {
         amountPaid: amount,
         feePaid: fee,
-        finePaid: fineAmount,
+        finePaid: 0,
         status: "PENDING" as const,
         payerPhone: normalizedPhone,
         failureReason: null,
@@ -258,13 +255,15 @@ export async function initiateSlotPayment(
 
     return { ok: true, transId: result.transId };
   } catch (error) {
-    await prisma.contribution.update({
-      where: { id: contribution.id },
-      data: {
-        status: "FAILED",
-        failureReason: error instanceof FapshiError ? error.message : "Payment initiation failed",
-      },
-    });
+    if (contribution?.id) {
+      await prisma.contribution.update({
+        where: { id: contribution.id },
+        data: {
+          status: "FAILED",
+          failureReason: error instanceof FapshiError ? error.message : "Payment initiation failed",
+        },
+      });
+    }
     if (error instanceof FapshiError) {
       return { ok: false, status: 502, error: error.message };
     }

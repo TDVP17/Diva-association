@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
 import { resolveUniqueSlotNames } from "@/lib/slot-naming";
+import { checkUserFinesForJoining } from "@/lib/unsettled-fines-gate";
 
 const bodySchema = z.object({
   userId: z.string().min(1),
@@ -52,6 +53,14 @@ export async function POST(request: Request) {
   });
   if (existingMembership && existingMembership.status !== "REJECTED") {
     return NextResponse.json({ error: "This user is already a member of this session" }, { status: 409 });
+  }
+
+  const finesCheck = await checkUserFinesForJoining(userId, tontineSessionId);
+  if (!finesCheck.canJoin) {
+    return NextResponse.json(
+      { error: `Impossible d'ajouter ce membre : il a des amendes impayées (${finesCheck.totalUnpaidAmount.toLocaleString()} FCFA) à finaliser avant d'intégrer une nouvelle cotisation.` },
+      { status: 409 },
+    );
   }
 
   const existingSlots = await prisma.membershipSlot.findMany({

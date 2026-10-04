@@ -148,17 +148,13 @@ export async function listUnpaidSlotsForBulkPayment(userId: string): Promise<Unp
       if (existing?.status === "PENDING" && existing.fapshiTxRef) continue;
 
       const { amount, fee } = getContributionTotal({ amount: Number(tontineSession.amount), fee: Number(tontineSession.fee) });
-      const outstandingFine = await prisma.fine.findUnique({
-        where: { membershipSlotId_dueDate: { membershipSlotId: slot.id, dueDate } },
-      });
-      const fineAmount = outstandingFine?.status === "UNPAID" ? Number(outstandingFine.amount) : 0;
 
       results.push({
         membershipSlotId: slot.id,
         beneficiaryName: slot.beneficiaryName,
         sessionLabel: tontineSession.title || TONTINE_LABELS[tontineSession.type] || tontineSession.type,
         tontineSessionId: membership.tontineSessionId,
-        baseTotal: amount + fee + fineAmount,
+        baseTotal: amount + fee,
         locked: !roundLock.ok,
         lockedReason: roundLock.ok ? undefined : roundLock.error,
       });
@@ -186,11 +182,7 @@ export async function getBulkPaymentQuote(userId: string, membershipSlotIds: str
     }
 
     const { amount, fee } = getContributionTotal({ amount: Number(tontineSession.amount), fee: Number(tontineSession.fee) });
-    const outstandingFine = await prisma.fine.findUnique({
-      where: { membershipSlotId_dueDate: { membershipSlotId: slot.id, dueDate } },
-    });
-    const fineAmount = outstandingFine && outstandingFine.status === "UNPAID" ? Number(outstandingFine.amount) : 0;
-    const baseTotal = amount + fee + fineAmount;
+    const baseTotal = amount + fee;
 
     items.push({
       membershipSlotId: slot.id,
@@ -198,7 +190,7 @@ export async function getBulkPaymentQuote(userId: string, membershipSlotIds: str
       sessionLabel: tontineSession.title || TONTINE_LABELS[tontineSession.type] || tontineSession.type,
       amount,
       fee,
-      fineAmount,
+      fineAmount: 0,
       baseTotal,
     });
   }
@@ -266,12 +258,8 @@ export async function initiateBulkPayment(
         }
 
         const { amount, fee } = getContributionTotal({ amount: Number(tontineSession.amount), fee: Number(tontineSession.fee) });
-        const outstandingFine = await tx.fine.findUnique({
-          where: { membershipSlotId_dueDate: { membershipSlotId: slot.id, dueDate } },
-        });
-        const fineAmount = outstandingFine?.status === "UNPAID" ? Number(outstandingFine.amount) : 0;
-        baseTotal += amount + fee + fineAmount;
-        items.push({ slotId: slot.id, beneficiaryName: slot.beneficiaryName, dueDate, amount, fee, fineAmount });
+        baseTotal += amount + fee;
+        items.push({ slotId: slot.id, beneficiaryName: slot.beneficiaryName, dueDate, amount, fee, fineAmount: 0 });
       }
 
       const combinedFee = computeProviderFee(provider, baseTotal);
@@ -286,11 +274,11 @@ export async function initiateBulkPayment(
         // total (not a proportional slice of the combined fee) — matches
         // Fapshi's real per-slot economics closely enough for reporting,
         // may differ from the combined total by a franc or two of rounding.
-        const slotFee = computeProviderFee(provider, item.amount + item.fee + item.fineAmount);
+        const slotFee = computeProviderFee(provider, item.amount + item.fee);
         const data = {
           amountPaid: item.amount,
           feePaid: item.fee,
-          finePaid: item.fineAmount,
+          finePaid: 0,
           status: "PENDING" as const,
           payerPhone: normalizedPhone,
           failureReason: null,

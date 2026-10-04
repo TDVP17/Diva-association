@@ -6,6 +6,7 @@ import { ensureMemberCode } from "@/lib/member-code";
 import { logAudit } from "@/lib/audit";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { translate } from "@/lib/i18n/translations";
+import { checkUserFinesForJoining } from "@/lib/unsettled-fines-gate";
 
 const bodySchema = z.object({
   action: z.enum(["approve", "reject", "ban"]),
@@ -43,6 +44,18 @@ export async function POST(
         { error: "Impossible de valider ce membre : le tirage au sort a déjà été lancé ou la cotisation est en cours." },
         { status: 409 },
       );
+    }
+
+    if (isApproved) {
+      const finesCheck = await checkUserFinesForJoining(existing.userId, existing.tontineSessionId);
+      if (!finesCheck.canJoin) {
+        return NextResponse.json(
+          {
+            error: `Impossible de valider ce membre : il a des amendes impayées (${finesCheck.totalUnpaidAmount.toLocaleString()} FCFA) non soldées. Il doit les régulariser avant d'intégrer une nouvelle cotisation.`,
+          },
+          { status: 409 },
+        );
+      }
     }
     const approved = isApproved;
     const isBanned = action === "ban";

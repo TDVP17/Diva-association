@@ -19,6 +19,7 @@ import { PaymentSuccessBanner } from "./payment-success-banner";
 import { getDesignatedSlot, assertPriorCyclePaidOut } from "@/lib/round-robin-lock";
 import { sessionStatusKey } from "@/lib/session-status-label";
 import { assertJoinable, sumRegisteredSlots } from "@/lib/session-joinability";
+import { checkUserFinesForJoining } from "@/lib/unsettled-fines-gate";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -99,6 +100,7 @@ export default async function SessionDetailPage({
       },
       sumRegisteredSlots(tontineSession.memberships),
     );
+    const finesCheck = await checkUserFinesForJoining(userId, id);
 
     if (!joinCheck.ok) {
       const regSlots = sumRegisteredSlots(tontineSession.memberships);
@@ -242,12 +244,35 @@ export default async function SessionDetailPage({
               </p>
             </details>
           )}
-          <p className="font-body-md text-body-md text-on-surface-variant">
-            {t("notYetMemberBody")}
-          </p>
-          <div className="w-full max-w-xs">
-            <JoinButton tontineSessionId={id} label={t("requestToJoin")} lang={lang} />
-          </div>
+          {!finesCheck.canJoin ? (
+            <div className="w-full max-w-md bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-center flex flex-col items-center gap-2 mt-2">
+              <span className="material-symbols-outlined text-amber-700 text-3xl">warning</span>
+              <p className="font-title-sm text-title-sm font-bold text-amber-900">
+                {lang === "fr" ? "Amendes impayées à régulariser" : "Outstanding Fines to Settle"}
+              </p>
+              <p className="font-body-sm text-body-sm text-amber-800">
+                {lang === "fr"
+                  ? `Vous avez des amendes impayées (${formatXAF(finesCheck.totalUnpaidAmount)}). Selon les règles de l'association, toutes vos amendes doivent être impérativement soldées avant de pouvoir intégrer une nouvelle cotisation.`
+                  : `You have unpaid fines (${formatXAF(finesCheck.totalUnpaidAmount)}). All fines must be settled before you can join a new cotisation.`}
+              </p>
+              <Link
+                href="/fines"
+                className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-label-md text-label-md transition-colors shadow-sm"
+              >
+                <span className="material-symbols-outlined text-[18px]">payments</span>
+                {lang === "fr" ? "Régulariser mes amendes" : "Settle My Fines"}
+              </Link>
+            </div>
+          ) : (
+            <>
+              <p className="font-body-md text-body-md text-on-surface-variant">
+                {t("notYetMemberBody")}
+              </p>
+              <div className="w-full max-w-xs">
+                <JoinButton tontineSessionId={id} label={t("requestToJoin")} lang={lang} />
+              </div>
+            </>
+          )}
         </section>
         <div className="mt-stack-gap-lg">
           <FinesInfoAccordion
@@ -730,7 +755,7 @@ export default async function SessionDetailPage({
         startDate={tontineSession.startDate}
       />
 
-      {/* Ordre de versement */}
+      {/* Ordre de bouffe */}
       <PayoutOrderAccordion tontineSessionId={id} lang={lang} />
 
       {/* Statut des membres */}
