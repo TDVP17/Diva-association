@@ -7,9 +7,23 @@ import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 
 const SLOT_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-export function SelectSlotsForm({ tontineSessionId, lang }: { tontineSessionId: string; lang: Lang }) {
+export function SelectSlotsForm({
+  tontineSessionId,
+  lang,
+  maxAvailableSlots,
+}: {
+  tontineSessionId: string;
+  lang: Lang;
+  maxAvailableSlots?: number | null;
+}) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
   const router = useRouter();
+  const maxLimit =
+    maxAvailableSlots !== null && maxAvailableSlots !== undefined
+      ? Math.max(1, Math.min(10, maxAvailableSlots))
+      : 10;
+  const options = SLOT_OPTIONS.filter((opt) => opt <= maxLimit);
+
   const [slotCount, setSlotCount] = useState(1);
   const [names, setNames] = useState<string[]>([""]);
   const [submitting, setSubmitting] = useState(false);
@@ -87,12 +101,20 @@ export function SelectSlotsForm({ tontineSessionId, lang }: { tontineSessionId: 
           onChange={(e) => handleSlotCountChange(Number(e.target.value))}
           className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
         >
-          {SLOT_OPTIONS.map((opt) => (
+          {options.map((opt) => (
             <option key={opt} value={opt}>
               {opt} {opt !== 1 ? t("slots") : t("slot")}
             </option>
           ))}
         </select>
+        {maxAvailableSlots !== null && maxAvailableSlots !== undefined && maxAvailableSlots < 10 && (
+          <p className="font-label-sm text-xs text-amber-700 mt-1.5 flex items-center gap-1">
+            <span className="material-symbols-outlined text-[15px]">info</span>
+            {lang === "fr"
+              ? `Il ne reste que ${maxAvailableSlots} place(s) disponible(s) sur cette cotisation.`
+              : `Only ${maxAvailableSlots} slot(s) remaining for this cotisation.`}
+          </p>
+        )}
       </div>
 
       {names.map((name, i) => (

@@ -42,7 +42,7 @@ export function MemberNamesManager({
     sessionStatus !== "DRAFT" || (startDate ? new Date() >= new Date(startDate) : false);
   const canEditNames = !isStarted;
   const canLeave = !isStarted;
-  const slotLimit = maxSlots ? Math.min(Number(maxSlots), 10) : 5;
+  const slotLimit = maxSlots ? Math.min(Number(maxSlots), 10) : 10;
 
   function handleAddName() {
     if (!canEditNames) return;

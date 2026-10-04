@@ -33,7 +33,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const tontineSession = await prisma.tontineSession.findUnique({
       where: { id: tontineSessionId },
-      select: { id: true, status: true },
+      include: {
+        memberships: {
+          select: { id: true, status: true, slotCount: true },
+        },
+      },
     });
     if (!tontineSession) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
@@ -51,6 +55,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     });
     if (!membership || membership.status !== "APPROVED") {
       return NextResponse.json({ error: "Your membership isn't approved yet" }, { status: 403 });
+    }
+
+    if (tontineSession.maxSlots !== null) {
+      const maxAllowed = Number(tontineSession.maxSlots);
+      const otherSlotsTotal = tontineSession.memberships
+        .filter((m) => m.status === "APPROVED" && m.id !== membership.id)
+        .reduce((sum, m) => sum + (m.slotCount ? Number(m.slotCount) : 0), 0);
+      const remainingSlots = Math.max(0, maxAllowed - otherSlotsTotal);
+
+      if (slotCount > remainingSlots) {
+        return NextResponse.json(
+          {
+            error:
+              remainingSlots === 0
+                ? "Cette cotisation a atteint sa capacité maximale."
+                : `Il ne reste que ${remainingSlots} place(s) disponible(s) dans cette cotisation. Vous ne pouvez pas enregistrer ${slotCount} nom(s).`,
+          },
+          { status: 409 },
+        );
+      }
     }
 
     const existingSlots = await prisma.membershipSlot.findMany({
