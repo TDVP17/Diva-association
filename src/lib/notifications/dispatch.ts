@@ -109,7 +109,7 @@ async function deliverInstantNotifications(params: {
         const user = userMap.get(r.userId);
         const lang: Lang = user?.preferredLang === "en" ? "en" : "fr";
         const typeKey = NOTIFICATION_TYPE_KEY[params.type];
-        let title = typeKey ? translate(lang, typeKey) : "DIVA Asso";
+        let title = typeKey ? translate(lang, typeKey) : "DIVA Asso.";
         let body = r.message;
 
         if (params.type === "ADMIN_BROADCAST" && r.message.includes("\n\n")) {
@@ -159,13 +159,13 @@ async function deliverInstantNotifications(params: {
             const emailHtml = `
               <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1e293b; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0;">
                 <div style="text-align: center; margin-bottom: 24px;">
-                  <h2 style="color: #003528; margin: 0; font-size: 22px;">DIVA Asso</h2>
+                  <h2 style="color: #003528; margin: 0; font-size: 22px;">DIVA Asso.</h2>
                 </div>
                 <h3 style="color: #0f172a; margin-top: 0; font-size: 18px;">${title}</h3>
                 <p style="font-size: 15px; line-height: 1.6; white-space: pre-line; color: #334155;">${body}</p>
                 ${actionButton}
                 <hr style="margin: 32px 0 16px; border: none; border-top: 1px solid #e2e8f0;" />
-                <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0;">DIVA Asso — Plateforme de gestion des cotisations</p>
+                <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0;">DIVA Asso. — Plateforme de gestion des cotisations</p>
               </div>
             `;
             await sendEmailSafe(user.email, title, emailHtml);

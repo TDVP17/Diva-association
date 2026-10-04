@@ -44,11 +44,11 @@ export async function generateReceiptPdf(data: ReceiptData): Promise<Buffer> {
     const logoImage = await doc.embedPng(logoBytes);
     const logoSize = 36;
     page.drawImage(logoImage, { x: left, y: y - logoSize + 8, width: logoSize, height: logoSize });
-    page.drawText("DIVA Asso", { x: left + logoSize + 10, y, size: 20, font: bold, color: primary });
+    page.drawText("DIVA Asso.", { x: left + logoSize + 10, y, size: 20, font: bold, color: primary });
     page.drawText("Payment Receipt", { x: left + logoSize + 10, y: y - 20, size: 12, font, color: muted });
   } catch {
     // Logo optional — the receipt is still valid without it.
-    page.drawText("DIVA Asso", { x: left, y, size: 20, font: bold, color: primary });
+    page.drawText("DIVA Asso.", { x: left, y, size: 20, font: bold, color: primary });
     page.drawText("Payment Receipt", { x: left, y: y - 20, size: 12, font, color: muted });
   }
   y -= 44;

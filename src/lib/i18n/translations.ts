@@ -346,7 +346,7 @@ export const translations = {
     redirectingToFapshi: "Redirecting to Fapshi...",
 
     // Admin
-    adminBrand: "DIVA Asso",
+    adminBrand: "DIVA Asso.",
     adminNavDashboard: "Dashboard",
     adminNavNotifications: "Notifications",
     adminNavSupport: "Support",
@@ -1395,7 +1395,7 @@ export const translations = {
     redirectingToFapshi: "Redirection vers Fapshi...",
 
     // Admin
-    adminBrand: "DIVA Asso",
+    adminBrand: "DIVA Asso.",
     adminNavDashboard: "Tableau de bord",
     adminNavNotifications: "Notifications",
     adminNavSupport: "Support",

@@ -147,12 +147,9 @@ export function LoginContent({
         <div className="absolute top-0 right-0 w-32 h-32 bg-secondary-container rounded-full blur-[80px] opacity-20 -mr-10 -mt-10" />
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-primary-container rounded-full blur-[80px] opacity-10 -ml-10 -mb-10" />
 
-        <div className="flex flex-col items-center gap-2 mb-stack-gap-lg relative z-10">
+        <div className="flex flex-col items-center mb-stack-gap-lg relative z-10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/icon-512.png" alt="DIVA Asso" className="w-24 h-24 rounded-2xl shadow-md" />
-          <h2 className="font-headline-md text-2xl sm:text-3xl font-bold text-primary tracking-tight">
-            DIVA Asso
-          </h2>
+          <img src="/icons/icon-512.png" alt="DIVA Asso." className="w-24 h-24 rounded-2xl shadow-md" />
         </div>
 
         <div className="text-center mb-section-margin relative z-10">

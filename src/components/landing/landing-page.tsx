@@ -32,8 +32,8 @@ export function LandingPage({ lang }: { lang: Lang }) {
         <div className="max-w-6xl mx-auto px-container-padding h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 min-w-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/icon-512.png" alt="DIVA Asso" className="w-8 h-8 rounded-lg flex-shrink-0" />
-            <span className="font-title-md text-title-md text-primary tracking-tight truncate">DIVA Asso</span>
+            <img src="/icons/icon-512.png" alt="DIVA Asso." className="w-8 h-8 rounded-lg flex-shrink-0" />
+            <span className="font-title-md text-title-md text-primary tracking-tight truncate">DIVA Asso.</span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <LanguageToggle currentLang={lang} />
@@ -59,17 +59,13 @@ export function LandingPage({ lang }: { lang: Lang }) {
           <div className="absolute top-0 right-0 w-72 h-72 bg-secondary-container rounded-full blur-[100px] opacity-20 -mr-20 -mt-20" />
           <div className="absolute bottom-0 left-0 w-72 h-72 bg-primary-container rounded-full blur-[100px] opacity-10 -ml-20 -mb-20" />
           <div className="relative max-w-4xl mx-auto px-container-padding py-12 sm:py-16 md:py-20 text-center flex flex-col items-center">
-            {/* Logo hero with DIVA Asso under it */}
-            <div className="flex flex-col items-center mb-5">
+            <div className="flex flex-col items-center mb-6">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/icons/icon-512.png"
-                alt="DIVA Asso"
-                className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl shadow-xl object-contain border border-primary/10 mb-2.5"
+                alt="DIVA Asso."
+                className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl shadow-xl object-contain border border-primary/10"
               />
-              <span className="font-headline-sm sm:font-headline-md text-2xl sm:text-3xl font-bold tracking-tight text-primary">
-                DIVA Asso
-              </span>
             </div>
             <span className="inline-flex items-center gap-1.5 bg-secondary-fixed-dim/20 text-on-secondary-fixed-variant px-3 py-1 rounded-full font-label-sm text-label-sm mb-stack-gap-md">
               <span className="material-symbols-outlined text-[16px]">verified</span>
@@ -163,9 +159,9 @@ export function LandingPage({ lang }: { lang: Lang }) {
         <div className="max-w-6xl mx-auto px-container-padding py-stack-gap-lg flex flex-col sm:flex-row items-center justify-between gap-stack-gap-md">
           <div className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/icon-512.png" alt="DIVA Asso" className="w-6 h-6 rounded-md" />
+            <img src="/icons/icon-512.png" alt="DIVA Asso." className="w-6 h-6 rounded-md" />
             <div>
-              <p className="font-label-md text-label-md text-on-surface">DIVA Asso</p>
+              <p className="font-label-md text-label-md text-on-surface">DIVA Asso.</p>
               <p className="font-label-sm text-[11px] text-on-surface-variant">{t("landingFooterTagline")}</p>
             </div>
           </div>

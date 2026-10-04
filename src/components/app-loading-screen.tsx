@@ -16,12 +16,9 @@ export function AppLoadingScreen({ lang }: { lang: Lang }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/icons/icon-512.png"
-          alt="DIVA Asso"
-          className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl shadow-2xl object-contain mb-3"
+          alt="DIVA Asso."
+          className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl shadow-2xl object-contain"
         />
-        <h1 className="font-headline-sm sm:font-headline-md text-2xl sm:text-3xl font-bold tracking-tight text-[#fed65b]">
-          DIVA Asso
-        </h1>
         <div className="mt-8 flex flex-col items-center gap-3">
           <span
             aria-hidden

@@ -65,7 +65,7 @@ function drawHeader(
   if (logoImage) {
     const logoSize = 32;
     page.drawImage(logoImage, { x: LEFT, y: y - logoSize + 6, width: logoSize, height: logoSize });
-    page.drawText("DIVA Asso", { x: LEFT + logoSize + 10, y, size: 16, font: bold, color: colors.primary });
+    page.drawText("DIVA Asso.", { x: LEFT + logoSize + 10, y, size: 16, font: bold, color: colors.primary });
     page.drawText(`Transaction Archive — ${year}`, {
       x: LEFT + logoSize + 10,
       y: y - 16,
@@ -74,7 +74,7 @@ function drawHeader(
       color: colors.muted,
     });
   } else {
-    page.drawText("DIVA Asso", { x: LEFT, y, size: 16, font: bold, color: colors.primary });
+    page.drawText("DIVA Asso.", { x: LEFT, y, size: 16, font: bold, color: colors.primary });
     page.drawText(`Transaction Archive — ${year}`, { x: LEFT, y: y - 16, size: 10, font, color: colors.muted });
   }
   y -= 40;
