@@ -354,8 +354,8 @@ export async function signUpAction(
       return {
         error:
           lang === "fr"
-            ? "Un compte existe déjà avec cette adresse email. Deux personnes peuvent avoir le même nom, mais l'adresse email doit être unique pour chaque compte. Veuillez vous connecter ou utiliser une autre adresse email."
-            : "An account with this email address already exists. Multiple members can share the same name, but each account must have a unique email address. Please sign in or use another email address.",
+            ? "Un compte existe déjà avec cette adresse email. Veuillez vous connecter ou utiliser une autre adresse email."
+            : "An account with this email address already exists. Please sign in or use another email address.",
       };
     }
 
