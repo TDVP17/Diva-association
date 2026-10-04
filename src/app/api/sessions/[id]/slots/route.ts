@@ -5,8 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { resolveUniqueSlotNames } from "@/lib/slot-naming";
 
 const bodySchema = z.object({
-  slotCount: z.coerce.number().int().min(1).max(5),
-  beneficiaryNames: z.array(z.string().trim().min(1).max(100)).min(1).max(5),
+  slotCount: z.coerce.number().int().min(1).max(10),
+  beneficiaryNames: z.array(z.string().trim().min(1).max(100)).min(1).max(10),
 });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {

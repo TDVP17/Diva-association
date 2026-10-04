@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 
-const SLOT_OPTIONS = [1, 2, 3, 4, 5];
+const SLOT_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 interface MemberDraftManagerProps {
   tontineSessionId: string;

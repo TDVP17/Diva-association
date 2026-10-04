@@ -1213,7 +1213,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                     onChange={(e) => handleAddSlotCountChange(Number(e.target.value))}
                     className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
                   >
-                    {[1, 2, 3, 4, 5].map((opt) => (
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((opt) => (
                       <option key={opt} value={opt}>
                         {opt} {opt !== 1 ? t("slots") : t("slot")}
                       </option>
