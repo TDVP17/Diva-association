@@ -161,7 +161,7 @@ export function AppLockGate({ lang }: { lang: Lang }) {
         </div>
 
         {/* Brand under logo */}
-        <p className="font-bold text-base text-primary tracking-tight mb-1">DIVA Asso</p>
+        <p className="font-bold text-base text-primary tracking-tight mb-1">DIVA Asso.</p>
 
         {/* Lock Info */}
         <h2 className="font-semibold text-lg text-slate-800 mb-1">

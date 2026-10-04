@@ -11,7 +11,11 @@ export function AppLoadingScreen({ lang }: { lang: Lang }) {
   const t = (key: Parameters<typeof translate>[1]) => translate(lang, key);
 
   return (
-    <main className="min-h-screen w-full flex flex-col items-center justify-center bg-[#003528] px-container-padding text-center">
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#003528] px-container-padding text-center"
+    >
       <div className="flex flex-col items-center justify-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -29,6 +33,6 @@ export function AppLoadingScreen({ lang }: { lang: Lang }) {
           </p>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

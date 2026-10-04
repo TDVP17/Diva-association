@@ -91,11 +91,11 @@ export function AppLockSettings({
             <span className="material-symbols-outlined text-2xl">{bioIcon}</span>
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="font-label-md text-label-md text-on-surface font-semibold truncate">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-label-md text-label-md text-on-surface font-semibold">
                 {lang === "fr"
-                  ? `Verrouillage ${bioLabel}`
-                  : `${bioLabel} Lock`}
+                  ? "Verrouillage d'application"
+                  : "Application Lock"}
               </p>
               {enabled && (
                 <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full shrink-0">
@@ -109,7 +109,7 @@ export function AppLockSettings({
                   ? `Protégé par votre ${bioLabel} dès que vous quittez l'écran`
                   : `Protected with your ${bioLabel} when leaving the screen`
                 : lang === "fr"
-                ? `Déverrouiller facilement avec votre ${bioLabel}`
+                ? `Sécuriser l'accès avec votre ${bioLabel}`
                 : `Unlock easily using your ${bioLabel}`}
             </p>
           </div>
@@ -124,8 +124,8 @@ export function AppLockSettings({
           onClick={handleToggle}
           aria-label={
             lang === "fr"
-              ? `Activer ou désactiver le verrouillage par ${bioLabel}`
-              : `Toggle ${bioLabel} lock`
+              ? "Activer ou désactiver le verrouillage d'application"
+              : "Toggle application lock"
           }
           className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${
             enabled ? "bg-primary" : "bg-slate-300"

@@ -12,7 +12,7 @@
 export function LoadingSpinner({ fullPage = false, className = "" }: { fullPage?: boolean; className?: string }) {
   return (
     <div
-      className={`w-full flex items-center justify-center ${fullPage ? "min-h-[60vh]" : "py-10"} ${className}`}
+      className={`w-full flex items-center justify-center self-center justify-self-center ${fullPage ? "min-h-[60vh]" : "py-10"} ${className}`}
     >
       <span
         aria-hidden
