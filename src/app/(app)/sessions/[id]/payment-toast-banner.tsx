@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { playNotificationPopSound, playUiTapSound } from "@/lib/sound-effects";
 
 export function PaymentToastBanner({
   sessionLabel,
@@ -14,6 +15,12 @@ export function PaymentToastBanner({
 }) {
   const [dismissed, setDismissed] = useState(false);
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
+
+  useEffect(() => {
+    if (payerName) {
+      playNotificationPopSound();
+    }
+  }, [payerName]);
 
   if (!payerName || dismissed) return null;
 
@@ -44,7 +51,10 @@ export function PaymentToastBanner({
       </div>
       <button
         type="button"
-        onClick={() => setDismissed(true)}
+        onClick={() => {
+          playUiTapSound();
+          setDismissed(true);
+        }}
         className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors flex-shrink-0"
         aria-label={t("close")}
       >

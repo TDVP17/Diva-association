@@ -42,7 +42,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cod
     for (const slot of m.slots) {
       const contribution = await prisma.contribution.findUnique({
         where: { membershipSlotId_dueDate: { membershipSlotId: slot.id, dueDate } },
-        select: { status: true },
+        select: { status: true, receiptPdfUrl: true },
       });
       rows.push({
         slotId: slot.id,
@@ -52,6 +52,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cod
           m.tontineSession.title || TONTINE_LABELS[m.tontineSession.type] || m.tontineSession.type,
         amount: amount + fee,
         alreadyPaid: contribution?.status === "PAID",
+        receiptUrl: contribution?.receiptPdfUrl ? `/api/files/${contribution.receiptPdfUrl}` : null,
       });
     }
   }

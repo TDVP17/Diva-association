@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getUnreadInAppNotificationCount } from "@/lib/notifications/unread";
 import { getLang } from "@/lib/i18n/get-lang";
 import { AdminTopBar } from "@/components/admin/admin-top-bar";
 import { AdminSidebar, type AdminNavCounts } from "@/components/admin/admin-sidebar";
@@ -29,9 +30,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         readAt: null,
       },
     }),
-    prisma.notification.count({
-      where: { userId: session.user.id, status: { in: ["SENT", "FAILED"] }, readAt: null },
-    }),
+    getUnreadInAppNotificationCount(session.user.id),
     prisma.paymentAttempt.count({
       where: { status: { in: ["REFUND_FAILED_MANUAL_REVIEW", "DUPLICATE_PAID"] } },
     }),

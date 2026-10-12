@@ -18,7 +18,7 @@
 //     principle the original version of this file was built around, now
 //     scoped precisely to the calls where staleness would actually mislead
 //     someone, instead of blocking page-shell caching entirely.
-const CACHE_NAME = "diva-shell-v3";
+const CACHE_NAME = "diva-shell-v4";
 const STATIC_ASSETS = ["/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png", "/offline.html"];
 
 self.addEventListener("install", (event) => {
@@ -73,7 +73,9 @@ self.addEventListener("fetch", (event) => {
               // "Response body is already used" (seen in production).
               if (res.ok) {
                 const copy = res.clone();
-                caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+                caches.open(CACHE_NAME).then((cache) => cache.put(request, copy).catch((err) => {
+                  console.warn("[sw] cache.put static failed:", err);
+                }));
               }
               return res;
             })
@@ -92,7 +94,9 @@ self.addEventListener("fetch", (event) => {
         .then((res) => {
           if (res.ok) {
             const copy = res.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy).catch((err) => {
+              console.warn("[sw] cache.put navigate failed:", err);
+            }));
           }
           return res;
         })
@@ -121,16 +125,16 @@ self.addEventListener("push", (event) => {
     return;
   }
 
-  const title = payload.title || "DIVA";
+  const title = payload.title || "DIVA Asso.";
   const options = {
     body: payload.body || "",
     icon: "/icons/icon-192.png",
     badge: "/icons/refined-mark.png",
     vibrate: [200, 100, 200],
-    tag: payload.tag || undefined,
+    tag: payload.tag || "diva-" + Date.now(),
     renotify: true,
-    requireInteraction: false, // Allows swiping away / deleting in Android shade without opening app
-    data: { url: payload.url || "/dashboard" },
+    requireInteraction: false, // Allows swiping away in Android shade without opening app
+    data: { url: payload.url || "/notifications" },
   };
 
   event.waitUntil(

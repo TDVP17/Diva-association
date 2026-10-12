@@ -31,6 +31,7 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
   const [isStandalone, setIsStandalone] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isIos, setIsIos] = useState(false);
+  const [isAndroid, setIsAndroid] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
 
@@ -47,12 +48,15 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
     } catch {}
 
     // Check if the current page is running inside the standalone installed app window
-    setIsStandalone(isCurrentlyInStandalone());
+    const standalone = isCurrentlyInStandalone();
+    setIsStandalone(standalone);
 
-    // Detect iOS
+    // Detect device OS
     const ua = window.navigator.userAgent;
     const ios = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Macintosh") && "ontouchend" in document);
+    const android = /Android/i.test(ua);
     setIsIos(ios);
+    setIsAndroid(android);
 
     // Capture install prompt for Android/Chrome/Edge
     function onBeforeInstall(e: Event) {
@@ -66,6 +70,7 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
       // Installed now
       setDeferredPrompt(null);
       window.__deferredInstallPrompt = null;
+      setIsStandalone(true);
     }
 
     if (window.__deferredInstallPrompt) {
@@ -102,8 +107,8 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
         (typeof window !== "undefined" ? window.__deferredInstallPrompt : null);
 
       if (!promptEvent) {
-        for (let i = 0; i < 5; i++) {
-          await new Promise((resolve) => setTimeout(resolve, 150));
+        for (let i = 0; i < 4; i++) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
           promptEvent = deferredPrompt || (typeof window !== "undefined" ? window.__deferredInstallPrompt : null);
           if (promptEvent) break;
         }
@@ -114,13 +119,15 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
         const choice = await promptEvent.userChoice;
         if (choice.outcome === "accepted") {
           setDeferredPrompt(null);
+          return;
         }
-      } else {
-        // Fallback: show in-card instructions for Chrome/Android
-        setShowGuide((prev) => !prev);
       }
+
+      // Android direct download fallback
+      window.location.href = "/downloads/diva-association.apk";
     } catch (err) {
       console.warn("[pwa] install error:", err);
+      window.location.href = "/downloads/diva-association.apk";
     } finally {
       setInstalling(false);
     }
@@ -154,78 +161,75 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
     }
   }
 
+  // When already running inside the installed mobile app, hide all installation options completely
+  if (isStandalone) {
+    return null;
+  }
+
   return (
     <div className="w-full bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4 flex flex-col gap-3">
-      {isStandalone ? (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0">
-              <span className="material-symbols-outlined text-2xl">verified</span>
-            </div>
-            <div>
-              <p className="font-label-md text-label-md text-on-surface font-semibold">
-                {lang === "fr" ? "Application installée & active" : "App Installed & Active"}
-              </p>
-              <p className="font-label-sm text-label-sm text-on-surface-variant">
-                {lang === "fr"
-                  ? "Vous utilisez DIVA en mode application mobile"
-                  : "You are running DIVA as an installed mobile app"}
-              </p>
-            </div>
-          </div>
-          <span className="material-symbols-outlined text-emerald-600">check_circle</span>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-                <span className="material-symbols-outlined text-2xl">install_mobile</span>
-              </div>
-              <div className="min-w-0">
-                <p className="font-label-md text-label-md text-on-surface font-semibold truncate">
-                  {lang === "fr" ? "Installer l'application" : "Install App"}
-                </p>
-                <p className="font-label-sm text-label-sm text-on-surface-variant text-xs">
-                  {isIos
-                    ? lang === "fr"
-                      ? "Direct sur votre écran d'iPhone"
-                      : "Direct on your iPhone screen"
-                    : lang === "fr"
-                    ? "Installation directe sur votre téléphone"
-                    : "Direct installation on your phone"}
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={handleInstallClick}
-              disabled={installing}
-              className="px-3.5 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 active:scale-95 transition-all flex items-center gap-1.5 flex-shrink-0 shadow-sm cursor-pointer disabled:opacity-60"
-            >
-              <span className="material-symbols-outlined text-[16px]">
-                {isIos ? (showGuide ? "close" : "ios_share") : installing ? "hourglass_top" : "download"}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+              <span className="material-symbols-outlined text-2xl">
+                {isIos ? "phone_iphone" : isAndroid ? "android" : "install_mobile"}
               </span>
-              {installing
-                ? lang === "fr"
-                  ? "Lancement..."
-                  : "Starting..."
-                : isIos
-                ? showGuide
+            </div>
+            <div className="min-w-0">
+              <p className="font-label-md text-label-md text-on-surface font-semibold truncate">
+                {isIos
                   ? lang === "fr"
-                    ? "Fermer"
-                    : "Close"
+                    ? "Ajouter à l'écran d'accueil"
+                    : "Add to Home Screen"
                   : lang === "fr"
-                  ? "Installer"
-                  : "Install"
-                : lang === "fr"
-                ? "Installer"
-                : "Install"}
-            </button>
+                  ? "Télécharger l'application"
+                  : "Download the App"}
+              </p>
+              <p className="font-label-sm text-label-sm text-on-surface-variant text-xs truncate">
+                {isIos
+                  ? lang === "fr"
+                    ? "Instructions simples pour iPhone"
+                    : "Easy steps for iPhone"
+                  : isAndroid
+                  ? lang === "fr"
+                    ? "Téléchargement direct sur votre téléphone"
+                    : "Direct download on your phone"
+                  : lang === "fr"
+                  ? "Installation directe sur votre appareil"
+                  : "Direct installation on your device"}
+              </p>
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={handleInstallClick}
+            disabled={installing}
+            className="px-3.5 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 active:scale-95 transition-all flex items-center gap-1.5 flex-shrink-0 shadow-sm cursor-pointer disabled:opacity-60"
+          >
+            <span className="material-symbols-outlined text-[16px]">
+              {isIos ? (showGuide ? "close" : "help") : installing ? "hourglass_top" : "download"}
+            </span>
+            {installing
+              ? lang === "fr"
+                ? "Téléchargement..."
+                : "Downloading..."
+              : isIos
+              ? showGuide
+                ? lang === "fr"
+                  ? "Fermer"
+                  : "Close"
+                : lang === "fr"
+                ? "Comment faire"
+                : "How to add"
+              : lang === "fr"
+              ? "Télécharger"
+              : "Download"}
+          </button>
+        </div>
 
-          {/* Interactive in-card guide for iPhone or browsers needing manual action */}
-          {showGuide && (
+        {/* Interactive in-card guide for iPhone or browsers needing manual action */}
+        {showGuide && (
             <div className="p-3 bg-surface-container-low rounded-xl border border-primary/20 flex flex-col gap-2 animate-in fade-in duration-200">
               {isIos ? (
                 <>
@@ -304,7 +308,6 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
             </div>
           )}
         </div>
-      )}
 
       {/* Push notifications button for mobile lock screen alerts */}
       {pushSupported && (

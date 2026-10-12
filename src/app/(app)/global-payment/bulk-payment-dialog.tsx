@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 import { formatXAF } from "@/lib/format-currency";
+import { playSuccessChimeSound, playUiTapSound } from "@/lib/sound-effects";
 
 interface QuoteItem {
   membershipSlotId: string;
@@ -94,6 +95,7 @@ export function BulkPaymentDialog({
         if (body.status === "SUCCESSFUL") {
           if (pollRef.current) clearInterval(pollRef.current);
           if (hintRef.current) clearTimeout(hintRef.current);
+          playSuccessChimeSound();
           setStep("success");
           setTimeout(() => onSettled(), 1500);
         } else if (body.status === "FAILED" || body.status === "EXPIRED") {

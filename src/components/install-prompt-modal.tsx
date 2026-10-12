@@ -155,13 +155,16 @@ export function InstallPromptModal({ lang }: { lang: Lang }) {
         const choice = await promptEvent.userChoice;
         if (choice.outcome === "accepted") {
           setDismissed(true);
+          return;
         }
-      } else {
-        // Fallback for browsers where beforeinstallprompt was already consumed or not fired
-        setManualGuide(true);
       }
+
+      // Fallback: direct download for Android if native prompt is not available
+      window.location.href = "/downloads/diva-association.apk";
+      setDismissed(true);
     } catch (err) {
       console.warn("[PWA] auto install error:", err);
+      window.location.href = "/downloads/diva-association.apk";
     } finally {
       setInstalling(false);
     }
@@ -371,11 +374,11 @@ export function InstallPromptModal({ lang }: { lang: Lang }) {
                   <span>
                     {installing
                       ? lang === "fr"
-                        ? "Lancement de l'installation..."
-                        : "Starting installation..."
+                        ? "Lancement du téléchargement..."
+                        : "Starting download..."
                       : lang === "fr"
-                      ? "Installer l'application"
-                      : "Install Application"}
+                      ? "Télécharger / Installer l'application"
+                      : "Download / Install Application"}
                   </span>
                 </button>
 

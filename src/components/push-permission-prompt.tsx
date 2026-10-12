@@ -33,17 +33,19 @@ export function PushPermissionPrompt({ lang }: { lang: Lang }) {
         try {
           const registration = await navigator.serviceWorker.ready;
           let subscription = await registration.pushManager.getSubscription();
-          if (!subscription) {
+          if (!subscription && VAPID_PUBLIC_KEY) {
             subscription = await registration.pushManager.subscribe({
               userVisibleOnly: true,
               applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as BufferSource,
             });
           }
-          await fetch("/api/push/subscribe", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(subscription.toJSON()),
-          });
+          if (subscription) {
+            await fetch("/api/push/subscribe", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(subscription.toJSON()),
+            });
+          }
         } catch (err) {
           console.warn("[push] background auto-subscribe error:", err);
         }
@@ -51,7 +53,13 @@ export function PushPermissionPrompt({ lang }: { lang: Lang }) {
       }
 
       if (Notification.permission !== "default") return;
-      if (localStorage.getItem(DISMISSED_KEY)) return;
+
+      const isStandalone =
+        (typeof window !== "undefined" && window.matchMedia?.("(display-mode: standalone)").matches) ||
+        (typeof navigator !== "undefined" && (navigator as { standalone?: boolean }).standalone === true);
+
+      // In the installed app on the phone, always prompt the user to enable notifications
+      if (!isStandalone && localStorage.getItem(DISMISSED_KEY)) return;
       setVisible(true);
     }, 500);
     return () => clearTimeout(handle);

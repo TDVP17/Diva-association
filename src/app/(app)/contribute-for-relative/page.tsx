@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { MemberCodePayFlow } from "@/components/member-code-pay-flow";
+import { ShareAppSection } from "@/components/share-app-section";
 
 export default async function ContributeForRelativePage() {
   const session = await auth();
@@ -15,6 +16,7 @@ export default async function ContributeForRelativePage() {
         {t("contributeForRelativeNav")}
       </h1>
       <MemberCodePayFlow lang={lang} payEndpoint="/api/payments/relative/initiate" />
+      <ShareAppSection lang={lang} variant="card" />
     </main>
   );
 }

@@ -20,6 +20,7 @@ interface FundableSlot {
   tontineSessionTitle: string;
   amount: number;
   alreadyPaid: boolean;
+  receiptUrl?: string | null;
 }
 
 /**
@@ -55,13 +56,16 @@ export function MemberCodePayFlow({
     beneficiaryName: string;
     tontineSessionTitle: string;
     amount: number;
+    receiptUrl?: string | null;
   } | null>(null);
   const autoSearchDone = useRef(false);
 
   async function fetchSlots(memberCode: string) {
     const membershipsRes = await fetch(`/api/members/${encodeURIComponent(memberCode)}/memberships`);
     const membershipsBody = await membershipsRes.json();
-    setSlots(membershipsRes.ok ? (membershipsBody.slots ?? []) : []);
+    const fetchedSlots: FundableSlot[] = membershipsRes.ok ? (membershipsBody.slots ?? []) : [];
+    setSlots(fetchedSlots);
+    return fetchedSlots;
   }
 
   async function findMember(codeToSearch?: string) {
@@ -165,6 +169,36 @@ export function MemberCodePayFlow({
                   <span className="font-bold text-[#065f46] font-numeric-data">{formatXAF(lastPaidConfirmation.amount)}</span>
                 </div>
               </div>
+
+              {/* Action buttons: Download receipt now / View history */}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {lastPaidConfirmation.receiptUrl ? (
+                  <a
+                    href={lastPaidConfirmation.receiptUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#065f46] hover:bg-[#064e3b] text-white font-bold text-xs transition-all shadow-xs cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">download</span>
+                    <span>{lang === "fr" ? "Télécharger le reçu maintenant" : "Download receipt now"}</span>
+                  </a>
+                ) : (
+                  <a
+                    href="/history"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#065f46] hover:bg-[#064e3b] text-white font-bold text-xs transition-all shadow-xs cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">download</span>
+                    <span>{lang === "fr" ? "Reçu disponible dans l'historique" : "Receipt in history"}</span>
+                  </a>
+                )}
+                <a
+                  href="/history"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-[#a7f3d0] text-[#065f46] font-semibold text-xs hover:bg-[#f0fdf4] transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+                  <span>{lang === "fr" ? "Voir dans mes historiques" : "View in my history"}</span>
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -260,10 +294,22 @@ export function MemberCodePayFlow({
                     </p>
                   </div>
                 </div>
-                <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#d1fae5] text-[#065f46] text-xs font-semibold">
-                  <span className="material-symbols-outlined text-[13px]">check</span>
-                  {t("checkedPaid")}
-                </span>
+                {s.receiptUrl ? (
+                  <a
+                    href={s.receiptUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-bold transition-colors shadow-2xs cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">download</span>
+                    <span>{lang === "fr" ? "Reçu" : "Receipt"}</span>
+                  </a>
+                ) : (
+                  <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#d1fae5] text-[#065f46] text-xs font-semibold">
+                    <span className="material-symbols-outlined text-[13px]">check</span>
+                    {t("checkedPaid")}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -276,18 +322,20 @@ export function MemberCodePayFlow({
           membershipSlotId={confirmSlot.slotId}
           payEndpoint={payEndpoint}
           description={`${t("paymentDescriptionPrefix")}: ${confirmSlot.tontineSessionTitle}`}
-          onSettled={() => {
+          onSettled={async () => {
             const confirmedSlot = confirmSlot;
             setConfirmSlotId(null);
+            const freshSlots = await fetchSlots(member.memberCode);
+            const updatedSlot = freshSlots.find((s) => s.slotId === confirmedSlot?.slotId);
             if (confirmedSlot) {
               setLastPaidConfirmation({
                 slotId: confirmedSlot.slotId,
                 beneficiaryName: confirmedSlot.beneficiaryName,
                 tontineSessionTitle: confirmedSlot.tontineSessionTitle,
                 amount: confirmedSlot.amount,
+                receiptUrl: updatedSlot?.receiptUrl ?? null,
               });
             }
-            fetchSlots(member.memberCode);
           }}
           onClose={() => setConfirmSlotId(null)}
         />

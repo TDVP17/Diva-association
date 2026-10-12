@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getUnreadInAppNotificationCount } from "@/lib/notifications/unread";
 import { getContributionTotal, getNextDueDate } from "@/lib/tontine-engine";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { AvatarUpload } from "./avatar-upload";
@@ -57,13 +58,11 @@ export default async function ProfilePage() {
       },
     }),
     prisma.membership.findMany({
-      where: { userId: session.user.id },
+      where: { userId: session.user.id, status: { not: "REJECTED" } },
       include: { tontineSession: true, slots: true },
       orderBy: { joinedAt: "desc" },
     }),
-    prisma.notification.count({
-      where: { userId: session.user.id, status: { in: ["SENT", "FAILED"] }, readAt: null },
-    }),
+    getUnreadInAppNotificationCount(session.user.id),
     prisma.fine.aggregate({
       where: { membershipSlot: { membership: { userId: session.user.id } }, status: "UNPAID" },
       _sum: { amount: true },

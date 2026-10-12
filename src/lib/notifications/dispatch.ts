@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getUnreadInAppNotificationCount } from "@/lib/notifications/unread";
 import type { NotificationChannel, NotificationEventType } from "@/generated/prisma/enums";
 import { sendPushToUser } from "@/lib/push/send";
 import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
@@ -122,12 +123,7 @@ async function deliverInstantNotifications(params: {
 
         // 1. Deliver instant Web Push to phone
         try {
-          const badgeCount =
-            typeof prisma?.notification?.count === "function"
-              ? (await prisma.notification.count({
-                  where: { userId: r.userId, channel: "IN_APP", status: { in: ["SENT", "FAILED"] }, readAt: null },
-                })) || 1
-              : 1;
+          const badgeCount = (await getUnreadInAppNotificationCount(r.userId)) || 1;
 
           await sendPushToUser(r.userId, {
             title,

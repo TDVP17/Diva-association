@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { translate, type Lang } from "@/lib/i18n/translations";
+import { ShareAppSection } from "@/components/share-app-section";
 
 export interface TopRightMenuItem {
   href: string;
@@ -72,6 +73,9 @@ export function TopRightMenu({
                 )}
               </Link>
             ))}
+            <div className="border-t border-slate-100">
+              <ShareAppSection lang={lang} variant="menuItem" />
+            </div>
           </div>
           <form
             action={async () => {

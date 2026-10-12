@@ -2,6 +2,7 @@
 
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { getCycleDateForRound } from "@/lib/tontine-engine";
+import { playCelebrationSound } from "@/lib/sound-effects";
 import type { TontineType } from "@/generated/prisma/enums";
 
 export interface MemberSlotInfo {
@@ -74,8 +75,16 @@ export function TonTourBanner({
   }
 
   return (
-    <div className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-slate-100 flex items-center gap-3.5 my-3.5">
-      <div className="w-12 h-12 rounded-full bg-amber-100/90 flex items-center justify-center flex-shrink-0 text-2xl shadow-xs">
+    <div
+      onClick={playCelebrationSound}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") playCelebrationSound();
+      }}
+      className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-slate-100 flex items-center gap-3.5 my-3.5 cursor-pointer hover:bg-slate-50/80 active:scale-[0.99] transition-all select-none"
+    >
+      <div className="w-12 h-12 rounded-full bg-amber-100/90 flex items-center justify-center flex-shrink-0 text-2xl shadow-xs transition-transform hover:scale-110">
         🎉
       </div>
       <div className="min-w-0 flex-1">

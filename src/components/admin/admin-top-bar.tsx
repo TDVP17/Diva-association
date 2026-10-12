@@ -6,6 +6,8 @@ import { TopRightMenu, type TopRightMenuItem } from "@/components/top-right-menu
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { prisma } from "@/lib/prisma";
 
+import { getUnreadInAppNotificationCount } from "@/lib/notifications/unread";
+
 export async function AdminTopBar({
   userId,
   userName,
@@ -28,7 +30,7 @@ export async function AdminTopBar({
         readAt: null,
       },
     }),
-    prisma.notification.count({ where: { userId, status: { in: ["SENT", "FAILED"] }, readAt: null } }),
+    getUnreadInAppNotificationCount(userId),
     prisma.membership.count({ where: { status: "PENDING" } }),
     prisma.payout.count({ where: { status: { not: "CONFIRMED" } } }),
   ]);

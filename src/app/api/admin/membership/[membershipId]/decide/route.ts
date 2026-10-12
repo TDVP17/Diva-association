@@ -83,6 +83,14 @@ export async function POST(
 
     if (isApproved) {
       await ensureMemberCode(membership.userId);
+    } else {
+      await prisma.membershipSlot.deleteMany({
+        where: { membershipId: membership.id },
+      }).catch((err) => console.warn("[membership/decide] delete slots failed:", err));
+      await prisma.membership.update({
+        where: { id: membership.id },
+        data: { slotCount: null },
+      }).catch((err) => console.warn("[membership/decide] reset slotCount failed:", err));
     }
 
     if (isBanned) {
@@ -118,9 +126,7 @@ export async function POST(
           message,
           messageKey: approved ? "memberApprovedMessage" : "memberRejectedMessage",
           messageVars: approved || !parsed.data.reason ? undefined : { reason: parsed.data.reason },
-          // Approved members land back on the session to pick up onboarding
-          // (select slots, etc); rejected members have nowhere useful to go.
-          actionUrl: approved ? `/sessions/${membership.tontineSessionId}` : undefined,
+          actionUrl: `/sessions/${membership.tontineSessionId}`,
         },
       ],
     });

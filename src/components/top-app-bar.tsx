@@ -7,6 +7,8 @@ import { translate, type Lang } from "@/lib/i18n/translations";
 import { prisma } from "@/lib/prisma";
 import { getInitials } from "@/lib/initials";
 
+import { getUnreadInAppNotificationCount } from "@/lib/notifications/unread";
+
 export async function TopAppBar({
   userId,
   userName,
@@ -20,7 +22,7 @@ export async function TopAppBar({
 }) {
   const [unreadMessages, unreadNotifications, unpaidFines, pendingCotisations] = await Promise.all([
     prisma.chatMessage.count({ where: { receiverId: userId, readAt: null } }),
-    prisma.notification.count({ where: { userId, status: { in: ["SENT", "FAILED"] }, readAt: null } }),
+    getUnreadInAppNotificationCount(userId),
     prisma.fine.count({ where: { membershipSlot: { membership: { userId } }, status: "UNPAID" } }),
     prisma.membership.count({ where: { userId, status: "APPROVED", slotCount: null } }),
   ]);

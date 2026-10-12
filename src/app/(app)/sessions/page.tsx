@@ -40,9 +40,14 @@ export default async function SessionsPage() {
     orderBy: { joinedAt: "desc" },
   });
 
-  const excludedSessionIds = memberships
-    .filter((m) => m.status === "APPROVED" || m.status === "PENDING" || m.status === "BANNED")
-    .map((m) => m.tontineSessionId);
+  // Under "Mes cotisations", display only active/pending memberships.
+  // When an admin rejects a membership request, it leaves the member's cotisations
+  // and returns directly to "Cotisations disponibles".
+  const myCotisations = memberships.filter(
+    (m) => m.status === "APPROVED" || m.status === "PENDING"
+  );
+
+  const excludedSessionIds = myCotisations.map((m) => m.tontineSessionId);
 
   const candidates = await prisma.tontineSession.findMany({
     where: {
@@ -96,7 +101,7 @@ export default async function SessionsPage() {
       <section>
         <div className="sticky top-16 z-30 bg-background py-2 -mx-container-padding px-container-padding mb-stack-gap-md shadow-[0px_4px_20px_rgba(30,41,59,0.05)] flex items-center justify-between gap-2">
           <h2 className="font-title-md text-title-md text-primary">{t("mySessions")}</h2>
-          {memberships.length > 0 && (
+          {myCotisations.length > 0 && (
             <Link
               href="/global-payment"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary font-label-sm text-label-sm hover:bg-primary/20 transition-colors flex-shrink-0"
@@ -106,14 +111,14 @@ export default async function SessionsPage() {
             </Link>
           )}
         </div>
-        {memberships.length === 0 ? (
+        {myCotisations.length === 0 ? (
           <div className="bg-white rounded-xl p-8 text-center shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant flex flex-col items-center gap-stack-gap-sm">
             <span className="material-symbols-outlined text-outline text-[40px]">group_add</span>
             <p className="font-body-md text-body-md text-on-surface-variant">{t("notJoinedYet")}</p>
           </div>
         ) : (
           <div className="flex flex-col gap-stack-gap-md lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-stack-gap-md">
-            {memberships.map((m) => (
+            {myCotisations.map((m) => (
               <div
                 key={m.id}
                 className="relative bg-white rounded-xl p-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant flex items-center justify-between hover:bg-surface-container-low transition-colors"

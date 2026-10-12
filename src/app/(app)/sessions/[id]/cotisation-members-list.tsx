@@ -6,6 +6,7 @@ import { translate, type Lang } from "@/lib/i18n/translations";
 import { PaymentConfirmDialog } from "@/components/payment-confirm-dialog";
 import { BulkPaymentDialog } from "@/app/(app)/global-payment/bulk-payment-dialog";
 import { saveDraftContribution } from "@/lib/offline/db";
+import { playUiTapSound } from "@/lib/sound-effects";
 
 export interface CotisationMemberItem {
   id: string;
@@ -69,14 +70,19 @@ export function CotisationMembersList({
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
   const router = useRouter();
 
+  // Show only 3 members by default, expandable to show all
+  const [showAllMembers, setShowAllMembers] = useState(false);
+
   // State for single-slot and bulk-slot payment dialogs
   const [activeSlotIdForPay, setActiveSlotIdForPay] = useState<string | null>(null);
   const [showBulkDialog, setShowBulkDialog] = useState(false);
   const [savedOffline, setSavedOffline] = useState(false);
 
   const hasUnpaid = myUnpaidSlotIds.length > 0;
+  const displayedMembers = showAllMembers || members.length <= 3 ? members : members.slice(0, 3);
 
   async function handleMainCotiserAction() {
+    playUiTapSound();
     if (lockedReason) return;
     if (!hasUnpaid) return;
 
@@ -107,6 +113,7 @@ export function CotisationMembersList({
   }
 
   function handlePaySingle(slotId: string) {
+    playUiTapSound();
     if (lockedReason) return;
     setActiveSlotIdForPay(slotId);
   }
@@ -126,7 +133,7 @@ export function CotisationMembersList({
 
       {/* List container */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden divide-y divide-slate-100">
-        {members.map((slot, idx) => {
+        {displayedMembers.map((slot, idx) => {
           const initials = getInitials(slot.beneficiaryName);
           const colorClass = getAvatarColor(slot.beneficiaryName, idx);
 
@@ -182,6 +189,37 @@ export function CotisationMembersList({
             </div>
           );
         })}
+
+        {/* Option Voir tout / Réduire */}
+        {members.length > 3 && (
+          <div>
+            {!showAllMembers ? (
+              <button
+                type="button"
+                onClick={() => {
+                  playUiTapSound();
+                  setShowAllMembers(true);
+                }}
+                className="w-full py-3 px-4 text-xs font-bold text-emerald-800 hover:text-emerald-900 bg-emerald-50/50 hover:bg-emerald-50/80 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <span>{t("seeAllMembers", { count: String(members.length) })}</span>
+                <span className="material-symbols-outlined text-[16px]">expand_more</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  playUiTapSound();
+                  setShowAllMembers(false);
+                }}
+                className="w-full py-3 px-4 text-xs font-bold text-slate-600 hover:text-slate-800 bg-slate-50 hover:bg-slate-100 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <span>{t("showLessMembers")}</span>
+                <span className="material-symbols-outlined text-[16px]">expand_less</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Prominent Action Button: Cotiser maintenant -> */}

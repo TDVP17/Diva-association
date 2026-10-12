@@ -6,20 +6,28 @@ import { formatXAF } from "@/lib/format-currency";
 export function CotisationHeroCard({
   title,
   amount,
+  fee = 0,
   frequencyType,
   status,
   paidCount,
   totalSlots,
   totalPotAmount,
+  startDate,
+  endDate,
+  isDrawCompleted = false,
   lang,
 }: {
   title: string;
   amount: number;
+  fee?: number;
   frequencyType: string;
   status: string;
   paidCount: number;
   totalSlots: number;
   totalPotAmount: number;
+  startDate?: Date | null;
+  endDate?: Date | null;
+  isDrawCompleted?: boolean;
   lang: Lang;
 }) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
@@ -53,6 +61,25 @@ export function CotisationHeroCard({
       : "Draft"
     : status;
 
+  const startDateLabel = startDate
+    ? startDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
+        timeZone: "Africa/Douala",
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : null;
+
+  const endDateLabel =
+    isDrawCompleted && endDate
+      ? endDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
+          timeZone: "Africa/Douala",
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : null;
+
   return (
     <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#064e3b] via-[#064e3b] to-[#032e23] p-5 sm:p-6 text-white shadow-xl shadow-emerald-950/20 border border-emerald-500/20">
       {/* Background glow decoration */}
@@ -69,15 +96,46 @@ export function CotisationHeroCard({
         </div>
       </div>
 
-      {/* Prominent Amount */}
-      <div className="mt-3.5 mb-2.5 flex items-baseline relative z-10">
-        <span className="text-3xl sm:text-4xl font-black text-white tracking-tight drop-shadow-xs">
-          {formatXAF(amount)}
-        </span>
-        <span className="text-sm sm:text-base font-medium text-emerald-200/90 ml-2">
-          {frequencySuffix}
-        </span>
+      {/* Prominent Amount & Admin Fee */}
+      <div className="mt-3.5 mb-2 flex items-baseline flex-wrap gap-x-2.5 gap-y-1 relative z-10">
+        <div className="flex items-baseline">
+          <span className="text-3xl sm:text-4xl font-black text-white tracking-tight drop-shadow-xs">
+            {formatXAF(amount)}
+          </span>
+          <span className="text-sm sm:text-base font-medium text-emerald-200/90 ml-1.5">
+            {frequencySuffix}
+          </span>
+        </div>
+
+        {fee > 0 && (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-400/30 text-emerald-200 text-xs font-semibold shadow-xs">
+            <span>+ {formatXAF(fee)} {t("adminFeeLabel")}</span>
+          </span>
+        )}
       </div>
+
+      {/* Dates: Début (toujours visible) & Fin (visible UNIQUEMENT quand le tirage a été fait) */}
+      {startDateLabel && (
+        <div className="relative z-10 mb-3 flex items-center gap-2 text-xs text-emerald-200/90 flex-wrap">
+          <div className="flex items-center gap-1 bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+            <span className="material-symbols-outlined text-[14px] text-emerald-300">event</span>
+            <span>
+              {t("startsOnPrefix")}{" "}
+              <strong className="text-white font-bold">{startDateLabel}</strong>
+            </span>
+          </div>
+
+          {endDateLabel && (
+            <div className="flex items-center gap-1 bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-500/20 animate-in fade-in duration-300">
+              <span className="material-symbols-outlined text-[14px] text-amber-300">event_available</span>
+              <span>
+                {t("endsOnPrefix")}{" "}
+                <strong className="text-white font-bold">{endDateLabel}</strong>
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Modern Progress Bar */}
       <div className="relative z-10 w-full">

@@ -1,5 +1,9 @@
+"use client";
+
+import { useEffect } from "react";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { formatXAF } from "@/lib/format-currency";
+import { playSuccessChimeSound } from "@/lib/sound-effects";
 
 interface Props {
   lang: Lang;
@@ -26,6 +30,10 @@ export function PaymentSuccessBanner({
   transRef,
   receiptUrl,
 }: Props) {
+  useEffect(() => {
+    playSuccessChimeSound();
+  }, []);
+
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
   const total = amount + paymentFee;
 

@@ -353,6 +353,17 @@ async function handleFailedOrExpired(transId: string, verified: PaymentStatusRes
           messageVars: { amount: formatXAF(amount), session: sessionLabel },
           actionUrl: `/sessions/${membership.tontineSessionId}`,
         },
+        ...(contribution.paidByUserId && contribution.paidByUserId !== membership.userId
+          ? [
+              {
+                userId: contribution.paidByUserId,
+                message: `Votre tentative de cotisation de ${formatXAF(amount)} pour ${sessionLabel} n'a pas pu aboutir. Veuillez réessayer.`,
+                messageKey: "paymentFailedNotifMessage" as const,
+                messageVars: { amount: formatXAF(amount), session: sessionLabel },
+                actionUrl: "/contribute-for-relative",
+              },
+            ]
+          : []),
       ],
     });
   }

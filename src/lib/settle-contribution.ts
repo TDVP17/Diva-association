@@ -149,6 +149,30 @@ export async function settleContribution(
   // in their OWN preferredLang, not the beneficiary's.
   if (contribution.paidByUser && contribution.paidByUser.id !== user.id) {
     const payerLang: Lang = contribution.paidByUser.preferredLang === "en" ? "en" : "fr";
+    const beneficiaryLabel = `${user.name} (${contribution.membershipSlot.beneficiaryName})`;
+
+    // In-app & push notification to the relative's phone
+    await scheduleInAppNotifications({
+      tontineSessionId: membership.tontineSessionId,
+      type: "PAYMENT_SUCCESS",
+      recipients: [
+        {
+          userId: contribution.paidByUser.id,
+          message:
+            payerLang === "en"
+              ? `Your contribution of ${formatXAF(totalPaid)} for ${beneficiaryLabel} in ${sessionLabel} was successful! Receipt is available.`
+              : `Votre cotisation de ${formatXAF(totalPaid)} pour ${beneficiaryLabel} dans ${sessionLabel} a été validée avec succès ! Votre reçu est disponible.`,
+          messageKey: "relativePaymentSuccessNotif",
+          messageVars: {
+            amount: formatXAF(totalPaid),
+            beneficiary: beneficiaryLabel,
+            session: sessionLabel,
+          },
+          actionUrl: "/history",
+        },
+      ],
+    });
+
     await sendEmailSafe(
       contribution.paidByUser.email,
       translate(payerLang, "paymentSentEmailSubject", { session: sessionLabel }),

@@ -54,6 +54,20 @@ export async function GET() {
   });
 }
 
+/** Mark all unread notifications as read. */
+export async function PATCH() {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  await prisma.notification.updateMany({
+    where: { userId: session.user.id, readAt: null },
+    data: { readAt: new Date() },
+  });
+  return NextResponse.json({ ok: true });
+}
+
 /** Bulk-delete: clears every notification in the current user's feed. */
 export async function DELETE() {
   const session = await auth();
@@ -64,3 +78,4 @@ export async function DELETE() {
   await prisma.notification.deleteMany({ where: { userId: session.user.id } });
   return NextResponse.json({ ok: true });
 }
+

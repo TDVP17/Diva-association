@@ -96,7 +96,7 @@ export default async function SessionDetailPage({
   const myMembership = tontineSession.memberships.find((m) => m.userId === userId);
   const sessionLabel = tontineSession.title || TONTINE_LABELS[tontineSession.type];
 
-  if (!myMembership) {
+  if (!myMembership || myMembership.status === "REJECTED") {
     const joinCheck = assertJoinable(
       {
         ...tontineSession,
@@ -248,6 +248,22 @@ export default async function SessionDetailPage({
               </p>
             </details>
           )}
+          {myMembership?.status === "REJECTED" && (
+            <div className="w-full max-w-md bg-amber-50 border border-amber-200/80 rounded-xl p-3.5 text-center flex flex-col items-center gap-1.5 my-2 shadow-2xs">
+              <div className="flex items-center gap-1.5 text-amber-900 font-bold text-xs sm:text-sm">
+                <span className="material-symbols-outlined text-[18px] text-amber-700">info</span>
+                <span>{t("previousRequestRejected")}</span>
+              </div>
+              {myMembership.rejectionReason && (
+                <p className="text-xs text-amber-800 bg-amber-100/70 px-2.5 py-1 rounded-md">
+                  {lang === "fr" ? `Motif : ${myMembership.rejectionReason}` : `Reason: ${myMembership.rejectionReason}`}
+                </p>
+              )}
+              <p className="text-xs text-slate-600">
+                {t("previousRequestRejectedDesc")}
+              </p>
+            </div>
+          )}
           {!finesCheck.canJoin ? (
             <div className="w-full max-w-md bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-center flex flex-col items-center gap-2 mt-2">
               <span className="material-symbols-outlined text-amber-700 text-3xl">warning</span>
@@ -351,28 +367,6 @@ export default async function SessionDetailPage({
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
             {t("viewOpenCotisations")}
           </Link>
-        </section>
-      </main>
-    );
-  }
-
-  if (myMembership.status === "REJECTED") {
-    return (
-      <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-5xl mx-auto w-full">
-        <section className="bg-surface rounded-xl p-6 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant text-center flex flex-col items-center gap-3">
-          <span className="material-symbols-outlined text-amber-600 text-4xl">warning</span>
-          <h1 className="font-title-md text-title-md text-on-surface">{t("requestRejectedTitle")}</h1>
-          <p className="font-body-md text-body-md text-on-surface-variant">
-            {t("requestRejectedBody", { session: sessionLabel })}
-          </p>
-          {myMembership.rejectionReason && (
-            <p className="font-label-sm text-xs text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg">
-              {lang === "fr" ? `Motif : ${myMembership.rejectionReason}` : `Reason: ${myMembership.rejectionReason}`}
-            </p>
-          )}
-          <div className="w-full max-w-xs mt-2">
-            <JoinButton tontineSessionId={id} label={t("requestAgain")} lang={lang} />
-          </div>
         </section>
       </main>
     );
@@ -541,6 +535,21 @@ export default async function SessionDetailPage({
         null
       : null;
 
+  // Check if the draw is completed and every member has an assigned position
+  const hasOfficialPositions =
+    allSlotsFlat.length > 0 && allSlotsFlat.every((s) => s.officialPosition !== null);
+  const isDrawCompleted =
+    (tontineSession.status === "ACTIVE" || tontineSession.status === "CLOSED") &&
+    hasOfficialPositions;
+
+  const maxPosition = isDrawCompleted
+    ? Math.max(...allSlotsFlat.map((s) => s.officialPosition ?? 1))
+    : null;
+
+  const sessionEndDate = isDrawCompleted && maxPosition
+    ? getCycleDateForRound(tontineSession.type, tontineSession.startDate, maxPosition)
+    : null;
+
   return (
     <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-5xl mx-auto w-full pb-32">
       {/* Toast Notification flottant (en haut de l'écran) */}
@@ -580,11 +589,15 @@ export default async function SessionDetailPage({
       <CotisationHeroCard
         title={sessionLabel}
         amount={Number(tontineSession.amount)}
+        fee={Number(tontineSession.fee ?? 0)}
         frequencyType={tontineSession.type}
         status={tontineSession.status}
         paidCount={paidCount}
         totalSlots={slotCountForPot}
         totalPotAmount={totalPotAmount}
+        startDate={tontineSession.startDate}
+        endDate={sessionEndDate}
+        isDrawCompleted={isDrawCompleted}
         lang={lang}
       />
 

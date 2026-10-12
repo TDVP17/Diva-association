@@ -8,16 +8,16 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await sendPushToUser(session.user.id, {
-    title: "DIVA Asso",
-    body: "🔔 Notification de test réussie ! Les notifications push et les alertes fonctionnent sur votre téléphone.",
-    url: "/notifications",
-    badgeCount: 1,
-  });
+  try {
+    const result = await sendPushToUser(session.user.id, {
+      title: "DIVA Asso.",
+      body: "Vos notifications sur le téléphone sont parfaitement activées ! ✨",
+      url: "/notifications",
+    });
 
-  return NextResponse.json({
-    ok: true,
-    sent: result.sent,
-    failed: result.failed,
-  });
+    return NextResponse.json({ ok: true, sent: result.sent, failed: result.failed });
+  } catch (err) {
+    console.error("[push/test] test notification failed:", err);
+    return NextResponse.json({ error: "Failed to send test push" }, { status: 500 });
+  }
 }
