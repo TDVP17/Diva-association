@@ -7,6 +7,7 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     contribution: { update: (...a: unknown[]) => updateContribution(...a) },
     fine: { updateMany: (...a: unknown[]) => updateManyFine(...a) },
+    membership: { findMany: vi.fn().mockResolvedValue([]) },
     $transaction: (ops: unknown[]) => transaction(ops),
   },
 }));

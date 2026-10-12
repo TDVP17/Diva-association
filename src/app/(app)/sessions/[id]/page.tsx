@@ -16,6 +16,10 @@ import { PayoutOrderAccordion } from "./payout-order-accordion";
 import { MemberStatusAccordion } from "./member-status-accordion";
 import { PayoutTurnPanel } from "./payout-turn-panel";
 import { PaymentSuccessBanner } from "./payment-success-banner";
+import { PaymentToastBanner } from "./payment-toast-banner";
+import { CotisationHeroCard } from "./cotisation-hero-card";
+import { TonTourBanner } from "./ton-tour-banner";
+import { CotisationMembersList } from "./cotisation-members-list";
 import { getDesignatedSlot, assertPriorCyclePaidOut } from "@/lib/round-robin-lock";
 import { sessionStatusKey } from "@/lib/session-status-label";
 import { assertJoinable, sumRegisteredSlots } from "@/lib/session-joinability";
@@ -526,9 +530,26 @@ export default async function SessionDetailPage({
     paidContribution = await loadPaidContribution(paymentId, userId);
   }
 
+  // Find the most recent payer to display in the floating celebration toast banner
+  const paidContributionsList = contributions
+    .filter((c) => c.status === "PAID")
+    .sort((a, b) => (b.paidAt?.getTime() ?? 0) - (a.paidAt?.getTime() ?? 0));
+  const recentPayerName =
+    paidContributionsList.length > 0
+      ? paidContributionsList[0].paidByUser?.name ||
+        allSlotsFlat.find((s) => s.id === paidContributionsList[0].membershipSlotId)?.beneficiaryName ||
+        null
+      : null;
 
   return (
     <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-5xl mx-auto w-full pb-32">
+      {/* Toast Notification flottant (en haut de l'écran) */}
+      <PaymentToastBanner
+        sessionLabel={sessionLabel}
+        payerName={recentPayerName}
+        lang={lang}
+      />
+
       {paidContribution && (
         <PaymentSuccessBanner
           lang={lang}
@@ -554,88 +575,52 @@ export default async function SessionDetailPage({
           receiptUrl={paidContribution.receiptPdfUrl ? `/api/files/${paidContribution.receiptPdfUrl}` : null}
         />
       )}
-      <section className="mb-3.5 bg-surface rounded-xl p-3.5 sm:p-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant">
-        {/* En-tête : Titre, statut et stats clés */}
-        <div className="flex items-start justify-between gap-2.5">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 flex-wrap mb-1">
-              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-secondary-container/20 text-on-secondary-container font-label-sm text-[10px] uppercase tracking-wider font-bold">
-                {t(sessionStatusKey(tontineSession.status))}
-              </span>
-              {totalPotAmount > 0 && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200/80 font-bold text-[11px]">
-                  <span>💰</span>
-                  <span>{formatXAF(totalPotAmount)}</span>
-                </span>
-              )}
-            </div>
-            <h1 className="text-base sm:text-lg font-bold text-on-surface truncate">{sessionLabel}</h1>
-            {tontineSession.description && (
-              <details className="mt-1 max-w-xl">
-                <summary className="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 font-medium text-[11px] hover:bg-emerald-100 transition-colors shadow-2xs list-none [&::-webkit-details-marker]:hidden">
-                  <span className="text-[12px]">✨</span>
-                  <span>{t("seeDescription")}</span>
-                </summary>
-                <p className="font-body-sm text-xs text-on-surface-variant mt-1.5 whitespace-pre-line leading-relaxed bg-surface-container-low/70 p-2.5 rounded-lg border border-surface-variant/70">
-                  {tontineSession.description}
-                </p>
-              </details>
-            )}
-          </div>
 
-          <div className="text-right flex-shrink-0 bg-primary/5 border border-primary/10 px-2.5 py-1.5 rounded-lg">
-            <div className="text-[10px] text-on-surface-variant font-medium leading-none mb-0.5">{t("totalRegisteredSlots")}</div>
-            <div className="font-numeric-data text-sm sm:text-base font-bold text-primary">
-              {totalRegisteredSlots}{tontineSession.maxSlots ? ` / ${Number(tontineSession.maxSlots)}` : ""}
-            </div>
-          </div>
-        </div>
+      {/* 1. Carte Principale de la Cotisation (Cercle Rouge 1) */}
+      <CotisationHeroCard
+        title={sessionLabel}
+        amount={Number(tontineSession.amount)}
+        frequencyType={tontineSession.type}
+        status={tontineSession.status}
+        paidCount={paidCount}
+        totalSlots={slotCountForPot}
+        totalPotAmount={totalPotAmount}
+        lang={lang}
+      />
 
-        {/* Ligne compacte : Date et Échéance */}
-        <div className="mt-2.5 pt-2 border-t border-surface-variant/60 flex items-center justify-between text-xs text-on-surface-variant gap-2 flex-wrap">
-          <div className="flex items-center gap-1">
-            <span className="material-symbols-outlined text-[15px] text-primary">event</span>
-            <span>
-              {lang === "fr" ? "Début :" : "Starts:"}{" "}
-              <strong className="text-on-surface font-semibold">
-                {tontineSession.startDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-GB", {
-                  timeZone: "Africa/Douala",
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                })}
-              </strong>
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="material-symbols-outlined text-[15px] text-amber-600">schedule</span>
-            <span>
-              {t("deadlineLabel")}: <strong className="text-on-surface font-semibold">{tontineSession.limitTime}</strong>
-            </span>
-          </div>
-        </div>
+      {tontineSession.description && (
+        <details className="mt-2.5 max-w-xl mx-auto w-full px-1">
+          <summary className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 font-medium text-xs hover:bg-emerald-100 transition-colors shadow-2xs list-none [&::-webkit-details-marker]:hidden">
+            <span className="text-[13px]">✨</span>
+            <span>{t("seeDescription")}</span>
+          </summary>
+          <p className="font-body-sm text-xs text-on-surface-variant mt-2 whitespace-pre-line leading-relaxed bg-surface-container-low/80 p-3 rounded-xl border border-surface-variant">
+            {tontineSession.description}
+          </p>
+        </details>
+      )}
 
-        {/* Barre de progression des paiements */}
-        <div className="mt-2 pt-2 border-t border-surface-variant/60 flex items-center justify-between gap-3">
-          <div className="font-label-sm text-xs text-on-surface-variant">
-            {paidCount}/{allSlotsFlat.length} {t("slotsPaidThisCycle")}
-          </div>
-          <div className="w-24 sm:w-32 h-1.5 bg-surface-variant rounded-full overflow-hidden flex-shrink-0">
-            <div
-              className="h-full bg-primary rounded-full transition-all duration-300"
-              style={{ width: `${allSlotsFlat.length ? (paidCount / allSlotsFlat.length) * 100 : 0}%` }}
-            />
-          </div>
-        </div>
-      </section>
+      {/* 2. Bannière Ton tour (Cercle Rouge 2) */}
+      <TonTourBanner
+        mySlots={mySlots.map((s) => ({
+          id: s.id,
+          beneficiaryName: s.beneficiaryName,
+          officialPosition: s.officialPosition,
+          ballDrawn: s.ballDrawn,
+        }))}
+        sessionType={tontineSession.type}
+        startDate={tontineSession.startDate}
+        isBeneficiaryTurn={!!myDesignatedSlot}
+        lang={lang}
+      />
 
       {(tontineSession.status === "DRAWING" || tontineSession.status === "ACTIVE") &&
         myUndrawnSlots.length > 0 && (
           <Link
             href={`/sessions/${id}/draw`}
-            className="mb-stack-gap-lg flex items-center justify-between bg-primary text-on-primary rounded-xl p-4 shadow-md hover:opacity-90 transition-opacity"
+            className="my-3 flex items-center justify-between bg-emerald-700 hover:bg-emerald-800 text-white rounded-2xl p-4 shadow-md transition-colors"
           >
-            <span className="font-label-md text-label-md">{t("drawYourBall")}</span>
+            <span className="font-bold text-sm">{t("drawYourBall")}</span>
             <span className="material-symbols-outlined">casino</span>
           </Link>
         )}
@@ -649,133 +634,55 @@ export default async function SessionDetailPage({
         />
       )}
 
-      {/* Vos noms : fermé par défaut avec accordéon pour ouvrir comme les autres */}
-      <YourSlotsAccordion
+      {/* 3. Section Membres avec vérification KYC et boutons de paiement */}
+      <CotisationMembersList
+        members={memberStatusSlots.map((s) => ({
+          id: s.id,
+          beneficiaryName: s.beneficiaryName,
+          isMine: s.isMine,
+          paid: s.paid,
+          paidAtLabel: s.paidAtLabel,
+          paidByRelativeName: s.paidByRelativeName,
+          fineAmount: s.fineAmount,
+          ballDrawn: s.ballDrawn,
+          officialPosition: s.officialPosition,
+        }))}
+        myUnpaidSlotIds={mySlots
+          .filter((s) => contributionBySlot.get(s.id)?.status !== "PAID")
+          .map((s) => s.id)}
+        slotTotal={perSlotTotal}
+        paymentDescription={paymentDescription}
+        defaultPhone={myMembership.user.phone}
         lang={lang}
-        title={t("yourSlots")}
-        slotsCount={mySlots.length}
-        paidCount={mySlots.filter((s) => contributionBySlot.get(s.id)?.status === "PAID").length}
-      >
-        <div className="bg-surface overflow-hidden">
-          {mySlots.map((s, index) => {
-            const c = contributionBySlot.get(s.id);
-            const f = fineBySlot.get(s.id);
-            const paid = c?.status === "PAID";
-            const slotTotal = perSlotTotal + (f ? Number(f.amount) : 0);
-            const slotDateLabel = s.officialPosition
-              ? getCycleDateForRound(tontineSession.type, tontineSession.startDate, s.officialPosition).toLocaleDateString(
-                  lang === "fr" ? "fr-FR" : "en-GB",
-                  { timeZone: "Africa/Douala", day: "numeric", month: "short", year: "numeric" },
-                )
-              : null;
-            const notReadyForPayment = tontineSession.status === "DRAFT";
-            return (
-              <div
-                key={s.id}
-                className={`flex items-center p-4 ${index < mySlots.length - 1 ? "border-b border-surface-variant" : ""}`}
-              >
-                <div className="flex items-center gap-3 flex-grow min-w-0 mr-2">
-                  <div className="flex-shrink-0">
-                    {paid ? (
-                      <div className="w-8 h-8 rounded-full bg-[#d1fae5] text-[#059669] flex items-center justify-center shadow-xs" title={t("paid")}>
-                        <span className="material-symbols-outlined text-[20px] font-bold">check_circle</span>
-                      </div>
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center border border-slate-200" title={t("due")}>
-                        <span className="material-symbols-outlined text-[20px]">radio_button_unchecked</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-grow min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-label-md text-label-md text-on-surface truncate font-semibold">
-                        {s.beneficiaryName}
-                      </span>
-                      {paid ? (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold bg-[#d1fae5] text-[#065f46]">
-                          <span className="material-symbols-outlined text-[13px]">check</span>
-                          {t("paid")}
-                        </span>
-                      ) : myDesignatedSlot ? (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-900 border border-amber-300">
-                          <span className="material-symbols-outlined text-[13px] text-amber-700">redeem</span>
-                          {lang === "fr" ? "Tour de bouffe (déductible du gain)" : "Payout turn (deductible)"}
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="font-label-sm text-label-sm text-on-surface-variant">
-                      {t("positionLabel")} {s.ballDrawn ?? t("notYetRevealed")} ·{" "}
-                      {paid ? (
-                        <span>
-                          {c?.paidAt ? t("paidAtLabel", { time: c.paidAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) }) : t("paid")}
-                          {c?.paidByUser && (
-                            <span className="text-primary font-medium"> · {t("paidByRelativeBadge", { name: c.paidByUser.name })}</span>
-                          )}
-                        </span>
-                      ) : myDesignatedSlot ? (
-                        <span className="text-amber-900 font-medium">
-                          {formatXAF(slotTotal)} · {lang === "fr" ? "Paiement au choix (déduit du virement si non payé)" : "Optional (deducted if unpaid)"}
-                        </span>
-                      ) : (
-                        <span>{formatXAF(slotTotal)} {t("due")}</span>
-                      )}
-                    </div>
-                    {slotDateLabel && (
-                      <div className="font-label-sm text-[11px] text-on-surface-variant flex items-center gap-1 mt-0.5">
-                        <span className="material-symbols-outlined text-[13px]">event</span>
-                        {t("estimatedDateLabel")}: {slotDateLabel}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                {!paid && (
-                  <PayButton
-                    membershipSlotId={s.id}
-                    beneficiaryName={s.beneficiaryName}
-                    amountLabel={formatXAF(slotTotal)}
-                    description={paymentDescription}
-                    defaultPhone={myMembership.user.phone}
-                    lang={lang}
-                    isBeneficiaryTurn={!!myDesignatedSlot}
-                    lockedReason={
-                      notReadyForPayment
-                        ? t("paymentsAvailableAfterDraw")
-                        : !roundLock.ok && currentBeneficiaryName && !myDesignatedSlot
-                          ? t("paymentsLockedUntilPayout", { name: currentBeneficiaryName })
-                          : undefined
-                    }
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </YourSlotsAccordion>
-
-      {/* Mes noms enregistrés */}
-      <MemberNamesManager
-        tontineSessionId={id}
-        lang={lang}
-        currentNames={mySlots.map((s) => s.beneficiaryName)}
-        sessionStatus={tontineSession.status}
-        maxSlots={tontineSession.maxSlots ? Number(tontineSession.maxSlots) : null}
-        startDate={tontineSession.startDate}
+        isDraftSession={tontineSession.status === "DRAFT"}
+        isBeneficiaryTurn={!!myDesignatedSlot}
+        lockedReason={
+          !roundLock.ok && currentBeneficiaryName && !myDesignatedSlot
+            ? t("paymentsLockedUntilPayout", { name: currentBeneficiaryName })
+            : undefined
+        }
       />
 
-      {/* Ordre de bouffe */}
-      <PayoutOrderAccordion tontineSessionId={id} lang={lang} />
+      {/* Sections secondaires pliables : gestion des noms, ordre complet, amendes */}
+      <div className="mt-6 flex flex-col gap-3">
+        <MemberNamesManager
+          tontineSessionId={id}
+          lang={lang}
+          currentNames={mySlots.map((s) => s.beneficiaryName)}
+          sessionStatus={tontineSession.status}
+          maxSlots={tontineSession.maxSlots ? Number(tontineSession.maxSlots) : null}
+          startDate={tontineSession.startDate}
+        />
 
-      {/* Statut des membres */}
-      <MemberStatusAccordion slots={memberStatusSlots} lang={lang} />
+        <PayoutOrderAccordion tontineSessionId={id} lang={lang} />
 
-
-      {/* Explication du fonctionnement des amendes (fermé par défaut, à la fin) */}
-      <FinesInfoAccordion
-        lang={lang}
-        fineAmount={fineAmount}
-        fineIntervalHours={fineIntervalHours}
-        limitTime={limitTime}
-      />
+        <FinesInfoAccordion
+          lang={lang}
+          fineAmount={fineAmount}
+          fineIntervalHours={fineIntervalHours}
+          limitTime={limitTime}
+        />
+      </div>
     </main>
   );
 }

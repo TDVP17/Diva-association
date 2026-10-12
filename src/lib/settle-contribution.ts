@@ -115,6 +115,35 @@ export async function settleContribution(
     ],
   });
 
+  // Group celebration notification: Notify other approved members in the cotisation
+  // that a member has contributed (e.g. "Awa • Tontine du Quartier : « J'ai cotisé, merci la team ! »")
+  const otherMemberships = prisma.membership?.findMany
+    ? await prisma.membership.findMany({
+        where: {
+          tontineSessionId: membership.tontineSessionId,
+          status: "APPROVED",
+          userId: { not: user.id },
+        },
+        select: { userId: true },
+      })
+    : [];
+
+  if (otherMemberships.length > 0) {
+    const payerDisplayName =
+      paidByName || contribution.membershipSlot.beneficiaryName || user.name || "Un membre";
+    await scheduleInAppNotifications({
+      tontineSessionId: membership.tontineSessionId,
+      type: "PAYMENT_SUCCESS",
+      recipients: otherMemberships.map((m) => ({
+        userId: m.userId,
+        message: `${payerDisplayName} • ${sessionLabel} : « J'ai cotisé, merci la team ! »`,
+        messageKey: "memberPaidGroupCelebration",
+        messageVars: { member: payerDisplayName, session: sessionLabel },
+        actionUrl: `/sessions/${membership.tontineSessionId}`,
+      })),
+    });
+  }
+
   // The payer gets their own confirmation too, when they aren't the
   // beneficiary themselves (relative/friend paying via their own code) —
   // in their OWN preferredLang, not the beneficiary's.
