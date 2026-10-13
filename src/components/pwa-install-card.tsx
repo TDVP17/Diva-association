@@ -177,7 +177,7 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
               </span>
             </div>
             <div className="min-w-0">
-              <p className="font-label-md text-label-md text-on-surface font-semibold truncate">
+              <p className="font-label-md text-label-md text-on-surface font-semibold leading-snug">
                 {isIos
                   ? lang === "fr"
                     ? "Ajouter à l'écran d'accueil"
@@ -186,11 +186,11 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
                   ? "Télécharger l'application"
                   : "Download the App"}
               </p>
-              <p className="font-label-sm text-label-sm text-on-surface-variant text-xs truncate">
+              <p className="font-label-sm text-label-sm text-on-surface-variant text-xs leading-snug">
                 {isIos
                   ? lang === "fr"
-                    ? "Instructions simples pour iPhone"
-                    : "Easy steps for iPhone"
+                    ? "Installation sur iPhone"
+                    : "Installation on iPhone"
                   : isAndroid
                   ? lang === "fr"
                     ? "Téléchargement direct sur votre téléphone"
@@ -201,58 +201,48 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={handleInstallClick}
-            disabled={installing}
-            className="px-3.5 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 active:scale-95 transition-all flex items-center gap-1.5 flex-shrink-0 shadow-sm cursor-pointer disabled:opacity-60"
-          >
-            <span className="material-symbols-outlined text-[16px]">
-              {isIos ? (showGuide ? "close" : "help") : installing ? "hourglass_top" : "download"}
-            </span>
-            {installing
-              ? lang === "fr"
-                ? "Téléchargement..."
-                : "Downloading..."
-              : isIos
-              ? showGuide
+          {!isIos && (
+            <button
+              type="button"
+              onClick={handleInstallClick}
+              disabled={installing}
+              className="px-3.5 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 active:scale-95 transition-all flex items-center gap-1.5 flex-shrink-0 shadow-sm cursor-pointer disabled:opacity-60"
+            >
+              <span className="material-symbols-outlined text-[16px]">
+                {installing ? "hourglass_top" : "download"}
+              </span>
+              {installing
                 ? lang === "fr"
-                  ? "Fermer"
-                  : "Close"
+                  ? "Téléchargement..."
+                  : "Downloading..."
                 : lang === "fr"
-                ? "Comment faire"
-                : "How to add"
-              : lang === "fr"
-              ? "Télécharger"
-              : "Download"}
-          </button>
+                ? "Télécharger"
+                : "Download"}
+            </button>
+          )}
         </div>
 
         {/* Interactive in-card guide for iPhone or browsers needing manual action */}
-        {showGuide && (
-            <div className="p-3 bg-surface-container-low rounded-xl border border-primary/20 flex flex-col gap-2 animate-in fade-in duration-200">
+        {(isIos || showGuide) && (
+            <div className="p-3.5 bg-surface-container-low rounded-xl border border-primary/20 flex flex-col gap-3 animate-in fade-in duration-200">
               {isIos ? (
                 <>
-                  <p className="font-semibold text-xs text-primary flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[16px]">apple</span>
-                    <span>{lang === "fr" ? "Installation rapide sur iPhone :" : "Quick install on iPhone:"}</span>
-                  </p>
-                  <div className="flex items-start gap-2 text-xs text-on-surface leading-snug">
-                    <span className="font-bold text-primary shrink-0">1.</span>
+                  <div className="flex items-start gap-3 text-sm text-on-surface leading-snug">
+                    <span className="w-6 h-6 rounded-full bg-primary text-on-primary text-sm font-bold flex items-center justify-center shrink-0">1</span>
                     <p>
                       {lang === "fr" ? (
                         <>
-                          Touchez l&apos;icône <strong>Partager</strong> en bas de Safari (carré avec la flèche vers le haut <span className="material-symbols-outlined text-[13px] align-middle text-primary font-bold">ios_share</span>).
+                          Touchez l&apos;icône <strong>Partager</strong> en bas de Safari (carré avec la flèche vers le haut <span className="material-symbols-outlined text-[18px] align-middle text-primary font-bold">ios_share</span>).
                         </>
                       ) : (
                         <>
-                          Tap the <strong>Share</strong> icon at the bottom of Safari (<span className="material-symbols-outlined text-[13px] align-middle text-primary font-bold">ios_share</span>).
+                          Tap the <strong>Share</strong> icon at the bottom of Safari (<span className="material-symbols-outlined text-[18px] align-middle text-primary font-bold">ios_share</span>).
                         </>
                       )}
                     </p>
                   </div>
-                  <div className="flex items-start gap-2 text-xs text-on-surface leading-snug">
-                    <span className="font-bold text-primary shrink-0">2.</span>
+                  <div className="flex items-start gap-3 text-sm text-on-surface leading-snug">
+                    <span className="w-6 h-6 rounded-full bg-primary text-on-primary text-sm font-bold flex items-center justify-center shrink-0">2</span>
                     <p>
                       {lang === "fr" ? (
                         <>
@@ -265,8 +255,8 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
                       )}
                     </p>
                   </div>
-                  <div className="flex items-start gap-2 text-xs text-on-surface leading-snug">
-                    <span className="font-bold text-primary shrink-0">3.</span>
+                  <div className="flex items-start gap-3 text-sm text-on-surface leading-snug">
+                    <span className="w-6 h-6 rounded-full bg-primary text-on-primary text-sm font-bold flex items-center justify-center shrink-0">3</span>
                     <p>
                       {lang === "fr" ? (
                         <>
@@ -279,11 +269,6 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
                       )}
                     </p>
                   </div>
-                  <p className="text-[11px] text-on-surface-variant italic mt-1">
-                    {lang === "fr"
-                      ? "💡 Aucun paramétrage dans les Réglages de l'iPhone n'est nécessaire."
-                      : "💡 No setup in iPhone Settings is required."}
-                  </p>
                 </>
               ) : (
                 <>
