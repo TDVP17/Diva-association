@@ -169,7 +169,23 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
   return (
     <div className="w-full bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4 flex flex-col gap-3">
       <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
+        <div
+          className={`flex items-center justify-between gap-3 ${isIos ? "cursor-pointer select-none" : ""}`}
+          {...(isIos
+            ? {
+                role: "button",
+                tabIndex: 0,
+                "aria-expanded": showGuide,
+                onClick: handleInstallClick,
+                onKeyDown: (e: React.KeyboardEvent) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleInstallClick();
+                  }
+                },
+              }
+            : {})}
+        >
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
               <span className="material-symbols-outlined text-2xl">
@@ -220,10 +236,15 @@ export function PwaInstallCard({ lang }: { lang: Lang }) {
                 : "Download"}
             </button>
           )}
+          {isIos && (
+            <span className="material-symbols-outlined text-primary text-[24px] flex-shrink-0">
+              {showGuide ? "expand_less" : "expand_more"}
+            </span>
+          )}
         </div>
 
         {/* Interactive in-card guide for iPhone or browsers needing manual action */}
-        {(isIos || showGuide) && (
+        {showGuide && (
             <div className="p-3.5 bg-surface-container-low rounded-xl border border-primary/20 flex flex-col gap-3 animate-in fade-in duration-200">
               {isIos ? (
                 <>
