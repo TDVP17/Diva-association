@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { PaymentConfirmDialog } from "@/components/payment-confirm-dialog";
+import { BulkPaymentDialog } from "@/app/(app)/global-payment/bulk-payment-dialog";
 import { formatXAF } from "@/lib/format-currency";
 
 interface FoundMember {
@@ -50,7 +51,8 @@ export function MemberCodePayFlow({
   const [searchError, setSearchError] = useState<string | null>(null);
   const [member, setMember] = useState<FoundMember | null>(null);
   const [slots, setSlots] = useState<FundableSlot[]>([]);
-  const [confirmSlotId, setConfirmSlotId] = useState<string | null>(null);
+  const [selectedSlotIds, setSelectedSlotIds] = useState<string[]>([]);
+  const [showBulkDialog, setShowBulkDialog] = useState(false);
   const [lastPaidConfirmation, setLastPaidConfirmation] = useState<{
     slotId: string;
     beneficiaryName: string;
@@ -65,6 +67,8 @@ export function MemberCodePayFlow({
     const membershipsBody = await membershipsRes.json();
     const fetchedSlots: FundableSlot[] = membershipsRes.ok ? (membershipsBody.slots ?? []) : [];
     setSlots(fetchedSlots);
+    const unpaid = fetchedSlots.filter((s) => !s.alreadyPaid);
+    setSelectedSlotIds(unpaid.map((s) => s.slotId));
     return fetchedSlots;
   }
 
@@ -102,11 +106,14 @@ export function MemberCodePayFlow({
   function reset() {
     setMember(null);
     setSlots([]);
+    setSelectedSlotIds([]);
+    setShowBulkDialog(false);
     setCode("");
     setSearchError(null);
     setLastPaidConfirmation(null);
   }
 
+  const [confirmSlotId, setConfirmSlotId] = useState<string | null>(null);
   const confirmSlot = slots.find((s) => s.slotId === confirmSlotId);
 
   // Slots already paid vs unpaid
@@ -170,11 +177,11 @@ export function MemberCodePayFlow({
                 </div>
               </div>
 
-              {/* Action buttons: Download receipt now / View history */}
+              {/* Action buttons: Download receipt now / Share WhatsApp / View history */}
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 {lastPaidConfirmation.receiptUrl ? (
                   <a
-                    href={lastPaidConfirmation.receiptUrl}
+                    href={lastPaidConfirmation.receiptUrl.startsWith("/") ? lastPaidConfirmation.receiptUrl : `/api/files/${lastPaidConfirmation.receiptUrl}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#065f46] hover:bg-[#064e3b] text-white font-bold text-xs transition-all shadow-xs cursor-pointer"
@@ -191,6 +198,27 @@ export function MemberCodePayFlow({
                     <span>{lang === "fr" ? "Reçu disponible dans l'historique" : "Receipt in history"}</span>
                   </a>
                 )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const fullUrl = lastPaidConfirmation.receiptUrl
+                      ? (lastPaidConfirmation.receiptUrl.startsWith("http")
+                          ? lastPaidConfirmation.receiptUrl
+                          : `${typeof window !== "undefined" ? window.location.origin : ""}${lastPaidConfirmation.receiptUrl.startsWith("/") ? lastPaidConfirmation.receiptUrl : `/api/files/${lastPaidConfirmation.receiptUrl}`}`)
+                      : `${typeof window !== "undefined" ? window.location.origin : ""}/history`;
+                    const text = lang === "fr"
+                      ? `Bonjour, j'ai effectué le paiement de la cotisation pour *${lastPaidConfirmation.beneficiaryName}* (${lastPaidConfirmation.tontineSessionTitle}) d'un montant de *${formatXAF(lastPaidConfirmation.amount)}*. Reçu disponible ici : ${fullUrl}`
+                      : `Hello, I made the contribution payment for *${lastPaidConfirmation.beneficiaryName}* (${lastPaidConfirmation.tontineSessionTitle}) for an amount of *${formatXAF(lastPaidConfirmation.amount)}*. Receipt available here: ${fullUrl}`;
+                    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+                    window.open(waUrl, "_blank", "noopener,noreferrer");
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#25D366] hover:bg-[#128C7E] text-white font-bold text-xs transition-all shadow-xs cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px]">share</span>
+                  <span>{t("shareReceiptWhatsApp")}</span>
+                </button>
+
                 <a
                   href="/history"
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-[#a7f3d0] text-[#065f46] font-semibold text-xs hover:bg-[#f0fdf4] transition-colors cursor-pointer"
@@ -243,30 +271,82 @@ export function MemberCodePayFlow({
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            {unpaidSlots.map((s) => (
-              <div
-                key={s.slotId}
-                className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4 flex items-center justify-between gap-3"
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="material-symbols-outlined text-slate-300 text-xl flex-shrink-0" title={t("notCheckedPending")}>
-                    radio_button_unchecked
-                  </span>
-                  <div className="min-w-0">
-                    <p className="font-label-md text-label-md text-on-surface truncate font-medium">{s.tontineSessionTitle}</p>
-                    <p className="font-label-sm text-label-sm text-on-surface-variant truncate">
-                      {s.beneficiaryName} — {formatXAF(s.amount)}
-                    </p>
-                  </div>
-                </div>
+            {unpaidSlots.length > 1 && (
+              <div className="flex items-center justify-between gap-2 px-1 mb-1">
                 <button
-                  onClick={() => setConfirmSlotId(s.slotId)}
-                  className="flex-shrink-0 px-3 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 active:scale-95 transition-all shadow-xs"
+                  type="button"
+                  onClick={() => {
+                    if (selectedSlotIds.length === unpaidSlots.length) {
+                      setSelectedSlotIds([]);
+                    } else {
+                      setSelectedSlotIds(unpaidSlots.map((s) => s.slotId));
+                    }
+                  }}
+                  className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 cursor-pointer"
                 >
-                  {t("payViaFapshi")}
+                  <span className="material-symbols-outlined text-[16px]">
+                    {selectedSlotIds.length === unpaidSlots.length ? "check_box" : "check_box_outline_blank"}
+                  </span>
+                  <span>
+                    {selectedSlotIds.length === unpaidSlots.length ? t("deselectAllNames") : t("selectAllNames")}
+                  </span>
                 </button>
+                <span className="text-xs text-on-surface-variant font-medium">
+                  {selectedSlotIds.length}/{unpaidSlots.length} {lang === "fr" ? "sélectionné(s)" : "selected"}
+                </span>
               </div>
-            ))}
+            )}
+
+            {selectedSlotIds.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setShowBulkDialog(true)}
+                className="w-full mb-2 py-3 px-4 rounded-xl bg-primary hover:bg-primary/95 text-on-primary font-bold text-sm flex items-center justify-center gap-2 shadow-sm transition-transform active:scale-[0.99] cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">payments</span>
+                <span>{t("globalPaymentForRelative", { count: String(selectedSlotIds.length) })}</span>
+              </button>
+            )}
+
+            {unpaidSlots.map((s) => {
+              const isSelected = selectedSlotIds.includes(s.slotId);
+              return (
+                <div
+                  key={s.slotId}
+                  className={`bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border p-4 flex items-center justify-between gap-3 transition-colors ${
+                    isSelected ? "border-primary/50 bg-primary/5" : "border-surface-variant"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {unpaidSlots.length > 1 && (
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => {
+                          setSelectedSlotIds((prev) =>
+                            prev.includes(s.slotId) ? prev.filter((id) => id !== s.slotId) : [...prev, s.slotId],
+                          );
+                        }}
+                        className="w-4 h-4 rounded text-primary focus:ring-primary/30 cursor-pointer flex-shrink-0"
+                      />
+                    )}
+                    <div className="min-w-0">
+                      <p className="font-label-md text-label-md text-on-surface truncate font-semibold">{s.beneficiaryName}</p>
+                      <p className="font-label-sm text-label-sm text-on-surface-variant truncate">
+                        {s.tontineSessionTitle} — <span className="font-semibold text-emerald-800">{formatXAF(s.amount)}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmSlotId(s.slotId)}
+                    className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-label-sm text-label-sm font-semibold hover:opacity-90 active:scale-95 transition-all shadow-xs cursor-pointer"
+                  >
+                    {t("payViaFapshi")}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -295,15 +375,30 @@ export function MemberCodePayFlow({
                   </div>
                 </div>
                 {s.receiptUrl ? (
-                  <a
-                    href={s.receiptUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-bold transition-colors shadow-2xs cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[14px]">download</span>
-                    <span>{lang === "fr" ? "Reçu" : "Receipt"}</span>
-                  </a>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <a
+                      href={s.receiptUrl.startsWith("/") ? s.receiptUrl : `/api/files/${s.receiptUrl}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-bold transition-colors shadow-2xs cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">download</span>
+                      <span>{lang === "fr" ? "Reçu" : "Receipt"}</span>
+                    </a>
+                    <a
+                      href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                        lang === "fr"
+                          ? `Bonjour, voici le reçu de cotisation pour ${s.beneficiaryName} (${s.tontineSessionTitle}) : ${s.receiptUrl.startsWith("http") ? s.receiptUrl : `${typeof window !== "undefined" ? window.location.origin : ""}${s.receiptUrl.startsWith("/") ? s.receiptUrl : `/api/files/${s.receiptUrl}`}`}`
+                          : `Hello, here is the contribution receipt for ${s.beneficiaryName} (${s.tontineSessionTitle}): ${s.receiptUrl.startsWith("http") ? s.receiptUrl : `${typeof window !== "undefined" ? window.location.origin : ""}${s.receiptUrl.startsWith("/") ? s.receiptUrl : `/api/files/${s.receiptUrl}`}`}`,
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#25D366] hover:bg-[#128C7E] text-white text-xs font-semibold shadow-2xs cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">share</span>
+                      <span>WhatsApp</span>
+                    </a>
+                  </div>
                 ) : (
                   <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#d1fae5] text-[#065f46] text-xs font-semibold">
                     <span className="material-symbols-outlined text-[13px]">check</span>
@@ -338,6 +433,30 @@ export function MemberCodePayFlow({
             }
           }}
           onClose={() => setConfirmSlotId(null)}
+        />
+      )}
+
+      {showBulkDialog && selectedSlotIds.length > 0 && (
+        <BulkPaymentDialog
+          lang={lang}
+          membershipSlotIds={selectedSlotIds}
+          isRelative={true}
+          onSettled={async () => {
+            setShowBulkDialog(false);
+            const count = selectedSlotIds.length;
+            const paidSlots = unpaidSlots.filter((s) => selectedSlotIds.includes(s.slotId));
+            const totalPaid = paidSlots.reduce((acc, s) => acc + s.amount, 0);
+            setSelectedSlotIds([]);
+            const freshSlots = await fetchSlots(member.memberCode);
+            setLastPaidConfirmation({
+              slotId: "bulk",
+              beneficiaryName: `${count} ${lang === "fr" ? "noms sélectionnés" : "selected names"}`,
+              tontineSessionTitle: member.name,
+              amount: totalPaid,
+              receiptUrl: freshSlots.find((s) => s.alreadyPaid)?.receiptUrl ?? null,
+            });
+          }}
+          onClose={() => setShowBulkDialog(false)}
         />
       )}
     </div>

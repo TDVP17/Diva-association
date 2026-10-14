@@ -1,26 +1,29 @@
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { LanguageToggle } from "@/components/language-toggle";
 import { MemberCodePayFlow } from "@/components/member-code-pay-flow";
 
 /**
- * Public, no-account entry point for relatives/friends contributing on a
- * member's behalf — replaces the old per-session share-link flow. Enter
- * the member's personal code, see every active cotisation cycle they still
- * owe, and pay via Fapshi. No app shell (header/back nav/bottom nav) since
- * this is meant to be opened by someone with no DIVA account at all.
- *
- * Accepts an optional `?code=DIVA0001` query parameter to auto-populate the
- * code field and immediately look up the member — this is used by the share
- * link from the MemberCodeCard component.
+ * Entry point for relatives/friends contributing on a member's behalf.
+ * Requires the user to be logged in before validating payment so the
+ * transaction is recorded in their personal history, allowing them to
+ * download their receipt PDF and share it directly via WhatsApp.
  */
 export default async function PublicPayPage({
   searchParams,
 }: {
   searchParams: Promise<{ code?: string }>;
 }) {
+  const { code } = await searchParams;
+  const session = await auth();
+  if (!session?.user) {
+    const callback = code ? `/pay?code=${encodeURIComponent(code)}` : `/pay`;
+    redirect(`/login?callbackUrl=${encodeURIComponent(callback)}`);
+  }
+
   const lang = await getLang();
   const t = getTranslator(lang);
-  const { code } = await searchParams;
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-container-padding bg-background">
@@ -34,7 +37,7 @@ export default async function PublicPayPage({
         </div>
         <MemberCodePayFlow
           lang={lang}
-          payEndpoint="/api/payments/public/pay-slot"
+          payEndpoint="/api/payments/relative/initiate"
           initialCode={code}
         />
       </div>

@@ -232,4 +232,62 @@ describe("initiateBulkPayment", () => {
       expect.objectContaining({ where: { bulkPaymentId: "bulk-2" }, data: expect.objectContaining({ status: "FAILED" }) }),
     );
   });
+
+  describe("relative payment mode (options.isRelative)", () => {
+    it("allows a relative to initiate a bulk payment for all slots of a target member and records paidByUserId", async () => {
+      findManySlot.mockResolvedValue([
+        makeSlot("slot-target-1", { userId: "target-member-id" }),
+        makeSlot("slot-target-2", { userId: "target-member-id" }),
+      ]);
+      txFindUniqueContribution.mockResolvedValue(null);
+      txCreateBulkPayment.mockResolvedValue({ id: "bulk-relative" });
+      txCreateContribution.mockResolvedValue({});
+      initiateDirectPayment.mockResolvedValue({ transId: "tx-relative-1" });
+      updateBulkPayment.mockResolvedValue({});
+
+      const result = await initiateBulkPayment(
+        "relative-user-id",
+        ["slot-target-1", "slot-target-2"],
+        VALID_PHONE,
+        { isRelative: true },
+      );
+
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.transId).toBe("tx-relative-1");
+
+      expect(txCreateBulkPayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userId: "relative-user-id",
+          }),
+        }),
+      );
+
+      expect(txCreateContribution).toHaveBeenCalledTimes(2);
+      for (const call of txCreateContribution.mock.calls) {
+        expect(call[0].data.paidByUserId).toBe("relative-user-id");
+      }
+    });
+
+    it("rejects when slots belong to multiple different target members", async () => {
+      findManySlot.mockResolvedValue([
+        makeSlot("slot-1", { userId: "member-a" }),
+        makeSlot("slot-2", { userId: "member-b" }),
+      ]);
+
+      const result = await initiateBulkPayment(
+        "relative-user-id",
+        ["slot-1", "slot-2"],
+        VALID_PHONE,
+        { isRelative: true },
+      );
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.status).toBe(400);
+        expect(result.error).toMatch(/same member/i);
+      }
+      expect(txCreateBulkPayment).not.toHaveBeenCalled();
+    });
+  });
 });

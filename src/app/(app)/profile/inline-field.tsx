@@ -73,7 +73,12 @@ export function InlineField({
       await parseJsonOrThrow(res, t("otpInvalid"));
       setStep("otp");
     } catch (err) {
-      setError(friendlyErrorMessage(err, t("otpInvalid")));
+      setError(
+        friendlyErrorMessage(
+          err,
+          purpose === "PHONE_CHANGE" ? t("whatsappRegistrationFailedLater") : t("otpInvalid"),
+        ),
+      );
     } finally {
       setSending(false);
     }
@@ -92,7 +97,12 @@ export function InlineField({
       await parseJsonOrThrow(res, t("otpInvalid"));
       setStep("verified");
     } catch (err) {
-      setError(friendlyErrorMessage(err, t("otpInvalid")));
+      setError(
+        friendlyErrorMessage(
+          err,
+          purpose === "PHONE_CHANGE" ? t("whatsappRegistrationFailedLater") : t("otpInvalid"),
+        ),
+      );
     } finally {
       setVerifying(false);
     }

@@ -464,9 +464,9 @@ export default async function HistoryPage() {
                   </p>
                 )}
 
-                {/* Téléchargement de reçu si disponible */}
+                {/* Téléchargement de reçu si disponible & Partage WhatsApp */}
                 {r.receiptPdfUrl && (
-                  <div className="mt-3 pt-2.5 border-t border-surface-variant flex items-center justify-end">
+                  <div className="mt-3 pt-2.5 border-t border-surface-variant flex items-center justify-end gap-2 flex-wrap">
                     <a
                       href={r.receiptPdfUrl.startsWith("/") ? r.receiptPdfUrl : `/api/files/${r.receiptPdfUrl}`}
                       target="_blank"
@@ -481,6 +481,19 @@ export default async function HistoryPage() {
                       {r.kind === "payout"
                         ? (lang === "fr" ? "Télécharger le reçu de gain (PDF)" : "Download Payout Receipt (PDF)")
                         : t("downloadReceiptPdf")}
+                    </a>
+                    <a
+                      href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                        lang === "fr"
+                          ? `Bonjour, voici le reçu de cotisation pour ${r.beneficiaryName} (${r.sessionLabel}) : ${r.receiptPdfUrl.startsWith("http") ? r.receiptPdfUrl : `/api/files/${r.receiptPdfUrl}`}`
+                          : `Hello, here is the contribution receipt for ${r.beneficiaryName} (${r.sessionLabel}): ${r.receiptPdfUrl.startsWith("http") ? r.receiptPdfUrl : `/api/files/${r.receiptPdfUrl}`}`,
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#25D366] hover:bg-[#128C7E] text-white text-xs font-semibold shadow-xs transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">share</span>
+                      <span>WhatsApp</span>
                     </a>
                   </div>
                 )}

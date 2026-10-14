@@ -46,7 +46,12 @@ const TONTINE_LABELS: Record<string, string> = {
  * Scoped to the caller's OWN slots only — v1 doesn't combine self-pay with
  * paying for someone else's names in one transaction.
  */
-async function loadAndValidateSlots(userId: string, membershipSlotIds: string[], now: Date) {
+async function loadAndValidateSlots(
+  userId: string,
+  membershipSlotIds: string[],
+  now: Date,
+  options?: { isRelative?: boolean },
+) {
   const uniqueIds = [...new Set(membershipSlotIds)].sort();
   if (uniqueIds.length === 0) {
     return { ok: false as const, status: 400, error: "Select at least one name to pay for" };
@@ -64,9 +69,17 @@ async function loadAndValidateSlots(userId: string, membershipSlotIds: string[],
   }
 
   const roundLockCache = new Map<string, Awaited<ReturnType<typeof assertPriorCyclePaidOut>>>();
+  const firstSlotOwnerId = slots[0].membership.userId;
+
   for (const slot of slots) {
-    if (slot.membership.userId !== userId) {
-      return { ok: false as const, status: 403, error: "You can only include your own names in a combined payment" };
+    if (options?.isRelative) {
+      if (slot.membership.userId !== firstSlotOwnerId) {
+        return { ok: false as const, status: 400, error: "All selected names must belong to the same member" };
+      }
+    } else {
+      if (slot.membership.userId !== userId) {
+        return { ok: false as const, status: 403, error: "You can only include your own names in a combined payment" };
+      }
     }
     if (
       slot.membership.status !== "APPROVED" ||
@@ -97,7 +110,7 @@ async function loadAndValidateSlots(userId: string, membershipSlotIds: string[],
     }
   }
 
-  return { ok: true as const, slots, uniqueIds };
+  return { ok: true as const, slots, uniqueIds, isRelativePayment: firstSlotOwnerId !== userId };
 }
 
 export interface UnpaidSlotSummary {
@@ -165,9 +178,13 @@ export async function listUnpaidSlotsForBulkPayment(userId: string): Promise<Unp
 }
 
 /** Read-only preview for the Global Payment confirmation screen. */
-export async function getBulkPaymentQuote(userId: string, membershipSlotIds: string[]): Promise<BulkPaymentQuoteResult> {
+export async function getBulkPaymentQuote(
+  userId: string,
+  membershipSlotIds: string[],
+  options?: { isRelative?: boolean },
+): Promise<BulkPaymentQuoteResult> {
   const now = new Date();
-  const validated = await loadAndValidateSlots(userId, membershipSlotIds, now);
+  const validated = await loadAndValidateSlots(userId, membershipSlotIds, now, options);
   if (!validated.ok) return validated;
 
   const items: BulkPaymentQuoteItem[] = [];
@@ -217,6 +234,7 @@ export async function initiateBulkPayment(
   userId: string,
   membershipSlotIds: string[],
   phone: string,
+  options?: { isRelative?: boolean },
 ): Promise<InitiateBulkPaymentResult> {
   const normalizedPhone = normalizeCameroonPhone(phone);
   if (!normalizedPhone) {
@@ -224,9 +242,9 @@ export async function initiateBulkPayment(
   }
 
   const now = new Date();
-  const validated = await loadAndValidateSlots(userId, membershipSlotIds, now);
+  const validated = await loadAndValidateSlots(userId, membershipSlotIds, now, options);
   if (!validated.ok) return validated;
-  const { slots, uniqueIds } = validated;
+  const { slots, uniqueIds, isRelativePayment } = validated;
 
   const provider: PaymentProvider = "FAPSHI";
 
@@ -283,6 +301,7 @@ export async function initiateBulkPayment(
           payerPhone: normalizedPhone,
           failureReason: null,
           bulkPaymentId: created.id,
+          paidByUserId: isRelativePayment ? userId : undefined,
           paymentProvider: provider,
           providerFeeAmount: slotFee.providerFeeAmount,
           providerShareAmount: slotFee.providerShareAmount,

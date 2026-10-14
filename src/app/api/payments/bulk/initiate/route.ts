@@ -6,6 +6,7 @@ import { initiateBulkPayment } from "@/lib/initiate-bulk-payment";
 const bodySchema = z.object({
   membershipSlotIds: z.array(z.string().min(1)).min(1),
   phone: z.string().min(1),
+  isRelative: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
@@ -20,7 +21,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await initiateBulkPayment(session.user.id, parsed.data.membershipSlotIds, parsed.data.phone);
+    const result = await initiateBulkPayment(
+      session.user.id,
+      parsed.data.membershipSlotIds,
+      parsed.data.phone,
+      { isRelative: parsed.data.isRelative },
+    );
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }

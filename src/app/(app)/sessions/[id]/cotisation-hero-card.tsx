@@ -106,12 +106,6 @@ export function CotisationHeroCard({
             {frequencySuffix}
           </span>
         </div>
-
-        {fee > 0 && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-400/30 text-emerald-200 text-xs font-semibold shadow-xs">
-            <span>+ {formatXAF(fee)} {t("adminFeeLabel")}</span>
-          </span>
-        )}
       </div>
 
       {/* Dates: Début (toujours visible) & Fin (visible UNIQUEMENT quand le tirage a été fait) */}

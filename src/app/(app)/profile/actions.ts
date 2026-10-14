@@ -68,7 +68,10 @@ export async function updatePhoneAction(
     return { success: "Phone number updated." };
   } catch (err) {
     console.error("[updatePhoneAction] unexpected error:", err);
-    return { error: "Could not save your phone number. Please try again." };
+    return {
+      error:
+        "L'enregistrement de votre numéro WhatsApp n'a pas pu aboutir pour le moment. Veuillez réessayer plus tard.",
+    };
   }
 }
 

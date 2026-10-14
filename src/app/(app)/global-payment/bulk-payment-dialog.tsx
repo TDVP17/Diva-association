@@ -36,12 +36,14 @@ export function BulkPaymentDialog({
   lang,
   membershipSlotIds,
   defaultPhone,
+  isRelative = false,
   onSettled,
   onClose,
 }: {
   lang: Lang;
   membershipSlotIds: string[];
   defaultPhone?: string | null;
+  isRelative?: boolean;
   onSettled: () => void;
   onClose: () => void;
 }) {
@@ -63,7 +65,7 @@ export function BulkPaymentDialog({
     fetch("/api/payments/bulk/quote", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ membershipSlotIds }),
+      body: JSON.stringify({ membershipSlotIds, isRelative }),
     })
       .then(async (res) => {
         const body = await parseJsonOrThrow<Quote>(res, t("couldNotCalculateTotal"));
@@ -123,7 +125,7 @@ export function BulkPaymentDialog({
       const res = await fetch("/api/payments/bulk/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ membershipSlotIds, phone: normalized }),
+        body: JSON.stringify({ membershipSlotIds, phone: normalized, isRelative }),
       });
       const body = await parseJsonOrThrow<{ transId: string }>(res, t("paymentInitiationFailed"));
       setTransId(body.transId);

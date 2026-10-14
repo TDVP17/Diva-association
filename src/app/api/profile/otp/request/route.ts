@@ -56,7 +56,15 @@ export async function POST(request: Request) {
     await sendWhatsAppMessage(destinationPhone, t("otpMessage", { code: challenge.code }));
   } catch (err) {
     console.error("[otp/request] failed to send WhatsApp OTP:", err);
-    return NextResponse.json({ error: "Could not send the verification code. Please try again." }, { status: 502 });
+    return NextResponse.json(
+      {
+        error:
+          user.preferredLang === "en"
+            ? "Could not register your WhatsApp number right now. Please try again later."
+            : "L'enregistrement de votre numéro WhatsApp n'a pas pu aboutir pour le moment. Veuillez réessayer plus tard.",
+      },
+      { status: 502 },
+    );
   }
 
   return NextResponse.json({ ok: true });
