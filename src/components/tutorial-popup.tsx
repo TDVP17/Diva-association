@@ -43,7 +43,7 @@ export function TutorialPopup({ lang }: { lang: Lang }) {
       role="dialog"
       aria-modal="true"
     >
-      <div className="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl">
+      <div className="w-full max-w-sm rounded-2xl bg-surface p-5 shadow-xl max-h-[95vh] overflow-y-auto">
         {showVideo ? (
           <>
             <TutorialVideoPlayer lang={lang} />

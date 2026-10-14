@@ -356,7 +356,7 @@ export async function signUpAction(
           lang === "fr"
             ? "Un compte existe déjà avec cette adresse email. Veuillez vous connecter ou utiliser une autre adresse email."
             : "An account with this email address already exists. Please sign in or use another email address.",
-      };
+      }; 
     }
 
     if (error) {
