@@ -1,23 +1,41 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const mockAuth = vi.fn();
+const {
+  mockAuth,
+  mockFindUniqueMembershipSlot,
+  mockFindManyMembershipSlot,
+  mockUpdateMembershipSlot,
+  mockFindManyMembership,
+  mockFindFirstMembership,
+  mockCountContribution,
+  mockCreatePayout,
+  mockFindUniqueSession,
+  mockGetDesignatedSlot,
+  mockScheduleInAppNotifications,
+} = vi.hoisted(() => ({
+  mockAuth: vi.fn(),
+  mockFindUniqueMembershipSlot: vi.fn(),
+  mockFindManyMembershipSlot: vi.fn(),
+  mockUpdateMembershipSlot: vi.fn(),
+  mockFindManyMembership: vi.fn(),
+  mockFindFirstMembership: vi.fn(),
+  mockCountContribution: vi.fn(),
+  mockCreatePayout: vi.fn(),
+  mockFindUniqueSession: vi.fn(),
+  mockGetDesignatedSlot: vi.fn(),
+  mockScheduleInAppNotifications: vi.fn().mockResolvedValue(1),
+}));
+
 vi.mock("@/auth", () => ({
   auth: () => mockAuth(),
 }));
 
-const mockFindUniqueMembershipSlot = vi.fn();
-const mockFindManyMembership = vi.fn();
-const mockFindFirstMembership = vi.fn();
-const mockCountContribution = vi.fn();
-const mockCreatePayout = vi.fn();
-const mockFindUniqueSession = vi.fn();
-const mockFindManyMembershipSlot = vi.fn();
-
-vi.mock("@/lib/prisma", () => ({
-  prisma: {
+vi.mock("@/lib/prisma", () => {
+  const p: Record<string, unknown> = {
     membershipSlot: {
       findUnique: (...a: unknown[]) => mockFindUniqueMembershipSlot(...a),
       findMany: (...a: unknown[]) => mockFindManyMembershipSlot(...a),
+      update: (...a: unknown[]) => mockUpdateMembershipSlot(...a),
     },
     membership: {
       findMany: (...a: unknown[]) => mockFindManyMembership(...a),
@@ -32,16 +50,23 @@ vi.mock("@/lib/prisma", () => ({
     tontineSession: {
       findUnique: (...a: unknown[]) => mockFindUniqueSession(...a),
     },
-  },
-}));
+  };
+  p.$transaction = async (fn: (tx: typeof p) => Promise<unknown>) => fn(p);
+  return { prisma: p };
+});
 
-const mockGetDesignatedSlot = vi.fn();
 vi.mock("@/lib/round-robin-lock", () => ({
   getDesignatedSlot: (...a: unknown[]) => mockGetDesignatedSlot(...a),
 }));
 
+vi.mock("@/lib/notifications/dispatch", () => ({
+  scheduleInAppNotifications: (...a: unknown[]) => mockScheduleInAppNotifications(...a),
+}));
+
 import { POST as postPayoutClaim } from "@/app/api/payments/payout-claims/route";
 import { GET as getPayoutOrder } from "@/app/api/sessions/[id]/payout-order/route";
+import { POST as postDraw } from "@/app/api/sessions/[id]/draw/route";
+import { isPayoutInfoUnlockTime } from "@/lib/tontine-engine";
 
 describe("Draw and Payout Rules", () => {
   beforeEach(() => {
@@ -169,6 +194,88 @@ describe("Draw and Payout Rules", () => {
       const data = await res.json();
       expect(data.userMustDrawFirst).toBe(true);
       expect(data.rows).toEqual([]);
+    });
+  });
+
+  describe("isPayoutInfoUnlockTime", () => {
+    it("locks payout details before 18:30 Cameroon time (17:30 UTC) on due date", () => {
+      // Due date: 2026-10-18
+      const dueDate = new Date(Date.UTC(2026, 9, 18, 0, 0, 0));
+      // At 18:29 Cameroon time = 17:29 UTC
+      const before1830 = new Date(Date.UTC(2026, 9, 18, 17, 29, 0));
+      expect(isPayoutInfoUnlockTime(dueDate, before1830)).toBe(false);
+    });
+
+    it("unlocks payout details at or after 18:30 Cameroon time (17:30 UTC) on due date", () => {
+      const dueDate = new Date(Date.UTC(2026, 9, 18, 0, 0, 0));
+      // At 18:30 Cameroon time = 17:30 UTC
+      const at1830 = new Date(Date.UTC(2026, 9, 18, 17, 30, 0));
+      expect(isPayoutInfoUnlockTime(dueDate, at1830)).toBe(true);
+
+      // Later that evening (19:00 Cameroon = 18:00 UTC)
+      const after1830 = new Date(Date.UTC(2026, 9, 18, 18, 0, 0));
+      expect(isPayoutInfoUnlockTime(dueDate, after1830)).toBe(true);
+    });
+  });
+
+  describe("POST /api/sessions/[id]/draw — multi-name drawing", () => {
+    it("draws one slot at a time and returns remaining count and next slot name", async () => {
+      mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+      mockFindUniqueSession.mockResolvedValue({
+        id: "session-1",
+        status: "ACTIVE",
+        memberships: [
+          {
+            userId: "user-1",
+            slots: [
+              { id: "slot-1", beneficiaryName: "Marie Fotso", ballDrawn: null, officialPosition: 3 },
+              { id: "slot-2", beneficiaryName: "Alice Fotso", ballDrawn: null, officialPosition: 7 },
+            ],
+          },
+        ],
+      });
+      mockUpdateMembershipSlot.mockResolvedValue({ id: "slot-1", ballDrawn: 3 });
+
+      // First draw (for Marie)
+      const req1 = new Request("http://localhost/api/sessions/session-1/draw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slotId: "slot-1" }),
+      });
+      const res1 = await postDraw(req1, { params: Promise.resolve({ id: "session-1" }) });
+      expect(res1.status).toBe(200);
+      const data1 = await res1.json();
+      expect(data1.drawn).toEqual([{ slotId: "slot-1", beneficiaryName: "Marie Fotso", ballDrawn: 3 }]);
+      expect(data1.remainingUndrawnCount).toBe(1);
+      expect(data1.nextSlotName).toBe("Alice Fotso");
+
+      // Second draw (for Alice)
+      mockFindUniqueSession.mockResolvedValue({
+        id: "session-1",
+        status: "ACTIVE",
+        memberships: [
+          {
+            userId: "user-1",
+            slots: [
+              { id: "slot-1", beneficiaryName: "Marie Fotso", ballDrawn: 3, officialPosition: 3 },
+              { id: "slot-2", beneficiaryName: "Alice Fotso", ballDrawn: null, officialPosition: 7 },
+            ],
+          },
+        ],
+      });
+      mockUpdateMembershipSlot.mockResolvedValue({ id: "slot-2", ballDrawn: 7 });
+
+      const req2 = new Request("http://localhost/api/sessions/session-1/draw", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slotId: "slot-2" }),
+      });
+      const res2 = await postDraw(req2, { params: Promise.resolve({ id: "session-1" }) });
+      expect(res2.status).toBe(200);
+      const data2 = await res2.json();
+      expect(data2.drawn).toEqual([{ slotId: "slot-2", beneficiaryName: "Alice Fotso", ballDrawn: 7 }]);
+      expect(data2.remainingUndrawnCount).toBe(0);
+      expect(data2.nextSlotName).toBeNull();
     });
   });
 });

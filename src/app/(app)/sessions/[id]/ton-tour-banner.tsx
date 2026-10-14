@@ -53,10 +53,43 @@ export function TonTourBanner({
     isDrawAction = true;
   } else if (isBeneficiaryTurn) {
     headline = lang === "fr" ? "Ton tour : C'est le moment ! 🎉" : "Your turn: Right now! 🎉";
-    subtitle =
-      lang === "fr"
-        ? "Ordre de bouffe : Vous recevez la cagnotte de ce tour"
-        : "Payout order: You receive the pot this round";
+    const slotWithPosition = mySlots.find((s) => s.officialPosition !== null) ?? mySlots[0];
+    const position = slotWithPosition?.officialPosition;
+    const posSuffix =
+      position === 1
+        ? (lang === "fr" ? "1ère position" : "1st position")
+        : position === 2
+        ? (lang === "fr" ? "2e position" : "2nd position")
+        : position === 3
+        ? (lang === "fr" ? "3e position" : "3rd position")
+        : position !== null && position !== undefined
+        ? `${position}e position`
+        : "";
+
+    let dateExacteStr = "";
+    if (position !== null && position !== undefined) {
+      try {
+        const cycleDate = getCycleDateForRound(sessionType, startDate, position);
+        dateExacteStr = cycleDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
+          timeZone: "Africa/Douala",
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        });
+      } catch {}
+    }
+
+    if (posSuffix && dateExacteStr) {
+      subtitle =
+        lang === "fr"
+          ? `Ordre de bouffe : ${posSuffix} (${dateExacteStr})`
+          : `Payout order: ${posSuffix} (${dateExacteStr})`;
+    } else {
+      subtitle =
+        lang === "fr"
+          ? "Ordre de bouffe : Vous recevez la cagnotte de ce tour"
+          : "Payout order: You receive the pot this round";
+    }
   } else {
     // Member has drawn their balls: reveal the assigned position
     const slotWithPosition = mySlots.find((s) => s.officialPosition !== null) ?? mySlots[0];

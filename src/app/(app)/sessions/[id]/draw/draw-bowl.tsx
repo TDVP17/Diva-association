@@ -22,18 +22,28 @@ interface DrawnSlot {
 export function DrawBowl({
   tontineSessionId,
   totalSlots,
+  undrawnSlots,
+  totalUserSlots,
   lang,
 }: {
   tontineSessionId: string;
   totalSlots: number;
+  undrawnSlots: Array<{ id: string; beneficiaryName: string }>;
+  totalUserSlots: number;
   lang: Lang;
 }) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
   const router = useRouter();
+  const [currentSlots, setCurrentSlots] = useState(undrawnSlots);
   const [drawing, setDrawing] = useState(false);
   const [results, setResults] = useState<DrawnSlot[] | null>(null);
+  const [remainingUndrawnCount, setRemainingUndrawnCount] = useState<number>(0);
+  const [nextSlotName, setNextSlotName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(true);
+
+  const activeSlot = currentSlots[0];
+  const currentStep = totalUserSlots - currentSlots.length + 1;
 
   // The draw assigns each slot's position from the session's shared
   // unclaimed-number pool server-side — it has to stay perfectly
@@ -65,7 +75,7 @@ export function DrawBowl({
   const floatingBalls = FLOAT_CLASSES.slice(0, ballCount);
 
   async function handleDraw() {
-    if (drawing) return;
+    if (drawing || !activeSlot) return;
     if (!isOnline) {
       setError(t("drawRequiresConnection"));
       return;
@@ -73,10 +83,21 @@ export function DrawBowl({
     setDrawing(true);
     setError(null);
     try {
-      const res = await fetch(`/api/sessions/${tontineSessionId}/draw`, { method: "POST" });
-      const body = await parseJsonOrThrow<{ drawn: DrawnSlot[] }>(res, t("drawFailed"));
+      const res = await fetch(`/api/sessions/${tontineSessionId}/draw`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slotId: activeSlot.id }),
+      });
+      const body = await parseJsonOrThrow<{
+        drawn: DrawnSlot[];
+        remainingUndrawnCount: number;
+        nextSlotName: string | null;
+      }>(res, t("drawFailed"));
+
       setTimeout(() => {
         setResults(body.drawn);
+        setRemainingUndrawnCount(body.remainingUndrawnCount);
+        setNextSlotName(body.nextSlotName);
         setDrawing(false);
       }, 600);
     } catch (err) {
@@ -85,8 +106,26 @@ export function DrawBowl({
     }
   }
 
+  function handleContinueNextSlot() {
+    setCurrentSlots((prev) => prev.slice(1));
+    setResults(null);
+  }
+
   return (
     <>
+      {totalUserSlots > 1 && activeSlot && (
+        <div className="mb-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-label-md text-sm shadow-sm">
+          <span className="material-symbols-outlined text-[18px]">person</span>
+          <span>
+            {t("drawForSlot", {
+              name: activeSlot.beneficiaryName,
+              current: String(currentStep),
+              total: String(totalUserSlots),
+            })}
+          </span>
+        </div>
+      )}
+
       <div className="relative w-full max-w-[320px] h-[320px] mx-auto mb-stack-gap-lg">
         <div className="absolute inset-0 rounded-full bg-gradient-to-b from-surface-container-low to-surface-container-high border border-surface-variant flex items-center justify-center overflow-hidden shadow-[0_20px_40px_rgba(0,53,40,0.15),inset_0_-20px_40px_rgba(0,0,0,0.05)]">
           <div className="absolute inset-4 rounded-full bg-surface shadow-inner opacity-50" />
@@ -96,7 +135,7 @@ export function DrawBowl({
                 key={i}
                 type="button"
                 onClick={handleDraw}
-                disabled={drawing || !isOnline}
+                disabled={drawing || !isOnline || !activeSlot}
                 aria-label={t("pickYourBalls")}
                 className={`absolute rounded-full bg-white flex items-center justify-center font-bold text-2xl text-emerald-800/40 select-none focus:outline-none transition-transform hover:scale-110 hover:-translate-y-1 shadow-[inset_-5px_-5px_15px_rgba(0,0,0,0.2),inset_5px_5px_15px_rgba(255,255,255,0.8),0_10px_20px_rgba(0,53,40,0.2)] ${floatClass}`}
               >
@@ -112,10 +151,14 @@ export function DrawBowl({
 
       <button
         onClick={handleDraw}
-        disabled={drawing || !isOnline}
+        disabled={drawing || !isOnline || !activeSlot}
         className="w-full max-w-sm py-4 px-6 rounded-xl bg-primary text-on-primary font-label-md text-label-md uppercase tracking-wider shadow-[0px_8px_30px_rgba(0,53,40,0.2)] hover:shadow-[0px_10px_35px_rgba(0,53,40,0.3)] active:scale-95 transition-all duration-200 disabled:opacity-60"
       >
-        {drawing ? t("drawingInProgress") : t("pickYourBalls")}
+        {drawing
+          ? t("drawingInProgress")
+          : activeSlot && totalUserSlots > 1
+          ? t("drawNextSlot", { name: activeSlot.beneficiaryName })
+          : t("pickYourBalls")}
       </button>
       {!isOnline && (
         <p className="font-label-sm text-label-sm text-on-surface-variant text-center mt-2">
@@ -132,7 +175,7 @@ export function DrawBowl({
                   <div className="w-20 h-20 rounded-full bg-white flex items-center justify-center font-numeric-data text-[36px] text-primary shadow-[inset_-5px_-5px_15px_rgba(0,0,0,0.2),inset_5px_5px_15px_rgba(255,255,255,0.8),0_10px_20px_rgba(0,53,40,0.2)]">
                     {r.ballDrawn}
                   </div>
-                  <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">{r.beneficiaryName}</p>
+                  <p className="font-label-sm text-label-sm text-on-surface-variant mt-1 font-semibold">{r.beneficiaryName}</p>
                 </div>
               ))}
             </div>
@@ -145,12 +188,29 @@ export function DrawBowl({
               <span className="material-symbols-outlined text-[18px]">pending_actions</span>
               <p className="font-label-sm text-label-sm">{t("pendingAdminValidation")}</p>
             </div>
-            <button
-              onClick={() => router.push(`/sessions/${tontineSessionId}`)}
-              className="w-full py-3 rounded-lg border-2 border-primary text-primary font-label-md text-label-md hover:bg-primary/5 active:scale-95 transition-all"
-            >
-              {t("gotIt")}
-            </button>
+
+            {remainingUndrawnCount > 0 ? (
+              <div className="w-full flex flex-col gap-2">
+                <p className="font-label-sm text-on-surface-variant mb-1">
+                  {t("drawRemainingNotice", { count: String(remainingUndrawnCount) })}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleContinueNextSlot}
+                  className="w-full py-3.5 px-4 rounded-xl bg-primary text-on-primary font-label-md text-label-md uppercase tracking-wide hover:shadow-md active:scale-95 transition-all"
+                >
+                  {t("drawNextSlot", { name: nextSlotName || "suivant" })}
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => router.push(`/sessions/${tontineSessionId}`)}
+                className="w-full py-3 rounded-lg border-2 border-primary text-primary font-label-md text-label-md hover:bg-primary/5 active:scale-95 transition-all"
+              >
+                {t("gotIt")}
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -3,16 +3,23 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
 type DrawResult =
-  | { ok: true; drawn: Array<{ slotId: string; beneficiaryName: string; ballDrawn: number }> }
+  | {
+      ok: true;
+      drawn: Array<{ slotId: string; beneficiaryName: string; ballDrawn: number }>;
+      remainingUndrawnCount: number;
+      nextSlotName: string | null;
+    }
   | { ok: false; status: number; error: string };
 
-export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { id: tontineSessionId } = await params;
+  const payload = await request.json().catch(() => ({}));
+  const requestedSlotId = typeof payload?.slotId === "string" ? payload.slotId : null;
 
   try {
     const result = await prisma.$transaction(async (tx): Promise<DrawResult> => {
@@ -47,22 +54,35 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         return { ok: false, status: 409, error: "Your position hasn't been assigned yet" };
       }
 
-      // The draw animation is real, but it always reveals the admin's real,
-      // already-assigned officialPosition — nothing here is randomized.
-      const drawn: Array<{ slotId: string; beneficiaryName: string; ballDrawn: number }> = [];
-      for (const slot of myUndrawnSlots) {
-        const ballDrawn = slot.officialPosition!;
-        await tx.membershipSlot.update({ where: { id: slot.id }, data: { ballDrawn } });
-        drawn.push({ slotId: slot.id, beneficiaryName: slot.beneficiaryName, ballDrawn });
-      }
+      // Draw ONE slot at a time as requested:
+      // "Et pour celui qui a plusieurs noms, il doit selections les boules pour chaque noms."
+      const slotToDraw = requestedSlotId
+        ? myUndrawnSlots.find((s) => s.id === requestedSlotId) ?? myUndrawnSlots[0]
+        : myUndrawnSlots[0];
 
-      return { ok: true, drawn };
+      const ballDrawn = slotToDraw.officialPosition!;
+      await tx.membershipSlot.update({ where: { id: slotToDraw.id }, data: { ballDrawn } });
+      const drawn = [{ slotId: slotToDraw.id, beneficiaryName: slotToDraw.beneficiaryName, ballDrawn }];
+
+      const remainingUndrawnCount = myUndrawnSlots.length - 1;
+      const nextUndrawnSlot = myUndrawnSlots.find((s) => s.id !== slotToDraw.id) ?? null;
+
+      return {
+        ok: true,
+        drawn,
+        remainingUndrawnCount,
+        nextSlotName: nextUndrawnSlot?.beneficiaryName ?? null,
+      };
     });
 
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
-    return NextResponse.json({ drawn: result.drawn });
+    return NextResponse.json({
+      drawn: result.drawn,
+      remainingUndrawnCount: result.remainingUndrawnCount,
+      nextSlotName: result.nextSlotName,
+    });
   } catch (err) {
     console.error("[draw] unexpected error:", err);
     return NextResponse.json({ error: "Could not draw your ball. Please try again." }, { status: 500 });

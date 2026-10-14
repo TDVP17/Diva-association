@@ -315,6 +315,9 @@ export const translations = {
     drawRequiresConnection: "Drawing your position needs a live connection — reconnect and try again.",
     youDrewBalls: "You drew {count} balls!",
     youDrewBall: "You drew Ball #{number}!",
+    drawForSlot: "Drawing for: {name} ({current}/{total})",
+    drawNextSlot: "Draw for {name}",
+    drawRemainingNotice: "{count} more name(s) to draw",
 
     // Profile
     yourCotisations: "Your Cotisations",
@@ -1402,6 +1405,9 @@ export const translations = {
     drawRequiresConnection: "Le tirage de votre position nécessite une connexion active — reconnectez-vous et réessayez.",
     youDrewBalls: "Vous avez tiré {count} boules !",
     youDrewBall: "Vous avez tiré la boule n°{number} !",
+    drawForSlot: "Tirage pour : {name} ({current}/{total})",
+    drawNextSlot: "Tirer pour {name}",
+    drawRemainingNotice: "Encore {count} nom(s) à tirer",
 
     // Profile
     yourCotisations: "Vos cotisations",

@@ -3,7 +3,8 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getDesignatedSlot } from "@/lib/round-robin-lock";
-import { getMostRecentDueDate } from "@/lib/tontine-engine";
+import { getMostRecentDueDate, isPayoutInfoUnlockTime } from "@/lib/tontine-engine";
+import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 
 const bodySchema = z.object({
   membershipSlotId: z.string().min(1),
@@ -45,6 +46,14 @@ export async function POST(request: Request) {
 
   const dueDate = getMostRecentDueDate(slot.membership.tontineSession.type, new Date());
 
+  // Enforce rule: Payment information can only be submitted starting at 18:30 on the contribution date
+  if (!isPayoutInfoUnlockTime(dueDate, new Date())) {
+    return NextResponse.json(
+      { error: "Payout details can only be submitted starting from 18:30 on the contribution date" },
+      { status: 409 },
+    );
+  }
+
   // Enforce rule: Payment information can ONLY be submitted once at least half of members have contributed
   const approvedMemberships = await prisma.membership.findMany({
     where: { tontineSessionId: slot.membership.tontineSessionId, status: "APPROVED" },
@@ -76,6 +85,25 @@ export async function POST(request: Request) {
         payoutAccountName: accountName,
       },
     });
+
+    // Notify user in their notification center that their details were successfully submitted
+    try {
+      await scheduleInAppNotifications({
+        tontineSessionId: slot.membership.tontineSessionId,
+        type: "PAYOUT_TURN",
+        recipients: [
+          {
+            userId: session.user.id,
+            message:
+              "Vos coordonnées de paiement ont été soumises. L'administrateur traitera votre virement sous peu.",
+            actionUrl: `/sessions/${slot.membership.tontineSessionId}`,
+          },
+        ],
+      });
+    } catch (notifErr) {
+      console.warn("[payout-claims] in-app notification dispatch failed:", notifErr);
+    }
+
     return NextResponse.json({ ok: true, id: payout.id });
   } catch (err) {
     console.error("[payout-claims] unexpected error:", err);

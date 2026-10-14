@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { isContributionDay, toDueDateKey, ALL_TONTINE_TYPES } from "@/lib/tontine-engine";
+import { isContributionDay, toDueDateKey, ALL_TONTINE_TYPES, isPayoutInfoUnlockTime } from "@/lib/tontine-engine";
 import { getDesignatedSlot } from "@/lib/round-robin-lock";
 import { translate } from "@/lib/i18n/translations";
 import { scheduleNotifications } from "@/lib/notifications/dispatch";
@@ -10,11 +10,8 @@ import { NOTIFICATION_TYPE_KEY } from "@/lib/notifications/type-labels";
 
 /**
  * Notifies whoever's turn it is to receive the "food"/payout this cycle —
- * WhatsApp + email sent directly here (immediate, not staggered — this is
- * a single recipient, not a bulk admin broadcast), plus an IN_APP
- * Notification row for their "My Notifications" feed. Idempotent via
- * FoodTurnLog, same unique-constraint-catch pattern as the existing daily
- * reminder crons.
+ * Triggered at 18:30 (CUTOFF_HOUR: 18:30) Cameroon time on contribution day,
+ * once at least half of the members have contributed and their lucky ball is drawn.
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -28,6 +25,7 @@ export async function GET(request: Request) {
   for (const type of ALL_TONTINE_TYPES) {
     if (!isContributionDay(type, now)) continue;
     const dueDate = toDueDateKey(now);
+    if (!isPayoutInfoUnlockTime(dueDate, now)) continue;
 
     const sessions = await prisma.tontineSession.findMany({ where: { type, status: "ACTIVE" } });
     for (const tontineSession of sessions) {

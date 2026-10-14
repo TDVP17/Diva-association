@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getContributionTotal, getNextDueDate, getCycleDateForRound, getTontineConfig } from "@/lib/tontine-engine";
+import { getContributionTotal, getNextDueDate, getCycleDateForRound, getTontineConfig, isPayoutInfoUnlockTime } from "@/lib/tontine-engine";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { formatXAF } from "@/lib/format-currency";
 import { FinesInfoAccordion } from "./fines-info-accordion";
@@ -485,7 +485,7 @@ export default async function SessionDetailPage({
       fineAmount: f ? Number(f.amount) : null,
       estimatedDateLabel: slotDateLabel,
     };
-  });
+  }).sort((a, b) => a.beneficiaryName.localeCompare(b.beneficiaryName, "fr", { sensitivity: "base" }));
 
   const mySlots = [...myMembership.slots].sort((a, b) =>
     a.beneficiaryName.localeCompare(b.beneficiaryName, "fr", { sensitivity: "base" }),
@@ -622,8 +622,10 @@ export default async function SessionDetailPage({
         const totalSlotsCount = allSlotsFlat.length > 0 ? allSlotsFlat.length : (totalRegisteredSlots || 1);
         const halfThreshold = Math.ceil(totalSlotsCount / 2);
         const isHalfPaid = paidCount >= halfThreshold;
+        const isTimeUnlocked = isPayoutInfoUnlockTime(dueDate, now);
         const isBeneficiaryTurn =
           !hasUndrawnSlots && !!myDesignatedSlot && myDesignatedSlot.ballDrawn !== null;
+        const canFillPayoutDetails = isBeneficiaryTurn && isHalfPaid && isTimeUnlocked;
 
         return (
           <>
@@ -652,28 +654,31 @@ export default async function SessionDetailPage({
                 </Link>
               )}
 
-            {/* If beneficiary has drawn their ball, but half of the members have not paid yet,
-                the alert to provide payment details is held back until the 50% milestone */}
-            {isBeneficiaryTurn && !myActivePayoutClaim && !isHalfPaid && (
+            {/* If beneficiary has drawn their ball, but 18:30 or 50% contributions has not been reached yet */}
+            {isBeneficiaryTurn && !myActivePayoutClaim && !canFillPayoutDetails && (
               <div className="mb-stack-gap-lg rounded-2xl border border-emerald-500/30 bg-emerald-50/60 p-4 text-emerald-950 flex items-start gap-3 shadow-xs">
                 <span className="material-symbols-outlined text-emerald-700 text-[24px] flex-shrink-0 mt-0.5">
                   hourglass_empty
                 </span>
                 <div className="min-w-0 flex-1">
                   <h4 className="font-label-md text-sm font-bold text-emerald-950">
-                    {lang === "fr" ? "Ordre de bouffe : Tour en attente de cotisations" : "Payout Turn: Waiting for Contributions"}
+                    {lang === "fr" ? "Ordre de bouffe : Tour en attente" : "Payout Turn: Waiting"}
                   </h4>
                   <p className="font-body-sm text-xs text-emerald-900/90 mt-1 leading-relaxed">
-                    {lang === "fr"
-                      ? `L'alerte pour renseigner vos coordonnées de paiement s'activera dès que la moitié des membres aura cotisé (${paidCount}/${halfThreshold} cotisations reçues).`
-                      : `The prompt to provide your payout details will activate once at least half of the members have contributed (${paidCount}/${halfThreshold} contributions received).`}
+                    {!isHalfPaid
+                      ? lang === "fr"
+                        ? `L'alerte pour renseigner vos coordonnées de paiement s'activera dès que la moitié des membres aura cotisé (${paidCount}/${halfThreshold} cotisations reçues).`
+                        : `The prompt to provide your payout details will activate once at least half of the members have contributed (${paidCount}/${halfThreshold} contributions received).`
+                      : lang === "fr"
+                      ? "Le formulaire pour renseigner vos coordonnées de paiement pour le virement s'activera à 18h30."
+                      : "The form to provide your payout details for the transfer will unlock at 6:30 PM."}
                   </p>
                 </div>
               </div>
             )}
 
-            {/* PayoutTurnPanel is only rendered if an active claim exists, OR if the beneficiary has drawn their ball AND at least half of the members have paid */}
-            {(myActivePayoutClaim || (isBeneficiaryTurn && isHalfPaid)) && (
+            {/* PayoutTurnPanel is only rendered if an active claim exists, OR if the beneficiary can fill details (ball drawn, >= 50% paid, and time >= 18:30) */}
+            {(myActivePayoutClaim || canFillPayoutDetails) && (
               <PayoutTurnPanel
                 membershipSlotId={myActivePayoutClaim?.membershipSlotId ?? myDesignatedSlot!.id}
                 payoutId={myActivePayoutClaim?.id ?? null}
@@ -714,8 +719,10 @@ export default async function SessionDetailPage({
         }
       />
 
-      {/* Sections secondaires pliables : gestion des noms, ordre complet, amendes */}
+      {/* Sections secondaires pliables : Ordre de bouffe EN PREMIER avant mes noms enregistrés */}
       <div className="mt-6 flex flex-col gap-3">
+        <PayoutOrderAccordion tontineSessionId={id} lang={lang} />
+
         <MemberNamesManager
           tontineSessionId={id}
           lang={lang}
@@ -724,8 +731,6 @@ export default async function SessionDetailPage({
           maxSlots={tontineSession.maxSlots ? Number(tontineSession.maxSlots) : null}
           startDate={tontineSession.startDate}
         />
-
-        <PayoutOrderAccordion tontineSessionId={id} lang={lang} />
 
         <FinesInfoAccordion
           lang={lang}

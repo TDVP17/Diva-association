@@ -58,7 +58,13 @@ export default async function DrawPage({ params }: { params: Promise<{ id: strin
       ) : positionsNotYetAssigned ? (
         <p className="font-body-md text-body-md text-on-surface-variant">{t("positionsNotYetAssigned")}</p>
       ) : (
-        <DrawBowl tontineSessionId={id} totalSlots={allSlots.length} lang={lang} />
+        <DrawBowl
+          tontineSessionId={id}
+          totalSlots={allSlots.length}
+          undrawnSlots={myUndrawnSlots.map((s) => ({ id: s.id, beneficiaryName: s.beneficiaryName }))}
+          totalUserSlots={myMembership.slots.length}
+          lang={lang}
+        />
       )}
     </main>
   );

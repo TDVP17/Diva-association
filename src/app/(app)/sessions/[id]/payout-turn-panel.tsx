@@ -70,6 +70,11 @@ export function PayoutTurnPanel({
     }
   }
 
+  if (status === "DETAILS_SUBMITTED") {
+    // As requested: the notification after submitting details to admin only belongs in the notification center
+    return null;
+  }
+
   return (
     <section className="mb-stack-gap-lg overflow-hidden rounded-2xl border-2 border-emerald-500/40 bg-gradient-to-br from-emerald-50 via-teal-50/40 to-white p-5 shadow-md">
       {status === null && (
@@ -177,24 +182,6 @@ export function PayoutTurnPanel({
                 )}
               </button>
             </form>
-          </div>
-        </div>
-      )}
-
-      {status === "DETAILS_SUBMITTED" && (
-        <div className="flex items-start gap-3 bg-white/95 rounded-xl border border-emerald-300 p-4 shadow-xs">
-          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-            <span className="material-symbols-outlined text-[24px]">verified</span>
-          </div>
-          <div className="min-w-0 flex-1">
-            <h4 className="font-label-md text-label-md font-bold text-emerald-950">
-              {t("payoutDetailsSubmitted")}
-            </h4>
-            <p className="font-body-sm text-body-sm text-emerald-800/90 mt-1">
-              {lang === "fr"
-                ? "Vos coordonnées (numéro de compte et nom) ont bien été transmises à l'administrateur. Dès qu'il valide le versement, votre virement sera immédiatement effectué."
-                : "Your account number and name have been transmitted to the administrator. The payout will be released directly to your account shortly."}
-            </p>
           </div>
         </div>
       )}

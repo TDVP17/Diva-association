@@ -257,6 +257,17 @@ export function getCutoffInstant(date: Date): Date {
 }
 
 /**
+ * Unlocks payout details collection starting at 18:30 Cameroon time on or after the contribution dueDate.
+ */
+export function isPayoutInfoUnlockTime(dueDate: Date, now: Date = new Date()): boolean {
+  const { year, month, day } = getCameroonDateParts(dueDate);
+  const unlockInstant = new Date(
+    Date.UTC(year, month - 1, day, 18 - CAMEROON_UTC_OFFSET_HOURS, 30),
+  );
+  return now.getTime() >= unlockInstant.getTime();
+}
+
+/**
  * Outstanding fine for a contribution still unpaid at `now`, relative to
  * its `cutoff`. `override` is a session's own fineAmountPerPeriod/
  * fineIntervalHours (admin-configurable per cotisation) — falls back to
