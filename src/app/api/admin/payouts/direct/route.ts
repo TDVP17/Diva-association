@@ -210,73 +210,82 @@ export async function POST(request: Request) {
     },
   });
 
-  // Notify next designated beneficiary if the round-robin advances
+  // Notify next designated beneficiary only if their ball is drawn AND at least half have contributed
   const newDesignatedSlot = await getDesignatedSlot(tontineSessionId);
-  if (newDesignatedSlot) {
-    const newBeneficiaryMembership = await prisma.membership.findFirst({
-      where: { slots: { some: { id: newDesignatedSlot.id } } },
-      include: { user: true },
+  if (newDesignatedSlot && newDesignatedSlot.ballDrawn !== null) {
+    const nextDue = getNextDueDate(session.type, new Date());
+    const approvedMemberships = await prisma.membership.findMany({
+      where: { tontineSessionId, status: "APPROVED" },
+      include: { slots: true },
     });
-    if (newBeneficiaryMembership) {
-      const approvedMemberships = await prisma.membership.findMany({
-        where: { tontineSessionId, status: "APPROVED" },
-        select: { slotCount: true },
-      });
-      const totalApprovedSlots = approvedMemberships.reduce(
-        (sum, m) => sum + (m.slotCount ? Number(m.slotCount) : 0),
-        0,
-      );
-      const estimatedPot = Number(session.amount) * totalApprovedSlots;
-      const nextDue = getNextDueDate(session.type, new Date());
-      const beneficiaryUser = newBeneficiaryMembership.user;
-      const sessionLabel = session.title || TONTINE_TYPE_LABELS[session.type] || session.type;
-      const beneficiaryLang = beneficiaryUser.preferredLang === "en" ? "en" : "fr";
-      const firstName = beneficiaryUser.name.trim().split(/\s+/)[0] ?? beneficiaryUser.name;
-      const dateLabel = nextDue.toLocaleDateString(beneficiaryLang === "fr" ? "fr-FR" : "en-GB", {
-        timeZone: "Africa/Douala",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      });
+    const allSlots = approvedMemberships.flatMap((m) => m.slots);
+    const halfThreshold = Math.ceil(allSlots.length / 2);
+    const paidContributionsCount = await prisma.contribution.count({
+      where: {
+        membershipSlotId: { in: allSlots.map((s) => s.id) },
+        dueDate: nextDue,
+        status: "PAID",
+      },
+    });
 
-      const newDesignatedPosition = newDesignatedSlot.officialPosition ?? 1;
-      const fullPayoutTurnMessage = payoutTurnMessage(
-        beneficiaryLang,
-        firstName,
-        sessionLabel,
-        estimatedPot,
-        dateLabel,
-        newDesignatedPosition,
-      );
-
-      await sendWhatsAppMessageSafe(beneficiaryUser.phone, fullPayoutTurnMessage);
-      await scheduleNotifications({
-        tontineSessionId,
-        channel: "EMAIL",
-        type: "PAYOUT_TURN",
-        recipients: [{ userId: beneficiaryUser.id, message: fullPayoutTurnMessage }],
+    if (paidContributionsCount >= halfThreshold) {
+      const newBeneficiaryMembership = await prisma.membership.findFirst({
+        where: { slots: { some: { id: newDesignatedSlot.id } } },
+        include: { user: true },
       });
-      await scheduleInAppNotifications({
-        tontineSessionId,
-        type: "PAYOUT_TURN",
-        recipients: [
-          {
-            userId: beneficiaryUser.id,
-            message:
-              beneficiaryLang === "fr"
-                ? `C'est votre tour de bouffer la cagnotte de ${sessionLabel} ! Veuillez fournir votre numéro de compte Mobile Money ou Orange Money et votre nom complet pour le virement.`
-                : `It's your turn to receive the ${sessionLabel} payout! Please provide your Mobile Money / Orange Money account number and account name so the admin can process your payout.`,
-            messageKey: "payoutTurnNotifMessage",
-            messageVars: {
-              cotisation: sessionLabel,
-              amount: formatXAF(estimatedPot),
-              date: dateLabel,
-              position: String(newDesignatedPosition),
+      if (newBeneficiaryMembership) {
+        const totalApprovedSlots = allSlots.length;
+        const estimatedPot = Number(session.amount) * totalApprovedSlots;
+        const beneficiaryUser = newBeneficiaryMembership.user;
+        const sessionLabel = session.title || TONTINE_TYPE_LABELS[session.type] || session.type;
+        const beneficiaryLang = beneficiaryUser.preferredLang === "en" ? "en" : "fr";
+        const firstName = beneficiaryUser.name.trim().split(/\s+/)[0] ?? beneficiaryUser.name;
+        const dateLabel = nextDue.toLocaleDateString(beneficiaryLang === "fr" ? "fr-FR" : "en-GB", {
+          timeZone: "Africa/Douala",
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        });
+
+        const newDesignatedPosition = newDesignatedSlot.officialPosition ?? 1;
+        const fullPayoutTurnMessage = payoutTurnMessage(
+          beneficiaryLang,
+          firstName,
+          sessionLabel,
+          estimatedPot,
+          dateLabel,
+          newDesignatedPosition,
+        );
+
+        await sendWhatsAppMessageSafe(beneficiaryUser.phone, fullPayoutTurnMessage);
+        await scheduleNotifications({
+          tontineSessionId,
+          channel: "EMAIL",
+          type: "PAYOUT_TURN",
+          recipients: [{ userId: beneficiaryUser.id, message: fullPayoutTurnMessage }],
+        });
+        await scheduleInAppNotifications({
+          tontineSessionId,
+          type: "PAYOUT_TURN",
+          recipients: [
+            {
+              userId: beneficiaryUser.id,
+              message:
+                beneficiaryLang === "fr"
+                  ? `C'est votre tour de bouffer la cagnotte de ${sessionLabel} ! Veuillez fournir votre numéro de compte Mobile Money ou Orange Money et votre nom complet pour le virement.`
+                  : `It's your turn to receive the ${sessionLabel} payout! Please provide your Mobile Money / Orange Money account number and account name so the admin can process your payout.`,
+              messageKey: "payoutTurnNotifMessage",
+              messageVars: {
+                cotisation: sessionLabel,
+                amount: formatXAF(estimatedPot),
+                date: dateLabel,
+                position: String(newDesignatedPosition),
+              },
+              actionUrl: `/sessions/${tontineSessionId}`,
             },
-            actionUrl: `/sessions/${tontineSessionId}`,
-          },
-        ],
-      });
+          ],
+        });
+      }
     }
   }
 

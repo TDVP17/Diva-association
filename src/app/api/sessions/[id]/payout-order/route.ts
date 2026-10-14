@@ -19,6 +19,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
 
+  const userMembership = await prisma.membership.findFirst({
+    where: { tontineSessionId, userId: session.user.id, status: "APPROVED" },
+    include: { slots: true },
+  });
+  const userHasUndrawnSlots = userMembership?.slots.some((s) => s.ballDrawn === null) ?? false;
+  if (userHasUndrawnSlots) {
+    return NextResponse.json({ rows: [], userMustDrawFirst: true });
+  }
+
   const slots = await prisma.membershipSlot.findMany({
     where: {
       membership: { tontineSessionId, status: "APPROVED" },

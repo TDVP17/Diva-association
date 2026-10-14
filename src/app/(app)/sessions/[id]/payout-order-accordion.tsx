@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { LoadingSpinner } from "@/components/loading-spinner";
 
@@ -40,6 +41,7 @@ export function PayoutOrderAccordion({
   // Comes closed by default as instructed
   const [isOpen, setIsOpen] = useState(false);
   const [rows, setRows] = useState<PayoutOrderRow[] | null>(null);
+  const [userMustDrawFirst, setUserMustDrawFirst] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function toggle() {
@@ -52,6 +54,9 @@ export function PayoutOrderAccordion({
         if (res.ok) {
           const body = await res.json();
           setRows(body.rows);
+          if (body.userMustDrawFirst) {
+            setUserMustDrawFirst(true);
+          }
         }
       } catch (err) {
         console.warn("[PayoutOrderAccordion] fetch error:", err);
@@ -107,6 +112,21 @@ export function PayoutOrderAccordion({
           {loading ? (
             <div className="py-6 flex justify-center">
               <LoadingSpinner className="py-4" />
+            </div>
+          ) : userMustDrawFirst ? (
+            <div className="p-4 text-center text-xs text-on-surface-variant bg-surface-container-low rounded-lg flex flex-col items-center gap-2">
+              <span className="material-symbols-outlined text-emerald-700 text-2xl">casino</span>
+              <p className="font-medium text-slate-800">
+                {lang === "fr"
+                  ? "Vous devez d'abord tirer votre boule chanceuse pour découvrir l'ordre de passage !"
+                  : "You must pick your lucky ball first to reveal the payout schedule!"}
+              </p>
+              <Link
+                href={`/sessions/${tontineSessionId}/draw`}
+                className="mt-1 px-3 py-1.5 rounded-lg bg-emerald-700 text-white font-bold text-xs hover:bg-emerald-800 transition-colors shadow-xs"
+              >
+                {lang === "fr" ? "Tirer ma boule chanceuse" : "Draw my lucky ball"}
+              </Link>
             </div>
           ) : !rows || rows.length === 0 ? (
             <div className="p-4 text-center text-xs text-on-surface-variant bg-surface-container-low rounded-lg">

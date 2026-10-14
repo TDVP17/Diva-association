@@ -144,6 +144,66 @@ export async function settleContribution(
     });
   }
 
+  // When half of the members have contributed for this cycle, if the designated beneficiary
+  // has already drawn their lucky ball, alert them to submit their payout details.
+  try {
+    const designatedSlot = await prisma.membershipSlot.findFirst({
+      where: {
+        membership: { tontineSessionId: membership.tontineSessionId, status: "APPROVED" },
+        officialPosition: { not: null },
+        ballDrawn: { not: null },
+        payouts: { none: {} },
+      },
+      include: {
+        membership: { include: { user: true } },
+      },
+      orderBy: { officialPosition: "asc" },
+    });
+
+    if (designatedSlot) {
+      const allApprovedSlots = await prisma.membershipSlot.findMany({
+        where: { membership: { tontineSessionId: membership.tontineSessionId, status: "APPROVED" } },
+        select: { id: true },
+      });
+      const halfThreshold = Math.ceil(allApprovedSlots.length / 2);
+      const paidCount = await prisma.contribution.count({
+        where: {
+          membershipSlotId: { in: allApprovedSlots.map((s) => s.id) },
+          dueDate: contribution.dueDate,
+          status: "PAID",
+        },
+      });
+
+      if (paidCount === halfThreshold) {
+        const benUser = designatedSlot.membership.user;
+        const benLang: Lang = benUser.preferredLang === "en" ? "en" : "fr";
+        const alertMsg =
+          benLang === "fr"
+            ? `C'est votre tour de bouffer la cagnotte de ${sessionLabel} ! La moitié des membres a cotisé : veuillez fournir votre numéro de compte Mobile Money ou Orange Money et votre nom complet.`
+            : `It's your turn to receive the ${sessionLabel} payout! Half of the members have contributed: please provide your Mobile Money or Orange Money account number and name.`;
+
+        await scheduleInAppNotifications({
+          tontineSessionId: membership.tontineSessionId,
+          type: "PAYOUT_TURN",
+          recipients: [
+            {
+              userId: benUser.id,
+              message: alertMsg,
+              messageKey: "payoutTurnNotifMessage",
+              messageVars: { cotisation: sessionLabel },
+              actionUrl: `/sessions/${membership.tontineSessionId}`,
+            },
+          ],
+        });
+        if (benUser.phone) {
+          await sendWhatsAppMessageSafe(benUser.phone, alertMsg);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[settleContribution] 50% milestone alert failed:", err);
+  }
+
   // The payer gets their own confirmation too, when they aren't the
   // beneficiary themselves (relative/friend paying via their own code) —
   // in their OWN preferredLang, not the beneficiary's.

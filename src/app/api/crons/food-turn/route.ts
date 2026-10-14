@@ -32,7 +32,22 @@ export async function GET(request: Request) {
     const sessions = await prisma.tontineSession.findMany({ where: { type, status: "ACTIVE" } });
     for (const tontineSession of sessions) {
       const designatedSlot = await getDesignatedSlot(tontineSession.id);
-      if (!designatedSlot) continue;
+      if (!designatedSlot || designatedSlot.ballDrawn === null) continue;
+
+      const approvedMemberships = await prisma.membership.findMany({
+        where: { tontineSessionId: tontineSession.id, status: "APPROVED" },
+        include: { slots: true },
+      });
+      const allSlots = approvedMemberships.flatMap((m) => m.slots);
+      const halfThreshold = Math.ceil(allSlots.length / 2);
+      const paidContributionsCount = await prisma.contribution.count({
+        where: {
+          membershipSlotId: { in: allSlots.map((s) => s.id) },
+          dueDate,
+          status: "PAID",
+        },
+      });
+      if (paidContributionsCount < halfThreshold) continue;
 
       const log = await prisma.foodTurnLog
         .create({ data: { membershipSlotId: designatedSlot.id, dueDate } })

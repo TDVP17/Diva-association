@@ -491,6 +491,7 @@ export default async function SessionDetailPage({
     a.beneficiaryName.localeCompare(b.beneficiaryName, "fr", { sensitivity: "base" }),
   );
   const myUndrawnSlots = mySlots.filter((s) => s.ballDrawn === null);
+  const hasUndrawnSlots = myUndrawnSlots.length > 0;
 
   // "Designated" (zero payout rows yet) gates the initial "submit your
   // details" prompt; once submitted, the slot drops out of that query
@@ -499,6 +500,8 @@ export default async function SessionDetailPage({
   // two are tracked separately rather than re-using one query for both.
   const designatedSlot = await getDesignatedSlot(id);
   const myDesignatedSlot = designatedSlot && mySlots.some((s) => s.id === designatedSlot.id) ? designatedSlot : null;
+  const isBeneficiaryTurn =
+    !hasUndrawnSlots && !!myDesignatedSlot && myDesignatedSlot.ballDrawn !== null;
 
   // Same read-only guard initiateSlotPayment() enforces server-side — shown
   // here so the Pay button is disabled up front instead of only failing
@@ -613,39 +616,74 @@ export default async function SessionDetailPage({
         </details>
       )}
 
-      {/* 2. Bannière Ton tour (Cercle Rouge 2) */}
-      <TonTourBanner
-        mySlots={mySlots.map((s) => ({
-          id: s.id,
-          beneficiaryName: s.beneficiaryName,
-          officialPosition: s.officialPosition,
-          ballDrawn: s.ballDrawn,
-        }))}
-        sessionType={tontineSession.type}
-        startDate={tontineSession.startDate}
-        isBeneficiaryTurn={!!myDesignatedSlot}
-        lang={lang}
-      />
+      {/* 2. Bannière Ton tour */}
+      {(() => {
+        const hasUndrawnSlots = myUndrawnSlots.length > 0;
+        const totalSlotsCount = allSlotsFlat.length > 0 ? allSlotsFlat.length : (totalRegisteredSlots || 1);
+        const halfThreshold = Math.ceil(totalSlotsCount / 2);
+        const isHalfPaid = paidCount >= halfThreshold;
+        const isBeneficiaryTurn =
+          !hasUndrawnSlots && !!myDesignatedSlot && myDesignatedSlot.ballDrawn !== null;
 
-      {(tontineSession.status === "DRAWING" || tontineSession.status === "ACTIVE") &&
-        myUndrawnSlots.length > 0 && (
-          <Link
-            href={`/sessions/${id}/draw`}
-            className="my-3 flex items-center justify-between bg-emerald-700 hover:bg-emerald-800 text-white rounded-2xl p-4 shadow-md transition-colors"
-          >
-            <span className="font-bold text-sm">{t("drawYourBall")}</span>
-            <span className="material-symbols-outlined">casino</span>
-          </Link>
-        )}
+        return (
+          <>
+            <TonTourBanner
+              mySlots={mySlots.map((s) => ({
+                id: s.id,
+                beneficiaryName: s.beneficiaryName,
+                officialPosition: s.officialPosition,
+                ballDrawn: s.ballDrawn,
+              }))}
+              sessionType={tontineSession.type}
+              startDate={tontineSession.startDate}
+              tontineSessionId={id}
+              isBeneficiaryTurn={isBeneficiaryTurn}
+              lang={lang}
+            />
 
-      {(myActivePayoutClaim || myDesignatedSlot) && (
-        <PayoutTurnPanel
-          membershipSlotId={myActivePayoutClaim?.membershipSlotId ?? myDesignatedSlot!.id}
-          payoutId={myActivePayoutClaim?.id ?? null}
-          status={myActivePayoutClaim?.status ?? null}
-          lang={lang}
-        />
-      )}
+            {(tontineSession.status === "DRAWING" || tontineSession.status === "ACTIVE") &&
+              myUndrawnSlots.length > 0 && (
+                <Link
+                  href={`/sessions/${id}/draw`}
+                  className="my-3 flex items-center justify-between bg-emerald-700 hover:bg-emerald-800 text-white rounded-2xl p-4 shadow-md transition-colors"
+                >
+                  <span className="font-bold text-sm">{t("drawYourBall")}</span>
+                  <span className="material-symbols-outlined">casino</span>
+                </Link>
+              )}
+
+            {/* If beneficiary has drawn their ball, but half of the members have not paid yet,
+                the alert to provide payment details is held back until the 50% milestone */}
+            {isBeneficiaryTurn && !myActivePayoutClaim && !isHalfPaid && (
+              <div className="mb-stack-gap-lg rounded-2xl border border-emerald-500/30 bg-emerald-50/60 p-4 text-emerald-950 flex items-start gap-3 shadow-xs">
+                <span className="material-symbols-outlined text-emerald-700 text-[24px] flex-shrink-0 mt-0.5">
+                  hourglass_empty
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-label-md text-sm font-bold text-emerald-950">
+                    {lang === "fr" ? "Ordre de bouffe : Tour en attente de cotisations" : "Payout Turn: Waiting for Contributions"}
+                  </h4>
+                  <p className="font-body-sm text-xs text-emerald-900/90 mt-1 leading-relaxed">
+                    {lang === "fr"
+                      ? `L'alerte pour renseigner vos coordonnées de paiement s'activera dès que la moitié des membres aura cotisé (${paidCount}/${halfThreshold} cotisations reçues).`
+                      : `The prompt to provide your payout details will activate once at least half of the members have contributed (${paidCount}/${halfThreshold} contributions received).`}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* PayoutTurnPanel is only rendered if an active claim exists, OR if the beneficiary has drawn their ball AND at least half of the members have paid */}
+            {(myActivePayoutClaim || (isBeneficiaryTurn && isHalfPaid)) && (
+              <PayoutTurnPanel
+                membershipSlotId={myActivePayoutClaim?.membershipSlotId ?? myDesignatedSlot!.id}
+                payoutId={myActivePayoutClaim?.id ?? null}
+                status={myActivePayoutClaim?.status ?? null}
+                lang={lang}
+              />
+            )}
+          </>
+        );
+      })()}
 
       {/* 3. Section Membres avec vérification KYC et boutons de paiement */}
       <CotisationMembersList
@@ -668,9 +706,9 @@ export default async function SessionDetailPage({
         defaultPhone={myMembership.user.phone}
         lang={lang}
         isDraftSession={tontineSession.status === "DRAFT"}
-        isBeneficiaryTurn={!!myDesignatedSlot}
+        isBeneficiaryTurn={isBeneficiaryTurn}
         lockedReason={
-          !roundLock.ok && currentBeneficiaryName && !myDesignatedSlot
+          !roundLock.ok && currentBeneficiaryName && !isBeneficiaryTurn
             ? t("paymentsLockedUntilPayout", { name: currentBeneficiaryName })
             : undefined
         }

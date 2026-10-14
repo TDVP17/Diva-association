@@ -40,7 +40,7 @@ export async function GET(request: Request) {
 
   for (const tontineSession of activeSessions) {
     const designatedSlot = await getDesignatedSlot(tontineSession.id);
-    if (!designatedSlot || designatedSlot.officialPosition === null) continue;
+    if (!designatedSlot || designatedSlot.officialPosition === null || designatedSlot.ballDrawn === null) continue;
 
     const estimatedDate = getCycleDateForRound(
       tontineSession.type,

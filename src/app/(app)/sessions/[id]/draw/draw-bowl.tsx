@@ -59,16 +59,10 @@ export function DrawBowl({
     };
   }, []);
 
-  // Purely decorative — the actual outcome is assigned server-side at
-  // random from the pool of unclaimed numbers, regardless of which ball
-  // (or the CTA) the member taps. Math.random is impure, so it's only ever
-  // called inside this useState lazy initializer, React's documented
-  // exception for one-time random values computed at mount.
-  const [decorativeNumbers] = useState<number[]>(() =>
-    Array.from({ length: Math.min(5, Math.max(totalSlots, 1)) }, () =>
-      Math.max(1, Math.ceil(Math.random() * totalSlots)),
-    ),
-  );
+  // In a real lottery / tontine draw, the numbers on the balls must be
+  // completely hidden until the member actually draws their ball.
+  const ballCount = Math.min(FLOAT_CLASSES.length, Math.max(totalSlots, 1));
+  const floatingBalls = FLOAT_CLASSES.slice(0, ballCount);
 
   async function handleDraw() {
     if (drawing) return;
@@ -97,15 +91,16 @@ export function DrawBowl({
         <div className="absolute inset-0 rounded-full bg-gradient-to-b from-surface-container-low to-surface-container-high border border-surface-variant flex items-center justify-center overflow-hidden shadow-[0_20px_40px_rgba(0,53,40,0.15),inset_0_-20px_40px_rgba(0,0,0,0.05)]">
           <div className="absolute inset-4 rounded-full bg-surface shadow-inner opacity-50" />
           <div className="relative w-full h-full">
-            {decorativeNumbers.map((n, i) => (
+            {floatingBalls.map((floatClass, i) => (
               <button
                 key={i}
                 type="button"
                 onClick={handleDraw}
                 disabled={drawing || !isOnline}
-                className={`absolute rounded-full bg-white flex items-center justify-center font-numeric-data text-numeric-data text-primary focus:outline-none transition-transform hover:scale-110 hover:-translate-y-1 shadow-[inset_-5px_-5px_15px_rgba(0,0,0,0.2),inset_5px_5px_15px_rgba(255,255,255,0.8),0_10px_20px_rgba(0,53,40,0.2)] ${FLOAT_CLASSES[i]}`}
+                aria-label={t("pickYourBalls")}
+                className={`absolute rounded-full bg-white flex items-center justify-center font-bold text-2xl text-emerald-800/40 select-none focus:outline-none transition-transform hover:scale-110 hover:-translate-y-1 shadow-[inset_-5px_-5px_15px_rgba(0,0,0,0.2),inset_5px_5px_15px_rgba(255,255,255,0.8),0_10px_20px_rgba(0,53,40,0.2)] ${floatClass}`}
               >
-                {n}
+                ?
               </button>
             ))}
           </div>

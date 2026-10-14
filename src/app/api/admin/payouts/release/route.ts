@@ -151,16 +151,28 @@ export async function POST(request: Request) {
   // line, for the first time. A one-time heads-up, distinct from the
   // "payout released" message above sent to the PREVIOUS beneficiary.
   const newDesignatedSlot = await getDesignatedSlot(claim.tontineSessionId);
-  if (newDesignatedSlot) {
-    const newBeneficiaryMembership = await prisma.membership.findFirst({
-      where: { slots: { some: { id: newDesignatedSlot.id } } },
-      include: { user: true },
+  if (newDesignatedSlot && newDesignatedSlot.ballDrawn !== null) {
+    const nextDueDate = getNextDueDate(claim.tontineSession.type, new Date());
+    const approvedMemberships = await prisma.membership.findMany({
+      where: { tontineSessionId: claim.tontineSessionId, status: "APPROVED" },
+      include: { slots: true },
     });
-    if (newBeneficiaryMembership) {
-      const approvedMemberships = await prisma.membership.findMany({
-        where: { tontineSessionId: claim.tontineSessionId, status: "APPROVED" },
-        select: { slotCount: true },
+    const allSlots = approvedMemberships.flatMap((m) => m.slots);
+    const halfThreshold = Math.ceil(allSlots.length / 2);
+    const paidContributionsCount = await prisma.contribution.count({
+      where: {
+        membershipSlotId: { in: allSlots.map((s) => s.id) },
+        dueDate: nextDueDate,
+        status: "PAID",
+      },
+    });
+
+    if (paidContributionsCount >= halfThreshold) {
+      const newBeneficiaryMembership = await prisma.membership.findFirst({
+        where: { slots: { some: { id: newDesignatedSlot.id } } },
+        include: { user: true },
       });
+      if (newBeneficiaryMembership) {
       const totalApprovedSlots = approvedMemberships.reduce(
         (sum, m) => sum + (m.slotCount ? Number(m.slotCount) : 0),
         0,
@@ -219,6 +231,7 @@ export async function POST(request: Request) {
       });
     }
   }
+}
 
   await logAudit({
     actorId: admin.user.id,
