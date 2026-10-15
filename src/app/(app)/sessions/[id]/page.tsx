@@ -639,6 +639,7 @@ export default async function SessionDetailPage({
               startDate={tontineSession.startDate}
               tontineSessionId={id}
               isBeneficiaryTurn={isBeneficiaryTurn}
+              designatedSlotId={myDesignatedSlot?.id}
               lang={lang}
             />
 
@@ -680,6 +681,10 @@ export default async function SessionDetailPage({
             {(myActivePayoutClaim || canFillPayoutDetails) && (
               <PayoutTurnPanel
                 membershipSlotId={myActivePayoutClaim?.membershipSlotId ?? myDesignatedSlot!.id}
+                beneficiaryName={
+                  mySlots.find((s) => s.id === (myActivePayoutClaim?.membershipSlotId ?? myDesignatedSlot!.id))
+                    ?.beneficiaryName
+                }
                 payoutId={myActivePayoutClaim?.id ?? null}
                 status={myActivePayoutClaim?.status ?? null}
                 lang={lang}

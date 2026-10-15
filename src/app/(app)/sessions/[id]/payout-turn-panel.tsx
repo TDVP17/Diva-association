@@ -10,11 +10,13 @@ type PayoutStatus = "DETAILS_SUBMITTED" | "RELEASED" | "CONFIRMED" | null;
 
 export function PayoutTurnPanel({
   membershipSlotId,
+  beneficiaryName,
   payoutId,
   status,
   lang,
 }: {
   membershipSlotId: string;
+  beneficiaryName?: string;
   payoutId: string | null;
   status: PayoutStatus;
   lang: Lang;
@@ -85,10 +87,18 @@ export function PayoutTurnPanel({
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="font-title-md text-title-md font-bold text-emerald-950 flex items-center gap-2">
-                {t("payoutTurnBannerTitle")}
+                {beneficiaryName
+                  ? lang === "fr"
+                    ? `C'est le tour de bouffer pour ${beneficiaryName} ! 🏆`
+                    : `It's time to receive the payout for ${beneficiaryName}! 🏆`
+                  : t("payoutTurnBannerTitle")}
               </h3>
               <p className="font-body-sm text-body-sm text-emerald-900/90 mt-1 leading-relaxed">
-                {t("payoutTurnBannerDesc")}
+                {beneficiaryName
+                  ? lang === "fr"
+                    ? `Renseignez vos coordonnées Mobile Money ou Orange Money pour recevoir le virement de la cagnotte pour ${beneficiaryName}. L'administrateur effectuera directement votre versement.`
+                    : `Provide your Mobile Money or Orange Money details to receive the pot transfer for ${beneficiaryName}. The admin will process your payout directly.`
+                  : t("payoutTurnBannerDesc")}
               </p>
               <div className="mt-2.5 rounded-lg bg-emerald-100/70 border border-emerald-200/80 p-2.5 text-xs text-emerald-900 flex items-start gap-2">
                 <span className="material-symbols-outlined text-[18px] text-emerald-700 flex-shrink-0 mt-0.5">info</span>
@@ -190,7 +200,13 @@ export function PayoutTurnPanel({
         <div className="flex flex-col gap-3 bg-white/95 rounded-xl border border-emerald-400 p-4 shadow-sm">
           <div className="flex items-center gap-2.5 text-emerald-800 font-bold">
             <span className="material-symbols-outlined text-[24px] text-emerald-600">celebration</span>
-            <p className="font-label-md text-label-md">{t("payoutSentToYou")}</p>
+            <p className="font-label-md text-label-md">
+              {beneficiaryName
+                ? lang === "fr"
+                  ? `Virement envoyé pour ${beneficiaryName} !`
+                  : `Payout sent for ${beneficiaryName}!`
+                : t("payoutSentToYou")}
+            </p>
           </div>
           <p className="text-xs text-slate-600">
             {lang === "fr"
