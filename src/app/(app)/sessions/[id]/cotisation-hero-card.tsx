@@ -98,11 +98,19 @@ export function CotisationHeroCard({
 
       {/* Prominent Amount & Admin Fee */}
       <div className="mt-3.5 mb-2 flex items-baseline flex-wrap gap-x-2.5 gap-y-1 relative z-10">
-        <div className="flex items-baseline">
+        <div className="flex items-baseline flex-wrap gap-x-1.5 gap-y-0.5">
           <span className="text-3xl sm:text-4xl font-black text-white tracking-tight drop-shadow-xs">
             {formatXAF(amount)}
           </span>
-          <span className="text-sm sm:text-base font-medium text-emerald-200/90 ml-1.5">
+          {fee > 0 && (
+            <span
+              title={lang === "fr" ? `+ ${new Intl.NumberFormat("fr-FR").format(fee)} FCFA de frais` : `+ ${new Intl.NumberFormat("fr-FR").format(fee)} FCFA fee`}
+              className="text-sm sm:text-base font-bold text-emerald-300 drop-shadow-xs"
+            >
+              +{new Intl.NumberFormat("fr-FR").format(fee)}
+            </span>
+          )}
+          <span className="text-sm sm:text-base font-medium text-emerald-200/90 ml-1">
             {frequencySuffix}
           </span>
         </div>
