@@ -57,15 +57,15 @@ export async function getSlotPaymentQuote(
   if (
     !slot ||
     slot.membership.status !== "APPROVED" ||
-    (slot.membership.tontineSession.status !== "ACTIVE" && slot.membership.tontineSession.status !== "DRAWING")
+    slot.membership.tontineSession.status !== "ACTIVE"
   ) {
     return { ok: false, status: 404, error: "This slot isn't currently accepting contributions" };
   }
   if (slot.membership.tontineSession.isPaused) {
     return { ok: false, status: 409, error: "This cotisation is temporarily paused — payments will resume shortly" };
   }
-  if (slot.membership.tontineSession.status === "ACTIVE" && slot.officialPosition === null) {
-    return { ok: false, status: 409, error: "This name hasn't been assigned a draw position yet" };
+  if (slot.officialPosition === null) {
+    return { ok: false, status: 409, error: "Impossible de cotiser tant que l'ordre de bouffe (position) n'est pas établi" };
   }
 
   const { tontineSession } = slot.membership;
@@ -128,15 +128,15 @@ export async function initiateSlotPayment(
   if (
     !slot ||
     slot.membership.status !== "APPROVED" ||
-    (slot.membership.tontineSession.status !== "ACTIVE" && slot.membership.tontineSession.status !== "DRAWING")
+    slot.membership.tontineSession.status !== "ACTIVE"
   ) {
     return { ok: false, status: 404, error: "This slot isn't currently accepting contributions" };
   }
   if (slot.membership.tontineSession.isPaused) {
     return { ok: false, status: 409, error: "This cotisation is temporarily paused — payments will resume shortly" };
   }
-  if (slot.membership.tontineSession.status === "ACTIVE" && slot.officialPosition === null) {
-    return { ok: false, status: 409, error: "This name hasn't been assigned a draw position yet" };
+  if (slot.officialPosition === null) {
+    return { ok: false, status: 409, error: "Impossible de cotiser tant que l'ordre de bouffe (position) n'est pas établi" };
   }
 
   const { tontineSession } = slot.membership;

@@ -25,8 +25,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cod
   }
 
   const memberships = await prisma.membership.findMany({
-    where: { userId: user.id, status: "APPROVED", tontineSession: { status: { in: ["DRAWING", "ACTIVE"] } } },
-    include: { tontineSession: true, slots: true },
+    where: { userId: user.id, status: "APPROVED", tontineSession: { status: "ACTIVE" } },
+    include: { tontineSession: true, slots: { where: { officialPosition: { not: null } } } },
   });
 
   const now = new Date();

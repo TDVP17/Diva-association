@@ -175,7 +175,7 @@ export function CotisationMembersList({
                   <button
                     type="button"
                     onClick={() => handlePaySingle(slot.id)}
-                    disabled={isDraftSession || !!lockedReason}
+                    disabled={isDraftSession || slot.officialPosition === null || !!lockedReason}
                     className="px-3 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {lang === "fr" ? "Cotiser" : "Pay"}
@@ -237,6 +237,16 @@ export function CotisationMembersList({
         <div className="w-full mt-4 py-3 px-4 rounded-2xl bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-center text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 shadow-2xs">
           <span className="material-symbols-outlined text-[18px] text-emerald-600">check_circle</span>
           <span>{t("allContributionsSettled")}</span>
+        </div>
+      )}
+
+      {/* Notice si les cotisations sont bloquées (ex: pas d'ordre de bouffe) */}
+      {lockedReason && hasUnpaid && (
+        <div className="w-full mt-3 p-3.5 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-900 flex items-center gap-2.5 text-xs sm:text-sm font-medium shadow-2xs">
+          <span className="material-symbols-outlined text-amber-600 text-[20px] flex-shrink-0">
+            lock
+          </span>
+          <span>{lockedReason}</span>
         </div>
       )}
 

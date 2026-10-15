@@ -83,12 +83,15 @@ async function loadAndValidateSlots(
     }
     if (
       slot.membership.status !== "APPROVED" ||
-      (slot.membership.tontineSession.status !== "ACTIVE" && slot.membership.tontineSession.status !== "DRAWING")
+      slot.membership.tontineSession.status !== "ACTIVE"
     ) {
       return { ok: false as const, status: 409, error: `${slot.beneficiaryName} isn't currently accepting contributions` };
     }
     if (slot.membership.tontineSession.isPaused) {
       return { ok: false as const, status: 409, error: `${slot.beneficiaryName}'s cotisation is temporarily paused` };
+    }
+    if (slot.officialPosition === null) {
+      return { ok: false as const, status: 409, error: `Impossible de cotiser tant que l'ordre de bouffe n'est pas établi (${slot.beneficiaryName})` };
     }
 
     const tontineSessionId = slot.membership.tontineSessionId;
@@ -162,14 +165,17 @@ export async function listUnpaidSlotsForBulkPayment(userId: string): Promise<Unp
 
       const { amount, fee } = getContributionTotal({ amount: Number(tontineSession.amount), fee: Number(tontineSession.fee) });
 
+      const isLockedNoOrder = tontineSession.status !== "ACTIVE" || slot.officialPosition === null;
       results.push({
         membershipSlotId: slot.id,
         beneficiaryName: slot.beneficiaryName,
         sessionLabel: tontineSession.title || TONTINE_LABELS[tontineSession.type] || tontineSession.type,
         tontineSessionId: membership.tontineSessionId,
         baseTotal: amount + fee,
-        locked: !roundLock.ok,
-        lockedReason: roundLock.ok ? undefined : roundLock.error,
+        locked: !roundLock.ok || isLockedNoOrder,
+        lockedReason: isLockedNoOrder
+          ? "Impossible de cotiser tant que l'ordre de bouffe n'est pas établi"
+          : (!roundLock.ok ? roundLock.error : undefined),
       });
     }
   }

@@ -62,12 +62,13 @@ const VALID_PHONE = "677123456";
 
 function makeSlot(
   id: string,
-  overrides: Partial<{ userId: string; status: string; sessionStatus: string; isPaused: boolean; sessionId: string }> = {},
+  overrides: Partial<{ userId: string; status: string; sessionStatus: string; isPaused: boolean; sessionId: string; officialPosition: number | null }> = {},
 ) {
   const sessionId = overrides.sessionId ?? "session-1";
   return {
     id,
     beneficiaryName: `Slot ${id}`,
+    officialPosition: overrides.officialPosition !== undefined ? overrides.officialPosition : 1,
     membership: {
       userId: overrides.userId ?? "member-1",
       status: overrides.status ?? "APPROVED",
@@ -125,11 +126,21 @@ describe("initiateBulkPayment", () => {
     expect(txCreateBulkPayment).not.toHaveBeenCalled();
   });
 
-  it("rejects when one slot's session isn't ACTIVE or DRAWING", async () => {
+  it("rejects when one slot's session isn't ACTIVE (e.g. CLOSED or DRAWING)", async () => {
     findManySlot.mockResolvedValue([makeSlot("slot-1", { sessionStatus: "CLOSED" })]);
     const result = await initiateBulkPayment("member-1", ["slot-1"], VALID_PHONE);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.status).toBe(409);
+  });
+
+  it("rejects when a slot has no assigned draw position / ordre de bouffe", async () => {
+    findManySlot.mockResolvedValue([makeSlot("slot-1", { officialPosition: null })]);
+    const result = await initiateBulkPayment("member-1", ["slot-1"], VALID_PHONE);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(409);
+      expect(result.error).toMatch(/ordre de bouffe/i);
+    }
   });
 
   it("rejects when the round-robin lock blocks one of the sessions", async () => {

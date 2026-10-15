@@ -710,10 +710,12 @@ export default async function SessionDetailPage({
         paymentDescription={paymentDescription}
         defaultPhone={myMembership.user.phone}
         lang={lang}
-        isDraftSession={tontineSession.status === "DRAFT"}
+        isDraftSession={!isDrawCompleted}
         isBeneficiaryTurn={isBeneficiaryTurn}
         lockedReason={
-          !roundLock.ok && currentBeneficiaryName && !isBeneficiaryTurn
+          !isDrawCompleted
+            ? t("paymentsLockedNoPayoutOrder")
+            : !roundLock.ok && currentBeneficiaryName && !isBeneficiaryTurn
             ? t("paymentsLockedUntilPayout", { name: currentBeneficiaryName })
             : undefined
         }
