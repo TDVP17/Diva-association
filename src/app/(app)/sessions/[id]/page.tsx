@@ -538,12 +538,11 @@ export default async function SessionDetailPage({
         null
       : null;
 
-  // Check if the draw is completed and every member has an assigned position
-  const hasOfficialPositions =
+  // Check if every slot in the group has an assigned position
+  const hasAllPositions =
     allSlotsFlat.length > 0 && allSlotsFlat.every((s) => s.officialPosition !== null);
   const isDrawCompleted =
-    (tontineSession.status === "ACTIVE" || tontineSession.status === "CLOSED") &&
-    hasOfficialPositions;
+    hasAllPositions && tontineSession.status !== "DRAFT";
 
   const maxPosition = isDrawCompleted
     ? Math.max(...allSlotsFlat.map((s) => s.officialPosition ?? 1))

@@ -38,6 +38,7 @@ export function DrawBowl({
   const [drawing, setDrawing] = useState(false);
   const [results, setResults] = useState<DrawnSlot[] | null>(null);
   const [remainingUndrawnCount, setRemainingUndrawnCount] = useState<number>(0);
+  const [selectedBallIndex, setSelectedBallIndex] = useState<number | null>(null);
   const [nextSlotName, setNextSlotName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(true);
@@ -75,7 +76,7 @@ export function DrawBowl({
   const floatingBalls = FLOAT_CLASSES.slice(0, ballCount);
 
   async function handleDraw() {
-    if (drawing || !activeSlot) return;
+    if (drawing || !activeSlot || selectedBallIndex === null) return;
     if (!isOnline) {
       setError(t("drawRequiresConnection"));
       return;
@@ -108,6 +109,7 @@ export function DrawBowl({
 
   function handleContinueNextSlot() {
     setCurrentSlots((prev) => prev.slice(1));
+    setSelectedBallIndex(null);
     setResults(null);
   }
 
@@ -130,34 +132,58 @@ export function DrawBowl({
         <div className="absolute inset-0 rounded-full bg-gradient-to-b from-surface-container-low to-surface-container-high border border-surface-variant flex items-center justify-center overflow-hidden shadow-[0_20px_40px_rgba(0,53,40,0.15),inset_0_-20px_40px_rgba(0,0,0,0.05)]">
           <div className="absolute inset-4 rounded-full bg-surface shadow-inner opacity-50" />
           <div className="relative w-full h-full">
-            {floatingBalls.map((floatClass, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={handleDraw}
-                disabled={drawing || !isOnline || !activeSlot}
-                aria-label={t("pickYourBalls")}
-                className={`absolute rounded-full bg-white flex items-center justify-center font-bold text-2xl text-emerald-800/40 select-none focus:outline-none transition-transform hover:scale-110 hover:-translate-y-1 shadow-[inset_-5px_-5px_15px_rgba(0,0,0,0.2),inset_5px_5px_15px_rgba(255,255,255,0.8),0_10px_20px_rgba(0,53,40,0.2)] ${floatClass}`}
-              >
-                ?
-              </button>
-            ))}
+            {floatingBalls.map((floatClass, i) => {
+              const isSelected = selectedBallIndex === i;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    if (!drawing) setSelectedBallIndex(i);
+                  }}
+                  disabled={drawing || !isOnline || !activeSlot}
+                  aria-label={t("pickYourBalls")}
+                  className={`absolute rounded-full flex items-center justify-center font-bold text-2xl select-none focus:outline-none transition-all duration-300 cursor-pointer ${
+                    isSelected
+                      ? "ring-4 ring-amber-400 bg-amber-100 text-amber-700 scale-125 -translate-y-2 z-20 shadow-[0_0_25px_rgba(251,191,36,0.9),inset_-5px_-5px_15px_rgba(0,0,0,0.15)]"
+                      : selectedBallIndex !== null
+                      ? "bg-white/80 text-emerald-800/20 opacity-60 scale-95 shadow-[inset_-5px_-5px_15px_rgba(0,0,0,0.1),0_5px_10px_rgba(0,53,40,0.1)]"
+                      : `bg-white text-emerald-800/40 hover:scale-110 hover:-translate-y-1 shadow-[inset_-5px_-5px_15px_rgba(0,0,0,0.2),inset_5px_5px_15px_rgba(255,255,255,0.8),0_10px_20px_rgba(0,53,40,0.2)] ${floatClass}`
+                  }`}
+                >
+                  {isSelected ? "✨" : "?"}
+                </button>
+              );
+            })}
           </div>
           <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-transparent via-white/10 to-white/40 pointer-events-none" />
         </div>
       </div>
 
+      {/* Instruction text */}
+      <p className="text-center font-medium text-xs sm:text-sm text-emerald-900 mb-3">
+        {selectedBallIndex === null
+          ? (lang === "fr" ? "Touchez une boule dans l'urne pour la choisir" : "Tap a ball in the bowl to select it")
+          : (lang === "fr" ? "Boule sélectionnée ! Cliquez ci-dessous pour valider" : "Ball selected! Click below to validate")}
+      </p>
+
       {error && <p className="font-label-sm text-label-sm text-error text-center mb-4">{error}</p>}
 
       <button
         onClick={handleDraw}
-        disabled={drawing || !isOnline || !activeSlot}
-        className="w-full max-w-sm py-4 px-6 rounded-xl bg-primary text-on-primary font-label-md text-label-md uppercase tracking-wider shadow-[0px_8px_30px_rgba(0,53,40,0.2)] hover:shadow-[0px_10px_35px_rgba(0,53,40,0.3)] active:scale-95 transition-all duration-200 disabled:opacity-60"
+        disabled={drawing || !isOnline || !activeSlot || selectedBallIndex === null}
+        className={`w-full max-w-sm py-4 px-6 rounded-xl font-label-md text-label-md uppercase tracking-wider transition-all duration-200 cursor-pointer ${
+          selectedBallIndex === null
+            ? "bg-slate-200 text-slate-400 cursor-not-allowed opacity-60 shadow-none"
+            : "bg-primary text-on-primary shadow-[0px_8px_30px_rgba(0,53,40,0.25)] hover:shadow-[0px_10px_35px_rgba(0,53,40,0.35)] active:scale-95"
+        }`}
       >
         {drawing
           ? t("drawingInProgress")
-          : activeSlot && totalUserSlots > 1
-          ? t("drawNextSlot", { name: activeSlot.beneficiaryName })
+          : selectedBallIndex === null
+          ? t("selectBallFirst")
+          : activeSlot
+          ? t("confirmBallSelection", { name: activeSlot.beneficiaryName })
           : t("pickYourBalls")}
       </button>
       {!isOnline && (

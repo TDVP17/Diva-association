@@ -319,6 +319,8 @@ export const translations = {
     drawForSlot: "Drawing for: {name} ({current}/{total})",
     drawNextSlot: "Draw for {name}",
     drawRemainingNotice: "{count} more name(s) to draw",
+    selectBallFirst: "Please select a ball from the bowl",
+    confirmBallSelection: "Validate draw for {name}",
 
     // Profile
     yourCotisations: "Your Cotisations",
@@ -1416,6 +1418,8 @@ export const translations = {
     drawForSlot: "Tirage pour : {name} ({current}/{total})",
     drawNextSlot: "Tirer pour {name}",
     drawRemainingNotice: "Encore {count} nom(s) à tirer",
+    selectBallFirst: "Veuillez sélectionner une boule dans l'urne",
+    confirmBallSelection: "Valider le tirage pour {name}",
 
     // Profile
     yourCotisations: "Vos cotisations",

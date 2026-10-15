@@ -57,7 +57,7 @@ export async function getSlotPaymentQuote(
   if (
     !slot ||
     slot.membership.status !== "APPROVED" ||
-    slot.membership.tontineSession.status !== "ACTIVE"
+    (slot.membership.tontineSession.status !== "ACTIVE" && slot.membership.tontineSession.status !== "DRAWING")
   ) {
     return { ok: false, status: 404, error: "This slot isn't currently accepting contributions" };
   }
@@ -128,7 +128,7 @@ export async function initiateSlotPayment(
   if (
     !slot ||
     slot.membership.status !== "APPROVED" ||
-    slot.membership.tontineSession.status !== "ACTIVE"
+    (slot.membership.tontineSession.status !== "ACTIVE" && slot.membership.tontineSession.status !== "DRAWING")
   ) {
     return { ok: false, status: 404, error: "This slot isn't currently accepting contributions" };
   }

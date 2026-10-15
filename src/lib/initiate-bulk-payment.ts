@@ -83,7 +83,7 @@ async function loadAndValidateSlots(
     }
     if (
       slot.membership.status !== "APPROVED" ||
-      slot.membership.tontineSession.status !== "ACTIVE"
+      (slot.membership.tontineSession.status !== "ACTIVE" && slot.membership.tontineSession.status !== "DRAWING")
     ) {
       return { ok: false as const, status: 409, error: `${slot.beneficiaryName} isn't currently accepting contributions` };
     }
@@ -165,7 +165,7 @@ export async function listUnpaidSlotsForBulkPayment(userId: string): Promise<Unp
 
       const { amount, fee } = getContributionTotal({ amount: Number(tontineSession.amount), fee: Number(tontineSession.fee) });
 
-      const isLockedNoOrder = tontineSession.status !== "ACTIVE" || slot.officialPosition === null;
+      const isLockedNoOrder = (tontineSession.status !== "ACTIVE" && tontineSession.status !== "DRAWING") || slot.officialPosition === null;
       results.push({
         membershipSlotId: slot.id,
         beneficiaryName: slot.beneficiaryName,
