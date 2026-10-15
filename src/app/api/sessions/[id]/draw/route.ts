@@ -62,6 +62,26 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
       const ballDrawn = slotToDraw.officialPosition!;
       await tx.membershipSlot.update({ where: { id: slotToDraw.id }, data: { ballDrawn } });
+
+      try {
+        const allSessionSlots = await tx.membershipSlot.findMany({
+          where: { membership: { tontineSessionId, status: "APPROVED" } },
+          select: { id: true, ballDrawn: true },
+        });
+        const allDrawn =
+          Array.isArray(allSessionSlots) &&
+          allSessionSlots.length > 0 &&
+          allSessionSlots.every((s) => s.id === slotToDraw.id || s.ballDrawn !== null);
+        if (allDrawn && tontineSession.status === "DRAWING" && tx.tontineSession?.update) {
+          await tx.tontineSession.update({
+            where: { id: tontineSessionId },
+            data: { status: "ACTIVE" },
+          });
+        }
+      } catch {
+        // Best-effort auto-flip to ACTIVE
+      }
+
       const drawn = [{ slotId: slotToDraw.id, beneficiaryName: slotToDraw.beneficiaryName, ballDrawn }];
 
       const remainingUndrawnCount = myUndrawnSlots.length - 1;

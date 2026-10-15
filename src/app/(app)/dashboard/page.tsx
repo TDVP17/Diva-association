@@ -35,7 +35,16 @@ export default async function DashboardPage() {
         // still showing up on the Cotisations page.
         tontineSession: { status: { not: "CLOSED" } },
       },
-      include: { tontineSession: true },
+      include: {
+        tontineSession: {
+          include: {
+            memberships: {
+              where: { status: "APPROVED" },
+              select: { slots: { select: { id: true, officialPosition: true, ballDrawn: true } } },
+            },
+          },
+        },
+      },
       orderBy: { joinedAt: "asc" },
     }),
     prisma.fine.aggregate({
@@ -86,10 +95,19 @@ export default async function DashboardPage() {
                         label={t("seeDescription")}
                       />
                     )}
-                    <p className="font-numeric-data text-numeric-data text-on-surface">{formatXAF(amount)}</p>
-                    <p className="font-label-sm text-label-sm text-on-surface-variant">
-                      {t("plusFeeSuffix", { fee: formatXAF(fee) })} &middot; {t(sessionStatusKey(m.tontineSession.status))}
-                    </p>
+                    {(() => {
+                      const allSlots = m.tontineSession.memberships?.flatMap((mem) => mem.slots) ?? [];
+                      const isDrawDone =
+                        m.tontineSession.status === "ACTIVE" ||
+                        (allSlots.length > 0 && allSlots.every((s) => s.officialPosition !== null));
+                      const effectiveStatus = isDrawDone ? "ACTIVE" : m.tontineSession.status;
+
+                      return (
+                        <p className="font-label-sm text-label-sm text-on-surface-variant">
+                          {t("plusFeeSuffix", { fee: formatXAF(fee) })} &middot; {t(sessionStatusKey(effectiveStatus))}
+                        </p>
+                      );
+                    })()}
                   </div>
                   <span className="material-symbols-outlined text-outline">chevron_right</span>
                 </Link>

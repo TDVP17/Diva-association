@@ -46,10 +46,10 @@ export function CotisationHeroCard({
   const progressPct = Math.round((paidCount / effectiveTotal) * 100);
 
   // Status label
-  const isStatusActive = status === "ACTIVE";
+  const isStatusActive = status === "ACTIVE" || (status === "DRAWING" && isDrawCompleted);
   const statusLabel = isStatusActive
     ? lang === "fr"
-      ? "Active"
+      ? "En cours"
       : "Active"
     : status === "DRAWING"
     ? lang === "fr"

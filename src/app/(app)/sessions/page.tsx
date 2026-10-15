@@ -36,7 +36,17 @@ export default async function SessionsPage() {
 
   const memberships = await prisma.membership.findMany({
     where: { userId, hiddenByMemberAt: null },
-    include: { tontineSession: true, slots: true },
+    include: {
+      tontineSession: {
+        include: {
+          memberships: {
+            where: { status: "APPROVED" },
+            select: { slots: { select: { id: true, officialPosition: true, ballDrawn: true } } },
+          },
+        },
+      },
+      slots: true,
+    },
     orderBy: { joinedAt: "desc" },
   });
 
@@ -163,11 +173,21 @@ export default async function SessionsPage() {
                   })()}
                 </div>
                 <div className="relative z-10 flex items-center gap-1 flex-shrink-0">
-                  <span
-                    className={`font-label-sm text-label-sm px-2 py-1 rounded pointer-events-none ${STATUS_STYLES[m.tontineSession.status]}`}
-                  >
-                    {t(sessionStatusKey(m.tontineSession.status))}
-                  </span>
+                  {(() => {
+                    const allSlots = m.tontineSession.memberships?.flatMap((mem) => mem.slots) ?? [];
+                    const isDrawDone =
+                      m.tontineSession.status === "ACTIVE" ||
+                      (allSlots.length > 0 && allSlots.every((s) => s.officialPosition !== null));
+                    const effectiveStatus = isDrawDone ? "ACTIVE" : m.tontineSession.status;
+
+                    return (
+                      <span
+                        className={`font-label-sm text-label-sm px-2 py-1 rounded pointer-events-none ${STATUS_STYLES[effectiveStatus]}`}
+                      >
+                        {t(sessionStatusKey(effectiveStatus))}
+                      </span>
+                    );
+                  })()}
                   {m.tontineSession.status === "CLOSED" && (
                     <HideClosedSessionButton membershipId={m.id} lang={lang} />
                   )}

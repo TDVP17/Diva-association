@@ -544,6 +544,12 @@ export default async function SessionDetailPage({
   const isDrawCompleted =
     hasAllPositions && tontineSession.status !== "DRAFT";
 
+  if (tontineSession.status === "DRAWING" && isDrawCompleted) {
+    prisma.tontineSession
+      .update({ where: { id: tontineSession.id }, data: { status: "ACTIVE" } })
+      .catch(() => {});
+  }
+
   const maxPosition = isDrawCompleted
     ? Math.max(...allSlotsFlat.map((s) => s.officialPosition ?? 1))
     : null;
