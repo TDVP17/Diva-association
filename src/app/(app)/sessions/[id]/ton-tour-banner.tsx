@@ -138,8 +138,8 @@ export function TonTourBanner({
 
     const subtitle = activePosStr
       ? lang === "fr"
-        ? `Ordre de bouffe : ${activePosStr} (1er de vos ${mySlots.length} noms)`
-        : `Payout order: ${activePosStr} (1st of your ${mySlots.length} names)`
+        ? `Ordre de bouffe : ${activePosStr}`
+        : `Payout order: ${activePosStr}`
       : lang === "fr"
       ? `Ordre de bouffe : ${mySlots.length} parts enregistrées`
       : `Payout order: ${mySlots.length} registered parts`;
@@ -195,7 +195,7 @@ export function TonTourBanner({
                 ? `Détails de vos ${mySlots.length} tours de bouffe`
                 : `Details of your ${mySlots.length} payout turns`} :
             </p>
-            {sortedSlots.map((s, idx) => {
+            {sortedSlots.map((s) => {
               const isThisSlotTurn = isBeneficiaryTurn && s.id === designatedSlotId;
               const posStr = getPosLabel(s.officialPosition);
               const dateStr = getSlotDate(s.officialPosition);
@@ -215,11 +215,6 @@ export function TonTourBanner({
                       {posStr && (
                         <span className="text-[11px] px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 font-semibold shadow-2xs">
                           {posStr}
-                        </span>
-                      )}
-                      {idx === 0 && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">
-                          {lang === "fr" ? "1er à bouffer" : "1st to receive"}
                         </span>
                       )}
                       {isThisSlotTurn && (
