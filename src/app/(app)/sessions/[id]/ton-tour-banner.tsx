@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { getCycleDateForRound } from "@/lib/tontine-engine";
 import { playCelebrationSound } from "@/lib/sound-effects";
@@ -32,6 +33,7 @@ export function TonTourBanner({
   lang: Lang;
 }) {
   const router = useRouter();
+  const [expanded, setExpanded] = useState(false);
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
 
   if (!mySlots || mySlots.length === 0) return null;
@@ -99,71 +101,144 @@ export function TonTourBanner({
     return `${pos}e position`;
   }
 
-  // Multi-slot view: when the member holds 2 or more names, display all of them clearly
+  // Multi-slot view: when the member holds 2 or more names, display the 1st name to bouffe,
+  // and let them click to expand/collapse full details for all names.
   if (mySlots.length > 1) {
+    const sortedSlots = [...mySlots].sort((a, b) => {
+      const posA = a.officialPosition ?? 999999;
+      const posB = b.officialPosition ?? 999999;
+      return posA - posB;
+    });
+
+    const firstSlot = sortedSlots[0];
+    const activeSlot = isBeneficiaryTurn && designatedSlotId
+      ? mySlots.find((s) => s.id === designatedSlotId) ?? firstSlot
+      : firstSlot;
+    const activePosStr = getPosLabel(activeSlot.officialPosition);
+    const activeDateStr = getSlotDate(activeSlot.officialPosition);
+
+    let headline = "";
+    if (isBeneficiaryTurn) {
+      headline = activeDateStr
+        ? lang === "fr"
+          ? `Ton tour : ${activeDateStr} (${activeSlot.beneficiaryName}) (C'est le moment ! 🎉)`
+          : `Your turn: ${activeDateStr} (${activeSlot.beneficiaryName}) (Right now! 🎉)`
+        : lang === "fr"
+        ? `Ton tour : C'est le moment pour ${activeSlot.beneficiaryName} ! 🎉`
+        : `Your turn: Right now for ${activeSlot.beneficiaryName}! 🎉`;
+    } else {
+      headline = activeDateStr
+        ? lang === "fr"
+          ? `Ton tour : ${activeDateStr} (${activeSlot.beneficiaryName})`
+          : `Your turn: ${activeDateStr} (${activeSlot.beneficiaryName})`
+        : lang === "fr"
+        ? `Ton tour : Position ${activeSlot.officialPosition} (${activeSlot.beneficiaryName})`
+        : `Your turn: Position ${activeSlot.officialPosition} (${activeSlot.beneficiaryName})`;
+    }
+
+    const subtitle = activePosStr
+      ? lang === "fr"
+        ? `Ordre de bouffe : ${activePosStr} (1er de vos ${mySlots.length} noms)`
+        : `Payout order: ${activePosStr} (1st of your ${mySlots.length} names)`
+      : lang === "fr"
+      ? `Ordre de bouffe : ${mySlots.length} parts enregistrées`
+      : `Payout order: ${mySlots.length} registered parts`;
+
     return (
-      <div
-        onClick={() => playCelebrationSound()}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") playCelebrationSound();
-        }}
-        className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 my-3.5 select-none cursor-pointer hover:bg-slate-50/40 transition-colors"
-      >
-        <div className="flex items-center gap-2.5 mb-3 pb-2.5 border-b border-slate-100">
-          <div className="w-9 h-9 rounded-full bg-amber-100/90 flex items-center justify-center text-lg flex-shrink-0 shadow-xs">
+      <div className="bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border border-slate-100 my-3.5 select-none transition-all">
+        <div
+          onClick={() => {
+            playCelebrationSound();
+            setExpanded((prev) => !prev);
+          }}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              playCelebrationSound();
+              setExpanded((prev) => !prev);
+            }
+          }}
+          className="flex items-center gap-3.5 cursor-pointer hover:bg-slate-50/60 rounded-xl transition-colors"
+        >
+          <div className="w-12 h-12 rounded-full bg-amber-100/90 flex items-center justify-center flex-shrink-0 text-2xl shadow-xs transition-transform hover:scale-110">
             🎉
           </div>
-          <div>
-            <h3 className="font-extrabold text-slate-900 text-sm sm:text-base leading-tight">
-              {lang === "fr" ? `Vos tours de bouffe (${mySlots.length} noms enregistrés)` : `Your payout turns (${mySlots.length} registered names)`}
-            </h3>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              {lang === "fr" ? "Chaque nom bouffera à son tour selon sa position" : "Each name will receive its pot on its assigned position"}
+          <div className="min-w-0 flex-1">
+            <p className="font-extrabold text-slate-900 text-sm sm:text-base leading-snug truncate">
+              {headline}
+            </p>
+            <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
+              {subtitle}
             </p>
           </div>
+          <span className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 text-xs font-semibold transition-colors">
+            <span>
+              {expanded
+                ? lang === "fr"
+                  ? "Masquer"
+                  : "Hide"
+                : lang === "fr"
+                ? `Tours bouffe (${mySlots.length})`
+                : `Turns (${mySlots.length})`}
+            </span>
+            <span className="material-symbols-outlined text-[16px]">
+              {expanded ? "expand_less" : "expand_more"}
+            </span>
+          </span>
         </div>
 
-        <div className="flex flex-col gap-2">
-          {mySlots.map((s) => {
-            const isThisSlotTurn = isBeneficiaryTurn && s.id === designatedSlotId;
-            const posStr = getPosLabel(s.officialPosition);
-            const dateStr = getSlotDate(s.officialPosition);
+        {expanded && (
+          <div className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2">
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              {lang === "fr"
+                ? `Détails de vos ${mySlots.length} tours de bouffe`
+                : `Details of your ${mySlots.length} payout turns`} :
+            </p>
+            {sortedSlots.map((s, idx) => {
+              const isThisSlotTurn = isBeneficiaryTurn && s.id === designatedSlotId;
+              const posStr = getPosLabel(s.officialPosition);
+              const dateStr = getSlotDate(s.officialPosition);
 
-            return (
-              <div
-                key={s.id}
-                className={`flex items-center justify-between gap-2 p-2.5 rounded-xl border transition-all ${
-                  isThisSlotTurn
-                    ? "bg-emerald-50/90 border-emerald-300 shadow-xs"
-                    : "bg-slate-50/70 border-slate-100"
-                }`}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-bold text-sm text-slate-900">{s.beneficiaryName}</span>
-                    {posStr && (
-                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 font-semibold shadow-2xs">
-                        {posStr}
-                      </span>
-                    )}
-                    {isThisSlotTurn && (
-                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-600 text-white font-bold animate-pulse shadow-xs">
-                        {lang === "fr" ? "C'est le moment ! 🎉" : "Right now! 🎉"}
-                      </span>
+              return (
+                <div
+                  key={s.id}
+                  className={`flex items-center justify-between gap-2 p-2.5 rounded-xl border transition-all ${
+                    isThisSlotTurn
+                      ? "bg-emerald-50/90 border-emerald-300 shadow-xs"
+                      : "bg-slate-50/70 border-slate-100"
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-sm text-slate-900">{s.beneficiaryName}</span>
+                      {posStr && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-700 font-semibold shadow-2xs">
+                          {posStr}
+                        </span>
+                      )}
+                      {idx === 0 && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-medium">
+                          {lang === "fr" ? "1er à bouffer" : "1st to receive"}
+                        </span>
+                      )}
+                      {isThisSlotTurn && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-600 text-white font-bold animate-pulse shadow-xs">
+                          {lang === "fr" ? "C'est le moment ! 🎉" : "Right now! 🎉"}
+                        </span>
+                      )}
+                    </div>
+                    {dateStr && (
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {lang === "fr" ? `Date : ${dateStr}` : `Date: ${dateStr}`}
+                      </p>
                     )}
                   </div>
-                  {dateStr && (
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {lang === "fr" ? `Date : ${dateStr}` : `Date: ${dateStr}`}
-                    </p>
-                  )}
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   }
