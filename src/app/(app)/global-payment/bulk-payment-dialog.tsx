@@ -174,16 +174,8 @@ export function BulkPaymentDialog({
                   </div>
                 ))}
                 <div className="flex justify-between items-center pt-2 mt-1 border-t border-outline-variant">
-                  <span className="font-body-md text-body-md text-on-surface-variant">{t("amountToContributeLabel")}</span>
-                  <span className="font-label-md text-label-md text-on-surface font-medium">{formatXAF(quote.baseTotal)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="font-body-md text-body-md text-on-surface-variant">{t("paymentFeeRateLabel")}</span>
-                  <span className="font-label-md text-label-md text-on-surface font-medium">{formatXAF(quote.providerFeeAmount)}</span>
-                </div>
-                <div className="flex justify-between items-center border-t border-outline-variant pt-2 mt-1">
-                  <span className="font-label-md text-label-md text-on-surface font-bold">{t("totalLabel")}</span>
-                  <span className="font-headline-sm text-headline-sm text-primary font-bold">{formatXAF(quote.totalCharged)}</span>
+                  <span className="font-label-md text-label-md text-on-surface font-bold">{t("amountToContributeLabel")}</span>
+                  <span className="font-headline-sm text-headline-sm text-primary font-bold">{formatXAF(quote.baseTotal)}</span>
                 </div>
               </div>
             )}
@@ -231,7 +223,7 @@ export function BulkPaymentDialog({
           <div className="flex flex-col items-center text-center gap-3">
             <span className="material-symbols-outlined text-primary text-4xl animate-pulse">smartphone</span>
             <h2 className="font-headline-sm text-headline-sm text-on-surface">{t("waitingForUssdConfirmationTitle")}</h2>
-            {quote && <p className="font-label-md text-label-md text-on-surface">{formatXAF(quote.totalCharged)}</p>}
+            {quote && <p className="font-label-md text-label-md text-on-surface">{formatXAF(quote.baseTotal)}</p>}
             <p className="font-label-sm text-label-sm text-on-surface-variant">{t("ussdSentToPhone", { phone })}</p>
             <p className="font-body-md text-body-md text-on-surface-variant">{t("ussdInstructions")}</p>
             {showWaitingHint && (
