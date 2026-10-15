@@ -52,7 +52,6 @@ export function TonTourBanner({
     icon = "🎲";
     isDrawAction = true;
   } else if (isBeneficiaryTurn) {
-    headline = lang === "fr" ? "Ton tour : C'est le moment ! 🎉" : "Your turn: Right now! 🎉";
     const slotWithPosition = mySlots.find((s) => s.officialPosition !== null) ?? mySlots[0];
     const position = slotWithPosition?.officialPosition;
     const posSuffix =
@@ -73,17 +72,26 @@ export function TonTourBanner({
         dateExacteStr = cycleDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
           timeZone: "Africa/Douala",
           day: "numeric",
-          month: "short",
+          month: "long",
           year: "numeric",
         });
       } catch {}
     }
 
-    if (posSuffix && dateExacteStr) {
+    if (dateExacteStr) {
+      headline =
+        lang === "fr"
+          ? `Ton tour : ${dateExacteStr} (C'est le moment ! 🎉)`
+          : `Your turn: ${dateExacteStr} (Right now! 🎉)`;
+    } else {
+      headline = lang === "fr" ? "Ton tour : C'est le moment ! 🎉" : "Your turn: Right now! 🎉";
+    }
+
+    if (posSuffix) {
       subtitle =
         lang === "fr"
-          ? `Ordre de bouffe : ${posSuffix} (${dateExacteStr})`
-          : `Payout order: ${posSuffix} (${dateExacteStr})`;
+          ? `Ordre de bouffe : ${posSuffix}`
+          : `Payout order: ${posSuffix}`;
     } else {
       subtitle =
         lang === "fr"
@@ -99,12 +107,13 @@ export function TonTourBanner({
     if (position !== null && position !== undefined) {
       try {
         const cycleDate = getCycleDateForRound(sessionType, startDate, position);
-        const monthRaw = cycleDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
+        const exactDateStr = cycleDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
           timeZone: "Africa/Douala",
+          day: "numeric",
           month: "long",
+          year: "numeric",
         });
-        const monthCap = monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1);
-        headline = t("yourTurnTitle", { turn: monthCap });
+        headline = t("yourTurnTitle", { turn: exactDateStr });
 
         const posSuffix =
           position === 1
