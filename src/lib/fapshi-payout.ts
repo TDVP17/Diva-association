@@ -3,15 +3,27 @@
 // payments," so this deliberately uses its own API user/key, distinct from
 // src/lib/fapshi.ts's collection service.
 
-const FAPSHI_PAYOUT_BASE_URL =
-  process.env.FAPSHI_PAYOUT_BASE_URL || process.env.FAPSHI_BASE_URL || "https://live.fapshi.com";
-const FAPSHI_PAYOUT_API_USER =
-  process.env.FAPSHI_PAYOUT_API_USER || process.env.FAPSHI_API_USER || "";
-const FAPSHI_PAYOUT_API_KEY =
-  process.env.FAPSHI_PAYOUT_API_KEY || process.env.FAPSHI_API_KEY || "";
+function cleanEnv(val: string | undefined): string {
+  if (!val) return "";
+  return val.trim().replace(/^["']|["']$/g, "");
+}
+
+function getPayoutBaseUrl(): string {
+  const envUrl = cleanEnv(process.env.FAPSHI_PAYOUT_BASE_URL || process.env.FAPSHI_BASE_URL).replace(/\/+$/, "");
+  if (envUrl) return envUrl;
+  return "https://live.fapshi.com";
+}
+
+function getPayoutApiUser(): string {
+  return cleanEnv(process.env.FAPSHI_PAYOUT_API_USER || process.env.FAPSHI_API_USER);
+}
+
+function getPayoutApiKey(): string {
+  return cleanEnv(process.env.FAPSHI_PAYOUT_API_KEY || process.env.FAPSHI_API_KEY);
+}
 
 export function isPayoutConfigured(): boolean {
-  return Boolean(FAPSHI_PAYOUT_API_USER && FAPSHI_PAYOUT_API_KEY);
+  return Boolean(getPayoutApiUser() && getPayoutApiKey());
 }
 
 export interface PayoutParams {
@@ -52,8 +64,8 @@ class FapshiPayoutError extends Error {
 
 function authHeaders(): Record<string, string> {
   return {
-    apiuser: FAPSHI_PAYOUT_API_USER,
-    apikey: FAPSHI_PAYOUT_API_KEY,
+    apiuser: getPayoutApiUser(),
+    apikey: getPayoutApiKey(),
     "Content-Type": "application/json",
   };
 }
@@ -69,7 +81,8 @@ export async function sendPayout(params: PayoutParams): Promise<PayoutResult> {
     throw new FapshiPayoutError("Le montant minimum pour un versement est de 100 FCFA", 400);
   }
 
-  const res = await fetch(`${FAPSHI_PAYOUT_BASE_URL}/payout`, {
+  const payoutBaseUrl = getPayoutBaseUrl();
+  const res = await fetch(`${payoutBaseUrl}/payout`, {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify(params),
@@ -94,7 +107,8 @@ export async function getPayoutStatus(transId: string): Promise<PayoutStatusResu
     throw new FapshiPayoutError("Fapshi payout service is not configured", 500);
   }
 
-  const res = await fetch(`${FAPSHI_PAYOUT_BASE_URL}/payment-status/${encodeURIComponent(transId)}`, {
+  const payoutBaseUrl = getPayoutBaseUrl();
+  const res = await fetch(`${payoutBaseUrl}/payment-status/${encodeURIComponent(transId)}`, {
     method: "GET",
     headers: authHeaders(),
   });

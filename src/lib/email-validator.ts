@@ -1,12 +1,7 @@
 import dns from "dns";
 import type { Lang } from "@/lib/i18n/translations";
 
-// Configure fast reliable DNS resolvers for MX validation
-try {
-  dns.setServers(["8.8.8.8", "1.1.1.1"]);
-} catch {
-  // Use system default if setServers is restricted
-}
+
 
 const DISPOSABLE_DOMAINS = new Set([
   "yopmail.com",
@@ -112,24 +107,37 @@ export async function validateEmailAddress(
 
   // 4. Real domain MX / DNS check
   try {
-    const mxRecords = await Promise.race([
-      dns.promises.resolveMx(domain),
-      new Promise<dns.MxRecord[]>((_, reject) =>
-        setTimeout(() => reject(new Error("DNS_TIMEOUT")), 3000),
-      ),
-    ]);
+    let hasMailServer = false;
 
-    if (!mxRecords || mxRecords.length === 0) {
-      // Fallback: check if the domain resolves to an A record
-      const aRecords = await dns.promises.resolve4(domain).catch(() => []);
-      if (aRecords.length === 0) {
-        return {
-          valid: false,
-          error:
-            lang === "fr"
-              ? `Le domaine @${domain} n'existe pas ou ne possède aucun serveur de messagerie.`
-              : `The domain @${domain} does not exist or has no active mail server.`,
-        };
+    try {
+      const mxRecords = await Promise.race([
+        dns.promises.resolveMx(domain),
+        new Promise<dns.MxRecord[]>((_, reject) =>
+          setTimeout(() => reject(new Error("DNS_TIMEOUT")), 2500),
+        ),
+      ]);
+      if (mxRecords && mxRecords.length > 0) {
+        hasMailServer = true;
+      }
+    } catch {
+      // Fallback if MX query is restricted or timed out
+    }
+
+    if (!hasMailServer) {
+      // Try resolving via system lookup (A / AAAA)
+      try {
+        await dns.promises.lookup(domain);
+        hasMailServer = true;
+      } catch (err: any) {
+        if (err?.code === "ENOTFOUND" || err?.code === "ENODATA") {
+          return {
+            valid: false,
+            error:
+              lang === "fr"
+                ? `Le domaine @${domain} n'existe pas. Veuillez vérifier l'orthographe de votre e-mail.`
+                : `The domain @${domain} does not exist. Please check your email spelling.`,
+          };
+        }
       }
     }
   } catch (err: any) {
@@ -142,7 +150,6 @@ export async function validateEmailAddress(
             : `The domain @${domain} does not exist. Please check your email spelling.`,
       };
     }
-    // In case of network timeout or unexpected error, don't hard-block valid users
   }
 
   return { valid: true, normalizedEmail: email };

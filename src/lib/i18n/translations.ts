@@ -29,6 +29,14 @@ export const translations = {
     googleSignInPopupNotice: "A Google window has opened to choose your account. You can cancel and return at any time.",
     cancelAndReturn: "Cancel and return to sign-in",
     orUseEmailPhoneNotice: "You can also sign in or register with email or phone above.",
+    verifyEmailTitle: "Verify Your Email Address",
+    verifyEmailSubtitle: "A 6-digit confirmation code was sent to {email}. Enter it below to activate your account.",
+    verifyEmailCodeLabel: "6-digit confirmation code",
+    confirmAndActivateAccount: "Confirm & Activate My Account",
+    resendConfirmationCode: "Resend code",
+    editSignupDetails: "Edit my details",
+    signupCodeSent: "Confirmation code sent to your email!",
+    signupCodeResent: "A new confirmation code has been sent to your email.",
 
     // Dashboard
     yourTontines: "Your Tontines",
@@ -1128,6 +1136,14 @@ export const translations = {
     googleSignInPopupNotice: "Une fenêtre Google est ouverte pour choisir votre compte. Vous pouvez annuler et revenir à tout moment.",
     cancelAndReturn: "Annuler et revenir à la connexion",
     orUseEmailPhoneNotice: "Vous pouvez aussi vous connecter ou créer un compte avec votre email ou téléphone ci-dessus.",
+    verifyEmailTitle: "Validation de votre adresse e-mail",
+    verifyEmailSubtitle: "Un code de validation à 6 chiffres a été envoyé à {email}. Saisissez-le ci-dessous pour activer votre compte.",
+    verifyEmailCodeLabel: "Code de validation à 6 chiffres",
+    confirmAndActivateAccount: "Confirmer et activer mon compte",
+    resendConfirmationCode: "Renvoyer le code",
+    editSignupDetails: "Modifier mes informations",
+    signupCodeSent: "Code de validation envoyé à votre e-mail !",
+    signupCodeResent: "Un nouveau code a été envoyé à votre adresse e-mail.",
 
     // Dashboard
     yourTontines: "Vos Tontines",

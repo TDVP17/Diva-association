@@ -1,8 +1,9 @@
 // Thin Resend client — plain fetch, no SDK, mirroring the no-dependency
 // style of src/lib/whatsapp/evolution.ts for consistency.
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY ?? "";
-const RESEND_FROM = process.env.RESEND_FROM ?? "DIVA Asso <notifications@divaasso.com>";
+const RESEND_API_KEY = (process.env.RESEND_API_KEY ?? "").trim().replace(/^["']|["']$/g, "");
+const RESEND_FROM =
+  process.env.RESEND_FROM || process.env.EMAIL_FROM || "DIVA Asso <contact@divaasso.com>";
 
 export class ResendError extends Error {
   constructor(

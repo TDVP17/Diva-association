@@ -7,6 +7,9 @@ import {
   signUpAction,
   requestPasswordResetAction,
   confirmPasswordResetAction,
+  requestSignUpCodeAction,
+  resendSignUpCodeAction,
+  confirmSignUpAction,
   type AuthFormState,
 } from "./actions";
 import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translations";
@@ -107,6 +110,90 @@ export function CredentialsForm({
     initialState,
   );
 
+  // Sign-up 2-step verification state
+  const [signupStep, setSignupStep] = useState<1 | 2>(1);
+  const [signupFullName, setSignupFullName] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  const [signupCode, setSignupCode] = useState("");
+  const [signupToken, setSignupToken] = useState("");
+  const [maskedEmail, setMaskedEmail] = useState("");
+  const [signupLoading, setSignupLoading] = useState(false);
+  const [signupError, setSignupError] = useState<string | null>(null);
+  const [signupNotice, setSignupNotice] = useState<string | null>(null);
+
+  async function handleRequestSignupCode(e: React.FormEvent) {
+    e.preventDefault();
+    if (!signupFullName.trim() || !signupEmail.trim() || !signupPassword) return;
+    setSignupLoading(true);
+    setSignupError(null);
+    setSignupNotice(null);
+    try {
+      const res = await requestSignUpCodeAction(
+        { fullName: signupFullName, email: signupEmail, password: signupPassword },
+        lang,
+      );
+      if (res.error) {
+        setSignupError(res.error);
+      } else if (res.signupToken) {
+        setSignupToken(res.signupToken);
+        setMaskedEmail(res.maskedEmail || signupEmail);
+        setSignupStep(2);
+        setSignupNotice(t("signupCodeSent"));
+      }
+    } catch {
+      setSignupError(t("somethingWentWrong"));
+    } finally {
+      setSignupLoading(false);
+    }
+  }
+
+  async function handleResendSignupCode() {
+    if (!signupToken) return;
+    setSignupLoading(true);
+    setSignupError(null);
+    setSignupNotice(null);
+    try {
+      const res = await resendSignUpCodeAction(signupToken, lang);
+      if (res.error) {
+        setSignupError(res.error);
+      } else if (res.signupToken) {
+        setSignupToken(res.signupToken);
+        setSignupNotice(t("signupCodeResent"));
+      }
+    } catch {
+      setSignupError(t("somethingWentWrong"));
+    } finally {
+      setSignupLoading(false);
+    }
+  }
+
+  async function handleConfirmSignup(e: React.FormEvent) {
+    e.preventDefault();
+    if (signupCode.length !== 6) return;
+    setSignupLoading(true);
+    setSignupError(null);
+    try {
+      const res = await confirmSignUpAction(signupToken, signupCode.trim(), callbackUrl, lang);
+      if (res.error) {
+        setSignupError(res.error);
+      }
+    } catch (err) {
+      if (
+        typeof err === "object" &&
+        err !== null &&
+        "digest" in err &&
+        typeof (err as { digest?: unknown }).digest === "string" &&
+        (err as { digest: string }).digest.startsWith("NEXT_REDIRECT")
+      ) {
+        throw err;
+      }
+      setSignupError(t("somethingWentWrong"));
+    } finally {
+      setSignupLoading(false);
+    }
+  }
+
   // Forgot password state
   const [resetStep, setResetStep] = useState<1 | 2>(1);
   const [resetIdentifier, setResetIdentifier] = useState("");
@@ -173,7 +260,11 @@ export function CredentialsForm({
         <div className="flex bg-surface-container-low rounded-lg p-1 mb-stack-gap-md">
           <button
             type="button"
-            onClick={() => setMode("signin")}
+            onClick={() => {
+              setMode("signin");
+              setSignupError(null);
+              setSignupNotice(null);
+            }}
             className={
               mode === "signin"
                 ? "flex-1 py-1.5 rounded-md font-label-md text-label-md bg-white shadow-sm text-primary font-semibold transition-all"
@@ -184,7 +275,11 @@ export function CredentialsForm({
           </button>
           <button
             type="button"
-            onClick={() => setMode("signup")}
+            onClick={() => {
+              setMode("signup");
+              setResetError(null);
+              setResetSuccess(null);
+            }}
             className={
               mode === "signup"
                 ? "flex-1 py-1.5 rounded-md font-label-md text-label-md bg-white shadow-sm text-primary font-semibold transition-all"
@@ -240,44 +335,147 @@ export function CredentialsForm({
           <SubmitButton pendingLabel={t("pleaseWait")}>{t("signIn")}</SubmitButton>
         </form>
       ) : mode === "signup" ? (
-        <form action={signUpFormAction} className="space-y-stack-gap-md">
-          <div className="floating-label-group">
-            <input
-              className="floating-input"
-              id="signup-name"
-              name="fullName"
-              type="text"
-              placeholder=" "
-              required
-              autoComplete="name"
+        signupStep === 1 ? (
+          <form onSubmit={handleRequestSignupCode} className="space-y-stack-gap-md">
+            <div className="floating-label-group">
+              <input
+                className="floating-input"
+                id="signup-name"
+                name="fullName"
+                type="text"
+                placeholder=" "
+                required
+                autoComplete="name"
+                value={signupFullName}
+                onChange={(e) => setSignupFullName(e.target.value)}
+              />
+              <label className="floating-label" htmlFor="signup-name">
+                {t("fullName")}
+              </label>
+            </div>
+            <div className="floating-label-group">
+              <input
+                className="floating-input"
+                id="signup-email"
+                name="email"
+                type="email"
+                placeholder=" "
+                required
+                autoComplete="email"
+                value={signupEmail}
+                onChange={(e) => setSignupEmail(e.target.value)}
+              />
+              <label className="floating-label" htmlFor="signup-email">
+                {t("email")}
+              </label>
+            </div>
+            <PasswordField
+              id="signup-password"
+              label={t("password")}
+              minLength={6}
+              lang={lang}
+              autoComplete="new-password"
+              value={signupPassword}
+              onChange={(e) => setSignupPassword(e.target.value)}
             />
-            <label className="floating-label" htmlFor="signup-name">
-              {t("fullName")}
-            </label>
-          </div>
-          <div className="floating-label-group">
-            <input
-              className="floating-input"
-              id="signup-email"
-              name="email"
-              type="email"
-              placeholder=" "
-              required
-              autoComplete="email"
-            />
-            <label className="floating-label" htmlFor="signup-email">
-              {t("email")}
-            </label>
-          </div>
-          <PasswordField id="signup-password" label={t("password")} minLength={6} lang={lang} autoComplete="new-password" />
-          {signUpState.error && (
-            <p className="font-label-sm text-label-sm text-error text-center">{signUpState.error}</p>
-          )}
-          {signUpState.success && (
-            <p className="font-label-sm text-label-sm text-primary text-center">{signUpState.success}</p>
-          )}
-          <SubmitButton pendingLabel={t("pleaseWait")}>{t("createAccount")}</SubmitButton>
-        </form>
+            {signupError && (
+              <p className="font-label-sm text-label-sm text-error text-center">{signupError}</p>
+            )}
+            <button
+              type="submit"
+              disabled={signupLoading || !signupFullName.trim() || !signupEmail.trim() || signupPassword.length < 6}
+              className="w-full py-3 rounded-lg bg-primary text-on-primary font-label-md text-label-md shadow-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {signupLoading && (
+                <span
+                  aria-hidden
+                  className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"
+                />
+              )}
+              {signupLoading ? t("pleaseWait") : t("createAccount")}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleConfirmSignup} className="space-y-stack-gap-md">
+            <div className="text-center mb-2">
+              <div className="w-12 h-12 rounded-full bg-primary/10 text-primary mx-auto flex items-center justify-center mb-2">
+                <span className="material-symbols-outlined text-[24px]">mark_email_read</span>
+              </div>
+              <h3 className="font-title-md text-title-md text-on-surface font-semibold">
+                {t("verifyEmailTitle")}
+              </h3>
+              <p className="font-body-sm text-body-sm text-on-surface-variant mt-1 leading-relaxed">
+                {t("verifyEmailSubtitle", { email: maskedEmail })}
+              </p>
+            </div>
+
+            {signupNotice && (
+              <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg text-primary text-center font-label-sm">
+                {signupNotice}
+              </div>
+            )}
+
+            <div className="floating-label-group">
+              <input
+                className="floating-input text-center font-mono tracking-widest text-xl font-bold"
+                id="signup-code"
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder=" "
+                required
+                autoFocus
+                value={signupCode}
+                onChange={(e) => setSignupCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              />
+              <label className="floating-label" htmlFor="signup-code">
+                {t("verifyEmailCodeLabel")}
+              </label>
+            </div>
+
+            {signupError && (
+              <p className="font-label-sm text-label-sm text-error text-center">{signupError}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={signupLoading || signupCode.length !== 6}
+              className="w-full py-3 rounded-lg bg-primary text-on-primary font-label-md text-label-md shadow-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {signupLoading && (
+                <span
+                  aria-hidden
+                  className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"
+                />
+              )}
+              {signupLoading ? t("pleaseWait") : t("confirmAndActivateAccount")}
+            </button>
+
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setSignupStep(1);
+                  setSignupCode("");
+                  setSignupError(null);
+                  setSignupNotice(null);
+                }}
+                className="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors flex items-center gap-1"
+              >
+                <span className="material-symbols-outlined text-[16px]">edit</span>
+                {t("editSignupDetails")}
+              </button>
+              <button
+                type="button"
+                disabled={signupLoading}
+                onClick={handleResendSignupCode}
+                className="font-label-sm text-label-sm text-primary hover:underline transition-colors disabled:opacity-50"
+              >
+                {t("resendConfirmationCode")}
+              </button>
+            </div>
+          </form>
+        )
       ) : (
         /* mode === "forgot" */
         <div className="space-y-stack-gap-md">

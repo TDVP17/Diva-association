@@ -77,7 +77,7 @@ export function renderBrandedEmailHtml(params: BrandedEmailParams): string {
               <strong>DIVA Asso.</strong> — Plateforme sécurisée de gestion des tontines et cotisations
             </p>
             <p style="font-size: 11px; color: #94a3b8; margin: 0;">
-              <a href="${baseUrl}" style="color: #003528; text-decoration: underline;">www.divaasso.com</a> • Douala, Cameroun
+              <a href="${baseUrl}" style="color: #003528; text-decoration: underline;">www.divaasso.com</a> • Bertoua, Cameroun
             </p>
           </td>
         </tr>

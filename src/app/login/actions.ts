@@ -6,10 +6,11 @@ import { prisma } from "@/lib/prisma";
 import { getSupabaseAuthClient, getSupabaseAdminClient } from "@/lib/supabase-auth";
 import { isAdminRole } from "@/lib/constants";
 import { ensureMemberCode } from "@/lib/member-code";
-import { createOtpChallenge, verifyOtp } from "@/lib/otp";
+import { createOtpChallenge, verifyOtp, generateOtp } from "@/lib/otp";
 import { sendEmailSafe } from "@/lib/email/resend";
 import { sendWelcomeAndAdminNotifications, renderBrandedEmailHtml } from "@/lib/email/template";
 import { validateEmailAddress } from "@/lib/email-validator";
+import { createSignupToken, verifySignupToken } from "@/lib/signup-token";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { getLang } from "@/lib/i18n/get-lang";
 
@@ -284,22 +285,17 @@ export async function confirmPasswordResetAction(
   }
 }
 
-export async function signUpAction(
-  callbackUrl: string,
-  _prevState: AuthFormState,
-  formData: FormData,
-): Promise<AuthFormState> {
-  const lang = await getLang();
-  const fullName = String(formData.get("fullName") ?? "").trim();
-  const rawEmail = String(formData.get("email") ?? "").trim();
-  const password = String(formData.get("password") ?? "");
+export async function requestSignUpCodeAction(
+  data: { fullName: string; email: string; password: string },
+  lang: Lang = "fr",
+): Promise<{ error?: string; success?: boolean; signupToken?: string; maskedEmail?: string }> {
+  const fullName = (data.fullName ?? "").trim();
+  const rawEmail = (data.email ?? "").trim();
+  const password = String(data.password ?? "");
 
   if (!fullName || !rawEmail || !password) {
     return {
-      error:
-        lang === "fr"
-          ? "Tous les champs sont obligatoires."
-          : "All fields are required.",
+      error: lang === "fr" ? "Tous les champs sont obligatoires." : "All fields are required.",
     };
   }
   if (password.length < 6) {
@@ -330,8 +326,144 @@ export async function signUpAction(
     };
   }
 
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true },
+  });
+  if (existingUser) {
+    return {
+      error:
+        lang === "fr"
+          ? "Un compte existe déjà avec cette adresse email. Veuillez vous connecter ou réinitialiser votre mot de passe."
+          : "An account already exists with this email address. Please sign in or reset your password.",
+    };
+  }
+
+  const code = generateOtp();
+  const expiresAt = Date.now() + 15 * 60 * 1000;
+
+  const signupToken = createSignupToken({
+    fullName,
+    email,
+    password,
+    code,
+    expiresAt,
+  });
+
+  const subject =
+    lang === "fr"
+      ? "DIVA Asso — Code de validation de votre adresse e-mail"
+      : "DIVA Asso — Email verification code";
+
+  const emailHtml = renderBrandedEmailHtml({
+    title: subject,
+    bodyHtml: `
+      <p style="margin-top: 0;">${lang === "fr" ? `Bonjour <strong>${fullName}</strong>,` : `Hello <strong>${fullName}</strong>,`}</p>
+      <p>
+        ${
+          lang === "fr"
+            ? "Merci de rejoindre la communauté <strong>DIVA Asso</strong> ! Pour vérifier que cette adresse e-mail vous appartient vraiment et activer votre compte, voici votre code de validation personnel :"
+            : "Thank you for joining <strong>DIVA Asso</strong>! To verify that this email address belongs to you and activate your account, here is your personal verification code:"
+        }
+      </p>
+      <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 22px; margin: 26px 0; text-align: center;">
+        <p style="margin: 0 0 8px 0; font-size: 13px; color: #166534; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+          ${lang === "fr" ? "Code de Confirmation Unique" : "Unique Confirmation Code"}
+        </p>
+        <div style="font-size: 36px; font-weight: 800; color: #003528; letter-spacing: 8px;">
+          ${code}
+        </div>
+        <p style="margin: 10px 0 0 0; font-size: 12px; color: #15803d;">
+          ${lang === "fr" ? "Ce code expire dans 15 minutes." : "This code expires in 15 minutes."}
+        </p>
+      </div>
+      <p style="font-size: 13px; color: #64748b; line-height: 1.6;">
+        ${
+          lang === "fr"
+            ? "Saisissez ce code dans l'application pour finaliser votre inscription en toute sécurité."
+            : "Enter this code in the app to securely complete your registration."
+        }
+      </p>
+    `,
+    lang,
+  });
+
   try {
-    const { data, error } = await getSupabaseAuthClient().auth.signUp({
+    await sendEmailSafe(email, subject, emailHtml);
+  } catch (err) {
+    console.error("[requestSignUpCodeAction] sendEmail failed:", err);
+    return {
+      error:
+        lang === "fr"
+          ? "Impossible d'envoyer l'e-mail de validation. Veuillez vérifier votre adresse e-mail."
+          : "Could not send verification email. Please check your email address.",
+    };
+  }
+
+  const atIdx = email.indexOf("@");
+  const maskedEmail =
+    atIdx > 2 ? email.slice(0, 2) + "***" + email.slice(atIdx - 1) : email;
+
+  return { success: true, signupToken, maskedEmail };
+}
+
+export async function resendSignUpCodeAction(
+  signupToken: string,
+  lang: Lang = "fr",
+): Promise<{ error?: string; success?: boolean; signupToken?: string; maskedEmail?: string }> {
+  const data = verifySignupToken(signupToken);
+  if (!data) {
+    return {
+      error:
+        lang === "fr"
+          ? "Session d'inscription expirée. Veuillez recommencer."
+          : "Registration session expired. Please start over.",
+    };
+  }
+  return requestSignUpCodeAction(
+    { fullName: data.fullName, email: data.email, password: data.password },
+    lang,
+  );
+}
+
+export async function confirmSignUpAction(
+  signupToken: string,
+  enteredCode: string,
+  callbackUrl: string = "/dashboard",
+  lang: Lang = "fr",
+): Promise<{ error?: string; success?: boolean }> {
+  const data = verifySignupToken(signupToken);
+  if (!data) {
+    return {
+      error:
+        lang === "fr"
+          ? "Session d'inscription invalide ou expirée. Veuillez recommencer."
+          : "Invalid or expired registration session. Please start over.",
+    };
+  }
+
+  if (Date.now() > data.expiresAt) {
+    return {
+      error:
+        lang === "fr"
+          ? "Le code de confirmation a expiré. Veuillez demander un nouveau code."
+          : "Verification code expired. Please request a new code.",
+    };
+  }
+
+  if (enteredCode.trim() !== data.code) {
+    return {
+      error:
+        lang === "fr"
+          ? "Code de confirmation incorrect. Veuillez vérifier vos e-mails."
+          : "Incorrect verification code. Please check your email.",
+    };
+  }
+
+  const { email, password, fullName } = data;
+
+  try {
+    const { data: supaData, error: supaError } = await getSupabaseAuthClient().auth.signUp({
       email,
       password,
       options: { data: { full_name: fullName } },
@@ -339,58 +471,52 @@ export async function signUpAction(
 
     const isAlreadyRegistered =
       Boolean(
-        error &&
-          (error.message?.toLowerCase().includes("already registered") ||
-            error.message?.toLowerCase().includes("already exists") ||
-            error.message?.toLowerCase().includes("user already") ||
-            (error as { code?: string })?.code === "user_already_exists" ||
-            error.message?.toLowerCase().includes("already been registered"))
+        supaError &&
+          (supaError.message?.toLowerCase().includes("already registered") ||
+            supaError.message?.toLowerCase().includes("already exists") ||
+            supaError.message?.toLowerCase().includes("user already") ||
+            (supaError as { code?: string })?.code === "user_already_exists" ||
+            supaError.message?.toLowerCase().includes("already been registered")),
       ) ||
-      Boolean(data?.user?.identities && data.user.identities.length === 0);
+      Boolean(supaData?.user?.identities && supaData.user.identities.length === 0);
 
     if (isAlreadyRegistered) {
       return {
         error:
           lang === "fr"
-            ? "Un compte existe déjà avec cette adresse email. Veuillez vous connecter ou utiliser une autre adresse email."
-            : "An account with this email address already exists. Please sign in or use another email address.",
-      }; 
+            ? "Un compte existe déjà avec cette adresse email. Veuillez vous connecter."
+            : "An account with this email address already exists. Please sign in.",
+      };
     }
 
-    if (error) {
-      if (error.message?.toLowerCase().includes("rate limit")) {
-        return {
-          error:
-            lang === "fr"
-              ? "Trop de tentatives. Veuillez patienter un instant avant de réessayer."
-              : "Too many attempts. Please wait a moment before trying again.",
-        };
+    if (supaError && !supaData?.user) {
+      console.error("[confirmSignUpAction] supabase error:", supaError);
+      return {
+        error:
+          lang === "fr"
+            ? `Erreur lors de la création du compte : ${supaError.message}`
+            : supaError.message,
+      };
+    }
+
+    // Auto-confirm in Supabase Admin because we proved email ownership
+    try {
+      const supabaseAdmin = getSupabaseAdminClient();
+      const { data: list } = await supabaseAdmin.auth.admin.listUsers();
+      const authUser = list?.users?.find((u) => u.email === email);
+      if (authUser) {
+        await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
+          email_confirm: true,
+        });
       }
-      return {
-        error:
-          lang === "fr"
-            ? `Erreur lors de la création du compte : ${error.message}`
-            : error.message,
-      };
+    } catch (err) {
+      console.error("[confirmSignUpAction] email_confirm update error:", err);
     }
 
-    if (!data.user) {
-      return {
-        error:
-          lang === "fr"
-            ? "Impossible de créer votre compte. Veuillez réessayer."
-            : "Could not create your account. Please try again.",
-      };
-    }
-
-    // Supabase Auth now owns the credential; mirror the account into our own
-    // users table so the rest of the app (role, memberships, etc.) has
-    // something to attach to. Note that Prisma schema allows duplicate names,
-    // only email is unique across accounts.
     const user = await prisma.user.upsert({
       where: { email },
-      update: { name: fullName },
-      create: { email, name: fullName },
+      update: { name: fullName, emailVerified: new Date() },
+      create: { email, name: fullName, emailVerified: new Date() },
     });
     const memberCode = await ensureMemberCode(user.id);
 
@@ -403,36 +529,48 @@ export async function signUpAction(
       lang,
     });
 
-    if (!data.session) {
-      // Email confirmation is required before the account can sign in.
-      return {
-        success:
-          lang === "fr"
-            ? "Compte créé avec succès ! Vérifiez vos e-mails pour le confirmer, puis connectez-vous."
-            : "Account created! Check your email to confirm it, then sign in.",
-      };
+    let redirectTo = callbackUrl;
+    if (callbackUrl === "/dashboard" && isAdminRole(user.role)) {
+      redirectTo = "/admin";
     }
 
-    await signIn("email-password", { email, password, redirectTo: callbackUrl });
-    return {};
+    await signIn("email-password", { email, password, redirectTo });
+    return { success: true };
   } catch (err) {
-    if (isRedirectSignal(err)) throw err; // successful sign-in — let the redirect happen
+    if (isRedirectSignal(err)) throw err;
     if (err instanceof AuthError) {
-      return {
-        success:
-          lang === "fr"
-            ? "Compte créé — veuillez vous connecter."
-            : "Account created — please sign in.",
-      };
+      return { success: true };
     }
-    console.error("[signUpAction] unexpected error:", err);
+    console.error("[confirmSignUpAction] unexpected error:", err);
     return {
       error:
         lang === "fr"
-          ? "Une erreur est survenue lors de la création de votre compte. Veuillez réessayer."
-          : "Something went wrong while creating your account. Please try again.",
+          ? "Une erreur est survenue lors de l'activation de votre compte. Veuillez vous connecter."
+          : "Something went wrong. Please try signing in.",
     };
   }
+}
+
+export async function signUpAction(
+  callbackUrl: string,
+  _prevState: AuthFormState,
+  formData: FormData,
+): Promise<AuthFormState> {
+  const lang = await getLang();
+  const fullName = String(formData.get("fullName") ?? "").trim();
+  const rawEmail = String(formData.get("email") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+
+  const res = await requestSignUpCodeAction({ fullName, email: rawEmail, password }, lang);
+  if (res.error) {
+    return { error: res.error };
+  }
+  return {
+    success:
+      lang === "fr"
+        ? "Un code de validation a été envoyé à votre adresse e-mail."
+        : "A verification code has been sent to your email address.",
+  };
 }
 
 export async function getGoogleSignInUrl(
