@@ -13,7 +13,7 @@ const FAPSHI_PAYOUT_BASE_URL = process.env.FAPSHI_PAYOUT_BASE_URL ?? FAPSHI_BASE
 const FAPSHI_PAYOUT_API_USER = process.env.FAPSHI_PAYOUT_API_USER || process.env.FAPSHI_API_USER || "";
 const FAPSHI_PAYOUT_API_KEY = process.env.FAPSHI_PAYOUT_API_KEY || process.env.FAPSHI_API_KEY || "";
 
-export type FapshiPaymentStatus = "CREATED" | "PENDING" | "SUCCESSFUL" | "FAILED" | "EXPIRED";
+export type FapshiPaymentStatus = "CREATED" | "PENDING" | "SUCCESSFUL" | "COMPLETED" | "FAILED" | "EXPIRED";
 
 export interface InitiateDirectPayParams {
   amount: number;

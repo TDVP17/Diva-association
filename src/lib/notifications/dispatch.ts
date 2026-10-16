@@ -103,7 +103,8 @@ async function deliverInstantNotifications(params: {
       : [];
 
     const userMap = new Map(users.map((u) => [u.id, u]));
-    const baseUrl = process.env.NEXTAUTH_URL ?? "https://diva-association.vercel.app";
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? "https://www.divaasso.com";
 
     await Promise.all(
       params.recipients.map(async (r) => {

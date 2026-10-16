@@ -37,7 +37,8 @@ export interface ProcessedTransaction {
 export async function processFapshiTransaction(transId: string, origin: string): Promise<ProcessedTransaction> {
   const verified = await getPaymentStatus(transId);
 
-  if (verified.status === "SUCCESSFUL") {
+  const isSuccess = verified.status === "SUCCESSFUL" || (verified.status as string) === "COMPLETED";
+  if (isSuccess) {
     return await handleSuccessful(transId, verified, origin);
   }
 

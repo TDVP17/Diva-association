@@ -20,7 +20,8 @@ export async function GET(request: Request) {
   }
 
   try {
-    const baseUrl = process.env.NEXTAUTH_URL ?? new URL(request.url).origin;
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? new URL(request.url).origin;
     const result = await processFapshiTransaction(transId, baseUrl);
     return NextResponse.json(result);
   } catch (err) {

@@ -81,6 +81,7 @@ interface PayoutClaim {
   payoutPhone: string;
   payoutAccountName: string;
   netPayout: number | null;
+  fapshiTransId?: string | null;
   detailsSubmittedAt: string;
   releasedAt: string | null;
   memberConfirmedAt: string | null;
@@ -122,6 +123,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   const [payoutClaims, setPayoutClaims] = useState<PayoutClaim[]>([]);
   const [reviewingClaimId, setReviewingClaimId] = useState<string | null>(null);
   const [payoutResult, setPayoutResult] = useState<string | null>(null);
+  const [payoutError, setPayoutError] = useState<string | null>(null);
   const [payoutPreview, setPayoutPreview] = useState<{
     pot: number;
     deducted: number;
@@ -410,13 +412,14 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     setReviewingClaimId(claimId);
     setLoadingPreview(true);
     setPayoutResult(null);
+    setPayoutError(null);
     setPayoutPreview(null);
     try {
       const res = await fetch(`/api/admin/payouts/preview?payoutClaimId=${claimId}`);
       const body = await res.json();
       if (!res.ok) {
         if (body?.error) console.error("[reviewClaim] server error:", body.error);
-        setPayoutResult(t("failedToReleasePayout"));
+        setPayoutError(body?.error || t("failedToReleasePayout"));
         return;
       }
       setPayoutPreview(body);
@@ -429,6 +432,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     if (!reviewingClaimId) return;
     setReleasing(true);
     setPayoutResult(null);
+    setPayoutError(null);
     try {
       const res = await fetch("/api/admin/payouts/release", {
         method: "POST",
@@ -438,15 +442,16 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
       const body = await res.json();
       if (!res.ok) {
         if (body?.error) console.error("[confirmReleasePayout] server error:", body.error);
-        setPayoutResult(t("failedToReleasePayout"));
+        setPayoutError(body?.error || t("failedToReleasePayout"));
         return;
       }
+      const refMsg = body.transId ? ` (Réf Fapshi: ${body.transId})` : "";
       setPayoutResult(
-        t("payoutResultLine", {
+        `${t("payoutResultLine", {
           pot: formatXAF(body.pot),
           deducted: formatXAF(body.deducted),
           net: formatXAF(body.netPayout),
-        }),
+        })}${refMsg}`,
       );
       setPayoutPreview(null);
       setReviewingClaimId(null);
@@ -506,8 +511,9 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
       if (!res.ok) {
         setDirectPayoutError(data?.error || t("failedToReleasePayout"));
       } else {
+        const refStr = data?.transId ? ` — Réf Fapshi: ${data.transId}` : "";
         setDirectPayoutResult(
-          `${t("payoutSentSuccess")} (${formatXAF(data.netPayout)})`
+          `${t("payoutSentSuccess")} (${formatXAF(data.netPayout)})${refStr}`
         );
         await refreshPayoutClaims();
       }
@@ -1559,6 +1565,29 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                         </button>
                       </div>
 
+                      {c.fapshiTransId && (
+                        <div className="flex items-center justify-between flex-wrap gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                          <div className="flex items-center gap-1.5 font-mono text-slate-700">
+                            <span className="material-symbols-outlined text-[15px] text-primary">tag</span>
+                            <span><strong>Réf Fapshi :</strong> {c.fapshiTransId}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => handleCopy(c.fapshiTransId!, `claim-ref-${c.id}`, e)}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${
+                              copiedKey === `claim-ref-${c.id}`
+                                ? "bg-emerald-600 text-white"
+                                : "bg-white text-slate-700 border border-slate-300 hover:bg-slate-100"
+                            }`}
+                          >
+                            <span className="material-symbols-outlined text-[13px]">
+                              {copiedKey === `claim-ref-${c.id}` ? "check" : "content_copy"}
+                            </span>
+                            {copiedKey === `claim-ref-${c.id}` ? t("copied") : t("copy")}
+                          </button>
+                        </div>
+                      )}
+
                       {c.status !== "CONFIRMED" && (
                         <div className="pt-2 border-t border-slate-100 flex items-center justify-end">
                           <button
@@ -1684,7 +1713,18 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
               })}
             </div>
           )}
-          {payoutResult && <p className="font-label-sm text-label-sm text-on-surface-variant mt-3">{payoutResult}</p>}
+          {payoutError && (
+            <div className="mt-3 p-3 bg-error-container text-on-error-container rounded-lg text-sm font-medium flex items-center gap-2">
+              <span className="material-symbols-outlined text-error text-[18px]">error</span>
+              <span>{payoutError}</span>
+            </div>
+          )}
+          {payoutResult && (
+            <div className="mt-3 p-3 bg-[#d1fae5] border border-[#10b981]/30 text-[#065f46] rounded-lg text-sm font-medium flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#059669] text-[18px]">check_circle</span>
+              <span>{payoutResult}</span>
+            </div>
+          )}
           </div>
         </section>
       )}

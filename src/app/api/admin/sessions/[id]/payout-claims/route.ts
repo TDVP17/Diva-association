@@ -24,6 +24,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       payoutPhone: c.payoutPhone,
       payoutAccountName: c.payoutAccountName,
       netPayout: c.netPayout ? Number(c.netPayout) : null,
+      fapshiTransId: c.fapshiTransId,
       detailsSubmittedAt: c.detailsSubmittedAt.toISOString(),
       releasedAt: c.releasedAt?.toISOString() ?? null,
       memberConfirmedAt: c.memberConfirmedAt?.toISOString() ?? null,

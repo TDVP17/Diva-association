@@ -274,6 +274,8 @@ export default async function HistoryPage() {
         <div className="flex flex-col gap-3">
           {rows.map((r) => {
             const isPaid = r.status === "PAID";
+            const isPending = r.status === "PENDING";
+            const isLate = r.status === "LATE";
             const isRefunded = r.status === "REFUNDED";
             const isRefundPending = r.status === "DUPLICATE_PAID" || r.status === "REFUND_INITIATED";
             const isFailed = r.status === "FAILED" || r.status === "REFUND_FAILED_MANUAL_REVIEW";
@@ -289,7 +291,11 @@ export default async function HistoryPage() {
                       ? "border-cyan-200 bg-cyan-50/20"
                       : isPaid
                         ? "border-surface-variant hover:border-primary/30"
-                        : "border-red-200 bg-red-50/10"
+                        : isPending
+                          ? "border-amber-200 bg-amber-50/15"
+                          : isLate
+                            ? "border-orange-200 bg-orange-50/15"
+                            : "border-red-200 bg-red-50/10"
                 }`}
               >
                 {/* Entête de carte avec type, statut et montant */}
@@ -337,7 +343,17 @@ export default async function HistoryPage() {
                     ) : isPaid ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-[#d1fae5] text-[#065f46]">
                         <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                        {t("checkedPaid")}
+                        {lang === "fr" ? "Validé" : t("checkedPaid")}
+                      </span>
+                    ) : isPending ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                        <span className="material-symbols-outlined text-[14px]">schedule</span>
+                        {lang === "fr" ? "En attente" : "Pending"}
+                      </span>
+                    ) : isLate ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-orange-100 text-orange-800 border border-orange-200">
+                        <span className="material-symbols-outlined text-[14px]">warning</span>
+                        {lang === "fr" ? "En retard" : "Late"}
                       </span>
                     ) : null}
                     {isRefunded && (

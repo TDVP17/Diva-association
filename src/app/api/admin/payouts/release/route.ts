@@ -252,5 +252,11 @@ export async function POST(request: Request) {
     request,
   });
 
-  return NextResponse.json({ pot, deducted, netPayout, dueDate: claim.dueDate.toISOString() });
+  return NextResponse.json({
+    pot,
+    deducted,
+    netPayout,
+    dueDate: claim.dueDate.toISOString(),
+    transId: fapshiResult.transId,
+  });
 }

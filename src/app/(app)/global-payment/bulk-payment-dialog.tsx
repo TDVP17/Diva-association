@@ -56,6 +56,7 @@ export function BulkPaymentDialog({
   const [submitting, setSubmitting] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
   const [transId, setTransId] = useState<string | null>(null);
+  const [failedReason, setFailedReason] = useState<string | null>(null);
   const [showWaitingHint, setShowWaitingHint] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hintRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -93,8 +94,8 @@ export function BulkPaymentDialog({
       try {
         const res = await fetch(`/api/payments/fapshi/status?transId=${encodeURIComponent(id)}`);
         if (!res.ok) return;
-        const body = (await res.json()) as { status: string };
-        if (body.status === "SUCCESSFUL") {
+        const body = (await res.json()) as { status: string; failureReason?: string | null };
+        if (body.status === "SUCCESSFUL" || body.status === "COMPLETED") {
           if (pollRef.current) clearInterval(pollRef.current);
           if (hintRef.current) clearTimeout(hintRef.current);
           playSuccessChimeSound();
@@ -103,6 +104,7 @@ export function BulkPaymentDialog({
         } else if (body.status === "FAILED" || body.status === "EXPIRED") {
           if (pollRef.current) clearInterval(pollRef.current);
           if (hintRef.current) clearTimeout(hintRef.current);
+          setFailedReason(body.failureReason ?? null);
           setStep("failed");
         }
       } catch {
@@ -141,6 +143,7 @@ export function BulkPaymentDialog({
   function retry() {
     setStep("form");
     setPayError(null);
+    setFailedReason(null);
     setShowWaitingHint(false);
     setTransId(null);
   }
@@ -248,7 +251,9 @@ export function BulkPaymentDialog({
         {step === "failed" && (
           <div className="flex flex-col items-center text-center gap-4">
             <span className="material-symbols-outlined text-error text-4xl">error</span>
-            <p className="font-body-md text-body-md text-on-surface">{t("paymentFailedInsufficientFunds")}</p>
+            <p className="font-body-md text-body-md text-on-surface">
+              {failedReason || t("paymentFailedInsufficientFunds")}
+            </p>
             <div className="flex gap-3 w-full">
               <button
                 onClick={onClose}
