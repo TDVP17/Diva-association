@@ -1,7 +1,7 @@
 import type { Fine, Membership, MembershipSlot, TontineSession, User } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
-import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
 import { sendEmailSafe } from "@/lib/email/resend";
+import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { translate } from "@/lib/i18n/translations";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { formatXAF } from "@/lib/format-currency";
@@ -36,8 +36,16 @@ export async function settleFine(fine: FineWithSlot): Promise<void> {
     session: sessionLabel,
   });
 
-  await sendWhatsAppMessageSafe(user.phone, message);
-  await sendEmailSafe(user.email, translate(lang, "finePaidEmailSubject"), `<p>${message}</p>`);
+  const subject = translate(lang, "finePaidEmailSubject");
+  const emailHtml = renderBrandedEmailHtml({
+    title: subject,
+    bodyText: message,
+    actionUrl: "/fines",
+    actionLabel: lang === "en" ? "View Fines" : "Voir mes amendes",
+    lang,
+  });
+
+  await sendEmailSafe(user.email, subject, emailHtml);
 
   await scheduleInAppNotifications({
     tontineSessionId: tontineSession.id,

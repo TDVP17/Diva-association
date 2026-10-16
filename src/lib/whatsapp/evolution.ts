@@ -31,46 +31,15 @@ function normalizePhone(phone: string): string {
   return digits;
 }
 
-export async function sendWhatsAppMessage(phone: string, text: string): Promise<void> {
-  const number = normalizePhone(phone);
-  if (!number) {
-    throw new EvolutionApiError("Cannot send WhatsApp message: empty phone number", 400);
-  }
-  if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY || !EVOLUTION_INSTANCE_NAME) {
-    throw new EvolutionApiError("Evolution API is not configured", 500);
-  }
-
-  const res = await fetch(
-    `${EVOLUTION_API_URL}/message/sendText/${encodeURIComponent(EVOLUTION_INSTANCE_NAME)}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: EVOLUTION_API_KEY,
-      },
-      body: JSON.stringify({ number, text }),
-    },
-  );
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new EvolutionApiError(
-      body?.message ?? `Evolution API sendText failed (${res.status})`,
-      res.status,
-    );
-  }
+export async function sendWhatsAppMessage(_phone: string, _text: string): Promise<void> {
+  // WhatsApp notifications are completely disabled by user policy in favor of Email notifications.
+  return;
 }
 
 /**
- * Best-effort send: logs and swallows failures instead of throwing, for call
- * sites (crons, webhooks) where a WhatsApp outage must never break the
- * underlying financial operation it's reporting on.
+ * WhatsApp notifications are completely disabled by user policy in favor of Email notifications.
  */
-export async function sendWhatsAppMessageSafe(phone: string | null, text: string): Promise<void> {
-  if (!phone) return;
-  try {
-    await sendWhatsAppMessage(phone, text);
-  } catch (error) {
-    console.error("WhatsApp notification failed:", error);
-  }
+export async function sendWhatsAppMessageSafe(_phone: string | null, _text: string): Promise<void> {
+  // No-op: all alerts routed through Email.
+  return;
 }

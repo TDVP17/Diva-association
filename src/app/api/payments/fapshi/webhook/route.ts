@@ -3,7 +3,12 @@ import { processFapshiTransaction } from "@/lib/process-fapshi-transaction";
 
 export async function POST(request: Request) {
   const secret = request.headers.get("x-wh-secret");
-  if (!secret || secret !== process.env.FAPSHI_WEBHOOK_SECRET) {
+  const expectedSecrets = [
+    process.env.FAPSHI_WEBHOOK_SECRET,
+    process.env.FAPSHI_PAYOUT_WEBHOOK_SECRET,
+  ].filter(Boolean);
+
+  if (!secret || !expectedSecrets.includes(secret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

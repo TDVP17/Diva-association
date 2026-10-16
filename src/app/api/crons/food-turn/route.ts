@@ -4,8 +4,8 @@ import { isContributionDay, toDueDateKey, ALL_TONTINE_TYPES, isPayoutInfoUnlockT
 import { getDesignatedSlot } from "@/lib/round-robin-lock";
 import { translate } from "@/lib/i18n/translations";
 import { scheduleNotifications } from "@/lib/notifications/dispatch";
-import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
 import { sendEmailSafe } from "@/lib/email/resend";
+import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { NOTIFICATION_TYPE_KEY } from "@/lib/notifications/type-labels";
 
 /**
@@ -61,12 +61,21 @@ export async function GET(request: Request) {
       const lang = membership.user.preferredLang === "en" ? "en" : "fr";
       const message = translate(lang, "foodTurnMessage", { name: membership.user.name });
 
-      await sendWhatsAppMessageSafe(membership.user.phone, message);
-      await sendEmailSafe(
-        membership.user.email,
-        translate(lang, NOTIFICATION_TYPE_KEY.FOOD_TURN),
-        message.split("\n").map((l) => `<p>${l}</p>`).join(""),
-      );
+      if (membership.user.email) {
+        const emailTitle = lang === "fr" ? "C'est votre tour de recevoir la cagnotte ! 🎉" : "It's your turn to receive the pot! 🎉";
+        const emailHtml = renderBrandedEmailHtml({
+          title: emailTitle,
+          bodyText: message,
+          actionUrl: `/sessions/${tontineSession.id}`,
+          actionLabel: lang === "fr" ? "Voir ma cagnotte" : "View My Pot",
+          lang,
+        });
+        await sendEmailSafe(
+          membership.user.email,
+          `DIVA Asso — ${emailTitle}`,
+          emailHtml,
+        );
+      }
       await scheduleNotifications({
         tontineSessionId: tontineSession.id,
         channel: "IN_APP",

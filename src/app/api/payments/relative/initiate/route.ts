@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       request,
     });
 
-    return NextResponse.json({ transId: result.transId });
+    return NextResponse.json({ transId: result.transId, link: result.link });
   } catch (err) {
     console.error("[payments/relative/initiate] unexpected error:", err);
     return NextResponse.json({ error: "Payment initiation failed" }, { status: 500 });

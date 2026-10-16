@@ -30,7 +30,7 @@ export interface BulkPaymentQuote {
 
 export type BulkPaymentQuoteResult = { ok: true; quote: BulkPaymentQuote } | { ok: false; status: number; error: string };
 
-export type InitiateBulkPaymentResult = { ok: true; transId: string } | { ok: false; status: number; error: string };
+export type InitiateBulkPaymentResult = { ok: true; transId: string; link?: string } | { ok: false; status: number; error: string };
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -358,7 +358,7 @@ export async function initiateBulkPayment(
       }),
     ]);
 
-    return { ok: true, transId: result.transId };
+    return { ok: true, transId: result.transId, link: result.link };
   } catch (error) {
     const failureReason = error instanceof FapshiError ? error.message : "Payment initiation failed";
     await prisma.$transaction([

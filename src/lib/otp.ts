@@ -8,7 +8,8 @@ const REQUEST_COOLDOWN_MS = 60 * 1000;
 const MAX_ATTEMPTS = 5;
 
 export function generateOtp(): string {
-  return String(randomInt(0, 1_000_000)).padStart(6, "0");
+  // Always a 6-digit code between 100000 and 999999
+  return String(randomInt(100_000, 1_000_000));
 }
 
 function hashOtp(code: string): string {
@@ -17,8 +18,8 @@ function hashOtp(code: string): string {
 
 /**
  * Creates a new OTP challenge for the given user+purpose, unless one was
- * already requested within the cooldown window (returns null in that case
- * so the caller can avoid re-sending a WhatsApp message too often).
+ * already requested within the cooldown window. Ensures code is unique and
+ * does not collide with active unconsumed challenges.
  */
 export async function createOtpChallenge(
   userId: string,
@@ -33,7 +34,26 @@ export async function createOtpChallenge(
     return null;
   }
 
-  const code = generateOtp();
+  // Invalidate any prior unconsumed challenges for this purpose
+  await prisma.otpChallenge.updateMany({
+    where: { userId, purpose, consumedAt: null },
+    data: { consumedAt: new Date() },
+  });
+
+  // Generate unique code
+  let code = generateOtp();
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const existing = await prisma.otpChallenge.findFirst({
+      where: {
+        userId,
+        codeHash: hashOtp(code),
+        expiresAt: { gt: new Date() },
+      },
+    });
+    if (!existing) break;
+    code = generateOtp();
+  }
+
   await prisma.otpChallenge.create({
     data: {
       userId,

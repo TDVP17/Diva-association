@@ -5,6 +5,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { getSupabaseAuthClient } from "@/lib/supabase-auth";
 import { ensureMemberCode } from "@/lib/member-code";
+import { sendWelcomeAndAdminNotifications } from "@/lib/email/template";
 
 // Local-only "log in as any seeded user" provider — lets you click through
 // the app without setting up real Google OAuth credentials. Excluded from
@@ -134,7 +135,17 @@ export const {
     // sign-up flow creates its User row directly and calls
     // ensureMemberCode() itself (see src/app/login/actions.ts).
     async createUser({ user }) {
-      if (user.id) await ensureMemberCode(user.id);
+      if (user.id) {
+        const memberCode = await ensureMemberCode(user.id);
+        if (user.email) {
+          void sendWelcomeAndAdminNotifications({
+            userId: user.id,
+            name: user.name || "Nouveau membre",
+            email: user.email,
+            memberCode,
+          });
+        }
+      }
     },
   },
   callbacks: {

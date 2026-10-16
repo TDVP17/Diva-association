@@ -7,7 +7,7 @@ import { detectMobileMoneyProvider, fapshiMediumFor } from "@/lib/mobile-money-p
 import type { PaymentProvider } from "@/generated/prisma/enums";
 
 export type InitiateSlotPaymentResult =
-  | { ok: true; transId: string }
+  | { ok: true; transId: string; link?: string }
   | { ok: false; status: number; error: string };
 
 export interface SlotPaymentQuote {
@@ -253,7 +253,7 @@ export async function initiateSlotPayment(
       }),
     ]);
 
-    return { ok: true, transId: result.transId };
+    return { ok: true, transId: result.transId, link: result.link };
   } catch (error) {
     if (contribution?.id) {
       await prisma.contribution.update({

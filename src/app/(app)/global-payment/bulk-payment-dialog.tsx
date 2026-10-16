@@ -129,7 +129,11 @@ export function BulkPaymentDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ membershipSlotIds, phone: normalized, isRelative }),
       });
-      const body = await parseJsonOrThrow<{ transId: string }>(res, t("paymentInitiationFailed"));
+      const body = await parseJsonOrThrow<{ transId: string; link?: string }>(res, t("paymentInitiationFailed"));
+      if (body.link) {
+        window.location.href = body.link;
+        return;
+      }
       setTransId(body.transId);
       setStep("waiting");
       startPolling(body.transId);

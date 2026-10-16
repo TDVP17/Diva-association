@@ -2,9 +2,8 @@ import type { Contribution, Membership, MembershipSlot, TontineSession, User } f
 import { prisma } from "@/lib/prisma";
 import { generateReceiptPdf } from "@/lib/receipt";
 import { saveFile } from "@/lib/storage";
-import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
 import { sendEmailSafe } from "@/lib/email/resend";
-import { paymentSuccessMessage } from "@/lib/whatsapp/templates";
+import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { formatXAF } from "@/lib/format-currency";
 import { translate, type Lang } from "@/lib/i18n/translations";
@@ -76,16 +75,7 @@ export async function settleContribution(
   const receiptUrl = `${options.origin}/api/files/${receiptKey}`;
   const recipientLang: Lang = user.preferredLang === "en" ? "en" : "fr";
 
-  await sendWhatsAppMessageSafe(
-    user.phone,
-    paymentSuccessMessage(
-      recipientLang,
-      `${user.name} (${contribution.membershipSlot.beneficiaryName})`,
-      totalPaid,
-      sessionLabel,
-      receiptUrl,
-    ),
-  );
+
 
   await sendEmailSafe(
     user.email,
@@ -195,9 +185,7 @@ export async function settleContribution(
             },
           ],
         });
-        if (benUser.phone) {
-          await sendWhatsAppMessageSafe(benUser.phone, alertMsg);
-        }
+
       }
     }
   } catch (err) {
@@ -246,18 +234,7 @@ export async function settleContribution(
         receiptUrl,
       }),
     );
-    if (contribution.paidByUser.phone) {
-      await sendWhatsAppMessageSafe(
-        contribution.paidByUser.phone,
-        paymentSuccessMessage(
-          payerLang,
-          `${contribution.paidByUser.name} (pour ${contribution.membershipSlot.beneficiaryName})`,
-          totalPaid,
-          sessionLabel,
-          receiptUrl,
-        ),
-      );
-    }
+
   }
 }
 
@@ -274,16 +251,40 @@ function paymentSuccessEmailHtml(
   },
 ): string {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
-  const paidByLine = data.paidByName ? `<p><strong>${t("paidByLabel")}:</strong> ${data.paidByName}</p>` : "";
-  return `
-    <p>${t("paymentReceivedEmailGreeting", { name: data.recipientName })}</p>
+  const paidByLine = data.paidByName ? `<tr><td style="padding: 6px 0; color: #64748b;"><strong>${t("paidByLabel")} :</strong></td><td style="padding: 6px 0; font-weight: 600; text-align: right;">${data.paidByName}</td></tr>` : "";
+  
+  const bodyHtml = `
+    <p style="margin-top: 0;">${t("paymentReceivedEmailGreeting", { name: data.recipientName })}</p>
     <p>${t("paymentReceivedEmailIntro")}</p>
-    <p><strong>${t("contributedForLabel")}:</strong> ${data.beneficiaryName}</p>
-    ${paidByLine}
-    <p><strong>${t("contributionLabel")}:</strong> ${data.sessionLabel}</p>
-    <p><strong>${t("amountLabel")}:</strong> ${formatXAF(data.amount)}</p>
-    <p><strong>${t("transactionIdLabel")}:</strong> ${data.transRef}</p>
-    <p><a href="${data.receiptUrl}">${t("downloadReceiptPdf")}</a></p>
-    <p>${t("thankYouContributionLine")}</p>
+    
+    <table width="100%" style="margin: 18px 0; border-collapse: collapse; font-size: 14px;">
+      <tr>
+        <td style="padding: 6px 0; color: #64748b;"><strong>${t("contributedForLabel")} :</strong></td>
+        <td style="padding: 6px 0; font-weight: 600; text-align: right;">${data.beneficiaryName}</td>
+      </tr>
+      ${paidByLine}
+      <tr>
+        <td style="padding: 6px 0; color: #64748b;"><strong>${t("contributionLabel")} :</strong></td>
+        <td style="padding: 6px 0; font-weight: 600; text-align: right;">${data.sessionLabel}</td>
+      </tr>
+      <tr>
+        <td style="padding: 6px 0; color: #64748b;"><strong>${t("amountLabel")} :</strong></td>
+        <td style="padding: 6px 0; font-weight: 700; color: #003528; text-align: right; font-size: 16px;">${formatXAF(data.amount)}</td>
+      </tr>
+      <tr>
+        <td style="padding: 6px 0; color: #64748b;"><strong>${t("transactionIdLabel")} :</strong></td>
+        <td style="padding: 6px 0; font-family: monospace; text-align: right; font-size: 13px;">${data.transRef}</td>
+      </tr>
+    </table>
+
+    <p style="margin-bottom: 0;">${t("thankYouContributionLine")}</p>
   `;
+
+  return renderBrandedEmailHtml({
+    title: t("paymentReceivedEmailSubject", { session: data.sessionLabel }),
+    bodyHtml,
+    actionUrl: data.receiptUrl,
+    actionLabel: t("downloadReceiptPdf"),
+    lang,
+  });
 }

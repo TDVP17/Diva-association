@@ -2,7 +2,7 @@
 // style of src/lib/whatsapp/evolution.ts for consistency.
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY ?? "";
-const RESEND_FROM = process.env.RESEND_FROM ?? "DIVA Asso <notifications@diva-associations.cm>";
+const RESEND_FROM = process.env.RESEND_FROM ?? "DIVA Asso <notifications@divaasso.com>";
 
 export class ResendError extends Error {
   constructor(
@@ -30,6 +30,7 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
+    console.error("[resend] API error response:", body);
     throw new ResendError(body?.message ?? `Resend request failed (${res.status})`, res.status);
   }
 }

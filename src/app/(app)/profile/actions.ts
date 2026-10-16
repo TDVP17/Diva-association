@@ -4,6 +4,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getSupabaseAdminClient, getSupabaseAuthClient } from "@/lib/supabase-auth";
 import { hasVerifiedOtp } from "@/lib/otp";
+import { getLang } from "@/lib/i18n/get-lang";
+import { validateEmailAddress } from "@/lib/email-validator";
 
 export interface ProfileFormState {
   error?: string;
@@ -49,28 +51,36 @@ export async function updatePhoneAction(
   formData: FormData,
 ): Promise<ProfileFormState> {
   const session = await auth();
+  const lang = await getLang();
   if (!session?.user) {
-    return { error: "You must be signed in to update your profile." };
+    return { error: lang === "fr" ? "Vous devez être connecté pour modifier votre profil." : "You must be signed in to update your profile." };
   }
 
   const phone = String(formData.get("phone") ?? "").trim();
   if (!phone) {
-    return { error: "Please enter a phone number." };
+    return { error: lang === "fr" ? "Veuillez entrer un numéro de téléphone." : "Please enter a phone number." };
   }
 
   const verified = await hasVerifiedOtp(session.user.id, "PHONE_CHANGE", phone);
   if (!verified) {
-    return { error: "Please verify this phone number with the code we sent you first." };
+    return {
+      error:
+        lang === "fr"
+          ? "Veuillez d'abord valider ce numéro avec le code de vérification."
+          : "Please verify this phone number with the code we sent you first.",
+    };
   }
 
   try {
     await prisma.user.update({ where: { id: session.user.id }, data: { phone } });
-    return { success: "Phone number updated." };
+    return { success: lang === "fr" ? "Numéro de téléphone mis à jour." : "Phone number updated." };
   } catch (err) {
     console.error("[updatePhoneAction] unexpected error:", err);
     return {
       error:
-        "L'enregistrement de votre numéro WhatsApp n'a pas pu aboutir pour le moment. Veuillez réessayer plus tard.",
+        lang === "fr"
+          ? "L'enregistrement de votre numéro n'a pas pu aboutir pour le moment. Veuillez réessayer plus tard."
+          : "Could not register your phone number right now. Please try again later.",
     };
   }
 }
@@ -91,14 +101,17 @@ export async function updateEmailAction(
     return { error: "You must be signed in to update your profile." };
   }
 
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  if (!email || !email.includes("@")) {
-    return { error: "Please enter a valid email address." };
+  const rawEmail = String(formData.get("email") ?? "").trim();
+  const lang = await getLang();
+  const check = await validateEmailAddress(rawEmail, lang);
+  if (!check.valid) {
+    return { error: check.error };
   }
+  const email = check.normalizedEmail || rawEmail.toLowerCase();
 
   const verified = await hasVerifiedOtp(session.user.id, "EMAIL_CHANGE", email);
   if (!verified) {
-    return { error: "Please verify this email address with the code we sent you first." };
+    return { error: lang === "fr" ? "Veuillez d'abord valider cette adresse e-mail avec le code de vérification." : "Please verify this email address with the code we sent you first." };
   }
 
   try {

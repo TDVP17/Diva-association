@@ -5,7 +5,8 @@ import { requireAdmin } from "@/lib/require-admin";
 import { computePayoutPreview } from "@/lib/payout-preview";
 import { sendPayout, FapshiPayoutError } from "@/lib/fapshi-payout";
 import { detectMobileMoneyProvider, fapshiMediumFor } from "@/lib/mobile-money-provider";
-import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
+import { sendEmailSafe } from "@/lib/email/resend";
+import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { payoutReleasedMessage } from "@/lib/whatsapp/templates";
 import { getNextDueDate } from "@/lib/tontine-engine";
 import { logAudit } from "@/lib/audit";
@@ -193,7 +194,20 @@ export async function POST(request: Request) {
     deducted,
   );
 
-  await sendWhatsAppMessageSafe(user.phone, releaseMsg);
+  if (user.email) {
+    const emailHtml = renderBrandedEmailHtml({
+      title: userLang === "fr" ? "Virement de cagnotte effectué ! 💰" : "Payout Disbursed! 💰",
+      bodyText: releaseMsg,
+      actionUrl: `/sessions/${tontineSessionId}`,
+      actionLabel: userLang === "fr" ? "Consulter ma cagnotte" : "View My Pot",
+      lang: userLang,
+    });
+    await sendEmailSafe(
+      user.email,
+      userLang === "fr" ? "DIVA Asso — Virement de cagnotte effectué ! 💰" : "DIVA Asso — Payout Disbursed! 💰",
+      emailHtml,
+    );
+  }
 
   await prisma.notification.create({
     data: {
@@ -257,13 +271,28 @@ export async function POST(request: Request) {
           newDesignatedPosition,
         );
 
-        await sendWhatsAppMessageSafe(beneficiaryUser.phone, fullPayoutTurnMessage);
-        await scheduleNotifications({
-          tontineSessionId,
-          channel: "EMAIL",
-          type: "PAYOUT_TURN",
-          recipients: [{ userId: beneficiaryUser.id, message: fullPayoutTurnMessage }],
-        });
+        if (beneficiaryUser.email) {
+          const potEmailHtml = renderBrandedEmailHtml({
+            title:
+              beneficiaryLang === "fr"
+                ? "DIVA Asso — C'est votre tour de bouffer la cagnotte ! 🎉"
+                : "DIVA Asso — It's your turn to receive the payout! 🎉",
+            bodyText: fullPayoutTurnMessage,
+            actionUrl: `/sessions/${tontineSessionId}`,
+            actionLabel:
+              beneficiaryLang === "fr"
+                ? "Voir ma session"
+                : "View My Session",
+            lang: beneficiaryLang,
+          });
+          await sendEmailSafe(
+            beneficiaryUser.email,
+            beneficiaryLang === "fr"
+              ? "DIVA Asso — C'est votre tour de bouffer la cagnotte ! 🎉"
+              : "DIVA Asso — It's your turn to receive the payout! 🎉",
+            potEmailHtml,
+          );
+        }
         await scheduleInAppNotifications({
           tontineSessionId,
           type: "PAYOUT_TURN",

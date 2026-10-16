@@ -25,12 +25,14 @@ export interface InitiateDirectPayParams {
   userId?: string;
   externalId?: string;
   message?: string;
+  redirectUrl?: string;
 }
 
 export interface InitiateDirectPayResult {
   message: string;
   transId: string;
   dateInitiated: string;
+  link?: string;
 }
 
 export interface PaymentStatusResult {
@@ -93,17 +95,67 @@ export async function initiateDirectPayment(params: InitiateDirectPayParams): Pr
     throw new FapshiError("Fapshi is not configured", 500);
   }
 
+  const directPayload = {
+    amount: params.amount,
+    phone: params.phone,
+    medium: params.medium,
+    name: params.name,
+    email: params.email,
+    userId: params.userId,
+    externalId: params.externalId,
+    message: params.message,
+  };
+
   const res = await fetch(`${FAPSHI_BASE_URL}/direct-pay`, {
     method: "POST",
     headers: authHeaders(),
-    body: JSON.stringify(params),
+    body: JSON.stringify(directPayload),
   });
 
-  const body = await res.json();
-  if (!res.ok) {
-    throw new FapshiError(body?.message ?? "Fapshi direct-pay request failed", res.status);
+  const body = await res.json().catch(() => null);
+  if (res.ok && body?.transId) {
+    return body as InitiateDirectPayResult;
   }
-  return body as InitiateDirectPayResult;
+
+  // If Direct Pay is not yet activated on Fapshi Live (HTTP 403 / activate-direct-pay error),
+  // automatically fall back to Fapshi's hosted checkout (/initiate-pay) so payments work immediately!
+  const isDirectPayDisabled =
+    res.status === 403 &&
+    (typeof body?.message === "string" &&
+      (body.message.includes("activate-direct-pay") || body.message.includes("Forbidden request")));
+
+  if (isDirectPayDisabled) {
+    const fallbackAppUrl =
+      params.redirectUrl ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.NEXTAUTH_URL ||
+      "https://www.divaasso.com";
+
+    const initRes = await fetch(`${FAPSHI_BASE_URL}/initiate-pay`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        amount: params.amount,
+        email: params.email,
+        userId: params.userId,
+        externalId: params.externalId,
+        message: params.message,
+        redirectUrl: fallbackAppUrl,
+      }),
+    });
+
+    const initBody = await initRes.json().catch(() => null);
+    if (initRes.ok && initBody?.link && initBody?.transId) {
+      return {
+        message: initBody.message ?? "Request successful",
+        transId: initBody.transId,
+        dateInitiated: initBody.dateInitiated ?? new Date().toISOString(),
+        link: initBody.link,
+      };
+    }
+  }
+
+  throw new FapshiError(body?.message ?? "Fapshi payment request failed", res.status);
 }
 
 export interface PayoutParams {

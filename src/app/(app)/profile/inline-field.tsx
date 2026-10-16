@@ -64,21 +64,20 @@ export function InlineField({
     if (!newValue.trim()) return;
     setSending(true);
     setError(null);
+    const fallbackMsg =
+      purpose === "PHONE_CHANGE"
+        ? t("phoneRegistrationFailedLater")
+        : t("codeSendingFailed");
     try {
       const res = await fetch("/api/profile/otp/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ purpose, pendingValue: newValue.trim() }),
       });
-      await parseJsonOrThrow(res, t("otpInvalid"));
+      await parseJsonOrThrow(res, fallbackMsg);
       setStep("otp");
     } catch (err) {
-      setError(
-        friendlyErrorMessage(
-          err,
-          purpose === "PHONE_CHANGE" ? t("whatsappRegistrationFailedLater") : t("otpInvalid"),
-        ),
-      );
+      setError(friendlyErrorMessage(err, fallbackMsg, (k, vars) => t(k as any, vars)));
     } finally {
       setSending(false);
     }
@@ -97,12 +96,7 @@ export function InlineField({
       await parseJsonOrThrow(res, t("otpInvalid"));
       setStep("verified");
     } catch (err) {
-      setError(
-        friendlyErrorMessage(
-          err,
-          purpose === "PHONE_CHANGE" ? t("whatsappRegistrationFailedLater") : t("otpInvalid"),
-        ),
-      );
+      setError(friendlyErrorMessage(err, t("otpInvalid"), (k, vars) => t(k as any, vars)));
     } finally {
       setVerifying(false);
     }

@@ -203,7 +203,11 @@ export function PaymentConfirmDialog({
           phone: normalized,
         }),
       });
-      const body = await parseJsonOrThrow<{ transId: string }>(res, t("paymentInitiationFailed"));
+      const body = await parseJsonOrThrow<{ transId: string; link?: string }>(res, t("paymentInitiationFailed"));
+      if (body.link) {
+        window.location.href = body.link;
+        return;
+      }
       setTransId(body.transId);
       setUsedPhone(normalized);
       setStep("waiting");

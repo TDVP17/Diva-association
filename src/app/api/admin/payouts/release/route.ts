@@ -5,8 +5,8 @@ import { requireAdmin } from "@/lib/require-admin";
 import { computePayoutPreview } from "@/lib/payout-preview";
 import { sendPayout, FapshiPayoutError } from "@/lib/fapshi-payout";
 import { detectMobileMoneyProvider, fapshiMediumFor } from "@/lib/mobile-money-provider";
-import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
 import { sendEmailSafe } from "@/lib/email/resend";
+import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { payoutTurnMessage, payoutReleasedMessage } from "@/lib/whatsapp/templates";
 import { scheduleInAppNotifications, scheduleNotifications } from "@/lib/notifications/dispatch";
 import { getDesignatedSlot } from "@/lib/round-robin-lock";
@@ -129,21 +129,19 @@ export async function POST(request: Request) {
     deducted,
   );
 
-  await sendWhatsAppMessageSafe(user.phone, releaseMsg);
   if (user.email) {
-    const emailHtml = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1e293b; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0;">
-        <div style="text-align: center; margin-bottom: 20px;">
-          <h2 style="color: #003528; margin: 0;">DIVA Asso</h2>
-        </div>
-        <h3 style="color: #003528; margin-top: 0;">Virement de gain effectué</h3>
-        <p style="font-size: 15px; line-height: 1.6; white-space: pre-line;">${releaseMsg}</p>
-        <p style="margin-top: 24px;">
-          <a href="${process.env.NEXTAUTH_URL ?? "https://diva-association.vercel.app"}/profile" style="background-color: #003528; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Voir mon compte</a>
-        </p>
-      </div>
-    `;
-    await sendEmailSafe(user.email, "DIVA Asso — Virement de gain effectué", emailHtml);
+    const emailHtml = renderBrandedEmailHtml({
+      title: lang === "fr" ? "Virement de cagnotte effectué ! 💰" : "Payout Disbursed! 💰",
+      bodyText: releaseMsg,
+      actionUrl: `/sessions/${claim.tontineSessionId}`,
+      actionLabel: lang === "fr" ? "Consulter ma cagnotte" : "View My Pot",
+      lang,
+    });
+    await sendEmailSafe(
+      user.email,
+      lang === "fr" ? "DIVA Asso — Virement de cagnotte effectué ! 💰" : "DIVA Asso — Payout Disbursed! 💰",
+      emailHtml,
+    );
   }
 
   // The round-robin just advanced — whoever getDesignatedSlot() now resolves
@@ -201,13 +199,29 @@ export async function POST(request: Request) {
         newDesignatedPosition,
       );
 
-      await sendWhatsAppMessageSafe(beneficiaryUser.phone, fullPayoutTurnMessage);
-      await scheduleNotifications({
-        tontineSessionId: claim.tontineSessionId,
-        channel: "EMAIL",
-        type: "PAYOUT_TURN",
-        recipients: [{ userId: beneficiaryUser.id, message: fullPayoutTurnMessage }],
-      });
+
+      if (beneficiaryUser.email) {
+        const potEmailHtml = renderBrandedEmailHtml({
+          title:
+            beneficiaryLang === "fr"
+              ? "DIVA Asso — C'est votre tour de bouffer la cagnotte ! 🎉"
+              : "DIVA Asso — It's your turn to receive the payout! 🎉",
+          bodyText: fullPayoutTurnMessage,
+          actionUrl: `/sessions/${claim.tontineSessionId}`,
+          actionLabel:
+            beneficiaryLang === "fr"
+              ? "Voir ma session & renseigner mes coordonnées"
+              : "View Session & Enter Account Details",
+          lang: beneficiaryLang,
+        });
+        await sendEmailSafe(
+          beneficiaryUser.email,
+          beneficiaryLang === "fr"
+            ? "DIVA Asso — C'est votre tour de bouffer la cagnotte ! 🎉"
+            : "DIVA Asso — It's your turn to receive the payout! 🎉",
+          potEmailHtml,
+        );
+      }
       await scheduleInAppNotifications({
         tontineSessionId: claim.tontineSessionId,
         type: "PAYOUT_TURN",

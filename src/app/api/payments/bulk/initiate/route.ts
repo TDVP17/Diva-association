@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
-    return NextResponse.json({ transId: result.transId });
+    return NextResponse.json({ transId: result.transId, link: result.link });
   } catch (err) {
     console.error("[payments/bulk/initiate] unexpected error:", err);
     return NextResponse.json({ error: "Payment initiation failed" }, { status: 500 });

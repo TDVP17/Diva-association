@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { initiatePayout, isPayoutConfigured, FapshiError } from "@/lib/fapshi";
-import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
+import { sendEmailSafe } from "@/lib/email/resend";
+import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { logAudit } from "@/lib/audit";
@@ -13,6 +14,7 @@ const BACKOFF_BASE_MINUTES = 5; // 5, 10, 20 minutes — exponential per retry.
 interface RefundTarget {
   slotLabel: string;
   payerLang: Lang;
+  payerEmail: string | null;
 }
 
 async function loadRefundTarget(attempt: PaymentAttempt): Promise<RefundTarget | null> {
@@ -29,6 +31,7 @@ async function loadRefundTarget(attempt: PaymentAttempt): Promise<RefundTarget |
     return {
       slotLabel: contribution.membershipSlot.beneficiaryName,
       payerLang: payer.preferredLang === "en" ? "en" : "fr",
+      payerEmail: payer.email ?? null,
     };
   }
   if (attempt.fineId) {
@@ -41,6 +44,7 @@ async function loadRefundTarget(attempt: PaymentAttempt): Promise<RefundTarget |
     return {
       slotLabel: fine.membershipSlot.beneficiaryName,
       payerLang: payer.preferredLang === "en" ? "en" : "fr",
+      payerEmail: payer.email ?? null,
     };
   }
   return null;
@@ -86,13 +90,21 @@ export async function triggerAutomatedRefund(paymentAttemptId: string): Promise<
       data: { status: "REFUNDED", refundTransId: result.transId, refundedAt: new Date(), lastRefundError: null },
     });
 
-    if (target) {
-      await sendWhatsAppMessageSafe(
-        attempt.payerPhone,
-        translate(target.payerLang, "waDuplicateRefunded", {
+    if (target?.payerEmail) {
+      const emailTitle =
+        target.payerLang === "en"
+          ? `Refund processed: ${formatXAF(Number(attempt.amount))}`
+          : `Remboursement effectué : ${formatXAF(Number(attempt.amount))}`;
+      const emailHtml = renderBrandedEmailHtml({
+        title: emailTitle,
+        bodyText: translate(target.payerLang, "waDuplicateRefunded", {
           amount: formatXAF(Number(attempt.amount)),
         }),
-      );
+        actionUrl: "/profile",
+        actionLabel: target.payerLang === "en" ? "View in App" : "Consulter dans l'application",
+        lang: target.payerLang,
+      });
+      await sendEmailSafe(target.payerEmail, `DIVA Asso — ${emailTitle}`, emailHtml);
     }
   } catch (error) {
     const attempts = attempt.refundAttempts + 1;

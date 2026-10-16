@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email/resend";
-import { sendWhatsAppMessage } from "@/lib/whatsapp/evolution";
+import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { sendPushToUser } from "@/lib/push/send";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { NOTIFICATION_TYPE_KEY } from "@/lib/notifications/type-labels";
@@ -40,10 +40,16 @@ export async function GET(request: Request) {
       if (n.channel === "EMAIL") {
         if (!n.user.email) throw new Error("Recipient has no email on file");
         const { subject, body } = splitSubjectAndBody(n.type, n.message, lang);
-        await sendEmail(n.user.email, subject, htmlFor(body));
+        const emailHtml = renderBrandedEmailHtml({
+          title: subject,
+          bodyText: body,
+          actionUrl: n.actionUrl ?? undefined,
+          actionLabel: lang === "en" ? "View in App" : "Consulter dans l'application",
+          lang,
+        });
+        await sendEmail(n.user.email, subject, emailHtml);
       } else if (n.channel === "WHATSAPP") {
-        if (!n.user.phone) throw new Error("Recipient has no WhatsApp number on file");
-        await sendWhatsAppMessage(n.user.phone, n.message);
+        // WhatsApp notifications are retired; mark as processed without external dispatch
       } else if (n.channel === "PUSH") {
         // +1 because this row's own status flips to SENT right after this
         // block — it isn't counted yet by the same query the badge-sync

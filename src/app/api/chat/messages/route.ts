@@ -6,8 +6,8 @@ import { translate, type Lang } from "@/lib/i18n/translations";
 import { LANG_COOKIE } from "@/lib/i18n/lang-cookie";
 import { isAdminRole } from "@/lib/constants";
 import { sendPushToUser } from "@/lib/push/send";
-import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
 import { sendEmailSafe } from "@/lib/email/resend";
+import { renderBrandedEmailHtml } from "@/lib/email/template";
 
 const AUTO_REPLY_THROTTLE_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -115,15 +115,20 @@ export async function POST(request: Request) {
       badgeCount: unreadChatCount,
     }).catch((err) => console.error("[chat] Push notification failed:", err));
 
-    if (receiver.phone) {
-      const waText = `*DIVA Asso - Nouveau message*\n\nDe : *${senderName}*\n« ${preview} »\n\nRépondre dans l'app : ${baseUrl}${chatUrl}`;
-      void sendWhatsAppMessageSafe(receiver.phone, waText).catch((err) =>
-        console.error("[chat] WhatsApp notification failed:", err),
-      );
-    }
-
     if (receiver.email) {
-      const emailHtml = `<p>Bonjour,</p><p>Vous avez reçu un nouveau message de <strong>${senderName}</strong> :</p><p style="padding:12px;background:#f1f5f9;border-radius:8px;">« ${preview} »</p><p><a href="${baseUrl}${chatUrl}" style="display:inline-block;padding:10px 16px;background:#003528;color:#ffffff;text-decoration:none;border-radius:6px;">Répondre dans l'application</a></p>`;
+      const emailHtml = renderBrandedEmailHtml({
+        title: `Nouveau message de ${senderName}`,
+        bodyHtml: `
+          <p style="margin-top: 0;">Bonjour,</p>
+          <p>Vous avez reçu un nouveau message de <strong>${senderName}</strong> :</p>
+          <div style="padding: 14px 16px; background-color: #f1f5f9; border-left: 3px solid #003528; border-radius: 8px; margin: 16px 0; font-style: italic; color: #1e293b;">
+            « ${preview} »
+          </div>
+        `,
+        actionUrl: chatUrl,
+        actionLabel: "Répondre dans l'application",
+        baseUrl,
+      });
       void sendEmailSafe(receiver.email, `Nouveau message de ${senderName} — DIVA Asso`, emailHtml).catch((err) =>
         console.error("[chat] Email notification failed:", err),
       );

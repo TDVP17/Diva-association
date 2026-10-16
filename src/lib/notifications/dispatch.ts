@@ -2,8 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { getUnreadInAppNotificationCount } from "@/lib/notifications/unread";
 import type { NotificationChannel, NotificationEventType } from "@/generated/prisma/enums";
 import { sendPushToUser } from "@/lib/push/send";
-import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
 import { sendEmailSafe } from "@/lib/email/resend";
+import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { NOTIFICATION_TYPE_KEY } from "@/lib/notifications/type-labels";
 import { translate, type Lang } from "@/lib/i18n/translations";
 
@@ -136,35 +136,17 @@ async function deliverInstantNotifications(params: {
           console.error("[push] instant delivery failed:", pushErr);
         }
 
-        // 2. Deliver instant WhatsApp message via Evolution API
-        if (user?.phone) {
-          try {
-            const link = r.actionUrl ? `\n\nConsulter : ${baseUrl}${r.actionUrl}` : "";
-            const waText = `*${title}*\n\n${body}${link}`;
-            await sendWhatsAppMessageSafe(user.phone, waText);
-          } catch (waErr) {
-            console.error("[whatsapp] instant delivery failed:", waErr);
-          }
-        }
-
-        // 3. Deliver instant Email notification via Resend
+        // Deliver instant Email notification via Resend with official DIVA logo and direct CTA button
         if (user?.email) {
           try {
-            const actionButton = r.actionUrl
-              ? `<p style="margin-top: 24px;"><a href="${baseUrl}${r.actionUrl}" style="background-color: #003528; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Consulter</a></p>`
-              : "";
-            const emailHtml = `
-              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1e293b; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0;">
-                <div style="text-align: center; margin-bottom: 24px;">
-                  <h2 style="color: #003528; margin: 0; font-size: 22px;">DIVA Asso.</h2>
-                </div>
-                <h3 style="color: #0f172a; margin-top: 0; font-size: 18px;">${title}</h3>
-                <p style="font-size: 15px; line-height: 1.6; white-space: pre-line; color: #334155;">${body}</p>
-                ${actionButton}
-                <hr style="margin: 32px 0 16px; border: none; border-top: 1px solid #e2e8f0;" />
-                <p style="font-size: 12px; color: #94a3b8; text-align: center; margin: 0;">DIVA Asso. — Plateforme de gestion des cotisations</p>
-              </div>
-            `;
+            const emailHtml = renderBrandedEmailHtml({
+              title,
+              bodyText: body,
+              actionUrl: r.actionUrl,
+              actionLabel: lang === "en" ? "View in App" : "Consulter dans l'application",
+              lang,
+              baseUrl,
+            });
             await sendEmailSafe(user.email, title, emailHtml);
           } catch (emailErr) {
             console.error("[email] instant delivery failed:", emailErr);
@@ -185,9 +167,8 @@ async function deliverInstantNotifications(params: {
  * the cron. Mirrors the pattern first used in the membership approve/reject
  * route, now shared so every IN_APP trigger site behaves consistently.
  *
- * Every IN_APP event also gets companion PUSH, WHATSAPP, and EMAIL rows for the same
- * recipients — reaching members directly on their phone even when the app is
- * closed, via system push, WhatsApp (Evolution API), and Email (Resend).
+ * Every IN_APP event also gets companion PUSH and EMAIL rows for the same
+ * recipients — reaching members directly via Web Push and Email (Resend).
  */
 export async function scheduleInAppNotifications(params: {
   tontineSessionId?: string;
@@ -209,10 +190,9 @@ export async function scheduleInAppNotifications(params: {
   });
 
   await scheduleNotifications({ ...params, channel: "PUSH" });
-  await scheduleNotifications({ ...params, channel: "WHATSAPP" });
   await scheduleNotifications({ ...params, channel: "EMAIL" });
 
-  // Trigger instant phone delivery (Push & WhatsApp & Email) in background
+  // Trigger instant delivery (Push & Email) in background
   void deliverInstantNotifications(params);
 
   return count;

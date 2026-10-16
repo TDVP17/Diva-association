@@ -47,8 +47,8 @@ export function WhatsAppPhonePrompt({ lang, hasPhone }: { lang: Lang; hasPhone: 
         </button>
 
         <div className="flex flex-col items-center gap-3 mb-5">
-          <div className="w-16 h-16 rounded-2xl bg-[#25D366]/15 text-[#128C7E] flex items-center justify-center shadow-inner">
-            <span className="material-symbols-outlined text-[36px]">chat</span>
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shadow-inner">
+            <span className="material-symbols-outlined text-[36px]">phone_iphone</span>
           </div>
           <h2 className="font-headline-sm text-headline-sm text-on-surface text-center font-bold">
             {t("whatsappPromptTitle")}

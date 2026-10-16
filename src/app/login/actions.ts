@@ -8,7 +8,8 @@ import { isAdminRole } from "@/lib/constants";
 import { ensureMemberCode } from "@/lib/member-code";
 import { createOtpChallenge, verifyOtp } from "@/lib/otp";
 import { sendEmailSafe } from "@/lib/email/resend";
-import { sendWhatsAppMessageSafe } from "@/lib/whatsapp/evolution";
+import { sendWelcomeAndAdminNotifications, renderBrandedEmailHtml } from "@/lib/email/template";
+import { validateEmailAddress } from "@/lib/email-validator";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { getLang } from "@/lib/i18n/get-lang";
 
@@ -161,50 +162,42 @@ export async function requestPasswordResetAction(
     };
   }
 
-  if (isEmail) {
-    const subject =
-      lang === "fr"
-        ? "DIVA Asso — Code de réinitialisation de mot de passe"
-        : "DIVA Asso — Password reset verification code";
-    const emailHtml = `
-      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1e293b; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0;">
-        <div style="text-align: center; margin-bottom: 20px;">
-          <h2 style="color: #003528; margin: 0;">DIVA Asso</h2>
-        </div>
-        <h3 style="color: #0f172a; margin-top: 0;">${subject}</h3>
-        <p style="font-size: 15px; line-height: 1.6; color: #334155;">
-          ${lang === "fr"
+  const subject =
+    lang === "fr"
+      ? "DIVA Asso — Code de réinitialisation de mot de passe"
+      : "DIVA Asso — Password reset verification code";
+  const emailHtml = renderBrandedEmailHtml({
+    title: subject,
+    bodyHtml: `
+      <p style="font-size: 15px; line-height: 1.6; color: #334155; margin-top: 0;">
+        ${
+          lang === "fr"
             ? `Bonjour <strong>${user.name}</strong>, voici votre code de vérification pour réinitialiser votre mot de passe :`
-            : `Hello <strong>${user.name}</strong>, here is your verification code to reset your password:`}
-        </p>
-        <div style="text-align: center; margin: 28px 0;">
-          <span style="display: inline-block; font-size: 32px; font-weight: bold; letter-spacing: 8px; padding: 14px 28px; background: #f0fdf4; color: #003528; border-radius: 10px; border: 1px solid #bbf7d0;">
-            ${challenge.code}
-          </span>
-        </div>
-        <p style="font-size: 13px; color: #64748b;">
-          ${lang === "fr"
-            ? "Ce code expire dans 10 minutes. Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email en toute sécurité."
-            : "This code expires in 10 minutes. If you did not request this, you can safely ignore this email."}
-        </p>
+            : `Hello <strong>${user.name}</strong>, here is your verification code to reset your password:`
+        }
+      </p>
+      <div style="text-align: center; margin: 26px 0;">
+        <span style="display: inline-block; font-size: 32px; font-weight: bold; letter-spacing: 8px; padding: 14px 28px; background: #f0fdf4; color: #003528; border-radius: 10px; border: 1px solid #bbf7d0;">
+          ${challenge.code}
+        </span>
       </div>
-    `;
-    await sendEmailSafe(user.email, subject, emailHtml);
-    const atIdx = user.email.indexOf("@");
-    const masked =
-      atIdx > 2
-        ? user.email.slice(0, 2) + "***" + user.email.slice(atIdx - 1)
-        : user.email;
-    return { success: true, channel: "EMAIL", destination: masked };
-  } else {
-    const waText =
-      lang === "fr"
-        ? `*DIVA Asso — Réinitialisation du mot de passe*\n\nBonjour *${user.name}*,\nVotre code de vérification est : *${challenge.code}*\n\nCe code expire dans 10 minutes. Pour votre sécurité, ne le transmettez à personne.`
-        : `*DIVA Asso — Password reset*\n\nHello *${user.name}*,\nYour verification code is: *${challenge.code}*\n\nThis code expires in 10 minutes. Do not share it with anyone.`;
-    await sendWhatsAppMessageSafe(user.phone, waText);
-    const maskedPhone = user.phone && user.phone.length > 4 ? `+***${user.phone.slice(-4)}` : "WhatsApp";
-    return { success: true, channel: "WHATSAPP", destination: maskedPhone };
-  }
+      <p style="font-size: 13px; color: #64748b; margin-bottom: 0;">
+        ${
+          lang === "fr"
+            ? "Ce code expire dans 10 minutes. Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email en toute sécurité."
+            : "This code expires in 10 minutes. If you did not request this, you can safely ignore this email."
+        }
+      </p>
+    `,
+    lang,
+  });
+  await sendEmailSafe(user.email, subject, emailHtml);
+  const atIdx = user.email.indexOf("@");
+  const masked =
+    atIdx > 2
+      ? user.email.slice(0, 2) + "***" + user.email.slice(atIdx - 1)
+      : user.email;
+  return { success: true, channel: "EMAIL", destination: masked };
 }
 
 export async function confirmPasswordResetAction(
@@ -299,10 +292,9 @@ export async function signUpAction(
   const lang = await getLang();
   const fullName = String(formData.get("fullName") ?? "").trim();
   const rawEmail = String(formData.get("email") ?? "").trim();
-  const email = rawEmail.toLowerCase();
   const password = String(formData.get("password") ?? "");
 
-  if (!fullName || !email || !password) {
+  if (!fullName || !rawEmail || !password) {
     return {
       error:
         lang === "fr"
@@ -318,6 +310,12 @@ export async function signUpAction(
           : "Password must be at least 6 characters.",
     };
   }
+
+  const emailCheck = await validateEmailAddress(rawEmail, lang);
+  if (!emailCheck.valid) {
+    return { error: emailCheck.error };
+  }
+  const email = emailCheck.normalizedEmail || rawEmail.toLowerCase();
 
   const existingBanned = await prisma.user.findUnique({
     where: { email },
@@ -394,10 +392,16 @@ export async function signUpAction(
       update: { name: fullName },
       create: { email, name: fullName },
     });
-    // Every member gets their unique code right away, not just once their
-    // first membership is approved — ensureMemberCode() is idempotent, so
-    // this is a no-op for an existing user who already has one.
-    await ensureMemberCode(user.id);
+    const memberCode = await ensureMemberCode(user.id);
+
+    // Welcome email & admin alert
+    void sendWelcomeAndAdminNotifications({
+      userId: user.id,
+      name: user.name,
+      email: user.email,
+      memberCode,
+      lang,
+    });
 
     if (!data.session) {
       // Email confirmation is required before the account can sign in.

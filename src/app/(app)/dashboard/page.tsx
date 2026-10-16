@@ -103,8 +103,11 @@ export default async function DashboardPage() {
                       const effectiveStatus = isDrawDone ? "ACTIVE" : m.tontineSession.status;
 
                       return (
-                        <p className="font-label-sm text-label-sm text-on-surface-variant">
-                          {t("plusFeeSuffix", { fee: formatXAF(fee) })} &middot; {t(sessionStatusKey(effectiveStatus))}
+                        <p className="font-label-sm text-label-sm text-on-surface-variant mt-1 flex items-center gap-1.5 flex-wrap">
+                          <span className="font-numeric-data text-on-surface font-semibold">{formatXAF(amount)}</span>
+                          <span>({t("plusFeeSuffix", { fee: formatXAF(fee) })})</span>
+                          <span>&middot;</span>
+                          <span className="font-medium text-primary">{t(sessionStatusKey(effectiveStatus))}</span>
                         </p>
                       );
                     })()}
