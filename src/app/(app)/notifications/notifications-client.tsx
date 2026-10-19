@@ -31,6 +31,7 @@ export function NotificationsClient({ lang }: { lang: Lang }) {
   const [pushStatus, setPushStatus] = useState<NotificationPermission | "unsupported">("default");
   const [pushBusy, setPushBusy] = useState(false);
   const [pushMessage, setPushMessage] = useState<string | null>(null);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -171,16 +172,16 @@ export function NotificationsClient({ lang }: { lang: Lang }) {
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Phone system notification status card */}
-      {pushStatus !== "unsupported" && (
-        <div className="bg-gradient-to-r from-[#064e3b] via-[#064e3b] to-[#043327] text-white rounded-2xl p-4 shadow-md border border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-start gap-3">
+      {/* Phone system notification status card — only shown when not yet activated */}
+      {pushStatus !== "unsupported" && pushStatus !== "granted" && !bannerDismissed && (
+        <div className="bg-gradient-to-r from-[#064e3b] via-[#064e3b] to-[#043327] text-white rounded-2xl p-4 shadow-md border border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative">
+          <div className="flex items-start gap-3 pr-6 sm:pr-0">
             <span className="material-symbols-outlined text-amber-400 text-2xl flex-shrink-0 mt-0.5">
-              {pushStatus === "granted" ? "notifications_active" : "notifications_paused"}
+              notifications_paused
             </span>
             <div>
               <p className="font-bold text-sm text-white">
-                {pushStatus === "granted" ? t("phoneNotificationsActive") : t("phoneNotificationsTitle")}
+                {t("phoneNotificationsTitle")}
               </p>
               <p className="text-xs text-emerald-200/90 mt-0.5 leading-relaxed">
                 {t("phoneNotificationsDesc")}
@@ -193,26 +194,23 @@ export function NotificationsClient({ lang }: { lang: Lang }) {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0 w-full sm:w-auto">
-            {pushStatus === "granted" ? (
-              <button
-                type="button"
-                onClick={handleTestPush}
-                disabled={pushBusy}
-                className="w-full sm:w-auto px-3.5 py-1.5 rounded-xl bg-emerald-800/80 hover:bg-emerald-700 text-white font-semibold text-xs border border-emerald-400/30 transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {t("testNotificationButton")}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleEnablePush}
-                disabled={pushBusy}
-                className="w-full sm:w-auto px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-emerald-950 font-bold text-xs transition-transform active:scale-95 shadow-sm cursor-pointer disabled:opacity-50"
-              >
-                {t("enablePhoneNotifications")}
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleEnablePush}
+              disabled={pushBusy}
+              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-emerald-950 font-bold text-xs transition-transform active:scale-95 shadow-sm cursor-pointer disabled:opacity-50"
+            >
+              {t("enablePhoneNotifications")}
+            </button>
           </div>
+          <button
+            type="button"
+            onClick={() => setBannerDismissed(true)}
+            aria-label="Fermer"
+            className="absolute top-2.5 right-2.5 p-1 text-emerald-200/70 hover:text-white rounded-lg transition-colors cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[18px]">close</span>
+          </button>
         </div>
       )}
 

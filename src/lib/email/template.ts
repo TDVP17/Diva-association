@@ -24,10 +24,30 @@ export function renderBrandedEmailHtml(params: BrandedEmailParams): string {
   const baseUrl = params.baseUrl || getAppBaseUrl();
   const logoUrl = `${baseUrl}/icons/icon-512.png`;
   const primaryColor = "#003528";
-  const actionButton = params.actionUrl
+  let targetUrl = "";
+  if (params.actionUrl) {
+    if (params.actionUrl.startsWith("http")) {
+      try {
+        const parsed = new URL(params.actionUrl);
+        const baseOrigin = new URL(baseUrl).origin;
+        if (parsed.origin === baseOrigin) {
+          targetUrl = `${baseUrl}/open?target=${encodeURIComponent(parsed.pathname + parsed.search)}`;
+        } else {
+          targetUrl = params.actionUrl;
+        }
+      } catch {
+        targetUrl = params.actionUrl;
+      }
+    } else {
+      const cleanPath = params.actionUrl.startsWith("/") ? params.actionUrl : `/${params.actionUrl}`;
+      targetUrl = `${baseUrl}/open?target=${encodeURIComponent(cleanPath)}`;
+    }
+  }
+
+  const actionButton = targetUrl
     ? `
       <div style="margin: 28px 0 10px 0; text-align: center;">
-        <a href="${params.actionUrl.startsWith("http") ? params.actionUrl : `${baseUrl}${params.actionUrl}`}" 
+        <a href="${targetUrl}" 
            style="background-color: ${primaryColor}; color: #ffffff; padding: 13px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block; box-shadow: 0 2px 4px rgba(0,53,40,0.15);">
           ${params.actionLabel || (params.lang === "en" ? "View in App" : "Consulter dans l'application")}
         </a>

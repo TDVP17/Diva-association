@@ -5,7 +5,7 @@ import { requireAdmin } from "@/lib/require-admin";
 import { getNextDueDate } from "@/lib/tontine-engine";
 import { getUnpaidSlots } from "@/lib/notify";
 import { translate } from "@/lib/i18n/translations";
-import { scheduleNotifications } from "@/lib/notifications/dispatch";
+import { scheduleInAppNotifications, scheduleNotifications } from "@/lib/notifications/dispatch";
 import { logAudit } from "@/lib/audit";
 import { formatXAF } from "@/lib/format-currency";
 
@@ -77,12 +77,33 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
   }
 
-  const scheduled = await scheduleNotifications({
-    tontineSessionId,
-    channel: parsed.data.channel,
-    type: parsed.data.type,
-    recipients,
-  });
+  let scheduled: number;
+  if (parsed.data.channel === "EMAIL") {
+    scheduled = await scheduleInAppNotifications({
+      tontineSessionId,
+      type: parsed.data.type,
+      recipients: recipients.map((r) => ({
+        ...r,
+        actionUrl: `/sessions/${tontineSessionId}`,
+      })),
+    });
+  } else {
+    scheduled = await scheduleNotifications({
+      tontineSessionId,
+      channel: parsed.data.channel,
+      type: parsed.data.type,
+      recipients,
+    });
+    // Companion in-app notification so the member also sees it on their phone
+    await scheduleInAppNotifications({
+      tontineSessionId,
+      type: parsed.data.type,
+      recipients: recipients.map((r) => ({
+        ...r,
+        actionUrl: `/sessions/${tontineSessionId}`,
+      })),
+    });
+  }
 
   await logAudit({
     actorId: admin.user.id,

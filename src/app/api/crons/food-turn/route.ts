@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { isContributionDay, toDueDateKey, ALL_TONTINE_TYPES, isPayoutInfoUnlockTime } from "@/lib/tontine-engine";
 import { getDesignatedSlot } from "@/lib/round-robin-lock";
 import { translate } from "@/lib/i18n/translations";
-import { scheduleNotifications } from "@/lib/notifications/dispatch";
+import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { sendEmailSafe } from "@/lib/email/resend";
 import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { NOTIFICATION_TYPE_KEY } from "@/lib/notifications/type-labels";
@@ -76,9 +76,8 @@ export async function GET(request: Request) {
           emailHtml,
         );
       }
-      await scheduleNotifications({
+      await scheduleInAppNotifications({
         tontineSessionId: tontineSession.id,
-        channel: "IN_APP",
         type: "FOOD_TURN",
         recipients: [
           {
@@ -89,13 +88,6 @@ export async function GET(request: Request) {
             actionUrl: `/sessions/${tontineSession.id}`,
           },
         ],
-      });
-      // IN_APP rows created via scheduleNotifications default to SCHEDULED,
-      // but there's nothing for the cron to "send" for IN_APP — flip it
-      // straight to SENT so it shows up in the user's feed immediately.
-      await prisma.notification.updateMany({
-        where: { tontineSessionId: tontineSession.id, userId: membership.userId, type: "FOOD_TURN", status: "SCHEDULED" },
-        data: { status: "SENT", sentAt: new Date() },
       });
 
       notified++;

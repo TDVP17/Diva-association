@@ -18,7 +18,7 @@
 //     principle the original version of this file was built around, now
 //     scoped precisely to the calls where staleness would actually mislead
 //     someone, instead of blocking page-shell caching entirely.
-const CACHE_NAME = "diva-shell-v4";
+const CACHE_NAME = "diva-shell-v5";
 const STATIC_ASSETS = ["/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png", "/offline.html"];
 
 self.addEventListener("install", (event) => {
@@ -57,6 +57,28 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return; // never intercept mutations
   const url = new URL(request.url);
+
+  // Cache Google Fonts (CSS stylesheet and woff2 font files) so Material Symbols
+  // icons always display reliably offline and on slow mobile networks.
+  if (url.hostname === "fonts.googleapis.com" || url.hostname === "fonts.gstatic.com") {
+    event.respondWith(
+      caches.match(request).then(
+        (cached) =>
+          cached ||
+          fetch(request)
+            .then((res) => {
+              if (res.ok) {
+                const copy = res.clone();
+                caches.open(CACHE_NAME).then((cache) => cache.put(request, copy).catch(() => {}));
+              }
+              return res;
+            })
+            .catch(() => cached || new Response("", { status: 200 })),
+      ),
+    );
+    return;
+  }
+
   if (url.origin !== self.location.origin) return; // never intercept cross-origin (Supabase, etc.)
 
   if (isStaticAsset(url)) {

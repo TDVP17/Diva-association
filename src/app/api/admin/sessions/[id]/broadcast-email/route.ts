@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
-import { scheduleNotifications } from "@/lib/notifications/dispatch";
+import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { logAudit } from "@/lib/audit";
 
 const bodySchema = z.object({
@@ -29,11 +29,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     distinct: ["userId"],
   });
 
-  const scheduled = await scheduleNotifications({
+  const scheduled = await scheduleInAppNotifications({
     tontineSessionId,
-    channel: "EMAIL",
     type: "ADMIN_BROADCAST",
-    recipients: memberships.map((m) => ({ userId: m.userId, message: `${parsed.data.subject}\n\n${parsed.data.body}` })),
+    recipients: memberships.map((m) => ({
+      userId: m.userId,
+      message: `${parsed.data.subject}\n\n${parsed.data.body}`,
+      actionUrl: `/sessions/${tontineSessionId}`,
+    })),
   });
 
   await logAudit({
