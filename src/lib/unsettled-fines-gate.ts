@@ -62,10 +62,19 @@ export async function checkUserFinesForJoining(
 
   const blockingFines = unpaidFines.filter((f) => {
     const session = f.membershipSlot.membership.tontineSession;
-    if (targetSessionId && session.id === targetSessionId) {
-      return false;
+    // Règle : Si la cotisation est terminée (CLOSED) et que le membre n'a pas payé ses amendes,
+    // il ne peut pas intégrer à nouveau ou entrer dans une autre cotisation tant qu'il n'a pas régularisé.
+    if (session.status === "CLOSED") {
+      return true;
     }
-    return true;
+    // Si l'amende vient d'une autre cotisation, elle bloque l'intégration de celle-ci
+    if (targetSessionId && session.id !== targetSessionId) {
+      return true;
+    }
+    if (!targetSessionId) {
+      return true;
+    }
+    return false;
   });
 
   if (blockingFines.length === 0) {

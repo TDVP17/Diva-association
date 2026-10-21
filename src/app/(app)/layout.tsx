@@ -87,7 +87,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </div>
       <BottomNav lang={lang} badges={navBadges} />
       <InstallPromptModal lang={lang} />
-      <TutorialPopup lang={lang} />
       <PushPermissionPrompt lang={lang} />
       <OfflineDraftSync lang={lang} />
       <NotificationBadgeSync />

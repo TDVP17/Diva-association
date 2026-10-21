@@ -164,29 +164,40 @@ export async function settleContribution(
         },
       });
 
-      if (paidCount === halfThreshold) {
-        const benUser = designatedSlot.membership.user;
-        const benLang: Lang = benUser.preferredLang === "en" ? "en" : "fr";
-        const benRawName = benUser.name.trim();
-        const benFirstName = benRawName.split(/\s+/)[0] || benRawName;
-        const alertMsg =
-          benLang === "fr"
-            ? `Salut, ${benFirstName} 👋 ! C'est à votre tour de bouffer la cagnotte de ${sessionLabel} ! 🎉 La moitié des membres a cotisé : veuillez fournir votre numéro de téléphone et le nom du compte Orange/MTN Money pour recevoir votre virement.`
-            : `Hello, ${benFirstName} 👋! It's your turn to receive the ${sessionLabel} payout! 🎉 Half of the members have contributed: please provide your phone number and Orange/MTN Money account name to receive your payout.`;
-
-        await scheduleInAppNotifications({
-          tontineSessionId: membership.tontineSessionId,
-          type: "PAYOUT_TURN",
-          recipients: [
-            {
-              userId: benUser.id,
-              message: alertMsg,
-              messageKey: "payoutTurnNotifMessage",
-              messageVars: { name: benFirstName, cotisation: sessionLabel },
-              actionUrl: `/sessions/${membership.tontineSessionId}`,
-            },
-          ],
+      if (paidCount >= halfThreshold) {
+        const alreadyAlerted = await prisma.notification.findFirst({
+          where: {
+            userId: designatedSlot.membership.userId,
+            tontineSessionId: membership.tontineSessionId,
+            type: "PAYOUT_TURN",
+            createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+          },
         });
+
+        if (!alreadyAlerted) {
+          const benUser = designatedSlot.membership.user;
+          const benLang: Lang = benUser.preferredLang === "en" ? "en" : "fr";
+          const benRawName = benUser.name.trim();
+          const benFirstName = benRawName.split(/\s+/)[0] || benRawName;
+          const alertMsg =
+            benLang === "fr"
+              ? `Salut, ${benFirstName} 👋 ! C'est à votre tour de bouffer la cagnotte de ${sessionLabel} ! 🎉 La moitié des membres a cotisé : veuillez fournir votre numéro de téléphone et le nom du compte Orange/MTN Money pour recevoir votre virement.`
+              : `Hello, ${benFirstName} 👋! It's your turn to receive the ${sessionLabel} payout! 🎉 Half of the members have contributed: please provide your phone number and Orange/MTN Money account name to receive your payout.`;
+
+          await scheduleInAppNotifications({
+            tontineSessionId: membership.tontineSessionId,
+            type: "PAYOUT_TURN",
+            recipients: [
+              {
+                userId: benUser.id,
+                message: alertMsg,
+                messageKey: "payoutTurnNotifMessage",
+                messageVars: { name: benFirstName, cotisation: sessionLabel },
+                actionUrl: `/sessions/${membership.tontineSessionId}`,
+              },
+            ],
+          });
+        }
       }
     }
   } catch (err) {

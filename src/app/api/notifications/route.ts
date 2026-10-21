@@ -37,20 +37,49 @@ export async function GET() {
     }
   }
 
+  const userFirstName = (session.user.name ?? "").trim().split(/\s+/)[0] || "";
+
   return NextResponse.json({
-    notifications: uniqueNotifications.map((n) => ({
-      id: n.id,
-      type: n.type,
-      message: n.message,
-      messageKey: n.messageKey,
-      messageVars: n.messageVars,
-      contributionLabel: n.tontineSession
+    notifications: uniqueNotifications.map((n) => {
+      const contributionLabel = n.tontineSession
         ? n.tontineSession.title || TONTINE_LABELS[n.tontineSession.type]
-        : null,
-      actionUrl: n.actionUrl,
-      sentAt: (n.sentAt ?? n.scheduledAt).toISOString(),
-      readAt: n.readAt ? n.readAt.toISOString() : null,
-    })),
+        : null;
+
+      let vars: Record<string, string> = {};
+      if (typeof n.messageVars === "string") {
+        try {
+          vars = JSON.parse(n.messageVars);
+        } catch {}
+      } else if (typeof n.messageVars === "object" && n.messageVars !== null) {
+        vars = { ...(n.messageVars as Record<string, string>) };
+      }
+      if (!vars.name && userFirstName) vars.name = userFirstName;
+      if (!vars.session && contributionLabel) vars.session = contributionLabel;
+      if (!vars.cotisation && contributionLabel) vars.cotisation = contributionLabel;
+
+      let msg = n.message;
+      if (msg.includes("{name}")) {
+        msg = msg.replace(/\{name\}/g, vars.name || userFirstName);
+      }
+      if (msg.includes("{session}")) {
+        msg = msg.replace(/\{session\}/g, vars.session || contributionLabel || "la cotisation");
+      }
+      if (msg.includes("{cotisation}")) {
+        msg = msg.replace(/\{cotisation\}/g, vars.cotisation || contributionLabel || "la cotisation");
+      }
+
+      return {
+        id: n.id,
+        type: n.type,
+        message: msg,
+        messageKey: n.messageKey,
+        messageVars: vars,
+        contributionLabel,
+        actionUrl: n.actionUrl,
+        sentAt: (n.sentAt ?? n.scheduledAt).toISOString(),
+        readAt: n.readAt ? n.readAt.toISOString() : null,
+      };
+    }),
   });
 }
 

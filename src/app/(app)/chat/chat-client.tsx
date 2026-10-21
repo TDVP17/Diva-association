@@ -232,15 +232,19 @@ export function ChatClient({
                 <span className="material-symbols-outlined">arrow_back</span>
               </Link>
             )}
-            <div className="w-10 h-10 rounded-full bg-surface-container-high text-primary flex items-center justify-center font-title-md text-title-md overflow-hidden flex-shrink-0">
+            <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-title-md text-title-md overflow-hidden flex-shrink-0">
               {active.avatar ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={active.avatar} alt={active.name} className="w-full h-full object-cover" />
+                <img src={active.avatar} alt={!isAdmin ? t("customerSupport") : active.name} className="w-full h-full object-cover" />
+              ) : !isAdmin ? (
+                <span className="material-symbols-outlined text-[22px] text-emerald-800">support_agent</span>
               ) : (
                 initials(active.name)
               )}
             </div>
-            <h2 className="font-label-md text-label-md font-bold text-on-surface truncate">{active.name}</h2>
+            <h2 className="font-label-md text-label-md font-bold text-on-surface truncate">
+              {!isAdmin ? t("customerSupport") : active.name}
+            </h2>
           </div>
 
           <Link

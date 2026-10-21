@@ -92,14 +92,16 @@ export async function GET() {
   let admin: Contact | null = null;
   if (adminUser) {
     const [withAdmin] = await withLastMessage(session.user.id, [adminUser.id]);
-    admin = withAdmin ?? {
-      id: adminUser.id,
-      name: adminUser.name,
-      avatar: adminUser.avatar ?? adminUser.image,
-      lastMessageAt: null,
-      lastMessagePreview: null,
-      unreadCount: 0,
-    };
+    admin = withAdmin
+      ? { ...withAdmin, name: "Support client" }
+      : {
+          id: adminUser.id,
+          name: "Support client",
+          avatar: adminUser.avatar ?? adminUser.image,
+          lastMessageAt: null,
+          lastMessagePreview: null,
+          unreadCount: 0,
+        };
   }
 
   return NextResponse.json({ members, admin });

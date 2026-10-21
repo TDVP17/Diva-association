@@ -51,6 +51,7 @@ export const translations = {
     finePaidMessage: "Your {amount} fine for {session} has been paid. Thank you!",
     finePaidEmailSubject: "Fine payment received",
     messages: "Messages",
+    customerSupport: "Customer Support",
     openChat: "Open Chat",
 
     // Sessions list
@@ -238,17 +239,17 @@ export const translations = {
     sendToAllMembers: "Send to All Members",
     emailSentSummary: "Sent to {count} member(s).",
     waReminderNoon:
-      "Hi {name}, this is a friendly reminder from DIVA Asso 🌿\n\nYour contribution of {amount} for the {cotisation} is due today. You have until 18:30 to pay before a late fine applies.\n\nThank you for staying on track with the community!",
+      "Hello, {name} 👋\n\nThis is a friendly reminder from DIVA Asso 🌿. Your contribution of {amount} for the {cotisation} is due today. You have until 18:30 to pay before a late fine applies.\n\nThank you for staying on track with the community!",
     waReminderUrgent:
-      "⚠️ URGENT — DIVA Asso\n\n{name}, your {amount} contribution for the {cotisation} is still unpaid. The 18:30 deadline is approaching — after 18:31 a late fine will automatically apply.\n\nPlease complete your payment now to avoid the fine.",
+      "Hello, {name} 👋 ⚠️ URGENT — DIVA Asso\n\nYour contribution of {amount} for the {cotisation} is still unpaid. The 18:30 deadline is approaching — after 18:31 a late fine will automatically apply.\n\nPlease complete your payment now to avoid the fine.",
     waPaymentSuccess:
-      "✅ You have successfully contributed {amount} for {cotisation}.\n\nThank you, {name}!\n\nDownload your receipt: {receiptUrl}",
+      "Hello, {name} 👋 ✅ You have successfully contributed {amount} for {cotisation}! 🎉\n\nDownload your receipt: {receiptUrl}",
     waFineNotice:
-      "🔴 Late payment notice — DIVA Asso\n\n{name}, your contribution for the {cotisation} was not received before the 18:30 deadline. A late fine of {amount} has been applied to your account.\n\nPlease settle your contribution and fine as soon as possible.",
+      "Hello, {name} 👋 🔴 Late payment notice — DIVA Asso\n\nYour contribution for the {cotisation} was not received before the 18:30 deadline. A late fine of {amount} has been applied to your account ⚠️.\n\nPlease settle your contribution and fine as soon as possible.",
     waDuplicateRefunded:
-      "Your payment was received twice for the same name. The second payment of {amount} has been automatically refunded.",
+      "Hello, {name} 👋 Your payment was received twice for the same name. The second payment of {amount} has been automatically refunded.",
     waPayoutTurn:
-      "Hello {name},\n\nWe're pleased to let you know that it's your turn to receive the {cotisation} payout (position #{position}).\n\n💰 Estimated amount: {amount}\n📅 Expected payout date: {date}\n\n👉 ACTION REQUIRED: Please log into the app and provide your Mobile Money / Orange Money phone number and the exact name on the account so the administrator can process your payout.\n\nThe DIVA Asso team",
+      "Hello, {name} 👋 🎉\n\nIt's your turn to receive the {cotisation} payout (position #{position})!\n\n💰 Total amount: {amount}\n📅 Estimated date: {date}\n\n👉 ACTION REQUIRED: Please log in and provide your Mobile Money or Orange Money account number and exact registered account name so the administrator can send your transfer.\n\nDIVA Asso Team",
     payoutTurnNotifMessage:
       "Hello, {name} 👋! It's your turn to receive the {cotisation} payout! 🎉 Half of the members have contributed: please provide your phone number and Orange/MTN Money account name to receive your payout.",
     payoutTurnBannerTitle: "It's your turn to receive the payout!",
@@ -538,7 +539,6 @@ export const translations = {
     presidentBadgeLabel: "President",
     validatedMembersCount: "{count} validated members",
     plusFeeSuffix: "+ {fee} fee",
-    customerSupport: "Customer Support",
     memberApprovedMessage:
       "Hello, {name} 👋! You have been accepted into the cotisation of {session}! 🎉 You can now choose your name(s) and join the cotisation.",
     memberRejectedMessage:
@@ -1159,6 +1159,7 @@ export const translations = {
     finePaidMessage: "Votre amende de {amount} pour {session} a été payée. Merci !",
     finePaidEmailSubject: "Paiement d'amende reçu",
     messages: "Messages",
+    customerSupport: "Support client",
     openChat: "Ouvrir le chat",
 
     // Sessions list
@@ -1348,17 +1349,17 @@ export const translations = {
     sendToAllMembers: "Envoyer à tous les membres",
     emailSentSummary: "Envoyé à {count} membre(s).",
     waReminderNoon:
-      "Bonjour {name}, ceci est un rappel amical de DIVA Asso 🌿\n\nVotre contribution de {amount} pour la {cotisation} est due aujourd'hui. Vous avez jusqu'à 18h30 pour payer avant qu'une amende de retard ne s'applique.\n\nMerci de rester à jour avec la communauté !",
+      "Salut, {name} 👋\n\nCeci est un rappel amical de DIVA Asso 🌿. Votre contribution de {amount} pour la {cotisation} est due aujourd'hui. Vous avez jusqu'à 18h30 pour payer avant qu'une amende de retard ne s'applique.\n\nMerci de rester à jour avec la communauté !",
     waReminderUrgent:
-      "⚠️ URGENT — DIVA Asso\n\n{name}, votre contribution de {amount} pour la {cotisation} est toujours impayée. L'échéance de 18h30 approche — après 18h31, une amende de retard s'appliquera automatiquement.\n\nVeuillez effectuer votre paiement maintenant pour éviter l'amende.",
+      "Salut, {name} 👋 ⚠️ URGENT — DIVA Asso\n\nVotre contribution de {amount} pour la {cotisation} est toujours impayée. L'échéance de 18h30 approche — après 18h31, une amende de retard s'appliquera automatiquement.\n\nVeuillez effectuer votre paiement maintenant pour éviter l'amende.",
     waPaymentSuccess:
-      "✅ Vous avez contribué avec succès {amount} pour {cotisation}.\n\nMerci, {name} !\n\nTéléchargez votre reçu : {receiptUrl}",
+      "Salut, {name} 👋 ✅ Vous avez contribué avec succès {amount} pour {cotisation} ! 🎉\n\nTéléchargez votre reçu : {receiptUrl}",
     waFineNotice:
-      "🔴 Avis de retard de paiement — DIVA Asso\n\n{name}, votre contribution pour la {cotisation} n'a pas été reçue avant l'échéance de 18h30. Une amende de retard de {amount} a été appliquée à votre compte.\n\nVeuillez régler votre contribution et votre amende dès que possible.",
+      "Salut, {name} 👋 🔴 Avis de retard de paiement — DIVA Asso\n\nVotre contribution pour la {cotisation} n'a pas été reçue avant l'échéance de 18h30. Une amende de retard de {amount} a été appliquée à votre compte ⚠️.\n\nVeuillez régler votre contribution et votre amende dès que possible.",
     waDuplicateRefunded:
-      "Votre paiement a été reçu deux fois pour le même nom. Le second paiement de {amount} a été automatiquement remboursé.",
+      "Salut, {name} 👋 Votre paiement a été reçu deux fois pour le même nom. Le second paiement de {amount} a été automatiquement remboursé.",
     waPayoutTurn:
-      "Bonjour {name},\n\nNous avons le plaisir de vous informer que c'est votre tour de recevoir la cagnotte de la cotisation {cotisation} (position n°{position}).\n\n💰 Montant total : {amount}\n📅 Date de versement prévue : {date}\n\n👉 ACTION REQUISE : Veuillez vous connecter à l'application et renseigner votre numéro de compte Mobile Money ou Orange Money (au choix : MTN ou Orange) et le nom complet exact sur le compte afin que l'administrateur effectue votre virement.\n\nL'équipe DIVA Asso",
+      "Salut, {name} 👋 🎉\n\nC'est votre tour de bouffer la cagnotte de la cotisation {cotisation} (position n°{position}) !\n\n💰 Montant total : {amount}\n📅 Date de versement prévue : {date}\n\n👉 ACTION REQUISE : Veuillez renseigner votre numéro de téléphone et le nom du compte Orange/MTN Money pour recevoir votre virement.\n\nL'équipe DIVA Asso",
     payoutTurnNotifMessage:
       "Salut, {name} 👋 ! C'est à votre tour de bouffer la cagnotte de {cotisation} ! 🎉 La moitié des membres a cotisé : veuillez fournir votre numéro de téléphone et le nom du compte Orange/MTN Money pour recevoir votre virement.",
     payoutTurnBannerTitle: "C'est votre tour de bouffer la cagnotte !",
@@ -1648,7 +1649,6 @@ export const translations = {
     presidentBadgeLabel: "Présidente",
     validatedMembersCount: "{count} membres validés",
     plusFeeSuffix: "+ {fee} de frais",
-    customerSupport: "Support client",
     memberApprovedMessage:
       "Salut, {name} 👋 ! Vous avez été accepté(e) dans la cotisation de {session} ! 🎉 Vous pouvez maintenant choisir votre/vos nom(s) et intégrer la cotisation.",
     memberRejectedMessage:
@@ -1926,9 +1926,9 @@ export const translations = {
       "Les rappels sont envoyés à 5 minutes d'intervalle et continuent même si vous fermez cette page.",
     notificationHistory: "Historique des notifications",
     contributionReminderMessage:
-      "Bonjour {name} 👋\nPetit rappel amical : votre contribution pour {cotisation} n'a pas encore été enregistrée. N'oubliez pas de contribuer avant l'échéance. ❤️",
+      "Salut, {name} 👋\n\nPetit rappel amical : votre contribution pour {cotisation} n'a pas encore été enregistrée. N'oubliez pas de contribuer avant l'échéance. 🌿⏰",
     fineReminderMessage:
-      "Bonjour {name} ❤️\nPetit rappel amical concernant votre amende impayée de {amount}. Merci de la régler avant la clôture de la cotisation pour rester éligible aux prochaines cotisations. 🙏",
+      "Salut, {name} 👋 ❤️\n\nPetit rappel amical concernant votre amende impayée de {amount}. Merci de la régler avant la clôture de la cotisation pour rester éligible aux prochaines cotisations. 🙏",
     foodTurnMessage:
       "Salut, {name} 👋 ! C'est votre tour de bouffer la cagnotte ! 🍲🎉 La moitié des membres a cotisé : veuillez fournir votre numéro de téléphone et le nom du compte Orange/MTN Money pour recevoir votre virement.",
     notifTypeContributionReminder: "Rappel de cotisation",
@@ -1937,8 +1937,8 @@ export const translations = {
     notifTypePaymentSuccess: "Confirmation de paiement",
     notifTypePaymentFailed: "Échec du paiement",
     notifTypePaymentRefundEscalated: "Remboursement à traiter manuellement",
-    paymentSuccessNotifMessage: "Votre paiement de {amount} pour {session} a été reçu. Merci !",
-    paymentFailedNotifMessage: "Votre paiement de {amount} pour {session} n'a pas abouti. Solde insuffisant ou transaction refusée — veuillez réessayer.",
+    paymentSuccessNotifMessage: "Salut, {name} 👋 ! Votre paiement de {amount} pour {session} a été reçu. Merci ! ✅🎉",
+    paymentFailedNotifMessage: "Salut, {name} 👋 ! Votre paiement de {amount} pour {session} n'a pas abouti. Solde insuffisant ou transaction refusée — veuillez réessayer. ⚠️",
     paymentRefundEscalatedNotifMessage: "Le remboursement automatique a échoué 3 fois pour un double paiement de {amount} sur le nom « {slot} ». Veuillez rembourser le payeur manuellement.",
     notifTypeAdminBroadcast: "Annonce",
     notifTypeMemberApproved: "Compte vérifié",

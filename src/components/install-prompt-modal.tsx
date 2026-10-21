@@ -174,18 +174,6 @@ export function InstallPromptModal({ lang }: { lang: Lang }) {
 
   return (
     <>
-      {/* Floating install button if dismissed for the session but user is in web browser */}
-      {ready && dismissed && !isStandalone && (
-        <button
-          onClick={handleReopen}
-          aria-label={lang === "fr" ? "Installer l'application" : "Install App"}
-          className="fixed bottom-20 md:bottom-6 right-4 z-40 bg-primary text-on-primary font-label-sm text-xs font-bold py-2.5 px-3.5 rounded-full shadow-lg border border-primary/20 flex items-center gap-1.5 hover:opacity-90 active:scale-95 transition-all cursor-pointer"
-        >
-          <span className="material-symbols-outlined text-[18px]">install_mobile</span>
-          <span>{lang === "fr" ? "Installer l'application" : "Install App"}</span>
-        </button>
-      )}
-
       {/* Main Installation Modal */}
       {modalVisible && (
         <div

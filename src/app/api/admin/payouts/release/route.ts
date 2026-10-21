@@ -44,6 +44,38 @@ export async function POST(request: Request) {
   const slot = claim.membershipSlot;
   const { user } = slot.membership;
 
+  // Règle Diva : c'est uniquement lorsque tout le monde a cotisé que celui qui bouffe peut recevoir la cagnotte
+  const otherApprovedSlots = await prisma.membershipSlot.findMany({
+    where: {
+      membership: { tontineSessionId: claim.tontineSessionId, status: "APPROVED" },
+      id: { not: slot.id }, // Le nom qui bouffe est exempté
+    },
+    select: { id: true, beneficiaryName: true },
+  });
+
+  const unpaidSlots = await prisma.membershipSlot.findMany({
+    where: {
+      id: { in: otherApprovedSlots.map((s) => s.id) },
+      contributions: {
+        none: {
+          dueDate: claim.dueDate,
+          status: "PAID",
+        },
+      },
+    },
+    select: { beneficiaryName: true },
+  });
+
+  if (unpaidSlots.length > 0) {
+    const unpaidNames = unpaidSlots.map((s) => s.beneficiaryName).join(", ");
+    return NextResponse.json(
+      {
+        error: `Impossible de verser la cagnotte : tous les membres doivent avoir cotisé avant le versement. Noms en attente (${unpaidSlots.length}) : ${unpaidNames}.`,
+      },
+      { status: 409 },
+    );
+  }
+
   // Never trust a client-echoed amount — recompute server-side right before sending money.
   const { pot, deducted, netPayout, toDeductFineIds, toDeductContributions } = await computePayoutPreview(
     claim.tontineSession,

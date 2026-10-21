@@ -8,26 +8,52 @@ import { translate, translations, type Lang, type TranslationKey } from "@/lib/i
  * ADMIN_BROADCAST) that has no translation key.
  */
 export function renderNotificationMessage(
-  n: { message: string; messageKey: string | null; messageVars: unknown },
+  n: {
+    message: string;
+    messageKey: string | null;
+    messageVars: unknown;
+    contributionLabel?: string | null;
+  },
   lang: Lang,
 ): string {
-  if (!n.messageKey || !(n.messageKey in translations.en)) return n.message;
-
-  const key = n.messageKey as TranslationKey;
-  const vars = (n.messageVars ?? undefined) as Record<string, string> | undefined;
-  const base = translate(lang, key, vars);
-
-  // Rejection reason is appended as a separate sentence rather than baked
-  // into memberRejectedMessage itself, so the base message stays a single
-  // reusable key.
-  if (key === "memberRejectedMessage" && vars?.reason) {
-    return base + translate(lang, "memberRejectedReasonSuffix", { reason: vars.reason });
+  let vars: Record<string, string> = {};
+  if (typeof n.messageVars === "string") {
+    try {
+      vars = JSON.parse(n.messageVars);
+    } catch {}
+  } else if (typeof n.messageVars === "object" && n.messageVars !== null) {
+    vars = { ...(n.messageVars as Record<string, string>) };
   }
 
-  if (vars?.name && !base.includes(vars.name) && !base.startsWith("Salut") && !base.startsWith("Bonjour") && !base.startsWith("Hello")) {
-    const greeting = lang === "en" ? `Hello, ${vars.name} 👋 ! ` : `Salut, ${vars.name} 👋 ! `;
-    return greeting + base;
+  if (!vars.session && n.contributionLabel) {
+    vars.session = n.contributionLabel;
+  }
+  if (!vars.cotisation && n.contributionLabel) {
+    vars.cotisation = n.contributionLabel;
   }
 
-  return base;
+  let text: string;
+  if (n.messageKey && n.messageKey in translations[lang]) {
+    const key = n.messageKey as TranslationKey;
+    text = translate(lang, key, vars);
+
+    if (key === "memberRejectedMessage" && vars?.reason) {
+      text = text + translate(lang, "memberRejectedReasonSuffix", { reason: vars.reason });
+    }
+  } else {
+    text = n.message;
+  }
+
+  // Replace any leftover placeholder {var} with values from vars or context
+  text = text.replace(/\{(\w+)\}/g, (match, key) => {
+    if (vars[key]) return vars[key];
+    if (key === "name") return vars.name || "";
+    if (key === "session" || key === "cotisation") return vars.session || vars.cotisation || n.contributionLabel || "la cotisation";
+    return match;
+  });
+
+  // Clean up any awkward empty greeting punctuation
+  text = text.replace(/Salut,\s*👋/g, "Salut 👋").replace(/Hello,\s*👋/g, "Hello 👋");
+
+  return text;
 }
