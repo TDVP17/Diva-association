@@ -24,5 +24,10 @@ export function renderNotificationMessage(
     return base + translate(lang, "memberRejectedReasonSuffix", { reason: vars.reason });
   }
 
+  if (vars?.name && !base.includes(vars.name) && !base.startsWith("Salut") && !base.startsWith("Bonjour") && !base.startsWith("Hello")) {
+    const greeting = lang === "en" ? `Hello, ${vars.name} 👋 ! ` : `Salut, ${vars.name} 👋 ! `;
+    return greeting + base;
+  }
+
   return base;
 }

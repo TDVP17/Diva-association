@@ -19,7 +19,10 @@ const txQueryRaw = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    membershipSlot: { findUnique: (...a: unknown[]) => findUniqueSlot(...a) },
+    membershipSlot: {
+      findUnique: (...a: unknown[]) => findUniqueSlot(...a),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     fine: { findUnique: (...a: unknown[]) => findUniqueFine(...a) },
     contribution: { update: (...a: unknown[]) => updateContribution(...a) },
     paymentAttempt: { create: (...a: unknown[]) => createPaymentAttempt(...a) },

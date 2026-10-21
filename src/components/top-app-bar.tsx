@@ -31,9 +31,9 @@ export async function TopAppBar({
 
   const menuItems: TopRightMenuItem[] = [
     { href: "/fines", label: t("finesNavItem"), icon: "receipt_long", badge: unpaidFines || undefined },
-    { href: "/chat", label: t("messages"), icon: "chat_bubble", badge: unreadMessages || undefined },
     { href: "/sessions", label: t("contributionsNavItem"), icon: "account_balance", badge: pendingCotisations || undefined },
     { href: "/contribute-for-relative", label: t("contributeForRelativeNav"), icon: "volunteer_activism" },
+    { href: "/chat", label: t("customerSupport"), icon: "chat", badge: unreadMessages || undefined },
   ];
 
   return (

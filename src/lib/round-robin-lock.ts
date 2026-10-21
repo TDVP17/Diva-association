@@ -2,7 +2,15 @@ import { prisma } from "@/lib/prisma";
 import { getPreviousDueDate } from "@/lib/tontine-engine";
 import type { TontineType } from "@/generated/prisma/enums";
 
-export type RoundLockResult = { ok: true } | { ok: false; status: number; error: string };
+export type RoundLockResult =
+  | { ok: true }
+  | {
+      ok: false;
+      status: number;
+      error: string;
+      errorKey?: string;
+      errorVars?: Record<string, string>;
+    };
 
 /**
  * "Whose turn is it" — the lowest-officialPosition slot in the session with
@@ -57,6 +65,8 @@ export async function assertPriorCyclePaidOut(
   return {
     ok: false,
     status: 409,
-    error: `Contributions for a new cycle can't be collected until ${designatedSlot.beneficiaryName}'s payout from the previous cycle has been released.`,
+    error: `Les cotisations pour ce nouveau cycle ne peuvent pas débuter tant que la cagnotte du cycle précédent de ${designatedSlot.beneficiaryName} n'a pas été versée par l'administrateur.`,
+    errorKey: "paymentsLockedUntilPayout",
+    errorVars: { name: designatedSlot.beneficiaryName },
   };
 }

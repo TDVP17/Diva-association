@@ -250,7 +250,7 @@ export const translations = {
     waPayoutTurn:
       "Hello {name},\n\nWe're pleased to let you know that it's your turn to receive the {cotisation} payout (position #{position}).\n\n💰 Estimated amount: {amount}\n📅 Expected payout date: {date}\n\n👉 ACTION REQUIRED: Please log into the app and provide your Mobile Money / Orange Money phone number and the exact name on the account so the administrator can process your payout.\n\nThe DIVA Asso team",
     payoutTurnNotifMessage:
-      "It's your turn to receive the {cotisation} payout! Please provide your Mobile Money / Orange Money account number and account name so the admin can process your payout.",
+      "Hello, {name} 👋! It's your turn to receive the {cotisation} payout! 🎉 Half of the members have contributed: please provide your phone number and Orange/MTN Money account name to receive your payout.",
     payoutTurnBannerTitle: "It's your turn to receive the payout!",
     payoutTurnBannerDesc:
       "To receive your payout, you must provide your Mobile Money or Orange Money account number (MTN / Orange) and the exact name on your account below. The administrator will process your transfer directly.",
@@ -538,8 +538,9 @@ export const translations = {
     presidentBadgeLabel: "President",
     validatedMembersCount: "{count} validated members",
     plusFeeSuffix: "+ {fee} fee",
+    customerSupport: "Customer Support",
     memberApprovedMessage:
-      "Good news 🎉 Your account has been verified by the association. You can now continue with your contribution request.",
+      "Hello, {name} 👋! You have been accepted into the cotisation of {session}! 🎉 You can now choose your name(s) and join the cotisation.",
     memberRejectedMessage:
       "Your request was not approved by the association. You cannot join this contribution at this time.",
     memberRejectedReasonSuffix: " Reason: {reason}",
@@ -816,7 +817,7 @@ export const translations = {
     fineReminderMessage:
       "Hello {name} ❤️\nThis is a friendly reminder about your outstanding fine of {amount}. Please remember to settle it before the contribution closes so that you remain eligible to participate in future contributions. 🙏",
     foodTurnMessage:
-      "🎉 Congratulations {name}! It's your turn to receive the payout! 💰🎊\n\n👉 ACTION REQUIRED: Please log into the app now to provide your Mobile Money or Orange Money account number (MTN / Orange) and exact account holder name so the administrator can process your payout!",
+      "Hello, {name} 👋! It's your turn to receive the payout! 🍲🎉 Half of the members have contributed: please provide your phone number and Orange/MTN Money account name to receive your transfer.",
     notifTypeContributionReminder: "Contribution Reminder",
     notifTypeFineReminder: "Fine Reminder",
     notifTypeFoodTurn: "It's Your Turn!",
@@ -1359,7 +1360,7 @@ export const translations = {
     waPayoutTurn:
       "Bonjour {name},\n\nNous avons le plaisir de vous informer que c'est votre tour de recevoir la cagnotte de la cotisation {cotisation} (position n°{position}).\n\n💰 Montant total : {amount}\n📅 Date de versement prévue : {date}\n\n👉 ACTION REQUISE : Veuillez vous connecter à l'application et renseigner votre numéro de compte Mobile Money ou Orange Money (au choix : MTN ou Orange) et le nom complet exact sur le compte afin que l'administrateur effectue votre virement.\n\nL'équipe DIVA Asso",
     payoutTurnNotifMessage:
-      "C'est votre tour de bouffer la cagnotte de {cotisation} ! Veuillez fournir votre numéro de compte Mobile Money ou Orange Money et votre nom complet pour le virement.",
+      "Salut, {name} 👋 ! C'est à votre tour de bouffer la cagnotte de {cotisation} ! 🎉 La moitié des membres a cotisé : veuillez fournir votre numéro de téléphone et le nom du compte Orange/MTN Money pour recevoir votre virement.",
     payoutTurnBannerTitle: "C'est votre tour de bouffer la cagnotte !",
     payoutTurnBannerDesc:
       "Pour recevoir votre virement, vous devez impérativement renseigner ci-dessous votre numéro de compte Mobile Money ou Orange Money (au choix : MTN ou Orange) et le nom complet exact enregistré sur ce compte. L'administrateur effectuera directement votre versement sur votre compte.",
@@ -1647,8 +1648,9 @@ export const translations = {
     presidentBadgeLabel: "Présidente",
     validatedMembersCount: "{count} membres validés",
     plusFeeSuffix: "+ {fee} de frais",
+    customerSupport: "Support client",
     memberApprovedMessage:
-      "Bonne nouvelle 🎉 Votre compte a été vérifié par l'association. Vous pouvez maintenant continuer votre demande de cotisation.",
+      "Salut, {name} 👋 ! Vous avez été accepté(e) dans la cotisation de {session} ! 🎉 Vous pouvez maintenant choisir votre/vos nom(s) et intégrer la cotisation.",
     memberRejectedMessage:
       "Votre demande n'a pas été approuvée par l'association. Vous ne pouvez pas rejoindre cette cotisation pour le moment.",
     memberRejectedReasonSuffix: " Raison : {reason}",
@@ -1928,7 +1930,7 @@ export const translations = {
     fineReminderMessage:
       "Bonjour {name} ❤️\nPetit rappel amical concernant votre amende impayée de {amount}. Merci de la régler avant la clôture de la cotisation pour rester éligible aux prochaines cotisations. 🙏",
     foodTurnMessage:
-      "🎉 Bravo {name} ! C'est votre tour de bouffer la cotisation ! 💰🎊\n\n👉 ACTION REQUISE : Veuillez vous connecter à l'application dès maintenant pour fournir votre numéro de compte Mobile Money ou Orange Money (au choix : MTN ou Orange) et le nom exact associé au compte. L'administrateur en a besoin pour effectuer votre virement !",
+      "Salut, {name} 👋 ! C'est votre tour de bouffer la cagnotte ! 🍲🎉 La moitié des membres a cotisé : veuillez fournir votre numéro de téléphone et le nom du compte Orange/MTN Money pour recevoir votre virement.",
     notifTypeContributionReminder: "Rappel de cotisation",
     notifTypeFineReminder: "Rappel d'amende",
     notifTypeFoodTurn: "C'est ton tour !",

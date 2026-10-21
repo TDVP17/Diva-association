@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
+import { playBallDrawSound, playUiTapSound } from "@/lib/sound-effects";
 
 const FLOAT_CLASSES = [
   "top-[20%] left-[25%] w-14 h-14 animate-[float_4s_ease-in-out_infinite]",
@@ -83,6 +84,7 @@ export function DrawBowl({
     }
     setDrawing(true);
     setError(null);
+    playUiTapSound();
     try {
       const res = await fetch(`/api/sessions/${tontineSessionId}/draw`, {
         method: "POST",
@@ -100,6 +102,7 @@ export function DrawBowl({
         setRemainingUndrawnCount(body.remainingUndrawnCount);
         setNextSlotName(body.nextSlotName);
         setDrawing(false);
+        playBallDrawSound();
       }, 600);
     } catch (err) {
       setError(friendlyErrorMessage(err, t("drawFailed")));
@@ -108,6 +111,7 @@ export function DrawBowl({
   }
 
   function handleContinueNextSlot() {
+    playUiTapSound();
     setCurrentSlots((prev) => prev.slice(1));
     setSelectedBallIndex(null);
     setResults(null);
@@ -139,7 +143,10 @@ export function DrawBowl({
                   key={i}
                   type="button"
                   onClick={() => {
-                    if (!drawing) setSelectedBallIndex(i);
+                    if (!drawing) {
+                      playUiTapSound();
+                      setSelectedBallIndex(i);
+                    }
                   }}
                   disabled={drawing || !isOnline || !activeSlot}
                   aria-label={t("pickYourBalls")}
@@ -151,7 +158,7 @@ export function DrawBowl({
                       : `bg-white text-emerald-800/40 hover:scale-110 hover:-translate-y-1 shadow-[inset_-5px_-5px_15px_rgba(0,0,0,0.2),inset_5px_5px_15px_rgba(255,255,255,0.8),0_10px_20px_rgba(0,53,40,0.2)] ${floatClass}`
                   }`}
                 >
-                  {isSelected ? "✨" : "?"}
+                  <span className="text-2xl drop-shadow-sm select-none">🤭</span>
                 </button>
               );
             })}

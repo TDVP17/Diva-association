@@ -50,6 +50,47 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
   const [total, setTotal] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [filterTab, setFilterTab] = useState<FilterTab>("all");
+  const [recoveryResult, setRecoveryResult] = useState<{
+    userName: string;
+    email: string;
+    phone: string | null;
+    tempPassword?: string;
+    message: string;
+  } | null>(null);
+  const [resettingUserId, setResettingUserId] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  async function handleResetUserPassword(u: AdminUserRow) {
+    const confirmMsg =
+      lang === "fr"
+        ? `Réinitialiser le mot de passe de ${u.name} ? Un nouveau mot de passe temporaire sera généré et lui sera envoyé par email.`
+        : `Reset password for ${u.name}? A new temporary password will be generated and emailed to them.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setResettingUserId(u.id);
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Erreur lors de la réinitialisation");
+        return;
+      }
+      setRecoveryResult({
+        userName: u.name,
+        email: data.email,
+        phone: data.phone,
+        tempPassword: data.tempPassword,
+        message: data.message,
+      });
+    } catch {
+      alert("Erreur de connexion au serveur");
+    } finally {
+      setResettingUserId(null);
+    }
+  }
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -289,45 +330,150 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
                 </Link>
 
                 {u.role !== "ADMIN" && u.role !== "PRESIDENT" && (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const nextState = !u.isBanned;
-                      const confirmMsg = nextState
-                        ? lang === "fr"
-                          ? `Voulez-vous vraiment bannir ${u.name} ? Cette personne ne pourra plus se connecter à l'application avec son email ou son numéro de téléphone.`
-                          : `Are you sure you want to ban ${u.name}? They will no longer be able to log in with their email or phone number.`
-                        : lang === "fr"
-                          ? `Voulez-vous réactiver / débannir le compte de ${u.name} ?`
-                          : `Are you sure you want to unban ${u.name}?`;
-                      if (!window.confirm(confirmMsg)) return;
-                      try {
-                        const res = await fetch(`/api/admin/users/${u.id}/ban`, {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ isBanned: nextState }),
-                        });
-                        if (res.ok) {
-                          setUsers((prev) =>
-                            prev ? prev.map((item) => (item.id === u.id ? { ...item, isBanned: nextState } : item)) : null
-                          );
+                  <>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const nextState = !u.isBanned;
+                        const confirmMsg = nextState
+                          ? lang === "fr"
+                            ? `Voulez-vous vraiment bannir ${u.name} ? Cette personne ne pourra plus se connecter à l'application avec son email ou son numéro de téléphone.`
+                            : `Are you sure you want to ban ${u.name}? They will no longer be able to log in with their email or phone number.`
+                          : lang === "fr"
+                            ? `Voulez-vous réactiver / débannir le compte de ${u.name} ?`
+                            : `Are you sure you want to unban ${u.name}?`;
+                        if (!window.confirm(confirmMsg)) return;
+                        try {
+                          const res = await fetch(`/api/admin/users/${u.id}/ban`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ isBanned: nextState }),
+                          });
+                          if (res.ok) {
+                            setUsers((prev) =>
+                              prev ? prev.map((item) => (item.id === u.id ? { ...item, isBanned: nextState } : item)) : null
+                            );
+                          }
+                        } catch (e) {
+                          console.error("Ban toggle error:", e);
                         }
-                      } catch (e) {
-                        console.error("Ban toggle error:", e);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-md font-label-sm text-xs font-medium border transition-colors cursor-pointer ${
+                        u.isBanned
+                          ? "border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100"
+                          : "border-error/30 text-error bg-error/5 hover:bg-error/15"
+                      }`}
+                    >
+                      {u.isBanned ? (lang === "fr" ? "Débannir" : "Unban") : (lang === "fr" ? "Bannir" : "Ban")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleResetUserPassword(u)}
+                      disabled={resettingUserId === u.id}
+                      title={
+                        lang === "fr"
+                          ? "Aider à récupérer le compte (réinitialiser le mot de passe)"
+                          : "Help recover account (reset password)"
                       }
-                    }}
-                    className={`px-2.5 py-1.5 rounded-md font-label-sm text-xs font-medium border transition-colors cursor-pointer ${
-                      u.isBanned
-                        ? "border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100"
-                        : "border-error/30 text-error bg-error/5 hover:bg-error/15"
-                    }`}
-                  >
-                    {u.isBanned ? (lang === "fr" ? "Débannir" : "Unban") : (lang === "fr" ? "Bannir" : "Ban")}
-                  </button>
+                      className="px-2.5 py-1.5 rounded-md font-label-sm text-xs font-semibold border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">lock_reset</span>
+                      <span>
+                        {resettingUserId === u.id
+                          ? "..."
+                          : lang === "fr"
+                          ? "Récupérer compte"
+                          : "Reset Account"}
+                      </span>
+                    </button>
+                  </>
                 )}
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Modal de récupération de compte avec les identifiants générés */}
+      {recoveryResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-surface-variant flex flex-col gap-4">
+            <div className="flex items-center justify-between pb-2 border-b border-outline-variant/40">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-2xl">verified_user</span>
+                <h3 className="font-title-sm font-bold text-on-surface">
+                  {lang === "fr" ? "Récupération de compte réussie" : "Account Recovery Successful"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRecoveryResult(null)}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-surface-container text-on-surface-variant"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </div>
+
+            <p className="text-xs text-on-surface-variant">
+              {lang === "fr"
+                ? `Les identifiants pour ${recoveryResult.userName} ont été réinitialisés et envoyés par email à ${recoveryResult.email}. Vous pouvez également lui communiquer directement :`
+                : `Credentials for ${recoveryResult.userName} have been reset and sent by email to ${recoveryResult.email}. You can also share them directly:`}
+            </p>
+
+            <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-4 flex flex-col gap-2.5 text-xs text-emerald-950 font-medium">
+              <div>
+                <span className="text-emerald-700 font-bold block mb-0.5">
+                  {lang === "fr" ? "Identifiant de connexion :" : "Login Identifier:"}
+                </span>
+                <span className="font-mono text-sm font-bold bg-white px-2 py-1 rounded border border-emerald-200 block truncate">
+                  {recoveryResult.email}
+                  {recoveryResult.phone ? ` (ou ${recoveryResult.phone})` : ""}
+                </span>
+              </div>
+
+              {recoveryResult.tempPassword && (
+                <div>
+                  <span className="text-emerald-700 font-bold block mb-0.5">
+                    {lang === "fr" ? "Mot de passe temporaire généré :" : "Temporary Password:"}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-base font-extrabold bg-white px-2.5 py-1 rounded border border-emerald-300 text-primary tracking-wider flex-1 truncate">
+                      {recoveryResult.tempPassword}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const text = `Identifiant DIVA : ${recoveryResult.email}\nMot de passe temporaire : ${recoveryResult.tempPassword}\nLien : https://www.divaasso.com/login`;
+                        navigator.clipboard.writeText(text);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-primary text-white font-bold text-xs hover:bg-primary/90 flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">
+                        {copied ? "check" : "content_copy"}
+                      </span>
+                      <span>{copied ? (lang === "fr" ? "Copié !" : "Copied!") : (lang === "fr" ? "Copier" : "Copy")}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <p className="text-[11px] text-on-surface-variant/80 italic">
+              {lang === "fr"
+                ? "Conseillez au membre de modifier son mot de passe depuis son profil après sa connexion."
+                : "Advise the member to change their password from their profile after logging in."}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setRecoveryResult(null)}
+              className="w-full py-2.5 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-xs font-semibold transition-colors cursor-pointer"
+            >
+              {lang === "fr" ? "Fermer" : "Close"}
+            </button>
+          </div>
         </div>
       )}
     </div>

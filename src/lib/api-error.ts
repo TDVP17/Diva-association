@@ -49,7 +49,7 @@ export async function parseJsonOrThrow<T = Record<string, unknown>>(res: Respons
         ? (record.errorVars as Record<string, string>)
         : undefined;
     if (serverMessage) console.error("[parseJsonOrThrow] server error:", serverMessage);
-    throw new ApiError(fallback, errorKey, errorVars);
+    throw new ApiError(serverMessage || fallback, errorKey, errorVars);
   }
   return body as T;
 }
@@ -76,7 +76,26 @@ export function friendlyErrorMessage(
       const translated = translate(err.errorKey, err.errorVars);
       if (translated) return translated;
     }
-    return err.message;
+    const msg = (err.message || "").toLowerCase();
+    // Friendly localized mapping for well-known server error messages
+    if (
+      (msg.includes("until") && msg.includes("payout")) ||
+      msg.includes("cagnotte du cycle précédent")
+    ) {
+      return "Les cotisations pour ce nouveau cycle ne peuvent pas débuter tant que la cagnotte du cycle précédent n'a pas été versée par l'administrateur.";
+    }
+    if (msg.includes("insufficient") || msg.includes("solde")) {
+      return "Solde insuffisant sur votre compte Mobile Money / Orange Money. Veuillez recharger votre compte et réessayer.";
+    }
+    if (
+      msg.includes("terminée") ||
+      msg.includes("finished") ||
+      msg.includes("closed") ||
+      msg.includes("closes")
+    ) {
+      return "Cette session de cotisation est terminée pour ce cycle.";
+    }
+    return fallback;
   }
   console.error("[friendlyErrorMessage] unexpected error:", err);
   return fallback;

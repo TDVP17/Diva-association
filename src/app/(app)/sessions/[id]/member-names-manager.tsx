@@ -12,6 +12,7 @@ interface MemberNamesManagerProps {
   sessionStatus: "DRAFT" | "ACTIVE" | "DRAWING" | "CLOSED";
   maxSlots?: number | null;
   startDate?: string | Date | null;
+  isFinished?: boolean;
 }
 
 export function MemberNamesManager({
@@ -21,6 +22,7 @@ export function MemberNamesManager({
   sessionStatus,
   maxSlots,
   startDate,
+  isFinished = false,
 }: MemberNamesManagerProps) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
   const router = useRouter();
@@ -37,11 +39,9 @@ export function MemberNamesManager({
   const [leaving, setLeaving] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
 
-  // Adding, deleting names, and leaving are ONLY possible if the cotisation has not yet started
-  const isStarted =
-    sessionStatus !== "DRAFT" || (startDate ? new Date() >= new Date(startDate) : false);
-  const canEditNames = !isStarted;
-  const canLeave = !isStarted;
+  // Adding, deleting names, and leaving are possible when the cotisation is in DRAFT (avant le tirage) OR when this cycle is finished
+  const canEditNames = sessionStatus === "DRAFT" || isFinished;
+  const canLeave = sessionStatus === "DRAFT" || isFinished;
   const slotLimit = maxSlots ? Math.min(Number(maxSlots), 10) : 10;
 
   function handleAddName() {
@@ -52,8 +52,8 @@ export function MemberNamesManager({
     setSuccessMessage(null);
   }
 
-  function handleRemoveName(indexToRemove: number) {
-    if (!canEditNames) return;
+  async function handleRemoveName(indexToRemove: number) {
+    if (!canEditNames || saving) return;
     if (names.length <= 1) {
       setSaveError(
         lang === "fr"
@@ -62,9 +62,46 @@ export function MemberNamesManager({
       );
       return;
     }
-    setNames(names.filter((_, idx) => idx !== indexToRemove));
+
+    const nameToRemove = names[indexToRemove]?.trim() || `#${indexToRemove + 1}`;
+    const confirmMessage =
+      lang === "fr"
+        ? `Êtes-vous sûr de vouloir supprimer le nom « ${nameToRemove} » de cette cotisation ?`
+        : `Are you sure you want to remove the name "${nameToRemove}" from this cotisation?`;
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    const updated = names.filter((_, idx) => idx !== indexToRemove);
+    setNames(updated);
     setSaveError(null);
     setSuccessMessage(null);
+    setSaving(true);
+
+    try {
+      const trimmed = updated.map((n) => n.trim());
+      const res = await fetch(`/api/sessions/${tontineSessionId}/slots`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slotCount: trimmed.length,
+          beneficiaryNames: trimmed,
+        }),
+      });
+
+      await parseJsonOrThrow(res, t("couldNotSaveSlots"));
+      setSuccessMessage(
+        lang === "fr"
+          ? `Le nom « ${nameToRemove} » a été supprimé avec succès.`
+          : `The name "${nameToRemove}" has been successfully removed.`,
+      );
+      router.refresh();
+    } catch (err) {
+      setSaveError(friendlyErrorMessage(err, t("couldNotSaveSlots")));
+    } finally {
+      setSaving(false);
+    }
   }
 
   function handleNameChange(index: number, val: string) {
@@ -196,8 +233,12 @@ export function MemberNamesManager({
             <form onSubmit={handleSaveNames} className="flex flex-col gap-3.5">
               <p className="text-xs text-on-surface-variant leading-relaxed">
                 {lang === "fr"
-                  ? "La cotisation n'a pas encore commencé. Vous pouvez ajouter de nouveaux noms ou supprimer ceux que vous ne souhaitez plus conserver :"
-                  : "The cotisation has not started yet. You can add new names or remove existing ones:"}
+                  ? isFinished
+                    ? "Ce cycle de cotisation est terminé. Vous pouvez dès maintenant ajuster vos noms (ajouter ou retirer) ou quitter avant le prochain cycle :"
+                    : "La cotisation n'a pas encore commencé. Vous pouvez ajouter de nouveaux noms ou supprimer ceux que vous ne souhaitez plus conserver :"
+                  : isFinished
+                    ? "This cycle has finished. You can now adjust your names (add or remove) or leave before the next cycle starts:"
+                    : "The cotisation has not started yet. You can add new names or remove existing ones:"}
               </p>
 
               <div className="space-y-2.5">
@@ -217,8 +258,9 @@ export function MemberNamesManager({
                       <button
                         type="button"
                         onClick={() => handleRemoveName(i)}
+                        disabled={saving}
                         title={lang === "fr" ? "Supprimer ce nom" : "Remove this name"}
-                        className="w-9 h-9 rounded-lg border border-error/20 text-error hover:bg-error/10 flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors"
+                        className="w-9 h-9 rounded-lg border border-error/20 text-error hover:bg-error/10 flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors disabled:opacity-40"
                       >
                         <span className="material-symbols-outlined text-[18px]">delete</span>
                       </button>
@@ -303,7 +345,11 @@ export function MemberNamesManager({
                 </p>
                 <p className="text-[11px] text-on-surface-variant mt-0.5">
                   {lang === "fr"
-                    ? "Retirez votre participation de ce groupe avant le début de la cotisation."
+                    ? isFinished
+                      ? "Retirez votre participation pour ne plus être reconduit pour le prochain cycle."
+                      : "Retirez votre participation de ce groupe avant le début de la cotisation."
+                    : isFinished
+                    ? "Leave this group before the next cycle begins."
                     : "Remove your participation from this contribution before it starts."}
                 </p>
               </div>

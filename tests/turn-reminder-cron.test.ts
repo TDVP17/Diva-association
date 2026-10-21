@@ -20,10 +20,13 @@ vi.mock("@/lib/round-robin-lock", () => ({
   getDesignatedSlot: (...a: unknown[]) => getDesignatedSlot(...a),
 }));
 
-const scheduleNotifications = vi.fn().mockResolvedValue(1);
+const sendEmailSafe = vi.fn().mockResolvedValue({ id: "mock-email-id" });
+vi.mock("@/lib/email/resend", () => ({
+  sendEmailSafe: (...a: unknown[]) => sendEmailSafe(...a),
+}));
+
 const scheduleInAppNotifications = vi.fn().mockResolvedValue(1);
 vi.mock("@/lib/notifications/dispatch", () => ({
-  scheduleNotifications: (...a: unknown[]) => scheduleNotifications(...a),
   scheduleInAppNotifications: (...a: unknown[]) => scheduleInAppNotifications(...a),
 }));
 
@@ -61,7 +64,7 @@ describe("GET /api/crons/turn-reminder", () => {
     findManyMembership.mockReset();
     createTurnReminderLog.mockReset();
     getDesignatedSlot.mockReset();
-    scheduleNotifications.mockClear();
+    sendEmailSafe.mockClear();
     scheduleInAppNotifications.mockClear();
     process.env.CRON_SECRET = "test-secret";
   });
@@ -105,13 +108,13 @@ describe("GET /api/crons/turn-reminder", () => {
     expect(createTurnReminderLog).not.toHaveBeenCalled();
   });
 
-  it("sends Email + WhatsApp + In-App/Push and logs idempotently when the estimated date is tomorrow", async () => {
+  it("sends Email and In-App notification and logs idempotently when the estimated date is tomorrow", async () => {
     findManySession.mockResolvedValue([activeSession]);
     getDesignatedSlot.mockResolvedValue({ id: "slot-1", membershipId: "membership-1", officialPosition: 1 });
     createTurnReminderLog.mockResolvedValue({ id: "log-1" });
     findUniqueMembership.mockResolvedValue({
       userId: "user-1",
-      user: { id: "user-1", name: "Marie Fotso", phone: "677123456", preferredLang: "fr" },
+      user: { id: "user-1", name: "Marie Fotso", email: "marie@example.com", phone: "677123456", preferredLang: "fr" },
     });
     findManyMembership.mockResolvedValue([{ slotCount: 2 }, { slotCount: 1 }]);
 
@@ -123,33 +126,32 @@ describe("GET /api/crons/turn-reminder", () => {
       data: { membershipSlotId: "slot-1", estimatedDate: TOMORROW_KEY },
     });
 
-    expect(scheduleNotifications).toHaveBeenCalledWith(
-      expect.objectContaining({ channel: "EMAIL", type: "TURN_REMINDER_TOMORROW" }),
-    );
-    expect(scheduleNotifications).toHaveBeenCalledWith(
-      expect.objectContaining({ channel: "WHATSAPP", type: "TURN_REMINDER_TOMORROW" }),
+    expect(sendEmailSafe).toHaveBeenCalledWith(
+      "marie@example.com",
+      expect.stringContaining("Votre tour de bouffer approche"),
+      expect.any(String),
     );
     expect(scheduleInAppNotifications).toHaveBeenCalledWith(
       expect.objectContaining({ type: "TURN_REMINDER_TOMORROW" }),
     );
   });
 
-  it("skips the WhatsApp channel (but still sends Email/In-App/Push) when the member has no phone on file", async () => {
+  it("skips the Email channel when member has no email on file", async () => {
     findManySession.mockResolvedValue([activeSession]);
     getDesignatedSlot.mockResolvedValue({ id: "slot-1", membershipId: "membership-1", officialPosition: 1 });
     createTurnReminderLog.mockResolvedValue({ id: "log-1" });
     findUniqueMembership.mockResolvedValue({
       userId: "user-1",
-      user: { id: "user-1", name: "Marie Fotso", phone: null, preferredLang: "fr" },
+      user: { id: "user-1", name: "Marie Fotso", email: null, phone: null, preferredLang: "fr" },
     });
     findManyMembership.mockResolvedValue([{ slotCount: 1 }]);
 
     await GET(fakeCronRequest());
 
-    const whatsappCalls = scheduleNotifications.mock.calls.filter((c) => c[0].channel === "WHATSAPP");
-    expect(whatsappCalls).toHaveLength(0);
-    const emailCalls = scheduleNotifications.mock.calls.filter((c) => c[0].channel === "EMAIL");
-    expect(emailCalls).toHaveLength(1);
+    expect(sendEmailSafe).not.toHaveBeenCalled();
+    expect(scheduleInAppNotifications).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "TURN_REMINDER_TOMORROW" }),
+    );
   });
 
   it("does not re-notify the same slot for the same estimated date (idempotency)", async () => {
@@ -162,6 +164,6 @@ describe("GET /api/crons/turn-reminder", () => {
 
     expect(body.notified).toBe(0);
     expect(findUniqueMembership).not.toHaveBeenCalled();
-    expect(scheduleNotifications).not.toHaveBeenCalled();
+    expect(sendEmailSafe).not.toHaveBeenCalled();
   });
 });

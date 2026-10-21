@@ -111,11 +111,17 @@ export async function POST(
       data: { status: isApproved ? "VERIFIED" : "FAILED", verifiedAt: new Date() },
     });
 
+    const userFirstName = existing.user.name.trim().split(/\s+/)[0] || existing.user.name;
+    const sessionTitle = existing.tontineSession.title || existing.tontineSession.type;
+
     const message = isApproved
-      ? translate(lang, "memberApprovedMessage")
+      ? translate(lang, "memberApprovedMessage", { name: userFirstName, session: sessionTitle })
       : isBanned
-        ? (lang === "fr" ? "Votre demande a été refusée et vous avez été banni de cette cotisation." : "Your request was rejected and you have been banned from this cotisation.")
-        : translate(lang, "memberRejectedMessage") +
+        ? (lang === "fr"
+            ? `Salut, ${userFirstName} 👋 ! Votre demande a été refusée et vous avez été banni de cette cotisation.`
+            : `Hello, ${userFirstName} 👋! Your request was rejected and you have been banned from this cotisation.`)
+        : (lang === "fr" ? `Salut, ${userFirstName} 👋 ! ` : `Hello, ${userFirstName} 👋! `) +
+          translate(lang, "memberRejectedMessage") +
           (parsed.data.reason ? translate(lang, "memberRejectedReasonSuffix", { reason: parsed.data.reason }) : "");
     await scheduleInAppNotifications({
       tontineSessionId: membership.tontineSessionId,
@@ -125,7 +131,9 @@ export async function POST(
           userId: membership.userId,
           message,
           messageKey: approved ? "memberApprovedMessage" : "memberRejectedMessage",
-          messageVars: approved || !parsed.data.reason ? undefined : { reason: parsed.data.reason },
+          messageVars: approved
+            ? { name: userFirstName, session: sessionTitle }
+            : { name: userFirstName, ...(parsed.data.reason ? { reason: parsed.data.reason } : {}) },
           actionUrl: `/sessions/${membership.tontineSessionId}`,
         },
       ],

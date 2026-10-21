@@ -28,10 +28,20 @@ export function NotificationsClient({ lang }: { lang: Lang }) {
   const [loadError, setLoadError] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
 
-  const [pushStatus, setPushStatus] = useState<NotificationPermission | "unsupported">("default");
+  const [pushStatus, setPushStatus] = useState<NotificationPermission | "unsupported">(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      return Notification.permission;
+    }
+    return "default";
+  });
   const [pushBusy, setPushBusy] = useState(false);
   const [pushMessage, setPushMessage] = useState<string | null>(null);
-  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("diva_push_banner_dismissed") === "1";
+    }
+    return false;
+  });
 
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -40,6 +50,13 @@ export function NotificationsClient({ lang }: { lang: Lang }) {
       setPushStatus("unsupported");
     }
   }, []);
+
+  function handleDismissBanner() {
+    try {
+      sessionStorage.setItem("diva_push_banner_dismissed", "1");
+    } catch {}
+    setBannerDismissed(true);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -205,7 +222,7 @@ export function NotificationsClient({ lang }: { lang: Lang }) {
           </div>
           <button
             type="button"
-            onClick={() => setBannerDismissed(true)}
+            onClick={handleDismissBanner}
             aria-label="Fermer"
             className="absolute top-2.5 right-2.5 p-1 text-emerald-200/70 hover:text-white rounded-lg transition-colors cursor-pointer"
           >

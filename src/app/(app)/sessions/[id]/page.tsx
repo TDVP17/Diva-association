@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getContributionTotal, getNextDueDate, getCycleDateForRound, getTontineConfig, isPayoutInfoUnlockTime } from "@/lib/tontine-engine";
+import { getContributionTotal, getNextDueDate, getCycleDateForRound, getTontineConfig, isPayoutInfoUnlockTime, isSessionCycleFinished } from "@/lib/tontine-engine";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { formatXAF } from "@/lib/format-currency";
 import { FinesInfoAccordion } from "./fines-info-accordion";
@@ -463,6 +463,22 @@ export default async function SessionDetailPage({
         : (allSlotsFlat.length || 1);
   const totalPotAmount = Math.round(slotCountForPot * perSlotAmount + slotCountForPot * perSlotFee * 0.25);
 
+  const mySlots = [...myMembership.slots].sort((a, b) =>
+    a.beneficiaryName.localeCompare(b.beneficiaryName, "fr", { sensitivity: "base" }),
+  );
+  const myUndrawnSlots = mySlots.filter((s) => s.ballDrawn === null);
+  const hasUndrawnSlots = myUndrawnSlots.length > 0;
+
+  // "Designated" (zero payout rows yet) gates the initial "submit your
+  // details" prompt; once submitted, the slot drops out of that query
+  // (it now has a row) but the claim itself still needs its own status
+  // panel (awaiting release, then awaiting receipt confirmation) — so the
+  // two are tracked separately rather than re-using one query for both.
+  const designatedSlot = await getDesignatedSlot(id);
+  const myDesignatedSlot = designatedSlot && mySlots.some((s) => s.id === designatedSlot.id) ? designatedSlot : null;
+  const isBeneficiaryTurn =
+    !hasUndrawnSlots && !!myDesignatedSlot && myDesignatedSlot.ballDrawn !== null;
+
   const memberStatusSlots = allSlotsFlat.map((s) => {
     const c = contributionBySlot.get(s.id);
     const f = fineBySlot.get(s.id);
@@ -484,24 +500,9 @@ export default async function SessionDetailPage({
       paidByRelativeName: c?.paidByUser?.name ?? null,
       fineAmount: f ? Number(f.amount) : null,
       estimatedDateLabel: slotDateLabel,
+      isDesignatedWinner: s.id === designatedSlot?.id,
     };
   }).sort((a, b) => a.beneficiaryName.localeCompare(b.beneficiaryName, "fr", { sensitivity: "base" }));
-
-  const mySlots = [...myMembership.slots].sort((a, b) =>
-    a.beneficiaryName.localeCompare(b.beneficiaryName, "fr", { sensitivity: "base" }),
-  );
-  const myUndrawnSlots = mySlots.filter((s) => s.ballDrawn === null);
-  const hasUndrawnSlots = myUndrawnSlots.length > 0;
-
-  // "Designated" (zero payout rows yet) gates the initial "submit your
-  // details" prompt; once submitted, the slot drops out of that query
-  // (it now has a row) but the claim itself still needs its own status
-  // panel (awaiting release, then awaiting receipt confirmation) — so the
-  // two are tracked separately rather than re-using one query for both.
-  const designatedSlot = await getDesignatedSlot(id);
-  const myDesignatedSlot = designatedSlot && mySlots.some((s) => s.id === designatedSlot.id) ? designatedSlot : null;
-  const isBeneficiaryTurn =
-    !hasUndrawnSlots && !!myDesignatedSlot && myDesignatedSlot.ballDrawn !== null;
 
   // Same read-only guard initiateSlotPayment() enforces server-side — shown
   // here so the Pay button is disabled up front instead of only failing
@@ -558,6 +559,15 @@ export default async function SessionDetailPage({
     ? getCycleDateForRound(tontineSession.type, tontineSession.startDate, maxPosition)
     : null;
 
+  const isSessionFinished = isSessionCycleFinished({
+    status: tontineSession.status,
+    type: tontineSession.type,
+    startDate: tontineSession.startDate,
+    maxPosition,
+    isDrawCompleted,
+    now: new Date(),
+  });
+
   return (
     <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-5xl mx-auto w-full pb-32">
       {/* Toast Notification flottant (en haut de l'écran) */}
@@ -566,6 +576,25 @@ export default async function SessionDetailPage({
         payerName={recentPayerName}
         lang={lang}
       />
+
+      {/* Bannière Cotisation terminée */}
+      {isSessionFinished && (
+        <div className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-teal-950 text-white rounded-2xl p-5 shadow-lg border border-emerald-500/30 mb-5 flex items-start gap-4">
+          <span className="material-symbols-outlined text-amber-300 text-3xl flex-shrink-0 mt-0.5">
+            celebration
+          </span>
+          <div>
+            <h2 className="font-bold text-base text-white">
+              {lang === "fr" ? "Cette session de cotisation est terminée !" : "This cotisation session is finished!"}
+            </h2>
+            <p className="text-xs sm:text-sm text-emerald-100/90 mt-1 leading-relaxed">
+              {lang === "fr"
+                ? "Toutes les dates de ce cycle sont passées. Les cotisations sont désormais closes pour ce cycle. Un nouveau cycle va recommencer d'ici peu ! Vous êtes libre de sortir, d'ajouter des noms ou d'en retirer dans la section « Mes noms enregistrés » ci-dessous."
+                : "All dates for this cycle have completed. Contributions are now closed. A new cycle will restart shortly! You are free to leave, add names, or remove names in the 'My registered names' section below."}
+            </p>
+          </div>
+        </div>
+      )}
 
       {paidContribution && (
         <PaymentSuccessBanner
@@ -622,7 +651,7 @@ export default async function SessionDetailPage({
       )}
 
       {/* 2. Bannière Ton tour */}
-      {(() => {
+      {!isSessionFinished && (() => {
         const hasUndrawnSlots = myUndrawnSlots.length > 0;
         const totalSlotsCount = allSlotsFlat.length > 0 ? allSlotsFlat.length : (totalRegisteredSlots || 1);
         const halfThreshold = Math.ceil(totalSlotsCount / 2);
@@ -712,9 +741,16 @@ export default async function SessionDetailPage({
           fineAmount: s.fineAmount,
           ballDrawn: s.ballDrawn,
           officialPosition: s.officialPosition,
+          isDesignatedWinner: s.isDesignatedWinner,
         }))}
         myUnpaidSlotIds={mySlots
-          .filter((s) => contributionBySlot.get(s.id)?.status !== "PAID")
+          .filter((s) => {
+            // When it's the member's turn to bouffer, the winning slot is exempt from contributing
+            if (isBeneficiaryTurn && myDesignatedSlot && s.id === myDesignatedSlot.id) {
+              return false;
+            }
+            return contributionBySlot.get(s.id)?.status !== "PAID";
+          })
           .map((s) => s.id)}
         slotTotal={perSlotTotal}
         paymentDescription={paymentDescription}
@@ -723,7 +759,9 @@ export default async function SessionDetailPage({
         isDraftSession={!isDrawCompleted}
         isBeneficiaryTurn={isBeneficiaryTurn}
         lockedReason={
-          !isDrawCompleted
+          isSessionFinished
+            ? (lang === "fr" ? "Cette session de cotisation est terminée pour ce cycle." : "This cotisation session is finished for this cycle.")
+            : !isDrawCompleted
             ? t("paymentsLockedNoPayoutOrder")
             : !roundLock.ok && currentBeneficiaryName && !isBeneficiaryTurn
             ? t("paymentsLockedUntilPayout", { name: currentBeneficiaryName })
@@ -742,6 +780,7 @@ export default async function SessionDetailPage({
           sessionStatus={tontineSession.status}
           maxSlots={tontineSession.maxSlots ? Number(tontineSession.maxSlots) : null}
           startDate={tontineSession.startDate}
+          isFinished={isSessionFinished}
         />
 
         <FinesInfoAccordion

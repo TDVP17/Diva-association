@@ -65,9 +65,49 @@ export async function scheduleNotifications(params: {
 
   if (uniqueRecipients.length === 0) return 0;
 
+  // Retrieve user names and preferred languages to personalize message prefix
+  const recipientUserIds = uniqueRecipients.map((r) => r.userId);
+  const usersForPersonalization = prisma.user?.findMany
+    ? await prisma.user.findMany({
+        where: { id: { in: recipientUserIds } },
+        select: { id: true, name: true, preferredLang: true },
+      })
+    : [];
+  const userGreetingMap = new Map(usersForPersonalization.map((u) => [u.id, u]));
+
+  const personalizedRecipients = uniqueRecipients.map((r) => {
+    const u = userGreetingMap.get(r.userId);
+    const lang: Lang = u?.preferredLang === "en" ? "en" : "fr";
+    const rawName = u?.name?.trim() || "";
+    const firstName = rawName.split(/\s+/)[0] || rawName;
+    const greeting = firstName ? (lang === "en" ? `Hello, ${firstName} 👋` : `Salut, ${firstName} 👋`) : "";
+
+    let msg = r.message;
+    const hasGreeting =
+      msg.startsWith("Salut") ||
+      msg.startsWith("Bonjour") ||
+      msg.startsWith("Hello") ||
+      msg.startsWith("Hi");
+
+    if (greeting && !hasGreeting) {
+      msg = `${greeting} ! ${msg}`;
+    }
+
+    const vars = {
+      ...(r.messageVars ?? {}),
+      ...(firstName ? { name: firstName } : {}),
+    };
+
+    return {
+      ...r,
+      message: msg,
+      messageVars: vars,
+    };
+  });
+
   const now = Date.now();
   await prisma.notification.createMany({
-    data: uniqueRecipients.map((r, index) => ({
+    data: personalizedRecipients.map((r, index) => ({
       tontineSessionId: params.tontineSessionId,
       userId: r.userId,
       channel: params.channel,
@@ -81,7 +121,7 @@ export async function scheduleNotifications(params: {
     })),
   });
 
-  return uniqueRecipients.length;
+  return personalizedRecipients.length;
 }
 
 /**
@@ -98,7 +138,7 @@ async function deliverInstantNotifications(params: {
     const users = prisma.user?.findMany
       ? await prisma.user.findMany({
           where: { id: { in: userIds } },
-          select: { id: true, email: true, phone: true, preferredLang: true },
+          select: { id: true, email: true, phone: true, preferredLang: true, name: true },
         })
       : [];
 
@@ -110,9 +150,23 @@ async function deliverInstantNotifications(params: {
       params.recipients.map(async (r) => {
         const user = userMap.get(r.userId);
         const lang: Lang = user?.preferredLang === "en" ? "en" : "fr";
+        const rawName = user?.name?.trim() || "";
+        const firstName = rawName.split(/\s+/)[0] || rawName;
+        const greeting = firstName ? (lang === "en" ? `Hello, ${firstName} 👋` : `Salut, ${firstName} 👋`) : "";
         const typeKey = NOTIFICATION_TYPE_KEY[params.type];
         let title = typeKey ? translate(lang, typeKey) : "DIVA Asso.";
         let body = r.message;
+
+        // Ensure push/body begins with personalized greeting with emoji
+        const hasGreeting =
+          body.startsWith("Salut") ||
+          body.startsWith("Bonjour") ||
+          body.startsWith("Hello") ||
+          body.startsWith("Hi");
+
+        if (greeting && !hasGreeting) {
+          body = `${greeting} ! ${body}`;
+        }
 
         if (params.type === "ADMIN_BROADCAST" && r.message.includes("\n\n")) {
           const [parsedSubject, ...rest] = r.message.split("\n\n");
@@ -146,6 +200,7 @@ async function deliverInstantNotifications(params: {
               actionLabel: lang === "en" ? "View in App" : "Consulter dans l'application",
               lang,
               baseUrl,
+              recipientName: user.name,
             });
             await sendEmailSafe(user.email, title, emailHtml);
           } catch (emailErr) {

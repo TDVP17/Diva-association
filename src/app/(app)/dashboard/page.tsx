@@ -83,7 +83,7 @@ export default async function DashboardPage() {
                 <Link
                   key={m.id}
                   href={`/sessions/${m.tontineSession.id}`}
-                  className="bg-white rounded-xl p-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant flex items-center justify-between hover:bg-surface-container-low transition-colors"
+                  className="group relative bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-emerald-900/20 hover:border-emerald-700 flex items-center justify-between transition-all duration-150 cursor-pointer active:scale-[0.98] active:bg-emerald-50/80 active:border-emerald-700 active:shadow-inner"
                 >
                   <div>
                     <h3 className="font-label-md text-label-md text-primary uppercase tracking-wide">
@@ -135,18 +135,6 @@ export default async function DashboardPage() {
           <span className="material-symbols-outlined text-error flex-shrink-0">chevron_right</span>
         </Link>
       )}
-
-      <section>
-        <h2 className="font-title-md text-title-md text-primary mb-stack-gap-md">{t("quickActions")}</h2>
-        <Link
-          href="/chat"
-          className="bg-white rounded-xl p-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant flex items-center gap-3 hover:bg-surface-container-low active:scale-[0.99] transition-all min-h-[44px]"
-        >
-          <span className="material-symbols-outlined text-primary flex-shrink-0">chat_bubble</span>
-          <p className="font-label-md text-label-md text-on-surface flex-1">{t("openChat")}</p>
-          <span className="material-symbols-outlined text-outline flex-shrink-0">chevron_right</span>
-        </Link>
-      </section>
     </main>
   );
 }

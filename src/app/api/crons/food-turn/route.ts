@@ -59,16 +59,20 @@ export async function GET(request: Request) {
       if (!membership) continue;
 
       const lang = membership.user.preferredLang === "en" ? "en" : "fr";
-      const message = translate(lang, "foodTurnMessage", { name: membership.user.name });
+      const rawName = membership.user.name.trim();
+      const firstName = rawName.split(/\s+/)[0] || rawName;
+      const message = translate(lang, "foodTurnMessage", { name: firstName });
 
       if (membership.user.email) {
-        const emailTitle = lang === "fr" ? "C'est votre tour de recevoir la cagnotte ! 🎉" : "It's your turn to receive the pot! 🎉";
+        const emailTitle =
+          lang === "fr" ? "C'est votre tour de recevoir la cagnotte ! 🍲🎉" : "It's your turn to receive the pot! 🍲🎉";
         const emailHtml = renderBrandedEmailHtml({
           title: emailTitle,
           bodyText: message,
           actionUrl: `/sessions/${tontineSession.id}`,
-          actionLabel: lang === "fr" ? "Voir ma cagnotte" : "View My Pot",
+          actionLabel: lang === "fr" ? "Fournir mes coordonnées" : "Submit Payout Details",
           lang,
+          recipientName: membership.user.name,
         });
         await sendEmailSafe(
           membership.user.email,

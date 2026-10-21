@@ -167,10 +167,12 @@ export async function settleContribution(
       if (paidCount === halfThreshold) {
         const benUser = designatedSlot.membership.user;
         const benLang: Lang = benUser.preferredLang === "en" ? "en" : "fr";
+        const benRawName = benUser.name.trim();
+        const benFirstName = benRawName.split(/\s+/)[0] || benRawName;
         const alertMsg =
           benLang === "fr"
-            ? `C'est votre tour de bouffer la cagnotte de ${sessionLabel} ! La moitié des membres a cotisé : veuillez fournir votre numéro de compte Mobile Money ou Orange Money et votre nom complet.`
-            : `It's your turn to receive the ${sessionLabel} payout! Half of the members have contributed: please provide your Mobile Money or Orange Money account number and name.`;
+            ? `Salut, ${benFirstName} 👋 ! C'est à votre tour de bouffer la cagnotte de ${sessionLabel} ! 🎉 La moitié des membres a cotisé : veuillez fournir votre numéro de téléphone et le nom du compte Orange/MTN Money pour recevoir votre virement.`
+            : `Hello, ${benFirstName} 👋! It's your turn to receive the ${sessionLabel} payout! 🎉 Half of the members have contributed: please provide your phone number and Orange/MTN Money account name to receive your payout.`;
 
         await scheduleInAppNotifications({
           tontineSessionId: membership.tontineSessionId,
@@ -180,12 +182,11 @@ export async function settleContribution(
               userId: benUser.id,
               message: alertMsg,
               messageKey: "payoutTurnNotifMessage",
-              messageVars: { cotisation: sessionLabel },
+              messageVars: { name: benFirstName, cotisation: sessionLabel },
               actionUrl: `/sessions/${membership.tontineSessionId}`,
             },
           ],
         });
-
       }
     }
   } catch (err) {

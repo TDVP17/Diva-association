@@ -3,14 +3,13 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-// 90 days in milliseconds (3 months of inactivity)
-const THREE_MONTHS_MS = 90 * 24 * 60 * 60 * 1000;
+// 365 days in milliseconds (1 full year of inactivity)
+const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const STORAGE_KEY = "diva_last_connected_at";
 
 /**
- * Client-side watcher that enforces auto-logout if the user has not
- * connected to or used the application for more than 3 months (90 days).
- * Checks on mount, on PWA app resume (visibilitychange), and on window focus.
+ * Client-side watcher that enforces auto-logout only after 1 full year (365 days)
+ * of continuous inactivity. Checks on mount, on PWA app resume, and window focus.
  */
 export function InactivityAutoLogout() {
   const router = useRouter();
@@ -29,8 +28,8 @@ export function InactivityAutoLogout() {
         const lastConnected = Number(raw);
         if (!isNaN(lastConnected) && lastConnected > 0) {
           const elapsed = now - lastConnected;
-          if (elapsed > THREE_MONTHS_MS) {
-            // More than 3 months without connecting -> auto-disconnect
+          if (elapsed > ONE_YEAR_MS) {
+            // More than 1 year without connecting -> auto-disconnect
             localStorage.removeItem(STORAGE_KEY);
             // Trigger server signout and redirect to login with expiration notice
             window.location.href = "/login?expired=1";

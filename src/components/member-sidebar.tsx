@@ -8,7 +8,7 @@ const ITEMS = [
   { href: "/dashboard", label: "navHome", icon: "home" },
   { href: "/sessions", label: "contributionsNavItem", icon: "account_balance" },
   { href: "/fines", label: "finesNavItem", icon: "receipt_long" },
-  { href: "/chat", label: "messages", icon: "chat_bubble" },
+  { href: "/chat", label: "customerSupport", icon: "chat" },
   { href: "/contribute-for-relative", label: "contributeForRelativeNav", icon: "volunteer_activism" },
   { href: "/notifications", label: "myNotificationsNav", icon: "notifications" },
   { href: "/profile", label: "navProfile", icon: "person" },

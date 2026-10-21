@@ -3,7 +3,6 @@
 import { useState, useRef } from "react";
 import { CredentialsForm } from "./credentials-form";
 import { LanguageToggle } from "@/components/language-toggle";
-import { InstallPromptModal } from "@/components/install-prompt-modal";
 import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 import { getGoogleSignInUrl } from "./actions";
 
@@ -263,8 +262,6 @@ export function LoginContent({
           )}
         </div>
       )}
-
-      <InstallPromptModal lang={lang} />
     </main>
   );
 }

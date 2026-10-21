@@ -145,3 +145,54 @@ export function playCelebrationSound() {
     // Silently ignore audio playback failures
   }
 }
+
+/**
+ * 5. Exciting lottery ball draw & reveal sound effect.
+ * Synthesizes a rapid lottery tumbler shuffle followed by a bright, triumphant victory chime.
+ */
+export function playBallDrawSound() {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    // 1. Tumbler ball bounce & roll (rapid crisp percussive impulses)
+    [0, 0.07, 0.14, 0.21, 0.28].forEach((offset, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(220 + idx * 35, now + offset);
+      osc.frequency.exponentialRampToValueAtTime(90, now + offset + 0.045);
+
+      gain.gain.setValueAtTime(0.12, now + offset);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.045);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + offset);
+      osc.stop(now + offset + 0.05);
+    });
+
+    // 2. Triumphant reveal chime (C5, E5, G5, C6)
+    const notes = [523.25, 659.25, 783.99, 1046.5];
+    notes.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "triangle";
+      const start = now + 0.35 + idx * 0.06;
+      osc.frequency.setValueAtTime(freq, start);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.setValueAtTime(0.15, start);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.65);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.7);
+    });
+  } catch {
+    // Silently ignore audio playback failures
+  }
+}

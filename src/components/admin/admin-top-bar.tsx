@@ -36,12 +36,12 @@ export async function AdminTopBar({
   ]);
 
   const menuItems: TopRightMenuItem[] = [
-    { href: "/admin/support", label: t("messages"), icon: "chat_bubble", badge: unreadMessages },
     { href: "/admin/contributions", label: t("contributionsNavItem"), icon: "account_balance" },
     { href: "/admin/sessions/new", label: t("addContributionNav"), icon: "add_circle" },
     { href: "/admin/membership-requests", label: t("joinRequestsNav"), icon: "group_add", badge: pendingMemberships },
     { href: "/admin/food-requests", label: t("foodRequestsNav"), icon: "restaurant", badge: pendingFoodRequests },
     { href: "/admin/users", label: t("allUsersCard"), icon: "group" },
+    { href: "/admin/support", label: t("customerSupport"), icon: "chat", badge: unreadMessages },
   ];
 
   return (

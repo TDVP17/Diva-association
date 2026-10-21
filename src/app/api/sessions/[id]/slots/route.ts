@@ -3,6 +3,7 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { resolveUniqueSlotNames } from "@/lib/slot-naming";
+import { isSessionCycleFinished } from "@/lib/tontine-engine";
 
 const bodySchema = z.object({
   slotCount: z.coerce.number().int().min(1).max(10),
@@ -43,9 +44,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
-    if (tontineSession.status !== "DRAFT") {
+    const allSlots = await prisma.membershipSlot.findMany({
+      where: { membership: { tontineSessionId: tontineSession.id, status: "APPROVED" } },
+      select: { officialPosition: true },
+    });
+
+    const isFinished = isSessionCycleFinished({
+      status: tontineSession.status,
+      type: tontineSession.type,
+      startDate: tontineSession.startDate,
+      officialPositions: allSlots.map((s) => s.officialPosition),
+    });
+
+    if (tontineSession.status !== "DRAFT" && !isFinished) {
       return NextResponse.json(
-        { error: "Cannot modify slots once drawing or payments have started" },
+        { error: "Cannot modify slots while cotisation cycle is actively running" },
         { status: 409 },
       );
     }
@@ -90,21 +103,89 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     );
 
     await prisma.$transaction(async (tx) => {
-      // Delete previous slots if member is adjusting (increasing/decreasing) names
-      await tx.membershipSlot.deleteMany({
+      const existingUserSlots = await tx.membershipSlot.findMany({
         where: { membershipId: membership.id },
+        orderBy: { createdAt: "asc" },
       });
+
+      // Update existing slots with the new beneficiary names in place
+      const slotsToUpdate = existingUserSlots.slice(0, finalNames.length);
+      for (let i = 0; i < slotsToUpdate.length; i++) {
+        await tx.membershipSlot.update({
+          where: { id: slotsToUpdate[i].id },
+          data: { beneficiaryName: finalNames[i] },
+        });
+      }
+
+      // If slotCount was increased, create additional slots
+      if (finalNames.length > existingUserSlots.length) {
+        const newNames = finalNames.slice(existingUserSlots.length);
+        await tx.membershipSlot.createMany({
+          data: newNames.map((beneficiaryName) => ({
+            membershipId: membership.id,
+            beneficiaryName,
+          })),
+        });
+      }
+
+      // If slotCount was decreased, handle excess slots safely
+      if (existingUserSlots.length > finalNames.length) {
+        const excessSlots = existingUserSlots.slice(finalNames.length);
+        const excessSlotIds = excessSlots.map((s) => s.id);
+
+        if (!isFinished) {
+          // In DRAFT before start, slots have no paid contributions or payouts
+          await tx.paymentAttempt.updateMany({
+            where: {
+              OR: [
+                { contribution: { membershipSlotId: { in: excessSlotIds } } },
+                { fine: { membershipSlotId: { in: excessSlotIds } } },
+              ],
+            },
+            data: { contributionId: null, fineId: null },
+          });
+          await tx.notification.deleteMany({ where: { membershipSlotId: { in: excessSlotIds } } }).catch(() => {});
+          await tx.contribution.deleteMany({ where: { membershipSlotId: { in: excessSlotIds } } });
+          await tx.fine.deleteMany({ where: { membershipSlotId: { in: excessSlotIds } } });
+          await tx.membershipSlot.deleteMany({ where: { id: { in: excessSlotIds } } });
+        } else {
+          // If cycle is finished, check each excess slot to preserve historical receipts/payouts
+          for (const slot of excessSlots) {
+            const hasPaid = await tx.contribution.count({
+              where: { membershipSlotId: slot.id, status: "PAID" },
+            });
+            const hasPayout = await tx.payout.count({
+              where: { membershipSlotId: slot.id },
+            });
+            if (hasPaid === 0 && hasPayout === 0) {
+              await tx.paymentAttempt.updateMany({
+                where: {
+                  OR: [
+                    { contribution: { membershipSlotId: slot.id } },
+                    { fine: { membershipSlotId: slot.id } },
+                  ],
+                },
+                data: { contributionId: null, fineId: null },
+              });
+              await tx.notification.deleteMany({ where: { membershipSlotId: slot.id } }).catch(() => {});
+              await tx.contribution.deleteMany({ where: { membershipSlotId: slot.id } });
+              await tx.fine.deleteMany({ where: { membershipSlotId: slot.id } });
+              await tx.membershipSlot.delete({ where: { id: slot.id } });
+            } else {
+              // Excess slot has historical records — keep the slot record for history integrity
+              // but clear its active positions for the upcoming cycle
+              await tx.membershipSlot.update({
+                where: { id: slot.id },
+                data: { officialPosition: null, ballDrawn: null },
+              });
+            }
+          }
+        }
+      }
 
       await tx.membership.update({
         where: { id: membership.id },
         data: { slotCount },
-      });
-
-      await tx.membershipSlot.createMany({
-        data: finalNames.map((beneficiaryName) => ({
-          membershipId: membership.id,
-          beneficiaryName,
-        })),
       });
     });
 

@@ -136,6 +136,117 @@ export async function GET(request: Request) {
           }
         }
       }
+
+      // --- 1b. Payout Turn Reminder (TODAY - morning before 9h00) ---
+      if (estimatedDate.getTime() === todayKey.getTime()) {
+        const logToday = await prisma.turnReminderLog
+          .create({ data: { membershipSlotId: designatedSlot.id, estimatedDate: todayKey } })
+          .catch(() => null);
+
+        if (logToday) {
+          const membership = await prisma.membership.findUnique({
+            where: { id: designatedSlot.membershipId },
+            include: { user: true, slots: true },
+          });
+
+          if (membership) {
+            const approvedMemberships = await prisma.membership.findMany({
+              where: { tontineSessionId: tontineSession.id, status: "APPROVED" },
+              select: { slotCount: true },
+            });
+            const totalApprovedSlots = approvedMemberships.reduce(
+              (sum, m) => sum + (m.slotCount ? Number(m.slotCount) : 0),
+              0,
+            );
+            const estimatedAmount = Number(tontineSession.amount) * totalApprovedSlots;
+            const lang = membership.user.preferredLang === "en" ? "en" : "fr";
+            const firstName = membership.user.name.trim().split(/\s+/)[0] ?? membership.user.name;
+
+            // Check if member has OTHER registered slots in this session
+            const otherSlots = membership.slots.filter((s) => s.id !== designatedSlot.id);
+            const hasOtherSlots = otherSlots.length > 0;
+            const otherSlotNames = otherSlots.map((s) => s.beneficiaryName).join(", ");
+
+            const warningOtherSlotsFr = hasOtherSlots
+              ? `<div style="background-color: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 12px; margin-top: 14px; color: #92400e; font-size: 13px;">
+                  ⚠️ <strong>Attention :</strong> Vous avez d'autres noms enregistrés dans cette cotisation (<strong>${otherSlotNames}</strong>). Vous devez obligatoirement cotiser pour ces autres noms, sinon des amendes de retard s'appliqueront à ces noms !
+                 </div>`
+              : "";
+
+            const warningOtherSlotsEn = hasOtherSlots
+              ? `<div style="background-color: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 12px; margin-top: 14px; color: #92400e; font-size: 13px;">
+                  ⚠️ <strong>Warning:</strong> You have other registered names in this cotisation (<strong>${otherSlotNames}</strong>). You must contribute for these other names, otherwise late fines will apply to them!
+                 </div>`
+              : "";
+
+            const emailTitle =
+              lang === "fr"
+                ? `C'est votre tour de bouffer aujourd'hui ! 🍲🎉 — ${sessionLabel}`
+                : `It's your turn to receive the pot today! 🍲🎉 — ${sessionLabel}`;
+
+            const emailBodyHtml = `
+              <p style="margin-top: 0;">${lang === "fr" ? `Salut <strong>${firstName}</strong> 👋,` : `Hello <strong>${firstName}</strong> 👋,`}</p>
+              <p>
+                ${
+                  lang === "fr"
+                    ? `Aujourd'hui, c'est votre tour de bouffer la cagnotte pour votre nom <strong>${designatedSlot.beneficiaryName}</strong> dans la cotisation <strong>${sessionLabel}</strong> ! 🎉`
+                    : `Today is your turn to receive the pot for your name <strong>${designatedSlot.beneficiaryName}</strong> in the <strong>${sessionLabel}</strong> cotisation! 🎉`
+                }
+              </p>
+              <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 18px; margin: 20px 0; text-align: center;">
+                <p style="margin: 0 0 6px 0; font-size: 13px; color: #166534; font-weight: 600; text-transform: uppercase;">
+                  ${lang === "fr" ? "Montant de la cagnotte estimé" : "Estimated Pot Amount"}
+                </p>
+                <div style="font-size: 28px; font-weight: 800; color: #003528;">
+                  ${formatXAF(estimatedAmount)}
+                </div>
+                <p style="margin: 8px 0 0 0; font-size: 12px; color: #15803d;">
+                  ${lang === "fr" ? `Position officielle : N°${designatedSlot.officialPosition}` : `Official Position: #${designatedSlot.officialPosition}`}
+                </p>
+              </div>
+              <p style="font-size: 14px; color: #334155;">
+                ${
+                  lang === "fr"
+                    ? `💡 <strong>Information :</strong> Vous n'avez pas besoin de cotiser pour ce nom qui bouffe (${designatedSlot.beneficiaryName}).`
+                    : `💡 <strong>Note:</strong> You do not need to contribute for this winning name (${designatedSlot.beneficiaryName}).`
+                }
+              </p>
+              ${lang === "fr" ? warningOtherSlotsFr : warningOtherSlotsEn}
+            `;
+
+            if (membership.user.email) {
+              const emailHtml = renderBrandedEmailHtml({
+                title: emailTitle,
+                bodyHtml: emailBodyHtml,
+                actionUrl: `/sessions/${tontineSession.id}`,
+                actionLabel: lang === "fr" ? "Consulter ma cotisation" : "View Cotisation",
+                lang,
+                recipientName: membership.user.name,
+              });
+              await sendEmailSafe(membership.user.email, emailTitle, emailHtml);
+            }
+
+            const inAppMsg =
+              lang === "fr"
+                ? `Salut, ${firstName} 👋 ! Aujourd'hui c'est votre tour de bouffer la cagnotte (${formatXAF(estimatedAmount)}) pour « ${designatedSlot.beneficiaryName} » dans ${sessionLabel} ! Vous n'avez pas à cotiser pour ce nom.${hasOtherSlots ? ` Attention : cotisez pour vos autres noms (${otherSlotNames}) pour éviter les amendes.` : ""}`
+                : `Hello, ${firstName} 👋! Today is your turn to receive the pot (${formatXAF(estimatedAmount)}) for "${designatedSlot.beneficiaryName}" in ${sessionLabel}! You don't need to pay for this name.${hasOtherSlots ? ` Warning: contribute for your other names (${otherSlotNames}) to avoid fines.` : ""}`;
+
+            await scheduleInAppNotifications({
+              tontineSessionId: tontineSession.id,
+              type: "FOOD_TURN",
+              recipients: [
+                {
+                  userId: membership.userId,
+                  message: inAppMsg,
+                  actionUrl: `/sessions/${tontineSession.id}`,
+                },
+              ],
+            });
+
+            turnNotified++;
+          }
+        }
+      }
     }
 
     // --- 2. Advance Contribution Reminders (J-3, J-2, J-1) for unpaid members only ---
@@ -247,5 +358,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, turnNotified, reminderNotified });
+  return NextResponse.json({ ok: true, notified: turnNotified, turnNotified, reminderNotified });
 }

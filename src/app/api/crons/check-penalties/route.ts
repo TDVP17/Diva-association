@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import type { TontineType } from "@/generated/prisma/enums";
 import { computeFine, getCutoffInstant, isContributionDay, toDueDateKey, ALL_TONTINE_TYPES } from "@/lib/tontine-engine";
+import { getDesignatedSlot } from "@/lib/round-robin-lock";
 import { sendEmailSafe } from "@/lib/email/resend";
 import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { fineNoticeMessage } from "@/lib/whatsapp/templates";
@@ -43,10 +44,15 @@ export async function GET(request: Request) {
         fineIntervalHours: tontineSession.fineIntervalHours,
       });
       if (fineAmount <= 0) continue;
+      const designatedSlot = await getDesignatedSlot(tontineSession.id);
       let finesIssued = 0;
 
       for (const membership of tontineSession.memberships) {
         for (const slot of membership.slots) {
+          // The winning slot whose turn it is to bouffer is exempt from contributing for itself.
+          // Other slots owned by the same member must still contribute or incur fines.
+          if (designatedSlot && slot.id === designatedSlot.id) continue;
+
           const key = { membershipSlotId_dueDate: { membershipSlotId: slot.id, dueDate } };
 
           const [contribution, existingFine] = await Promise.all([

@@ -129,13 +129,13 @@ export default async function SessionsPage() {
         ) : (
           <div className="flex flex-col gap-stack-gap-md lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-stack-gap-md">
             {myCotisations.map((m) => (
-              <div
+              <Link
                 key={m.id}
-                className="relative bg-white rounded-xl p-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant flex items-center justify-between hover:bg-surface-container-low transition-colors"
+                href={`/sessions/${m.tontineSession.id}`}
+                className="group relative bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-emerald-900/20 hover:border-emerald-700 flex items-center justify-between transition-all duration-150 cursor-pointer active:scale-[0.98] active:bg-emerald-50/80 active:border-emerald-700 active:shadow-inner"
               >
-                <Link href={`/sessions/${m.tontineSession.id}`} className="absolute inset-0 rounded-xl" />
-                <div className="pointer-events-none">
-                  <h3 className="font-label-md text-label-md text-on-surface">
+                <div>
+                  <h3 className="font-label-md text-label-md text-on-surface font-semibold group-hover:text-primary transition-colors">
                     {m.tontineSession.title || TONTINE_LABELS[m.tontineSession.type]}
                   </h3>
                   {m.tontineSession.description && (
@@ -192,7 +192,7 @@ export default async function SessionsPage() {
                     <HideClosedSessionButton membershipId={m.id} lang={lang} />
                   )}
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}
@@ -235,10 +235,10 @@ export default async function SessionsPage() {
               <Link
                 key={s.id}
                 href={`/sessions/${s.id}`}
-                className="bg-white rounded-xl p-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant flex items-center justify-between hover:bg-surface-container-low transition-colors"
+                className="group relative bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-emerald-900/20 hover:border-emerald-700 flex items-center justify-between transition-all duration-150 cursor-pointer active:scale-[0.98] active:bg-emerald-50/80 active:border-emerald-700 active:shadow-inner"
               >
                 <div>
-                  <h3 className="font-label-md text-label-md text-on-surface">
+                  <h3 className="font-label-md text-label-md text-on-surface font-semibold group-hover:text-primary transition-colors">
                     {s.title || TONTINE_LABELS[s.type]}
                   </h3>
                   {s.description && (
@@ -310,12 +310,15 @@ export default async function SessionsPage() {
         ) : (
           <div className="flex flex-col gap-stack-gap-md lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-stack-gap-md">
             {activeCotisationsList.map((c) => (
-              <Link key={c.id} href={`/sessions/${c.id}`} className="block h-full">
-                <div className="bg-white rounded-xl p-4 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant flex items-center justify-between hover:bg-surface-container-low transition-colors h-full">
-                  <div>
-                    <h3 className="font-label-md text-label-md text-on-surface font-medium">
-                      {c.title}
-                    </h3>
+              <Link
+                key={c.id}
+                href={`/sessions/${c.id}`}
+                className="group relative bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-emerald-900/20 hover:border-emerald-700 flex items-center justify-between transition-all duration-150 cursor-pointer active:scale-[0.98] active:bg-emerald-50/80 active:border-emerald-700 active:shadow-inner h-full"
+              >
+                <div>
+                  <h3 className="font-label-md text-label-md text-on-surface font-semibold group-hover:text-primary transition-colors">
+                    {c.title}
+                  </h3>
                     {c.description && (
                       <DescriptionPill
                         description={c.description}
@@ -371,7 +374,6 @@ export default async function SessionsPage() {
                       {c.isActive ? t("tagActiveStatus") : (c.isFull ? t("tagFullStatus") : t("tagActiveStatus"))}
                     </span>
                   </div>
-                </div>
               </Link>
             ))}
           </div>

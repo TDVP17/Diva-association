@@ -1,14 +1,14 @@
 import { prisma } from "@/lib/prisma";
-import { getContributionTotal, getNextDueDate } from "@/lib/tontine-engine";
+import { getContributionTotal, getNextDueDate, isSessionCycleFinished } from "@/lib/tontine-engine";
 import { initiateDirectPayment, normalizeCameroonPhone, FapshiError } from "@/lib/fapshi";
 import { assertPriorCyclePaidOut } from "@/lib/round-robin-lock";
 import { computeProviderFee } from "@/lib/payment-fees";
 import { detectMobileMoneyProvider, fapshiMediumFor } from "@/lib/mobile-money-provider";
-import type { PaymentProvider } from "@/generated/prisma/enums";
+import type { PaymentProvider, TontineType } from "@/generated/prisma/enums";
 
 export type InitiateSlotPaymentResult =
   | { ok: true; transId: string; link?: string }
-  | { ok: false; status: number; error: string };
+  | { ok: false; status: number; error: string; errorKey?: string; errorVars?: Record<string, string> };
 
 export interface SlotPaymentQuote {
   amount: number;
@@ -37,6 +37,37 @@ const IN_FLIGHT_WINDOW_MS = 10 * 60 * 1000;
 function isPaymentInFlight(existing: { status: string; fapshiTxRef: string | null; updatedAt: Date } | null): boolean {
   if (!existing || existing.status !== "PENDING" || !existing.fapshiTxRef) return false;
   return Date.now() - existing.updatedAt.getTime() < IN_FLIGHT_WINDOW_MS;
+}
+
+async function assertCycleNotFinished(
+  tontineSession: {
+    id: string;
+    type: TontineType;
+    startDate: Date | null;
+    status: string;
+  },
+  now: Date = new Date(),
+) {
+  const allSlots = await prisma.membershipSlot.findMany({
+    where: { membership: { tontineSessionId: tontineSession.id, status: "APPROVED" } },
+    select: { officialPosition: true },
+  });
+  if (
+    isSessionCycleFinished({
+      status: tontineSession.status,
+      type: tontineSession.type,
+      startDate: tontineSession.startDate,
+      officialPositions: allSlots.map((s) => s.officialPosition),
+      now,
+    })
+  ) {
+    return {
+      ok: false as const,
+      status: 409,
+      error: "Cette session de cotisation est terminée pour ce cycle. Les cotisations sont closes.",
+    };
+  }
+  return { ok: true as const };
 }
 
 /**
@@ -70,6 +101,11 @@ export async function getSlotPaymentQuote(
 
   const { tontineSession } = slot.membership;
   const dueDate = getNextDueDate(tontineSession.type, new Date());
+
+  const cycleCheck = await assertCycleNotFinished(tontineSession, new Date());
+  if (!cycleCheck.ok) {
+    return cycleCheck;
+  }
 
   const existing = await prisma.contribution.findUnique({
     where: { membershipSlotId_dueDate: { membershipSlotId, dueDate } },
@@ -143,6 +179,11 @@ export async function initiateSlotPayment(
   const now = new Date();
   const dueDate = getNextDueDate(tontineSession.type, now);
 
+  const cycleCheck = await assertCycleNotFinished(tontineSession, now);
+  if (!cycleCheck.ok) {
+    return cycleCheck;
+  }
+
   const roundLock = await assertPriorCyclePaidOut(
     tontineSession.id,
     tontineSession.type,
@@ -150,7 +191,13 @@ export async function initiateSlotPayment(
     tontineSession.startDate,
   );
   if (!roundLock.ok) {
-    return { ok: false, status: roundLock.status, error: roundLock.error };
+    return {
+      ok: false,
+      status: roundLock.status,
+      error: roundLock.error,
+      errorKey: roundLock.errorKey,
+      errorVars: roundLock.errorVars,
+    };
   }
 
   const { amount, fee } = getContributionTotal({

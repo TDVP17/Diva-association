@@ -32,9 +32,9 @@ export async function getUnpaidSlots(tontineSessionId: string, dueDate: Date) {
     },
   });
 
-  return memberships.flatMap((m) =>
-    m.slots
-      .filter((s) => s.contributions[0]?.status !== "PAID")
+  return (memberships ?? []).flatMap((m) =>
+    (m.slots ?? [])
+      .filter((s) => s.contributions?.[0]?.status !== "PAID")
       .map((s) => ({ slotId: s.id, beneficiaryName: s.beneficiaryName, userId: m.userId, user: m.user })),
   );
 }

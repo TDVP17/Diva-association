@@ -10,6 +10,7 @@ export interface BrandedEmailParams {
   actionLabel?: string;
   lang?: Lang;
   baseUrl?: string;
+  recipientName?: string;
 }
 
 export function getAppBaseUrl(): string {
@@ -24,40 +25,60 @@ export function renderBrandedEmailHtml(params: BrandedEmailParams): string {
   const baseUrl = params.baseUrl || getAppBaseUrl();
   const logoUrl = `${baseUrl}/icons/icon-512.png`;
   const primaryColor = "#003528";
+  const rawUrl = params.actionUrl?.trim() || "/dashboard";
   let targetUrl = "";
-  if (params.actionUrl) {
-    if (params.actionUrl.startsWith("http")) {
-      try {
-        const parsed = new URL(params.actionUrl);
-        const baseOrigin = new URL(baseUrl).origin;
-        if (parsed.origin === baseOrigin) {
-          targetUrl = `${baseUrl}/open?target=${encodeURIComponent(parsed.pathname + parsed.search)}`;
-        } else {
-          targetUrl = params.actionUrl;
-        }
-      } catch {
-        targetUrl = params.actionUrl;
+
+  if (rawUrl.startsWith("http")) {
+    try {
+      const parsed = new URL(rawUrl);
+      const baseOrigin = new URL(baseUrl).origin;
+      if (parsed.origin === baseOrigin) {
+        targetUrl = `${baseUrl}/open?target=${encodeURIComponent(parsed.pathname + parsed.search)}`;
+      } else {
+        targetUrl = rawUrl;
       }
-    } else {
-      const cleanPath = params.actionUrl.startsWith("/") ? params.actionUrl : `/${params.actionUrl}`;
-      targetUrl = `${baseUrl}/open?target=${encodeURIComponent(cleanPath)}`;
+    } catch {
+      targetUrl = rawUrl;
     }
+  } else {
+    const cleanPath = rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`;
+    targetUrl = `${baseUrl}/open?target=${encodeURIComponent(cleanPath)}`;
   }
 
-  const actionButton = targetUrl
-    ? `
-      <div style="margin: 28px 0 10px 0; text-align: center;">
-        <a href="${targetUrl}" 
-           style="background-color: ${primaryColor}; color: #ffffff; padding: 13px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block; box-shadow: 0 2px 4px rgba(0,53,40,0.15);">
-          ${params.actionLabel || (params.lang === "en" ? "View in App" : "Consulter dans l'application")}
-        </a>
-      </div>
-    `
+  const actionButton = `
+    <div style="margin: 28px 0 10px 0; text-align: center;">
+      <a href="${targetUrl}" 
+         style="background-color: ${primaryColor}; color: #ffffff; padding: 13px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block; box-shadow: 0 2px 4px rgba(0,53,40,0.15);">
+        ${params.actionLabel || (params.lang === "en" ? "Open in App" : "Ouvrir dans l'application")}
+      </a>
+    </div>
+  `;
+
+  const rawRecipient = params.recipientName?.trim();
+  const firstName = rawRecipient ? rawRecipient.split(/\s+/)[0] : "";
+  const greetingHtml = firstName
+    ? `<p style="font-size: 16px; font-weight: 700; color: #003528; margin: 0 0 14px 0;">${
+        params.lang === "en" ? `Hello, ${firstName} 👋` : `Salut, ${firstName} 👋`
+      }</p>`
     : "";
 
-  const content = params.bodyHtml
-    ? params.bodyHtml
-    : `<p style="font-size: 15px; line-height: 1.65; color: #334155; margin: 0; white-space: pre-line;">${params.bodyText || ""}</p>`;
+  let content = "";
+  if (params.bodyHtml) {
+    const hasGreeting =
+      params.bodyHtml.includes("Salut") ||
+      params.bodyHtml.includes("Bonjour") ||
+      params.bodyHtml.includes("Hello");
+    content = hasGreeting ? params.bodyHtml : `${greetingHtml}${params.bodyHtml}`;
+  } else {
+    const text = params.bodyText || "";
+    const hasGreeting =
+      text.startsWith("Salut") ||
+      text.startsWith("Bonjour") ||
+      text.startsWith("Hello");
+    content = hasGreeting
+      ? `<p style="font-size: 15px; line-height: 1.65; color: #334155; margin: 0; white-space: pre-line;">${text}</p>`
+      : `${greetingHtml}<p style="font-size: 15px; line-height: 1.65; color: #334155; margin: 0; white-space: pre-line;">${text}</p>`;
+  }
 
   return `
     <!DOCTYPE html>

@@ -304,3 +304,41 @@ export function getCycleDateForRound(type: TontineType, startDate: Date, round: 
   }
   return cursor;
 }
+
+/**
+ * Determines whether a tontine session's current cycle has completely finished.
+ * A session cycle is finished if:
+ * 1. The session status is explicitly "CLOSED", OR
+ * 2. Drawing is completed (all approved slots have an official position assigned)
+ *    and the next due date exceeds the final round's cycle date.
+ */
+export function isSessionCycleFinished(params: {
+  status: string;
+  type: TontineType;
+  startDate: Date | null;
+  officialPositions?: (number | null)[];
+  maxPosition?: number | null;
+  isDrawCompleted?: boolean;
+  now?: Date;
+}): boolean {
+  if (params.status === "CLOSED") return true;
+  if (!params.startDate) return false;
+
+  let maxPos = params.maxPosition ?? 0;
+  let isDrawn = params.isDrawCompleted;
+
+  if (params.officialPositions !== undefined) {
+    if (params.officialPositions.length === 0) return false;
+    isDrawn = params.officialPositions.every((p) => p !== null && p > 0);
+    maxPos = Math.max(0, ...params.officialPositions.map((p) => p ?? 0));
+  }
+
+  if (!isDrawn || maxPos <= 0) return false;
+
+  const sessionEndDate = getCycleDateForRound(params.type, params.startDate, maxPos);
+  const now = params.now ?? new Date();
+  const dueDate = getNextDueDate(params.type, now);
+
+  return dueDate > sessionEndDate;
+}
+

@@ -100,15 +100,15 @@ export const {
     emailPasswordProvider,
     ...(process.env.NODE_ENV !== "production" ? [devLoginProvider] : []),
   ],
-  // 90-day (~3 months) persistence: the user stays logged in while actively using
-  // the app, but is automatically disconnected after more than 3 months of inactivity.
+  // 1-year (365 days) persistence: the user stays logged in for 1 year
+  // without being disconnected unless they manually sign out.
   session: {
     strategy: "jwt",
-    maxAge: 90 * 24 * 60 * 60, // 90 days = 3 months
+    maxAge: 365 * 24 * 60 * 60, // 365 days = 1 year
     updateAge: 24 * 60 * 60, // Updates sliding expiration at most once every 24h while active
   },
   jwt: {
-    maxAge: 90 * 24 * 60 * 60,
+    maxAge: 365 * 24 * 60 * 60,
   },
   cookies: {
     sessionToken: {
@@ -117,7 +117,7 @@ export const {
         sameSite: "lax",
         path: "/",
         secure: process.env.NODE_ENV === "production",
-        maxAge: 90 * 24 * 60 * 60,
+        maxAge: 365 * 24 * 60 * 60,
       },
     },
   },
@@ -163,7 +163,7 @@ export const {
     },
     async jwt({ token, user, trigger }) {
       const now = Math.floor(Date.now() / 1000);
-      const THREE_MONTHS_SECONDS = 90 * 24 * 60 * 60;
+      const ONE_YEAR_SECONDS = 365 * 24 * 60 * 60;
 
       if (user?.id) {
         token.id = user.id;
@@ -171,9 +171,9 @@ export const {
         token.lastConnectedAt = now;
       }
 
-      // If more than 3 months elapsed since last connection/activity, expire session
+      // If more than 1 year elapsed since last connection/activity, expire session
       if (token.lastConnectedAt && typeof token.lastConnectedAt === "number") {
-        if (now - token.lastConnectedAt > THREE_MONTHS_SECONDS) {
+        if (now - token.lastConnectedAt > ONE_YEAR_SECONDS) {
           return null;
         }
       }

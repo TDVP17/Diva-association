@@ -7,6 +7,7 @@ import {
   getNextDueDate,
   computeFeeSplitAmounts,
   getTontineConfig,
+  isSessionCycleFinished,
 } from "@/lib/tontine-engine";
 import type { TontineType } from "@/generated/prisma/enums";
 
@@ -153,3 +154,77 @@ describe("new frequency presets", () => {
     expect(() => getNextDueDate("BIWEEKLY_SUNDAY", new Date("2026-01-01T00:00:00Z"))).not.toThrow();
   });
 });
+
+describe("isSessionCycleFinished", () => {
+  it("returns true if session status is CLOSED", () => {
+    expect(
+      isSessionCycleFinished({
+        status: "CLOSED",
+        type: "HEBDO_SUNDAY",
+        startDate: new Date("2026-01-04T12:00:00Z"),
+      }),
+    ).toBe(true);
+  });
+
+  it("returns false if session has no startDate or empty positions", () => {
+    expect(
+      isSessionCycleFinished({
+        status: "ACTIVE",
+        type: "HEBDO_SUNDAY",
+        startDate: null,
+      }),
+    ).toBe(false);
+
+    expect(
+      isSessionCycleFinished({
+        status: "ACTIVE",
+        type: "HEBDO_SUNDAY",
+        startDate: new Date("2026-01-04T12:00:00Z"),
+        officialPositions: [],
+      }),
+    ).toBe(false);
+  });
+
+  it("returns false if not all positions are drawn", () => {
+    expect(
+      isSessionCycleFinished({
+        status: "ACTIVE",
+        type: "HEBDO_SUNDAY",
+        startDate: new Date("2026-01-04T12:00:00Z"),
+        officialPositions: [1, null, 3],
+      }),
+    ).toBe(false);
+  });
+
+  it("returns true when due date has passed the final round cycle date", () => {
+    const startDate = new Date("2026-01-04T12:00:00Z"); // Sunday
+    // For HEBDO_SUNDAY with 2 slots:
+    // Round 1: Jan 4
+    // Round 2: Jan 11
+    // Now: Jan 15 -> next due date is Jan 18 > Jan 11 -> finished
+    expect(
+      isSessionCycleFinished({
+        status: "ACTIVE",
+        type: "HEBDO_SUNDAY",
+        startDate,
+        officialPositions: [1, 2],
+        now: new Date("2026-01-15T12:00:00Z"),
+      }),
+    ).toBe(true);
+  });
+
+  it("returns false while cycle rounds are still active", () => {
+    const startDate = new Date("2026-01-04T12:00:00Z"); // Sunday
+    // Now: Jan 5 -> next due date is Jan 11 <= Jan 11 -> not finished
+    expect(
+      isSessionCycleFinished({
+        status: "ACTIVE",
+        type: "HEBDO_SUNDAY",
+        startDate,
+        officialPositions: [1, 2],
+        now: new Date("2026-01-05T12:00:00Z"),
+      }),
+    ).toBe(false);
+  });
+});
+

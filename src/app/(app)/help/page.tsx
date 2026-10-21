@@ -47,8 +47,8 @@ export default async function HelpPage() {
         href="/chat"
         className="w-full flex items-center justify-center gap-2 py-3 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all"
       >
-        <span className="material-symbols-outlined text-[20px]">support_agent</span>
-        {t("contactAdminSupport")}
+        <span className="material-symbols-outlined text-[20px]">chat</span>
+        {t("customerSupport")}
       </Link>
     </main>
   );

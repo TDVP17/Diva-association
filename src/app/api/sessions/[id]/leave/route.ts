@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { isSessionCycleFinished } from "@/lib/tontine-engine";
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -14,7 +15,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   try {
     const tontineSession = await prisma.tontineSession.findUnique({
       where: { id: tontineSessionId },
-      select: { id: true, status: true, startDate: true, validatedMembersCount: true },
+      select: { id: true, type: true, status: true, startDate: true, validatedMembersCount: true },
     });
 
     if (!tontineSession) {
@@ -22,11 +23,25 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     }
 
     const now = new Date();
-    const hasStarted = tontineSession.status !== "DRAFT" || (tontineSession.startDate && tontineSession.startDate <= now);
+
+    const allSlots = await prisma.membershipSlot.findMany({
+      where: { membership: { tontineSessionId: tontineSession.id, status: "APPROVED" } },
+      select: { officialPosition: true },
+    });
+
+    const isFinished = isSessionCycleFinished({
+      status: tontineSession.status,
+      type: tontineSession.type,
+      startDate: tontineSession.startDate,
+      officialPositions: allSlots.map((s) => s.officialPosition),
+      now,
+    });
+
+    const hasStarted = (tontineSession.status !== "DRAFT" || (tontineSession.startDate && tontineSession.startDate <= now)) && !isFinished;
     if (hasStarted) {
       return NextResponse.json(
         {
-          error: "Impossible de quitter : la cotisation a déjà commencé.",
+          error: "Impossible de quitter pendant qu'un cycle est en cours.",
           errorKey: "cannotLeaveOnceStarted",
         },
         { status: 409 },
@@ -43,7 +58,13 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     }
 
     const slotIds = membership.slots.map((s) => s.id);
-    if (slotIds.length > 0) {
+    const hasPaid = slotIds.length > 0
+      ? await prisma.contribution.count({
+          where: { membershipSlotId: { in: slotIds }, status: "PAID" },
+        })
+      : 0;
+
+    if (slotIds.length > 0 && !isFinished) {
       const hasDrawn = membership.slots.some((s) => s.ballDrawn !== null || s.officialPosition !== null);
       if (hasDrawn) {
         return NextResponse.json(
@@ -55,13 +76,10 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         );
       }
 
-      const hasPaid = await prisma.contribution.count({
-        where: { membershipSlotId: { in: slotIds }, status: "PAID" },
-      });
       if (hasPaid > 0) {
         return NextResponse.json(
           {
-            error: "Impossible de quitter : des cotisations ont déjà été payées.",
+            error: "Impossible de quitter : des cotisations ont déjà été payées pour ce cycle.",
             errorKey: "cannotLeaveOncePaid",
           },
           { status: 409 },
@@ -78,28 +96,46 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         },
       });
 
-      if (slotIds.length > 0) {
-        // 2. Remove unpaid contributions and fines
-        await tx.contribution.deleteMany({
-          where: { membershipSlotId: { in: slotIds } },
+      if (hasPaid > 0) {
+        // If member had paid contributions (leaving after a finished cycle),
+        // remove only non-paid contributions and unpaid fines to preserve payment history & receipts
+        if (slotIds.length > 0) {
+          await tx.contribution.deleteMany({
+            where: { membershipSlotId: { in: slotIds }, status: { not: "PAID" } },
+          });
+          await tx.fine.deleteMany({
+            where: { membershipSlotId: { in: slotIds }, status: "UNPAID" },
+          });
+        }
+
+        // Soft-remove membership by setting status to REJECTED so they aren't carried forward to next cycle
+        await tx.membership.update({
+          where: { id: membership.id },
+          data: {
+            status: "REJECTED",
+            rejectionReason: "Member left the cotisation after cycle completion",
+          },
         });
-        await tx.fine.deleteMany({
-          where: { membershipSlotId: { in: slotIds } },
+      } else {
+        // Clean delete when no payment history exists (in DRAFT or no paid contributions)
+        if (slotIds.length > 0) {
+          await tx.contribution.deleteMany({
+            where: { membershipSlotId: { in: slotIds } },
+          });
+          await tx.fine.deleteMany({
+            where: { membershipSlotId: { in: slotIds } },
+          });
+          await tx.membershipSlot.deleteMany({ where: { membershipId: membership.id } });
+        }
+
+        await tx.kycVerification.deleteMany({
+          where: { userId, tontineSessionId },
         });
 
-        // 3. Remove slots
-        await tx.membershipSlot.deleteMany({ where: { membershipId: membership.id } });
+        await tx.membership.delete({ where: { id: membership.id } });
       }
 
-      // 4. Remove kyc verification for this session if any
-      await tx.kycVerification.deleteMany({
-        where: { userId, tontineSessionId },
-      });
-
-      // 5. Remove membership
-      await tx.membership.delete({ where: { id: membership.id } });
-
-      // 6. Decrement validatedMembersCount if it was > 0 so that member count decreases in all views
+      // Decrement validatedMembersCount if it was > 0 so that member count decreases in all views
       if (
         membership.status === "APPROVED" &&
         tontineSession.validatedMembersCount &&
