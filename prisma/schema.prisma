@@ -109,6 +109,7 @@ enum SwapStatus {
 }
 
 enum NotificationType {
+  REMINDER_EVE
   REMINDER_NOON
   REMINDER_URGENT
   PAYMENT_SUCCESS

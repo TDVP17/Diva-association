@@ -3,16 +3,31 @@ import { translate, type Lang } from "@/lib/i18n/translations";
 import { TONTINE_TYPE_LABELS as TONTINE_LABELS } from "@/lib/tontine-labels";
 import { formatXAF } from "@/lib/format-currency";
 
+export function reminderEveMessage(
+  lang: Lang,
+  memberName: string,
+  type: TontineType,
+  amount: number,
+  sessionTitle?: string | null,
+): string {
+  return translate(lang, "waReminderEve", {
+    name: memberName,
+    amount: formatXAF(amount),
+    cotisation: sessionTitle || TONTINE_LABELS[type],
+  });
+}
+
 export function reminderNoonMessage(
   lang: Lang,
   memberName: string,
   type: TontineType,
   amount: number,
+  sessionTitle?: string | null,
 ): string {
   return translate(lang, "waReminderNoon", {
     name: memberName,
     amount: formatXAF(amount),
-    cotisation: TONTINE_LABELS[type],
+    cotisation: sessionTitle || TONTINE_LABELS[type],
   });
 }
 
@@ -21,11 +36,12 @@ export function reminderUrgentMessage(
   memberName: string,
   type: TontineType,
   amount: number,
+  sessionTitle?: string | null,
 ): string {
   return translate(lang, "waReminderUrgent", {
     name: memberName,
     amount: formatXAF(amount),
-    cotisation: TONTINE_LABELS[type],
+    cotisation: sessionTitle || TONTINE_LABELS[type],
   });
 }
 

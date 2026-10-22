@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
-import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
+import { parseJsonOrThrow, friendlyErrorMessage, ApiError } from "@/lib/api-error";
 
 interface MemberNamesManagerProps {
   tontineSessionId: string;
@@ -164,7 +164,11 @@ export function MemberNamesManager({
       );
       router.refresh();
     } catch (err) {
-      setSaveError(friendlyErrorMessage(err, t("couldNotSaveSlots")));
+      if (err instanceof ApiError && err.message && err.message !== t("couldNotSaveSlots")) {
+        setSaveError(err.message);
+      } else {
+        setSaveError(friendlyErrorMessage(err, t("couldNotSaveSlots")));
+      }
     } finally {
       setSaving(false);
     }

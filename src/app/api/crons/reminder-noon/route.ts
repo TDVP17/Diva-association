@@ -2,12 +2,17 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getActiveSessionsDueToday, getUnpaidSlots } from "@/lib/notify";
 import { getContributionTotal } from "@/lib/tontine-engine";
-import { sendEmailSafe } from "@/lib/email/resend";
-import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { reminderNoonMessage } from "@/lib/whatsapp/templates";
-import { translate } from "@/lib/i18n/translations";
 import { formatXAF } from "@/lib/format-currency";
+import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 
+export const maxDuration = 60;
+
+/**
+ * Cron: Noon Reminder (12h00 WAT / 11:00 UTC on contribution day).
+ * Strictly targets ONLY members who have not yet contributed today.
+ * Dispatches In-App notification, Web Push to phone, and Branded Email.
+ */
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -24,13 +29,13 @@ export async function GET(request: Request) {
       fee: Number(tontineSession.fee),
     });
     const unpaid = await getUnpaidSlots(tontineSession.id, dueDate);
+    const sessionTitle = tontineSession.title || tontineSession.type;
 
-    // NotificationLog is still one row per (user, session, cycle, type) — a
-    // member with several unpaid slots gets one reminder, not one per slot,
-    // enforced naturally by the unique-constraint catch below (only the
-    // first unpaid slot found for a given user actually sends/logs).
+    const processedUsers = new Set<string>();
+
     for (const slot of unpaid) {
-      if (!slot.user.phone && !slot.user.email) continue;
+      if (processedUsers.has(slot.userId)) continue;
+      processedUsers.add(slot.userId);
 
       const log = await prisma.notificationLog
         .create({
@@ -45,19 +50,28 @@ export async function GET(request: Request) {
       if (!log) continue;
 
       const lang = slot.user.preferredLang === "en" ? "en" : "fr";
-      const message = reminderNoonMessage(lang, slot.user.name, tontineSession.type, amount);
+      const rawName = slot.user.name?.trim() || "";
+      const firstName = rawName.split(/\s+/)[0] || rawName;
+      const message = reminderNoonMessage(lang, firstName, tontineSession.type, amount, sessionTitle);
 
-      if (slot.user.email) {
-        const subject = `${translate(lang, "notifTypeContributionReminder")} — ${tontineSession.title || tontineSession.type}`;
-        const emailHtml = renderBrandedEmailHtml({
-          title: subject,
-          bodyText: message,
-          actionUrl: `/sessions/${tontineSession.id}`,
-          actionLabel: `Cotiser maintenant (${formatXAF(amount)})`,
-          lang,
-        });
-        await sendEmailSafe(slot.user.email, subject, emailHtml);
-      }
+      await scheduleInAppNotifications({
+        tontineSessionId: tontineSession.id,
+        type: "CONTRIBUTION_REMINDER",
+        recipients: [
+          {
+            userId: slot.userId,
+            message,
+            messageKey: "waReminderNoon",
+            messageVars: {
+              name: firstName,
+              amount: formatXAF(amount),
+              cotisation: sessionTitle,
+            },
+            actionUrl: `/sessions/${tontineSession.id}`,
+          },
+        ],
+      });
+
       sent++;
     }
   }

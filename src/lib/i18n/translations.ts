@@ -238,6 +238,8 @@ export const translations = {
     emailBodyLabel: "Message",
     sendToAllMembers: "Send to All Members",
     emailSentSummary: "Sent to {count} member(s).",
+    waReminderEve:
+      "Hello, {name} 👋\n\nFriendly reminder from DIVA Asso 🌿: your contribution of {amount} for {cotisation} is due tomorrow! You can prepare your payment or pay ahead now in peace.\n\nThank you for staying on track with the community!",
     waReminderNoon:
       "Hello, {name} 👋\n\nThis is a friendly reminder from DIVA Asso 🌿. Your contribution of {amount} for the {cotisation} is due today. You have until 18:30 to pay before a late fine applies.\n\nThank you for staying on track with the community!",
     waReminderUrgent:
@@ -1348,6 +1350,8 @@ export const translations = {
     emailBodyLabel: "Message",
     sendToAllMembers: "Envoyer à tous les membres",
     emailSentSummary: "Envoyé à {count} membre(s).",
+    waReminderEve:
+      "Salut, {name} 👋\n\nRappel amical de DIVA Asso 🌿 : votre cotisation de {amount} pour « {cotisation} » aura lieu demain ! Vous pouvez vous préparer ou cotiser dès maintenant en toute sérénité.\n\nMerci de rester à jour avec la communauté !",
     waReminderNoon:
       "Salut, {name} 👋\n\nCeci est un rappel amical de DIVA Asso 🌿. Votre contribution de {amount} pour la {cotisation} est due aujourd'hui. Vous avez jusqu'à 18h30 pour payer avant qu'une amende de retard ne s'applique.\n\nMerci de rester à jour avec la communauté !",
     waReminderUrgent:
