@@ -399,7 +399,7 @@ export default async function SessionDetailPage({
           const registeredOtherSlots = tontineSession.memberships
             .filter((m) => m.status === "APPROVED" && m.id !== myMembership.id)
             .reduce((sum, m) => sum + (m.slotCount ? Number(m.slotCount) : 0), 0);
-          const maxSlotsNum = tontineSession.maxSlots ? Number(tontineSession.maxSlots) : null;
+          const maxSlotsNum = tontineSession.maxSlots ? Math.max(Number(tontineSession.maxSlots), 15) : null;
           const availableSlots = maxSlotsNum !== null ? Math.max(1, maxSlotsNum - registeredOtherSlots) : null;
           return <SelectSlotsForm tontineSessionId={id} lang={lang} maxAvailableSlots={availableSlots} />;
         })()}
@@ -778,7 +778,7 @@ export default async function SessionDetailPage({
           lang={lang}
           currentNames={mySlots.map((s) => s.beneficiaryName)}
           sessionStatus={tontineSession.status}
-          maxSlots={tontineSession.maxSlots ? Number(tontineSession.maxSlots) : null}
+          maxSlots={tontineSession.maxSlots ? Math.max(Number(tontineSession.maxSlots), 15) : null}
           startDate={tontineSession.startDate}
           isFinished={isSessionFinished}
         />

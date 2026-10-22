@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
@@ -39,15 +39,30 @@ export function MemberNamesManager({
   const [leaving, setLeaving] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
 
+  // Sync names when currentNames updates
+  useEffect(() => {
+    if (currentNames && currentNames.length > 0) {
+      setNames(currentNames);
+    }
+  }, [currentNames]);
+
   // Adding, deleting names, and leaving are possible when the cotisation is in DRAFT (avant le tirage) OR when this cycle is finished
   const canEditNames = sessionStatus === "DRAFT" || isFinished;
   const canLeave = sessionStatus === "DRAFT" || isFinished;
-  const slotLimit = maxSlots ? Math.min(Number(maxSlots), 10) : 10;
+  // A single member can register up to 15 names
+  const slotLimit = 15;
 
   function handleAddName() {
+    handleAddMultiple(1);
+  }
+
+  function handleAddMultiple(count: number) {
     if (!canEditNames) return;
-    if (names.length >= slotLimit) return;
-    setNames([...names, ""]);
+    const remaining = slotLimit - names.length;
+    const toAdd = Math.min(count, remaining);
+    if (toAdd <= 0) return;
+    const emptySlots = Array(toAdd).fill("");
+    setNames([...names, ...emptySlots]);
     setSaveError(null);
     setSuccessMessage(null);
   }
@@ -117,8 +132,8 @@ export function MemberNamesManager({
     if (names.some((n) => !n.trim())) {
       setSaveError(
         lang === "fr"
-          ? "Veuillez renseigner tous les noms avant d'enregistrer."
-          : "Please fill in all names before saving.",
+          ? "Veuillez renseigner un nom pour chaque case ou supprimer les cases vides avec l'icône corbeille rouge."
+          : "Please fill in all names or remove empty fields with the red trash icon before saving.",
       );
       return;
     }
@@ -138,11 +153,14 @@ export function MemberNamesManager({
         }),
       });
 
-      await parseJsonOrThrow(res, t("couldNotSaveSlots"));
+      const data = await parseJsonOrThrow<{ ok?: boolean; beneficiaryNames?: string[] }>(res, t("couldNotSaveSlots"));
+      if (data?.beneficiaryNames && data.beneficiaryNames.length > 0) {
+        setNames(data.beneficiaryNames);
+      }
       setSuccessMessage(
         lang === "fr"
-          ? "Vos noms ont été enregistrés avec succès."
-          : "Your names have been updated successfully.",
+          ? `Vos ${trimmed.length} nom(s) ont été enregistrés avec succès.`
+          : `Your ${trimmed.length} name(s) have been updated successfully.`,
       );
       router.refresh();
     } catch (err) {
@@ -234,11 +252,11 @@ export function MemberNamesManager({
               <p className="text-xs text-on-surface-variant leading-relaxed">
                 {lang === "fr"
                   ? isFinished
-                    ? "Ce cycle de cotisation est terminé. Vous pouvez dès maintenant ajuster vos noms (ajouter ou retirer) ou quitter avant le prochain cycle :"
-                    : "La cotisation n'a pas encore commencé. Vous pouvez ajouter de nouveaux noms ou supprimer ceux que vous ne souhaitez plus conserver :"
+                    ? "Ce cycle de cotisation est terminé. Vous pouvez dès maintenant ajuster vos noms (ajouter jusqu'à 15 noms ou retirer) ou quitter avant le prochain cycle :"
+                    : "La cotisation n'a pas encore commencé. Vous pouvez ajouter jusqu'à 15 noms ou supprimer ceux que vous ne souhaitez plus conserver :"
                   : isFinished
-                    ? "This cycle has finished. You can now adjust your names (add or remove) or leave before the next cycle starts:"
-                    : "The cotisation has not started yet. You can add new names or remove existing ones:"}
+                    ? "This cycle has finished. You can now adjust your names (up to 15 names) or leave before the next cycle starts:"
+                    : "The cotisation has not started yet. You can register up to 15 names or remove existing ones:"}
               </p>
 
               <div className="space-y-2.5">
@@ -269,16 +287,31 @@ export function MemberNamesManager({
                 ))}
               </div>
 
-              {names.length < slotLimit && (
-                <button
-                  type="button"
-                  onClick={handleAddName}
-                  className="self-start text-xs font-bold text-primary hover:text-primary/80 flex items-center gap-1.5 py-1 px-2 rounded-md hover:bg-primary/5 cursor-pointer transition-colors"
-                >
-                  <span className="material-symbols-outlined text-base">add_circle</span>
-                  <span>{lang === "fr" ? "Ajouter un autre nom" : "Add another name"}</span>
-                </button>
-              )}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                {names.length < slotLimit && (
+                  <button
+                    type="button"
+                    onClick={() => handleAddMultiple(1)}
+                    className="text-xs font-bold text-primary hover:text-primary/80 flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 cursor-pointer transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                    <span>{lang === "fr" ? "+1 nom" : "+1 name"}</span>
+                  </button>
+                )}
+                {names.length + 5 <= slotLimit && (
+                  <button
+                    type="button"
+                    onClick={() => handleAddMultiple(5)}
+                    className="text-xs font-bold text-emerald-800 hover:text-emerald-900 flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 cursor-pointer transition-colors shadow-2xs"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">group_add</span>
+                    <span>{lang === "fr" ? "+5 noms d'un coup" : "+5 names at once"}</span>
+                  </button>
+                )}
+                <span className="text-xs font-semibold text-on-surface-variant ml-auto">
+                  {names.length} / {slotLimit} {lang === "fr" ? "noms" : "names"}
+                </span>
+              </div>
 
               {saveError && (
                 <p className="font-label-sm text-xs text-error bg-error/5 p-2 rounded-lg border border-error/20">

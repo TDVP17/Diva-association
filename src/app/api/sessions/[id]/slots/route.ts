@@ -6,8 +6,8 @@ import { resolveUniqueSlotNames } from "@/lib/slot-naming";
 import { isSessionCycleFinished } from "@/lib/tontine-engine";
 
 const bodySchema = z.object({
-  slotCount: z.coerce.number().int().min(1).max(10),
-  beneficiaryNames: z.array(z.string().trim().min(1).max(100)).min(1).max(10),
+  slotCount: z.coerce.number().int().min(1).max(15),
+  beneficiaryNames: z.array(z.string().trim().min(1).max(100)).min(1).max(15),
 });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -71,7 +71,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     if (tontineSession.maxSlots !== null) {
-      const maxAllowed = Number(tontineSession.maxSlots);
+      // Ensure a single member is always permitted to register up to 15 slots in the session
+      const maxAllowed = Math.max(Number(tontineSession.maxSlots), 15);
       const otherSlotsTotal = tontineSession.memberships
         .filter((m) => m.status === "APPROVED" && m.id !== membership.id)
         .reduce((sum, m) => sum + (m.slotCount ? Number(m.slotCount) : 0), 0);

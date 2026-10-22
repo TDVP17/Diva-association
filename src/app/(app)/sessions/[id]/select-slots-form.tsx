@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 
-const SLOT_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const SLOT_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
 export function SelectSlotsForm({
   tontineSessionId,
@@ -20,8 +20,8 @@ export function SelectSlotsForm({
   const router = useRouter();
   const maxLimit =
     maxAvailableSlots !== null && maxAvailableSlots !== undefined
-      ? Math.max(1, Math.min(10, maxAvailableSlots))
-      : 10;
+      ? Math.max(1, Math.min(15, maxAvailableSlots))
+      : 15;
   const options = SLOT_OPTIONS.filter((opt) => opt <= maxLimit);
 
   const [slotCount, setSlotCount] = useState(1);

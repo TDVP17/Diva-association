@@ -713,7 +713,7 @@ export const translations = {
     couldNotCloseCotisation: "Could not close the cotisation",
     modifyMySlots: "Modify My Names / Slots",
     modifySlotsDescription:
-      "You can increase or reduce your number of names (1 to 5) or update beneficiary names for this cycle.",
+      "You can increase or reduce your number of names (1 to 15) or update beneficiary names for this cycle.",
     leaveCotisation: "Leave this Cotisation",
     confirmLeaveCotisation:
       "Are you sure you want to leave this cotisation? Your names and membership will be removed.",
@@ -722,7 +722,7 @@ export const translations = {
     cannotLeaveCotisationStarted: "The cotisation has already started: leaving this cotisation is no longer possible.",
     leftCotisationSuccess: "You have left this cotisation.",
     existingMemberRelaunchNotice:
-      "This cotisation is in preparation (or relaunched for a new cycle). As an existing approved member, you do not need to reapply! You can adjust your names (increase or reduce from 1 to 5) or leave the cotisation before the draw.",
+      "This cotisation is in preparation (or relaunched for a new cycle). As an existing approved member, you do not need to reapply! You can adjust your names (increase or reduce from 1 to 15) or leave the cotisation before the draw.",
     manageSlots: "Manage My Slots",
     slotsUpdatedSuccess: "Your names have been updated successfully.",
     memberApprovedBadge: "Approved Member",
@@ -1824,7 +1824,7 @@ export const translations = {
     couldNotCloseCotisation: "Impossible de clôturer la cotisation",
     modifyMySlots: "Modifier mes noms / places",
     modifySlotsDescription:
-      "Vous pouvez augmenter ou réduire votre nombre de noms (1 à 5 places) ou modifier vos noms pour ce cycle.",
+      "Vous pouvez augmenter ou réduire votre nombre de noms (1 à 15 places) ou modifier vos noms pour ce cycle.",
     leaveCotisation: "Quitter cette cotisation",
     confirmLeaveCotisation:
       "Êtes-vous sûr de vouloir quitter cette cotisation ? Vos noms et votre adhésion seront retirés.",
@@ -1833,7 +1833,7 @@ export const translations = {
     cannotLeaveCotisationStarted: "La cotisation a déjà commencé : il est impossible de quitter cette cotisation.",
     leftCotisationSuccess: "Vous avez quitté cette cotisation avec succès.",
     existingMemberRelaunchNotice:
-      "Cette cotisation est en phase de préparation (ou relancée pour un nouveau cycle). En tant que membre déjà approuvé, vous n'avez pas besoin de refaire une demande ! Vous pouvez ajuster vos noms (augmenter ou réduire de 1 à 5) ou quitter la cotisation avant le tirage.",
+      "Cette cotisation est en phase de préparation (ou relancée pour un nouveau cycle). En tant que membre déjà approuvé, vous n'avez pas besoin de refaire une demande ! Vous pouvez ajuster vos noms (augmenter ou réduire de 1 à 15) ou quitter la cotisation avant le tirage.",
     manageSlots: "Gérer mes places",
     slotsUpdatedSuccess: "Vos noms ont été mis à jour avec succès.",
     memberApprovedBadge: "Membre validé",

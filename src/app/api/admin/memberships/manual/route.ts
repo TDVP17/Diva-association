@@ -8,8 +8,8 @@ import { checkUserFinesForJoining } from "@/lib/unsettled-fines-gate";
 const bodySchema = z.object({
   userId: z.string().min(1),
   tontineSessionId: z.string().min(1),
-  slotCount: z.coerce.number().int().min(1).max(10),
-  beneficiaryNames: z.array(z.string().trim().min(1).max(100)).min(1).max(10),
+  slotCount: z.coerce.number().int().min(1).max(15),
+  beneficiaryNames: z.array(z.string().trim().min(1).max(100)).min(1).max(15),
 });
 
 export async function POST(request: Request) {
