@@ -91,7 +91,7 @@ export async function initiateFinePayment(
         throw new AlreadySettledError();
       }
       if (
-        current.status === "PENDING" &&
+        (current.status === "PENDING" || current.status === "UNPAID") &&
         current.fapshiTxRef &&
         Date.now() - new Date(current.updatedAt).getTime() < IN_FLIGHT_WINDOW_MS
       ) {

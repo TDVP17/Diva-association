@@ -161,7 +161,12 @@ export async function listUnpaidSlotsForBulkPayment(userId: string): Promise<Unp
         where: { membershipSlotId_dueDate: { membershipSlotId: slot.id, dueDate } },
       });
       if (existing?.status === "PAID") continue;
-      if (existing?.status === "PENDING" && existing.fapshiTxRef) continue;
+      if (
+        existing?.status === "PENDING" &&
+        Date.now() - existing.updatedAt.getTime() < IN_FLIGHT_WINDOW_MS
+      ) {
+        continue;
+      }
 
       const { amount, fee } = getContributionTotal({ amount: Number(tontineSession.amount), fee: Number(tontineSession.fee) });
 
@@ -202,6 +207,12 @@ export async function getBulkPaymentQuote(
     });
     if (existing?.status === "PAID") {
       return { ok: false, status: 409, error: `${slot.beneficiaryName} is already paid for this cycle` };
+    }
+    if (
+      existing?.status === "PENDING" &&
+      Date.now() - existing.updatedAt.getTime() < IN_FLIGHT_WINDOW_MS
+    ) {
+      return { ok: false, status: 409, error: `A payment is already in progress for ${slot.beneficiaryName}` };
     }
 
     const { amount, fee } = getContributionTotal({ amount: Number(tontineSession.amount), fee: Number(tontineSession.fee) });
@@ -275,7 +286,6 @@ export async function initiateBulkPayment(
         }
         if (
           existing?.status === "PENDING" &&
-          existing.fapshiTxRef &&
           Date.now() - existing.updatedAt.getTime() < IN_FLIGHT_WINDOW_MS
         ) {
           throw new SlotUnavailableError(`A payment is already in progress for ${slot.beneficiaryName}`);

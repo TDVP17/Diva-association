@@ -206,7 +206,10 @@ async function settleBulkPayment(
     const claimedIds: string[] = [];
     for (const c of contributions) {
       if (c.status === "PAID") continue;
-      await tx.contribution.update({ where: { id: c.id }, data: { status: "PAID", paidAt, fapshiTxRef: transId } });
+      await tx.contribution.update({
+        where: { id: c.id },
+        data: { status: "PAID", paidAt, fapshiTxRef: `${transId}-${c.id}` },
+      });
       claimedIds.push(c.id);
     }
     await tx.bulkPayment.update({ where: { id: fresh.id }, data: { status: "SUCCESSFUL" } });

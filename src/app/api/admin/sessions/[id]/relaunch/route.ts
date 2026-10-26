@@ -44,8 +44,41 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const allSlotIds = existingSession.memberships.flatMap((m) => m.slots.map((s) => s.id));
 
       if (allSlotIds.length > 0) {
+        // Collect contribution & fine IDs to clean up payment attempts and bulk payments
+        const contributions = await tx.contribution.findMany({
+          where: { membershipSlotId: { in: allSlotIds } },
+          select: { id: true, bulkPaymentId: true },
+        });
+        const contributionIds = contributions.map((c) => c.id);
+        const bulkPaymentIds = [
+          ...new Set(contributions.map((c) => c.bulkPaymentId).filter((b): b is string => Boolean(b))),
+        ];
+
+        const fines = await tx.fine.findMany({
+          where: { membershipSlotId: { in: allSlotIds } },
+          select: { id: true },
+        });
+        const fineIds = fines.map((f) => f.id);
+
+        if (contributionIds.length > 0 || fineIds.length > 0 || bulkPaymentIds.length > 0) {
+          await tx.paymentAttempt.deleteMany({
+            where: {
+              OR: [
+                ...(contributionIds.length > 0 ? [{ contributionId: { in: contributionIds } }] : []),
+                ...(fineIds.length > 0 ? [{ fineId: { in: fineIds } }] : []),
+                ...(bulkPaymentIds.length > 0 ? [{ bulkPaymentId: { in: bulkPaymentIds } }] : []),
+              ],
+            },
+          });
+        }
+
         // Clear prior cycle transactions for this session's slots
         await tx.contribution.deleteMany({ where: { membershipSlotId: { in: allSlotIds } } });
+
+        if (bulkPaymentIds.length > 0) {
+          await tx.bulkPayment.deleteMany({ where: { id: { in: bulkPaymentIds } } });
+        }
+
         await tx.fine.deleteMany({ where: { membershipSlotId: { in: allSlotIds } } });
         await tx.foodTurnLog.deleteMany({ where: { membershipSlotId: { in: allSlotIds } } });
         await tx.turnReminderLog.deleteMany({ where: { membershipSlotId: { in: allSlotIds } } });
@@ -56,6 +89,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           data: { officialPosition: null, ballDrawn: null },
         });
       }
+
+      // Clean notifications and reminder logs to free up database storage
+      await tx.notificationLog.deleteMany({ where: { tontineSessionId: id } });
+      await tx.notification.deleteMany({
+        where: {
+          OR: [
+            { tontineSessionId: id },
+            ...(allSlotIds.length > 0 ? [{ membershipSlotId: { in: allSlotIds } }] : []),
+          ],
+        },
+      });
 
       await tx.payout.deleteMany({ where: { tontineSessionId: id } });
       await tx.positionSwapRequest.deleteMany({ where: { tontineSessionId: id } });

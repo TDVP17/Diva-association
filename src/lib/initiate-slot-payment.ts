@@ -34,8 +34,10 @@ export type SlotPaymentQuoteResult =
 // abandoned attempt doesn't lock the slot out for good.
 const IN_FLIGHT_WINDOW_MS = 10 * 60 * 1000;
 
-function isPaymentInFlight(existing: { status: string; fapshiTxRef: string | null; updatedAt: Date } | null): boolean {
-  if (!existing || existing.status !== "PENDING" || !existing.fapshiTxRef) return false;
+function isPaymentInFlight(
+  existing: { status: string; fapshiTxRef?: string | null; bulkPaymentId?: string | null; updatedAt: Date } | null,
+): boolean {
+  if (!existing || existing.status !== "PENDING") return false;
   return Date.now() - existing.updatedAt.getTime() < IN_FLIGHT_WINDOW_MS;
 }
 
@@ -112,6 +114,9 @@ export async function getSlotPaymentQuote(
   });
   if (existing?.status === "PAID") {
     return { ok: false, status: 409, error: "This slot is already paid for this cycle" };
+  }
+  if (isPaymentInFlight(existing)) {
+    return { ok: false, status: 409, error: "A payment is already in progress for this slot — please wait a moment" };
   }
 
   const { amount, fee } = getContributionTotal({
