@@ -151,11 +151,17 @@ export function CotisationMembersList({
                   {initials}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-bold text-slate-900 text-sm truncate leading-snug">
-                    {slot.beneficiaryName}
+                  <p className="font-bold text-slate-900 text-sm truncate leading-snug flex items-center gap-1.5 flex-wrap">
+                    <span>{slot.beneficiaryName}</span>
                     {slot.isMine && (
-                      <span className="text-primary font-bold ml-1">
+                      <span className="text-primary font-bold text-xs">
                         {lang === "fr" ? "(toi)" : "(you)"}
+                      </span>
+                    )}
+                    {slot.isDesignatedWinner && (
+                      <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[10px] shadow-2xs">
+                        <span>🍲</span>
+                        <span>{lang === "fr" ? "Bouffe ce tour" : "Payout turn"}</span>
                       </span>
                     )}
                   </p>
@@ -171,11 +177,6 @@ export function CotisationMembersList({
                 {slot.paid ? (
                   <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs shadow-2xs">
                     {t("paidBadge")}
-                  </span>
-                ) : slot.isDesignatedWinner ? (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs shadow-2xs">
-                    <span>🍲</span>
-                    <span>{lang === "fr" ? "Bouffe (exempté)" : "Payout turn"}</span>
                   </span>
                 ) : slot.isMine ? (
                   <button

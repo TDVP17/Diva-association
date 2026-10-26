@@ -44,18 +44,17 @@ export async function POST(request: Request) {
   const slot = claim.membershipSlot;
   const { user } = slot.membership;
 
-  // Règle Diva : c'est uniquement lorsque tout le monde a cotisé que celui qui bouffe peut recevoir la cagnotte
-  const otherApprovedSlots = await prisma.membershipSlot.findMany({
+  // Règle Diva : c'est uniquement lorsque tout le monde a cotisé (y compris le bénéficiaire) que la cagnotte peut être versée
+  const allApprovedSlots = await prisma.membershipSlot.findMany({
     where: {
       membership: { tontineSessionId: claim.tontineSessionId, status: "APPROVED" },
-      id: { not: slot.id }, // Le nom qui bouffe est exempté
     },
     select: { id: true, beneficiaryName: true },
   });
 
   const unpaidSlots = await prisma.membershipSlot.findMany({
     where: {
-      id: { in: otherApprovedSlots.map((s) => s.id) },
+      id: { in: allApprovedSlots.map((s) => s.id) },
       contributions: {
         none: {
           dueDate: claim.dueDate,
@@ -141,13 +140,15 @@ export async function POST(request: Request) {
     prisma.payout.update({
       where: { id: payoutClaimId },
       data: {
-        status: "RELEASED",
+        status: "CONFIRMED",
         pot,
         deducted,
         netPayout,
         fapshiTransId: fapshiResult.transId,
         releasedByAdminId: admin.user.id,
         releasedAt: new Date(),
+        memberConfirmedAt: new Date(),
+        confirmedByAdmin: true,
       },
     }),
   ]);
@@ -188,7 +189,6 @@ export async function POST(request: Request) {
       include: { slots: true },
     });
     const allSlots = approvedMemberships.flatMap((m) => m.slots);
-    const halfThreshold = Math.ceil(allSlots.length / 2);
     const paidContributionsCount = await prisma.contribution.count({
       where: {
         membershipSlotId: { in: allSlots.map((s) => s.id) },
@@ -197,7 +197,7 @@ export async function POST(request: Request) {
       },
     });
 
-    if (paidContributionsCount >= halfThreshold) {
+    if (allSlots.length > 0 && paidContributionsCount >= allSlots.length) {
       const newBeneficiaryMembership = await prisma.membership.findFirst({
         where: { slots: { some: { id: newDesignatedSlot.id } } },
         include: { user: true },

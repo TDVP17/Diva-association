@@ -26,7 +26,6 @@ export function PayoutTurnPanel({
   const [phone, setPhone] = useState("");
   const [accountName, setAccountName] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const cleanPhone = phone.replace(/\D/g, "").slice(0, 9);
@@ -55,20 +54,6 @@ export function PayoutTurnPanel({
     } catch (err) {
       setError(friendlyErrorMessage(err, t("couldNotSubmitPayoutDetails")));
       setSubmitting(false);
-    }
-  }
-
-  async function confirmReceipt() {
-    if (!payoutId) return;
-    setConfirming(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/payments/payout-claims/${payoutId}/confirm`, { method: "POST" });
-      await parseJsonOrThrow(res, t("couldNotSubmitPayoutDetails"));
-      router.refresh();
-    } catch (err) {
-      setError(friendlyErrorMessage(err, t("couldNotSubmitPayoutDetails")));
-      setConfirming(false);
     }
   }
 
@@ -101,11 +86,11 @@ export function PayoutTurnPanel({
                   : t("payoutTurnBannerDesc")}
               </p>
               <div className="mt-2.5 rounded-lg bg-emerald-100/70 border border-emerald-200/80 p-2.5 text-xs text-emerald-900 flex items-start gap-2">
-                <span className="material-symbols-outlined text-[18px] text-emerald-700 flex-shrink-0 mt-0.5">info</span>
+                <span className="material-symbols-outlined text-[18px] text-emerald-700 flex-shrink-0 mt-0.5">check_circle</span>
                 <span>
                   {lang === "fr"
-                    ? "✨ Bon à savoir : En tant que bénéficiaire de ce tour, vous n'êtes pas obligé de payer votre cotisation à l'avance. Si vous ne cotisez pas pour vos noms pour ce tour, le montant sera simplement déduit de votre cagnotte reçue lors du versement."
-                    : "✨ Good to know: As this round's beneficiary, you don't need to advance your contribution. If you don't pay now, it will simply be deducted from your payout when released."}
+                    ? "✨ Tous les membres de la tontine (y compris vous-même) ont cotisé pour ce cycle ! Vos coordonnées permettront à l'administrateur d'effectuer votre virement."
+                    : "✨ All members of the tontine (including yourself) have contributed for this cycle! Your details will allow the administrator to process your transfer."}
                 </span>
               </div>
             </div>
@@ -196,60 +181,22 @@ export function PayoutTurnPanel({
         </div>
       )}
 
-      {status === "RELEASED" && (
+      {(status === "RELEASED" || status === "CONFIRMED") && (
         <div className="flex flex-col gap-3 bg-white/95 rounded-xl border border-emerald-400 p-4 shadow-sm">
           <div className="flex items-center gap-2.5 text-emerald-800 font-bold">
             <span className="material-symbols-outlined text-[24px] text-emerald-600">celebration</span>
             <p className="font-label-md text-label-md">
               {beneficiaryName
                 ? lang === "fr"
-                  ? `Virement envoyé pour ${beneficiaryName} !`
-                  : `Payout sent for ${beneficiaryName}!`
+                  ? `Virement envoyé pour ${beneficiaryName} ! 🎉`
+                  : `Payout sent for ${beneficiaryName}! 🎉`
                 : t("payoutSentToYou")}
             </p>
           </div>
           <p className="text-xs text-slate-600">
             {lang === "fr"
-              ? "Le virement a été envoyé vers votre compte Mobile Money / Orange Money. Veuillez confirmer dès réception des fonds."
-              : "The transfer was sent to your Mobile Money / Orange Money account. Please confirm once received."}
-          </p>
-          {error && <p className="font-label-sm text-label-sm text-error">{error}</p>}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
-            {payoutId && (
-              <a
-                href={`/api/payouts/${payoutId}/receipt`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex-1 py-2.5 px-3 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-900 font-label-md text-label-md hover:bg-emerald-100 flex items-center justify-center gap-2 transition-colors text-center"
-              >
-                <span className="material-symbols-outlined text-[18px] text-emerald-700">picture_as_pdf</span>
-                <span>{lang === "fr" ? "Télécharger le reçu PDF" : "Download PDF Receipt"}</span>
-              </a>
-            )}
-            <button
-              onClick={confirmReceipt}
-              disabled={confirming}
-              className="flex-1 py-2.5 px-3 rounded-lg bg-emerald-700 text-white font-label-md text-label-md hover:bg-emerald-800 disabled:opacity-60 flex items-center justify-center gap-2 shadow-xs transition-colors"
-            >
-              <span className="material-symbols-outlined text-[18px]">check_circle</span>
-              {t("iReceivedMyPayout")}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {status === "CONFIRMED" && (
-        <div className="flex flex-col gap-3 bg-white/95 rounded-xl border border-emerald-400 p-4 shadow-sm">
-          <div className="flex items-center gap-2.5 text-emerald-800 font-bold">
-            <span className="material-symbols-outlined text-[24px] text-emerald-600">verified</span>
-            <p className="font-label-md text-label-md">
-              {lang === "fr" ? "Gain de tontine reçu et confirmé !" : "Payout received and confirmed!"}
-            </p>
-          </div>
-          <p className="text-xs text-slate-600">
-            {lang === "fr"
-              ? "Votre réception a bien été confirmée. Vous pouvez télécharger votre reçu officiel à tout moment."
-              : "Your receipt has been confirmed. You can download your official statement at any time."}
+              ? "Le virement a été envoyé avec succès vers votre compte Mobile Money / Orange Money. Vous pouvez télécharger votre reçu officiel ci-dessous."
+              : "The transfer has been successfully sent to your Mobile Money / Orange Money account. You can download your official statement below."}
           </p>
           {payoutId && (
             <div className="pt-1">

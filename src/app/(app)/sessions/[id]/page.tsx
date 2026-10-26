@@ -654,12 +654,10 @@ export default async function SessionDetailPage({
       {!isSessionFinished && (() => {
         const hasUndrawnSlots = myUndrawnSlots.length > 0;
         const totalSlotsCount = allSlotsFlat.length > 0 ? allSlotsFlat.length : (totalRegisteredSlots || 1);
-        const halfThreshold = Math.ceil(totalSlotsCount / 2);
-        const isHalfPaid = paidCount >= halfThreshold;
-        const isTimeUnlocked = isPayoutInfoUnlockTime(dueDate, now);
+        const isAllPaid = paidCount >= totalSlotsCount;
         const isBeneficiaryTurn =
           !hasUndrawnSlots && !!myDesignatedSlot && myDesignatedSlot.ballDrawn !== null;
-        const canFillPayoutDetails = isBeneficiaryTurn && isHalfPaid && isTimeUnlocked;
+        const canFillPayoutDetails = isBeneficiaryTurn && isAllPaid;
 
         return (
           <>
@@ -689,7 +687,7 @@ export default async function SessionDetailPage({
                 </Link>
               )}
 
-            {/* If beneficiary has drawn their ball, but 18:30 or 50% contributions has not been reached yet */}
+            {/* If beneficiary has drawn their ball, but not all members have contributed yet */}
             {isBeneficiaryTurn && !myActivePayoutClaim && !canFillPayoutDetails && (
               <div className="mb-stack-gap-lg rounded-2xl border border-emerald-500/30 bg-emerald-50/60 p-4 text-emerald-950 flex items-start gap-3 shadow-xs">
                 <span className="material-symbols-outlined text-emerald-700 text-[24px] flex-shrink-0 mt-0.5">
@@ -697,16 +695,12 @@ export default async function SessionDetailPage({
                 </span>
                 <div className="min-w-0 flex-1">
                   <h4 className="font-label-md text-sm font-bold text-emerald-950">
-                    {lang === "fr" ? "Ordre de bouffe : Tour en attente" : "Payout Turn: Waiting"}
+                    {lang === "fr" ? "Ordre de bouffe : En attente des cotisations" : "Payout Turn: Waiting for Contributions"}
                   </h4>
                   <p className="font-body-sm text-xs text-emerald-900/90 mt-1 leading-relaxed">
-                    {!isHalfPaid
-                      ? lang === "fr"
-                        ? `L'alerte pour renseigner vos coordonnées de paiement s'activera dès que la moitié des membres aura cotisé (${paidCount}/${halfThreshold} cotisations reçues).`
-                        : `The prompt to provide your payout details will activate once at least half of the members have contributed (${paidCount}/${halfThreshold} contributions received).`
-                      : lang === "fr"
-                      ? "Le formulaire pour renseigner vos coordonnées de paiement pour le virement s'activera à 18h30."
-                      : "The form to provide your payout details for the transfer will unlock at 6:30 PM."}
+                    {lang === "fr"
+                      ? `L'envoi de vos coordonnées de paiement s'activera dès que tout le monde aura cotisé (${paidCount}/${totalSlotsCount} cotisations reçues). N'oubliez pas que tout le monde, y compris vous-même pour vos parts, a l'obligation de cotiser !`
+                      : `The prompt to provide your payout details will activate once all members have contributed (${paidCount}/${totalSlotsCount} contributions received). Remember that everyone, including yourself for your parts, must contribute!`}
                   </p>
                 </div>
               </div>
@@ -744,13 +738,7 @@ export default async function SessionDetailPage({
           isDesignatedWinner: s.isDesignatedWinner,
         }))}
         myUnpaidSlotIds={mySlots
-          .filter((s) => {
-            // When it's the member's turn to bouffer, the winning slot is exempt from contributing
-            if (isBeneficiaryTurn && myDesignatedSlot && s.id === myDesignatedSlot.id) {
-              return false;
-            }
-            return contributionBySlot.get(s.id)?.status !== "PAID";
-          })
+          .filter((s) => contributionBySlot.get(s.id)?.status !== "PAID")
           .map((s) => s.id)}
         slotTotal={perSlotTotal}
         paymentDescription={paymentDescription}

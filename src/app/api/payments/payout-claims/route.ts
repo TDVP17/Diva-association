@@ -3,7 +3,7 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getDesignatedSlot } from "@/lib/round-robin-lock";
-import { getMostRecentDueDate, isPayoutInfoUnlockTime } from "@/lib/tontine-engine";
+import { getMostRecentDueDate } from "@/lib/tontine-engine";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 
 const bodySchema = z.object({
@@ -46,21 +46,13 @@ export async function POST(request: Request) {
 
   const dueDate = getMostRecentDueDate(slot.membership.tontineSession.type, new Date());
 
-  // Enforce rule: Payment information can only be submitted starting at 18:30 on the contribution date
-  if (!isPayoutInfoUnlockTime(dueDate, new Date())) {
-    return NextResponse.json(
-      { error: "Payout details can only be submitted starting from 18:30 on the contribution date" },
-      { status: 409 },
-    );
-  }
-
-  // Enforce rule: Payment information can ONLY be submitted once at least half of members have contributed
+  // Enforce rule: Payment information can ONLY be submitted once all members have contributed for this cycle
   const approvedMemberships = await prisma.membership.findMany({
     where: { tontineSessionId: slot.membership.tontineSessionId, status: "APPROVED" },
     include: { slots: true },
   });
   const allSlots = approvedMemberships.flatMap((m) => m.slots);
-  const halfThreshold = Math.ceil(allSlots.length / 2);
+  const totalSlotsCount = allSlots.length;
   const paidContributionsCount = await prisma.contribution.count({
     where: {
       membershipSlotId: { in: allSlots.map((s) => s.id) },
@@ -68,9 +60,9 @@ export async function POST(request: Request) {
       status: "PAID",
     },
   });
-  if (paidContributionsCount < halfThreshold) {
+  if (totalSlotsCount === 0 || paidContributionsCount < totalSlotsCount) {
     return NextResponse.json(
-      { error: "Payout details can only be submitted once at least half of the members have contributed" },
+      { error: "Les coordonnées de paiement ne peuvent être transmises que lorsque tous les membres ont cotisé pour ce cycle." },
       { status: 409 },
     );
   }

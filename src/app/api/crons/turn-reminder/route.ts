@@ -207,8 +207,8 @@ export async function GET(request: Request) {
               <p style="font-size: 14px; color: #334155;">
                 ${
                   lang === "fr"
-                    ? `💡 <strong>Information :</strong> Vous n'avez pas besoin de cotiser pour ce nom qui bouffe (${designatedSlot.beneficiaryName}).`
-                    : `💡 <strong>Note:</strong> You do not need to contribute for this winning name (${designatedSlot.beneficiaryName}).`
+                    ? `💡 <strong>Important :</strong> Tout le monde doit obligatoirement cotiser pour ce cycle, y compris pour votre part (<strong>${designatedSlot.beneficiaryName}</strong>). Dès que tous les membres auront cotisé, vous recevrez une alerte pour renseigner vos coordonnées Orange/MTN Money afin de recevoir la cagnotte !`
+                    : `💡 <strong>Important:</strong> Everyone must contribute for this cycle, including for your part (<strong>${designatedSlot.beneficiaryName}</strong>). Once all members have contributed, you will be prompted to provide your Orange/MTN Money details to receive the pot!`
                 }
               </p>
               ${lang === "fr" ? warningOtherSlotsFr : warningOtherSlotsEn}
@@ -228,8 +228,8 @@ export async function GET(request: Request) {
 
             const inAppMsg =
               lang === "fr"
-                ? `Salut, ${firstName} 👋 ! Aujourd'hui c'est votre tour de bouffer la cagnotte (${formatXAF(estimatedAmount)}) pour « ${designatedSlot.beneficiaryName} » dans ${sessionLabel} ! Vous n'avez pas à cotiser pour ce nom.${hasOtherSlots ? ` Attention : cotisez pour vos autres noms (${otherSlotNames}) pour éviter les amendes.` : ""}`
-                : `Hello, ${firstName} 👋! Today is your turn to receive the pot (${formatXAF(estimatedAmount)}) for "${designatedSlot.beneficiaryName}" in ${sessionLabel}! You don't need to pay for this name.${hasOtherSlots ? ` Warning: contribute for your other names (${otherSlotNames}) to avoid fines.` : ""}`;
+                ? `Salut, ${firstName} 👋 ! Aujourd'hui c'est votre tour de bouffer la cagnotte (${formatXAF(estimatedAmount)}) pour « ${designatedSlot.beneficiaryName} » dans ${sessionLabel} ! N'oubliez pas de cotiser pour vos parts. Dès que tous les membres auront cotisé, vous serez invité à fournir vos coordonnées de paiement.`
+                : `Hello, ${firstName} 👋! Today is your turn to receive the pot (${formatXAF(estimatedAmount)}) for "${designatedSlot.beneficiaryName}" in ${sessionLabel}! Remember to contribute for your parts. Once all members have contributed, you will be prompted to submit your payout details.`;
 
             await scheduleInAppNotifications({
               tontineSessionId: tontineSession.id,

@@ -134,7 +134,7 @@ export async function settleContribution(
     });
   }
 
-  // When half of the members have contributed for this cycle, if the designated beneficiary
+  // When ALL members have contributed for this cycle, if the designated beneficiary
   // has already drawn their lucky ball, alert them to submit their payout details.
   try {
     const designatedSlot = await prisma.membershipSlot.findFirst({
@@ -155,7 +155,7 @@ export async function settleContribution(
         where: { membership: { tontineSessionId: membership.tontineSessionId, status: "APPROVED" } },
         select: { id: true },
       });
-      const halfThreshold = Math.ceil(allApprovedSlots.length / 2);
+      const totalRequired = allApprovedSlots.length;
       const paidCount = await prisma.contribution.count({
         where: {
           membershipSlotId: { in: allApprovedSlots.map((s) => s.id) },
@@ -164,7 +164,7 @@ export async function settleContribution(
         },
       });
 
-      if (paidCount >= halfThreshold) {
+      if (totalRequired > 0 && paidCount >= totalRequired) {
         const alreadyAlerted = await prisma.notification.findFirst({
           where: {
             userId: designatedSlot.membership.userId,
@@ -181,8 +181,8 @@ export async function settleContribution(
           const benFirstName = benRawName.split(/\s+/)[0] || benRawName;
           const alertMsg =
             benLang === "fr"
-              ? `Salut, ${benFirstName} 👋 ! C'est à votre tour de bouffer la cagnotte de ${sessionLabel} ! 🎉 La moitié des membres a cotisé : veuillez fournir votre numéro de téléphone et le nom du compte Orange/MTN Money pour recevoir votre virement.`
-              : `Hello, ${benFirstName} 👋! It's your turn to receive the ${sessionLabel} payout! 🎉 Half of the members have contributed: please provide your phone number and Orange/MTN Money account name to receive your payout.`;
+              ? `Salut, ${benFirstName} 👋 ! C'est à votre tour de bouffer la cagnotte de ${sessionLabel} ! 🎉 Tous les membres ont cotisé : veuillez fournir votre numéro de téléphone et le nom du compte Orange/MTN Money pour recevoir votre virement.`
+              : `Hello, ${benFirstName} 👋! It's your turn to receive the ${sessionLabel} payout! 🎉 All members have contributed: please provide your phone number and Orange/MTN Money account name to receive your payout.`;
 
           await scheduleInAppNotifications({
             tontineSessionId: membership.tontineSessionId,
@@ -201,7 +201,7 @@ export async function settleContribution(
       }
     }
   } catch (err) {
-    console.error("[settleContribution] 50% milestone alert failed:", err);
+    console.error("[settleContribution] 100% milestone alert failed:", err);
   }
 
   // The payer gets their own confirmation too, when they aren't the

@@ -37,7 +37,7 @@ export async function GET(request: Request) {
         include: { slots: true },
       });
       const allSlots = approvedMemberships.flatMap((m) => m.slots);
-      const halfThreshold = Math.ceil(allSlots.length / 2);
+      if (allSlots.length === 0) continue;
       const paidContributionsCount = await prisma.contribution.count({
         where: {
           membershipSlotId: { in: allSlots.map((s) => s.id) },
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
           status: "PAID",
         },
       });
-      if (paidContributionsCount < halfThreshold) continue;
+      if (paidContributionsCount < allSlots.length) continue;
 
       const log = await prisma.foodTurnLog
         .create({ data: { membershipSlotId: designatedSlot.id, dueDate } })
