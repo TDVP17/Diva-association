@@ -118,11 +118,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, count: 0, message: "No recipients found" });
   }
 
-  const actionUrl = target === "GROUP" && tontineSessionId ? `/sessions/${tontineSessionId}` : "/notifications";
+  const actionUrl = tontineSessionId ? `/sessions/${tontineSessionId}` : "/notifications";
   const formattedMessage = `${title}\n\n${message}`;
 
   const count = await scheduleInAppNotifications({
-    tontineSessionId: target === "GROUP" ? tontineSessionId : undefined,
+    tontineSessionId: tontineSessionId || undefined,
     type: "ADMIN_BROADCAST",
     recipients: userIds.map((userId) => ({
       userId,
@@ -137,7 +137,7 @@ export async function POST(request: Request) {
     action: "admin_broadcast_alert",
     targetType: target === "GROUP" ? "TontineSession" : "System",
     targetId: target === "GROUP" ? tontineSessionId! : "all_users",
-    tontineSessionId: target === "GROUP" ? tontineSessionId : undefined,
+    tontineSessionId: tontineSessionId || undefined,
     metadata: {
       target,
       title,

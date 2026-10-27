@@ -50,7 +50,7 @@ export async function GET(request: Request) {
         if (log) {
           const membership = await prisma.membership.findUnique({
             where: { id: designatedSlot.membershipId },
-            include: { user: true },
+            include: { user: true, slots: true },
           });
 
           if (membership) {
@@ -71,6 +71,7 @@ export async function GET(request: Request) {
               month: "long",
               year: "numeric",
             });
+            const mySlotsList = membership.slots.map((s) => s.beneficiaryName).join(", ");
 
             const emailTitle =
               lang === "fr"
@@ -97,6 +98,20 @@ export async function GET(request: Request) {
                   ${lang === "fr" ? `Position officielle : N°${designatedSlot.officialPosition}` : `Official Position: #${designatedSlot.officialPosition}`}
                 </p>
               </div>
+
+              <div style="background-color: #fefce8; border: 1px solid #fef08a; border-radius: 10px; padding: 14px; margin: 16px 0; text-align: left; font-size: 13px; color: #854d0e;">
+                <p style="margin: 0 0 6px 0; font-weight: 700; color: #713f12; font-size: 14px;">
+                  ⚠️ ${lang === "fr" ? "Obligation de cotiser pour vos parts :" : "Mandatory contribution for your parts:"}
+                </p>
+                <p style="margin: 0; line-height: 1.5;">
+                  ${
+                    lang === "fr"
+                      ? `Même si c'est votre tour de recevoir la cagnotte demain, vous avez <strong>l'obligation stricte de cotiser pour vos noms (${mySlotsList})</strong>. C'est uniquement lorsque 100% des membres (y compris vous-même) auront cotisé que vous recevrez l'alerte pour renseigner vos coordonnées Orange/MTN Money afin d'encaisser votre virement !`
+                      : `Even though it's your turn to receive the pot tomorrow, you have the <strong>strict obligation to contribute for your names (${mySlotsList})</strong>. Only once 100% of members (including yourself) have contributed will you be prompted to submit your Orange/MTN Money details to cash out!`
+                  }
+                </p>
+              </div>
+
               <p style="font-size: 14px; color: #64748b;">
                 ${
                   lang === "fr"
@@ -125,8 +140,8 @@ export async function GET(request: Request) {
                   userId: membership.userId,
                   message:
                     lang === "fr"
-                      ? `Demain c'est votre tour de recevoir la cagnotte de ${sessionLabel} (${formatXAF(estimatedAmount)}) !`
-                      : `Tomorrow is your turn to receive the ${sessionLabel} payout (${formatXAF(estimatedAmount)})!`,
+                      ? `Demain c'est votre tour de recevoir la cagnotte de ${sessionLabel} (${formatXAF(estimatedAmount)}) ! N'oubliez pas : vous devez obligatoirement cotiser pour vos noms (${mySlotsList}). C'est quand tout le monde a cotisé que vos coordonnées de paiement vous seront demandées.`
+                      : `Tomorrow is your turn to receive the ${sessionLabel} pot (${formatXAF(estimatedAmount)})! Remember: you must contribute for your names (${mySlotsList}). Payout details will be requested once all members have contributed.`,
                   actionUrl: `/sessions/${tontineSession.id}`,
                 },
               ],

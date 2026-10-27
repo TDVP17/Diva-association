@@ -103,7 +103,7 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           target: alertTarget,
-          tontineSessionId: alertTarget === "GROUP" ? alertGroupId : undefined,
+          tontineSessionId: alertGroupId || undefined,
           title: alertTitle.trim(),
           message: alertMessage.trim(),
         }),
@@ -245,8 +245,8 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
                 </div>
               </div>
 
-              {/* Group selection if GROUP */}
-              {alertTarget === "GROUP" && (
+              {/* Group selection if GROUP or Optional Session Link if ALL */}
+              {alertTarget === "GROUP" ? (
                 <div className="animate-fade-in">
                   <label className="block font-label-md text-label-md text-on-surface mb-1.5 font-semibold">
                     {t("adminAlertSelectGroupPrompt")}
@@ -268,7 +268,94 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
                     )}
                   </select>
                 </div>
+              ) : (
+                <div className="animate-fade-in">
+                  <label className="block font-label-md text-label-md text-on-surface mb-1.5 font-semibold">
+                    {lang === "fr"
+                      ? "Associer à une cotisation (Optionnel — redirige les membres vers celle-ci)"
+                      : "Link to a cotisation (Optional — opens this cotisation on click)"}
+                  </label>
+                  <select
+                    value={alertGroupId}
+                    onChange={(e) => setAlertGroupId(e.target.value)}
+                    className="w-full border border-outline-variant rounded-xl px-3.5 py-2.5 font-label-md text-label-md bg-white text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  >
+                    <option value="">
+                      {lang === "fr" ? "— Aucune (redirection vers /notifications) —" : "— None (redirect to /notifications) —"}
+                    </option>
+                    {contributions.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               )}
+
+              {/* Quick Message Templates */}
+              <div>
+                <label className="block font-label-sm text-label-sm text-on-surface-variant mb-2">
+                  {lang === "fr" ? "Modèles rapides de message :" : "Quick message templates:"}
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const selectedSession = contributions.find((c) => c.id === alertGroupId)?.label || "";
+                      setAlertTitle(
+                        lang === "fr"
+                          ? `La cotisation ${selectedSession ? `« ${selectedSession} » ` : ""}va débuter bientôt ! 🚀`
+                          : `The cotisation ${selectedSession ? `"${selectedSession}" ` : ""}starts soon! 🚀`
+                      );
+                      setAlertMessage(
+                        lang === "fr"
+                          ? `Bonjour ! La session de cotisation ${selectedSession ? `« ${selectedSession} » ` : ""}va débuter très prochainement. Les places se remplissent vite : qu'attendez-vous pour intégrer le groupe et choisir vos numéros ? Rejoignez-nous dès maintenant sur divaasso.com !`
+                          : `Hello! The cotisation session ${selectedSession ? `"${selectedSession}" ` : ""}is starting soon. Slots are filling up fast: join the group and choose your positions today on divaasso.com!`
+                      );
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 transition-colors inline-flex items-center gap-1 font-medium"
+                  >
+                    <span>🚀</span> {lang === "fr" ? "Lancement imminent" : "Upcoming launch"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const selectedSession = contributions.find((c) => c.id === alertGroupId)?.label || "";
+                      setAlertTitle(
+                        lang === "fr"
+                          ? `Rappel : Cotisation en cours 🔔`
+                          : `Reminder: Contribution in progress 🔔`
+                      );
+                      setAlertMessage(
+                        lang === "fr"
+                          ? `Bonjour ! Les cotisations pour la session ${selectedSession ? `« ${selectedSession} » ` : ""}sont ouvertes. N'oubliez pas d'effectuer votre versement aujourd'hui afin de permettre au bénéficiaire de recevoir son tour sans retard.`
+                          : `Hello! Contributions for ${selectedSession ? `"${selectedSession}" ` : ""}are currently open. Please make sure to pay your slot today so the beneficiary receives their payout on time.`
+                      );
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-outline-variant bg-surface text-on-surface hover:bg-surface-variant transition-colors inline-flex items-center gap-1 font-medium"
+                  >
+                    <span>🔔</span> {lang === "fr" ? "Rappel de cotisation" : "Contribution reminder"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAlertTitle(
+                        lang === "fr"
+                          ? `Information importante DIVA Asso. 📢`
+                          : `Important Notice DIVA Asso. 📢`
+                      );
+                      setAlertMessage(
+                        lang === "fr"
+                          ? `Bonjour à tous les membres ! Une nouvelle information importante est disponible sur votre espace DIVA Asso. Connectez-vous dès maintenant sur divaasso.com pour suivre vos cotisations.`
+                          : `Hello to all members! An important update is available in your DIVA Asso. account. Log in to divaasso.com to stay informed.`
+                      );
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-outline-variant bg-surface text-on-surface hover:bg-surface-variant transition-colors inline-flex items-center gap-1 font-medium"
+                  >
+                    <span>📢</span> {lang === "fr" ? "Annonce générale" : "General announcement"}
+                  </button>
+                </div>
+              </div>
 
               {/* Title input */}
               <div>
