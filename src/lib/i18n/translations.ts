@@ -163,7 +163,7 @@ export const translations = {
       "A late fine is added automatically after the daily cutoff time, calculated per period you're overdue. Paying your contribution also settles any outstanding fine for that same cycle.",
     helpQ4: "Can someone else pay for my name?",
     helpA4:
-      "Yes — every contribution has a public link (shown on the contribution page) that lets someone else pay for any specific unpaid name, no account required. You can also use \"Contribute for a Relative\" from your own account.",
+      "Yes — you can pay for a member's name using \"Contribute for a Relative\" or via their personal member code. An account is required so that your payment receipt is securely generated and kept in your personal transaction history.",
     helpQ5: "How do I reach an admin if I have a problem?",
     helpA5:
       "Use the Messages tab — send a message describing your issue and an admin will follow up. You'll get an automatic acknowledgement the first time you reach out.",
@@ -1274,7 +1274,7 @@ export const translations = {
       "Une amende de retard est ajoutée automatiquement après l'heure limite quotidienne, calculée par période de retard. Payer votre cotisation règle aussi toute amende en attente pour ce même cycle.",
     helpQ4: "Quelqu'un d'autre peut-il payer pour mon nom ?",
     helpA4:
-      "Oui — chaque cotisation a un lien public (affiché sur la page de la cotisation) qui permet à quelqu'un d'autre de payer pour un nom impayé spécifique, sans compte requis. Vous pouvez aussi utiliser « Contribuer pour un proche » depuis votre propre compte.",
+      "Oui — vous pouvez cotiser pour le nom d'un membre via la fonction « Contribuer pour un proche » ou grâce à son matricule personnel. La création d'un compte est obligatoire afin que votre reçu soit généré à votre nom et conservé dans votre historique de transactions.",
     howDivaAssociationWorks: "Comment fonctionne DIVA Asso",
     watchTutorial: "Voir le tutoriel",
     notNow: "Plus tard",
