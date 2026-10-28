@@ -1,5 +1,7 @@
-import Link from "next/link";
-import { getLang, getTranslator } from "@/lib/i18n/get-lang";
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
+import { isAdminRole } from "@/lib/constants";
+import { getLang } from "@/lib/i18n/get-lang";
 
 interface PosterItem {
   id: string;
@@ -114,6 +116,10 @@ const POSTERS: PosterItem[] = [
 ];
 
 export default async function MarketingPostersPage() {
+  // Réservé aux administrateurs : les membres ne doivent jamais voir cette page.
+  const session = await auth();
+  if (!session?.user || !isAdminRole(session.user.role)) redirect("/dashboard");
+
   const lang = await getLang();
   const isFr = lang === "fr";
 
@@ -163,7 +169,7 @@ export default async function MarketingPostersPage() {
               className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow"
             >
               {/* Image Preview Container */}
-              <div className="relative bg-slate-900 aspect-[9/16] max-h-[460px] overflow-hidden flex items-center justify-center group">
+              <div className="relative bg-slate-900 aspect-square overflow-hidden flex items-center justify-center group">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={downloadUrl}

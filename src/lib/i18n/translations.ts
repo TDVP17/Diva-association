@@ -418,6 +418,7 @@ export const translations = {
 
     // Audit log viewer
     auditLogsNavTitle: "Audit Logs",
+    adminNavMarketing: "Marketing Posters",
     auditLogsPageTitle: "Audit Logs",
     auditLogsPageSubtitle: "A permanent, unmodifiable record of every sensitive action taken on the platform.",
     auditLogsEmptyState: "No audit log entries match these filters.",
@@ -1530,6 +1531,7 @@ export const translations = {
 
     // Audit log viewer
     auditLogsNavTitle: "Journal d'activité",
+    adminNavMarketing: "Affiches publicitaires",
     auditLogsPageTitle: "Journal d'activité",
     auditLogsPageSubtitle: "Un enregistrement permanent et non modifiable de chaque action sensible effectuée sur la plateforme.",
     auditLogsEmptyState: "Aucune entrée du journal ne correspond à ces filtres.",

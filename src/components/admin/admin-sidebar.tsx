@@ -13,6 +13,7 @@ const BASE_ITEMS = [
   { href: "/admin/support", label: "adminNavSupport", icon: "support_agent" },
   { href: "/admin/payment-issues", label: "paymentIssuesCard", icon: "shield_person" },
   { href: "/admin/audit-logs", label: "auditLogsNavTitle", icon: "history_edu" },
+  { href: "/admin/marketing", label: "adminNavMarketing", icon: "campaign" },
 ] as const;
 const PRESIDENT_ITEM = { href: "/admin/analytics", label: "adminNavAnalytics", icon: "monitoring" } as const;
 const SETTINGS_ITEM = { href: "/admin/settings", label: "adminNavSettings", icon: "settings" } as const;

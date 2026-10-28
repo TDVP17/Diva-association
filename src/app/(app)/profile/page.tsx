@@ -240,18 +240,6 @@ export default async function ProfilePage() {
           <span className="material-symbols-outlined text-outline">chevron_right</span>
         </Link>
         <Link
-          href="/marketing"
-          className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-50 to-amber-50 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-emerald-200 hover:border-emerald-300 transition-colors"
-        >
-          <span className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-emerald-800">campaign</span>
-            <span className="font-label-md text-label-md text-emerald-950 font-semibold">
-              {lang === "fr" ? "Affiches publicitaires (Télécharger HD)" : "Marketing Posters (Download HD)"}
-            </span>
-          </span>
-          <span className="material-symbols-outlined text-emerald-700">chevron_right</span>
-        </Link>
-        <Link
           href="/history"
           className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant hover:bg-surface-container-low transition-colors"
         >
