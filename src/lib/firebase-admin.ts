@@ -25,16 +25,32 @@ function getServiceAccount() {
   return undefined;
 }
 
-const serviceAccount = getServiceAccount();
+export function getAdminApp(): App | null {
+  if (getApps().length > 0) {
+    return getApps()[0]!;
+  }
 
-const adminApp: App =
-  getApps().length > 0
-    ? getApps()[0]!
-    : initializeApp(
-        serviceAccount
-          ? { credential: cert(serviceAccount) }
-          : undefined,
-      );
+  const serviceAccount = getServiceAccount();
+  if (!serviceAccount) {
+    return null;
+  }
 
-export const adminAuth: Auth = getAuth(adminApp);
-export { adminApp };
+  try {
+    return initializeApp({ credential: cert(serviceAccount) });
+  } catch (err) {
+    console.warn("[FirebaseAdmin] Erreur lors de l'initialisation de l'application Admin :", err);
+    return null;
+  }
+}
+
+export function getAdminAuth(): Auth | null {
+  const app = getAdminApp();
+  if (!app) return null;
+
+  try {
+    return getAuth(app);
+  } catch (err) {
+    console.warn("[FirebaseAdmin] Erreur lors de l'initialisation de Auth Admin :", err);
+    return null;
+  }
+}

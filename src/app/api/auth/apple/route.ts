@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminAuth } from "@/lib/firebase-admin";
+import { getAdminAuth } from "@/lib/firebase-admin";
 import { prisma } from "@/lib/prisma";
 import { ensureMemberCode } from "@/lib/member-code";
 
@@ -12,6 +12,14 @@ import { ensureMemberCode } from "@/lib/member-code";
  */
 export async function POST(request: Request) {
   try {
+    const adminAuth = getAdminAuth();
+    if (!adminAuth) {
+      return NextResponse.json(
+        { error: "Le service Firebase Admin n'est pas encore configuré sur ce serveur (clés manquantes)." },
+        { status: 503 },
+      );
+    }
+
     const body = await request.json().catch(() => null);
     const { idToken, email: clientEmail, displayName: clientDisplayName } = body || {};
 

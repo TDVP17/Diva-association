@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { getAuth, OAuthProvider, signInWithPopup } from "firebase/auth";
-import { app } from "@/lib/firebase";
+import { OAuthProvider, signInWithPopup } from "firebase/auth";
+import { getFirebaseAuth } from "@/lib/firebase";
 
 interface SignInWithAppleProps {
   callbackUrl?: string;
@@ -34,7 +34,12 @@ export function SignInWithApple({
     setErrorMsg(null);
 
     try {
-      const auth = getAuth(app);
+      const auth = getFirebaseAuth();
+      if (!auth) {
+        throw new Error(
+          "La configuration Firebase/Apple est en cours d'activation (clés d'API requises).",
+        );
+      }
       const provider = new OAuthProvider("apple.com");
 
       // Scopes demandés conformément aux directives Apple & Firebase
