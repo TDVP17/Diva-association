@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/audit";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { translate } from "@/lib/i18n/translations";
 import { checkUserFinesForJoining } from "@/lib/unsettled-fines-gate";
+import { TONTINE_TYPE_LABELS } from "@/lib/tontine-labels";
 
 const bodySchema = z.object({
   action: z.enum(["approve", "reject", "ban"]),
@@ -112,7 +113,10 @@ export async function POST(
     });
 
     const userFirstName = existing.user.name.trim().split(/\s+/)[0] || existing.user.name;
-    const sessionTitle = existing.tontineSession.title || existing.tontineSession.type;
+    const sessionTitle =
+      existing.tontineSession.title?.trim() ||
+      TONTINE_TYPE_LABELS[existing.tontineSession.type] ||
+      existing.tontineSession.type;
 
     const message = isApproved
       ? translate(lang, "memberApprovedMessage", { name: userFirstName, session: sessionTitle })

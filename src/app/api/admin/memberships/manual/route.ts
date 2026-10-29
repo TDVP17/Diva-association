@@ -4,6 +4,11 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
 import { resolveUniqueSlotNames } from "@/lib/slot-naming";
 import { checkUserFinesForJoining } from "@/lib/unsettled-fines-gate";
+import { ensureMemberCode } from "@/lib/member-code";
+import { logAudit } from "@/lib/audit";
+import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
+import { translate } from "@/lib/i18n/translations";
+import { TONTINE_TYPE_LABELS } from "@/lib/tontine-labels";
 
 const bodySchema = z.object({
   userId: z.string().min(1),
@@ -31,7 +36,7 @@ export async function POST(request: Request) {
 
   const tontineSession = await prisma.tontineSession.findUnique({
     where: { id: tontineSessionId },
-    select: { status: true },
+    select: { status: true, title: true, type: true },
   });
   if (!tontineSession) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
@@ -73,7 +78,7 @@ export async function POST(request: Request) {
   );
 
   try {
-    await prisma.$transaction(async (tx) => {
+    const createdMembership = await prisma.$transaction(async (tx) => {
       const membership = existingMembership
         ? await tx.membership.update({
             where: { id: existingMembership.id },
@@ -85,6 +90,50 @@ export async function POST(request: Request) {
       await tx.membershipSlot.createMany({
         data: finalNames.map((beneficiaryName) => ({ membershipId: membership.id, beneficiaryName })),
       });
+      return membership;
+    });
+
+    await ensureMemberCode(userId);
+
+    const userFirstName = targetUser.name.trim().split(/\s+/)[0] || targetUser.name;
+    const sessionTitle =
+      tontineSession.title?.trim() ||
+      TONTINE_TYPE_LABELS[tontineSession.type] ||
+      tontineSession.type;
+    const lang = targetUser.preferredLang === "en" ? "en" : "fr";
+
+    const message = translate(lang, "memberApprovedMessage", {
+      name: userFirstName,
+      session: sessionTitle,
+    });
+
+    await scheduleInAppNotifications({
+      tontineSessionId,
+      type: "MEMBER_APPROVED",
+      recipients: [
+        {
+          userId,
+          message,
+          messageKey: "memberApprovedMessage",
+          messageVars: { name: userFirstName, session: sessionTitle },
+          actionUrl: `/sessions/${tontineSessionId}`,
+        },
+      ],
+    });
+
+    await logAudit({
+      actorId: admin.user.id,
+      actorRole: admin.user.role,
+      action: "member_approved",
+      targetType: "Membership",
+      targetId: createdMembership.id,
+      tontineSessionId,
+      request,
+      payloadAfter: { status: "APPROVED", slotCount, finalNames },
+      metadata: {
+        userId,
+        manual: true,
+      },
     });
 
     return NextResponse.json({ ok: true, beneficiaryNames: finalNames });
