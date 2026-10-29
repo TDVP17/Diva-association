@@ -82,6 +82,14 @@ export async function validateEmailAddress(
     };
   }
 
+  // Apple Sign In Private Relay (Hide My Email) is ALWAYS valid
+  if (domain === "privaterelay.appleid.com") {
+    return {
+      valid: true,
+      normalizedEmail: email,
+    };
+  }
+
   // 2. Reject disposable / temporary email addresses
   if (DISPOSABLE_DOMAINS.has(domain)) {
     return {

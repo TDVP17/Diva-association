@@ -5,6 +5,7 @@ import { CredentialsForm } from "./credentials-form";
 import { LanguageToggle } from "@/components/language-toggle";
 import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 import { getGoogleSignInUrl } from "./actions";
+import { SignInWithApple } from "@/components/SignInWithApple";
 
 interface DevUser {
   email: string;
@@ -180,13 +181,15 @@ export function LoginContent({
           <div className="flex-grow border-t border-outline-variant" />
         </div>
 
-        <form onSubmit={(e) => { e.preventDefault(); }} className="relative z-10">
-          <button
-            type="button"
-            onClick={handleGoogleClick}
-            disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-stack-gap-sm bg-white border border-outline-variant rounded-lg py-3 px-4 hover:bg-surface-container-low transition-colors active:scale-[0.98] disabled:opacity-60 cursor-pointer"
-          >
+        <div className="relative z-10 flex flex-col gap-2.5">
+          <SignInWithApple callbackUrl={callbackUrl} />
+          <form onSubmit={(e) => { e.preventDefault(); }}>
+            <button
+              type="button"
+              onClick={handleGoogleClick}
+              disabled={googleLoading}
+              className="w-full flex items-center justify-center gap-stack-gap-sm bg-white border border-outline-variant rounded-lg py-3 px-4 hover:bg-surface-container-low transition-colors active:scale-[0.98] disabled:opacity-60 cursor-pointer"
+            >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -210,6 +213,7 @@ export function LoginContent({
             </span>
           </button>
         </form>
+        </div>
 
         {googleLoading && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
