@@ -1100,6 +1100,8 @@ export const translations = {
     shuffleOthersAction: "Shuffle remaining positions",
     shuffleAllAction: "Shuffle all",
     placeLabel: "Position",
+    checkedBadge: "Checked ✓",
+    currentlyAtPlace: "(Currently Position #{pos})",
 
     // Cotisation Video Design & Celebration
     memberPaidCelebrationQuote: "“Just contributed, thanks team!”",
@@ -2243,6 +2245,8 @@ export const translations = {
     shuffleOthersAction: "Mélanger les autres places",
     shuffleAllAction: "Tout mélanger",
     placeLabel: "Place",
+    checkedBadge: "Coché ✓",
+    currentlyAtPlace: "(Actuellement Place #{pos})",
 
     // Cotisation Video Design & Celebration
     memberPaidCelebrationQuote: "« J'ai cotisé, merci la team ! »",

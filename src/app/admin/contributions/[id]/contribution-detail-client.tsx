@@ -390,6 +390,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   }
 
   const [savingPositions, setSavingPositions] = useState(false);
+  const [openSlotDropdown, setOpenSlotDropdown] = useState<number | null>(null);
   const [positionsFeedback, setPositionsFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   async function savePositionsOnly() {
@@ -1115,27 +1116,98 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                     </div>
 
                     {/* Member Selector Dropdown & reorder arrows */}
-                    <div className="flex items-center gap-2 flex-grow sm:max-w-md w-full">
+                    <div className="flex items-center gap-2 flex-grow sm:max-w-md w-full relative">
+                      {/* Backdrop for closing open dropdown */}
+                      {openSlotDropdown === index && (
+                        <div
+                          className="fixed inset-0 z-30"
+                          onClick={() => setOpenSlotDropdown(null)}
+                        />
+                      )}
+
                       <div className="relative flex-grow">
-                        <select
-                          value={m.id}
-                          onChange={(e) => assignMemberToPosition(e.target.value, index)}
+                        {/* Trigger button */}
+                        <button
+                          type="button"
+                          onClick={() => setOpenSlotDropdown(openSlotDropdown === index ? null : index)}
                           aria-label={`Place #${index + 1}`}
-                          className={`w-full appearance-none border-2 rounded-xl pl-3.5 pr-9 py-2.5 text-sm font-bold bg-white text-on-surface focus:outline-none focus:ring-2 focus:ring-primary shadow-sm cursor-pointer transition-all ${
+                          className={`w-full flex items-center justify-between border-2 rounded-xl pl-3 pr-2.5 py-2.5 text-sm font-bold bg-white text-on-surface focus:outline-none focus:ring-2 focus:ring-primary shadow-sm cursor-pointer transition-all text-left ${
                             isFirst
                               ? "border-amber-500 bg-amber-50/40 text-amber-950 ring-1 ring-amber-300/50"
                               : "border-outline-variant hover:border-primary/60"
                           }`}
                         >
-                          {order.map((candidate) => (
-                            <option key={candidate.id} value={candidate.id}>
-                              {candidate.beneficiaryName} ({candidate.name}) {!candidate.hasPhone ? "⚠️" : ""}
-                            </option>
-                          ))}
-                        </select>
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant pointer-events-none text-[20px]">
-                          unfold_more
-                        </span>
+                          <div className="flex items-center gap-2 min-w-0 pr-1">
+                            <span className="material-symbols-outlined text-emerald-600 text-[18px] flex-shrink-0">
+                              check_circle
+                            </span>
+                            <span className="truncate">
+                              {m.beneficiaryName} ({m.name})
+                            </span>
+                          </div>
+                          <span className="material-symbols-outlined text-on-surface-variant text-[20px] flex-shrink-0 transition-transform">
+                            {openSlotDropdown === index ? "expand_less" : "unfold_more"}
+                          </span>
+                        </button>
+
+                        {/* Dropdown Menu with checkboxes */}
+                        {openSlotDropdown === index && (
+                          <div className="absolute left-0 right-0 top-full mt-1.5 z-40 bg-white rounded-xl shadow-2xl border-2 border-primary/20 max-h-64 overflow-y-auto py-1 animate-in fade-in zoom-in-95">
+                            <div className="px-3 py-1.5 border-b border-surface-variant/40 bg-surface-container-lowest flex items-center justify-between text-[11px] font-bold text-on-surface-variant">
+                              <span>Place #{index + 1}</span>
+                              <span className="text-emerald-700">✓ {t("checkedBadge")}</span>
+                            </div>
+                            {order.map((candidate, candIdx) => {
+                              const isSelected = candidate.id === m.id;
+                              return (
+                                <button
+                                  key={candidate.id}
+                                  type="button"
+                                  onClick={() => {
+                                    assignMemberToPosition(candidate.id, index);
+                                    setOpenSlotDropdown(null);
+                                  }}
+                                  className={`w-full px-3 py-2 flex items-center justify-between gap-2.5 text-left transition-colors cursor-pointer text-sm border-b border-surface-variant/20 last:border-b-0 ${
+                                    isSelected
+                                      ? "bg-emerald-50 text-emerald-950 font-bold"
+                                      : "hover:bg-surface-container-low text-on-surface font-medium"
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <span
+                                      className={`material-symbols-outlined text-[20px] flex-shrink-0 ${
+                                        isSelected ? "text-emerald-600 font-bold" : "text-outline-variant"
+                                      }`}
+                                    >
+                                      {isSelected ? "check_box" : "check_box_outline_blank"}
+                                    </span>
+                                    <div className="min-w-0">
+                                      <p className="truncate leading-tight">
+                                        {candidate.beneficiaryName} ({candidate.name})
+                                      </p>
+                                      {candIdx !== index && (
+                                        <p className="text-[11px] text-on-surface-variant mt-0.5">
+                                          {t("currentlyAtPlace", { pos: String(candIdx + 1) })}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {isSelected ? (
+                                    <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 flex-shrink-0 flex items-center gap-1">
+                                      <span className="material-symbols-outlined text-[13px]">check</span>
+                                      {t("checkedBadge")}
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs text-on-surface-variant font-numeric-data flex-shrink-0">
+                                      #{candIdx + 1}
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-0.5 flex-shrink-0">
