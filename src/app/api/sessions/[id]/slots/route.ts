@@ -118,13 +118,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         });
       }
 
-      // If slotCount was increased, create additional slots
+      // If slotCount was increased, create additional slots at the end
       if (finalNames.length > existingUserSlots.length) {
         const newNames = finalNames.slice(existingUserSlots.length);
+
+        // Find the current highest officialPosition in this session so new slots appear at the end
+        const maxPosSlot = await tx.membershipSlot.findFirst({
+          where: { membership: { tontineSessionId }, officialPosition: { not: null } },
+          orderBy: { officialPosition: "desc" },
+          select: { officialPosition: true },
+        });
+        const nextPos = maxPosSlot?.officialPosition ? maxPosSlot.officialPosition + 1 : null;
+
         await tx.membershipSlot.createMany({
-          data: newNames.map((beneficiaryName) => ({
+          data: newNames.map((beneficiaryName, idx) => ({
             membershipId: membership.id,
             beneficiaryName,
+            officialPosition: nextPos !== null ? nextPos + idx : null,
           })),
         });
       }

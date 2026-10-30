@@ -87,8 +87,19 @@ export async function POST(request: Request) {
         : await tx.membership.create({
             data: { userId, tontineSessionId, status: "APPROVED", slotCount },
           });
+      const maxPosSlot = await tx.membershipSlot.findFirst({
+        where: { membership: { tontineSessionId }, officialPosition: { not: null } },
+        orderBy: { officialPosition: "desc" },
+        select: { officialPosition: true },
+      });
+      const nextPos = maxPosSlot?.officialPosition ? maxPosSlot.officialPosition + 1 : null;
+
       await tx.membershipSlot.createMany({
-        data: finalNames.map((beneficiaryName) => ({ membershipId: membership.id, beneficiaryName })),
+        data: finalNames.map((beneficiaryName, idx) => ({
+          membershipId: membership.id,
+          beneficiaryName,
+          officialPosition: nextPos !== null ? nextPos + idx : null,
+        })),
       });
       return membership;
     });

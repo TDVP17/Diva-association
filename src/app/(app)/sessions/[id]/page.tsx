@@ -77,6 +77,7 @@ export default async function SessionDetailPage({
     where: { id },
     include: {
       memberships: {
+        orderBy: { joinedAt: "asc" },
         include: {
           user: { select: { id: true, name: true, avatar: true, image: true, phone: true } },
           slots: { orderBy: [{ officialPosition: "asc" }, { ballDrawn: "asc" }, { createdAt: "asc" }] },
@@ -448,9 +449,18 @@ export default async function SessionDetailPage({
   const contributionBySlot = new Map(contributions.map((c) => [c.membershipSlotId, c]));
   const fineBySlot = new Map(fines.map((f) => [f.membershipSlotId, f]));
 
-  const allSlotsFlat = approvedMemberships.flatMap((m) =>
-    m.slots.map((s) => ({ ...s, member: m.user, isMine: m.userId === userId })),
-  );
+  const allSlotsFlat = approvedMemberships
+    .flatMap((m) =>
+      m.slots.map((s) => ({ ...s, member: m.user, isMine: m.userId === userId })),
+    )
+    .sort((a, b) => {
+      if (a.officialPosition !== null && b.officialPosition !== null) {
+        return a.officialPosition - b.officialPosition;
+      }
+      if (a.officialPosition !== null) return -1;
+      if (b.officialPosition !== null) return 1;
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    });
   const paidCount = allSlotsFlat.filter((s) => contributionBySlot.get(s.id)?.status === "PAID").length;
 
   const perSlotAmount = Number(tontineSession.amount);

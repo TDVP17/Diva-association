@@ -15,6 +15,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     include: {
       memberships: {
         where: { status: "APPROVED" },
+        orderBy: { joinedAt: "asc" },
         include: {
           user: { select: { id: true, name: true, avatar: true, image: true, phone: true, memberCode: true } },
           slots: { orderBy: [{ officialPosition: "asc" }, { ballDrawn: "asc" }, { createdAt: "asc" }] },
@@ -55,21 +56,31 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     lockedAt: s.lockedAt ? s.lockedAt.toISOString() : null,
     validatedMembersCount: s.validatedMembersCount ?? 0,
     registeredSlots,
-    slots: s.memberships.flatMap((m) =>
-      m.slots.map((slot) => ({
-        id: slot.id,
-        membershipId: m.id,
-        userId: m.userId,
-        beneficiaryName: slot.beneficiaryName,
-        name: m.user.name,
-        memberCode: m.user.memberCode,
-        avatar: m.user.avatar ?? m.user.image,
-        hasPhone: !!m.user.phone,
-        officialPosition: slot.officialPosition,
-        ballDrawn: slot.ballDrawn,
-        paidThisCycle: paidSlotIds.has(slot.id),
-      })),
-    ),
+    slots: s.memberships
+      .flatMap((m) =>
+        m.slots.map((slot) => ({
+          id: slot.id,
+          membershipId: m.id,
+          userId: m.userId,
+          beneficiaryName: slot.beneficiaryName,
+          name: m.user.name,
+          memberCode: m.user.memberCode,
+          avatar: m.user.avatar ?? m.user.image,
+          hasPhone: !!m.user.phone,
+          officialPosition: slot.officialPosition,
+          ballDrawn: slot.ballDrawn,
+          createdAt: slot.createdAt,
+          paidThisCycle: paidSlotIds.has(slot.id),
+        })),
+      )
+      .sort((a, b) => {
+        if (a.officialPosition !== null && b.officialPosition !== null) {
+          return a.officialPosition - b.officialPosition;
+        }
+        if (a.officialPosition !== null) return -1;
+        if (b.officialPosition !== null) return 1;
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      }),
   });
 }
 
