@@ -81,19 +81,19 @@ export async function POST(request: Request) {
   let bodyHtml = "";
 
   if (purpose === "PHONE_CHANGE") {
-    title = lang === "fr" ? "Validation de votre numéro de téléphone" : "Phone Number Verification";
+    title = lang === "fr" ? "Validation de votre numéro WhatsApp" : "WhatsApp Number Verification";
     bodyHtml = `
       <p style="margin-top: 0;">${lang === "fr" ? `Bonjour <strong>${user.name}</strong>,` : `Hello <strong>${user.name}</strong>,`}</p>
       <p>
         ${
           lang === "fr"
-            ? `Vous avez demandé à enregistrer le numéro de téléphone <strong>${pendingValue}</strong> sur votre compte DIVA Asso.`
-            : `You requested to register the phone number <strong>${pendingValue}</strong> on your DIVA Asso account.`
+            ? `Vous avez demandé à enregistrer le numéro WhatsApp <strong>${pendingValue}</strong> sur votre compte DIVA Asso.`
+            : `You requested to register the WhatsApp number <strong>${pendingValue}</strong> on your DIVA Asso account.`
         }
       </p>
       <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 20px; margin: 24px 0; text-align: center;">
         <p style="margin: 0 0 8px 0; font-size: 13px; color: #166534; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-          ${lang === "fr" ? "Votre Code de Validation Unique" : "Your Unique Verification Code"}
+          ${lang === "fr" ? "Votre Code de Validation WhatsApp" : "Your WhatsApp Verification Code"}
         </p>
         <div style="font-size: 34px; font-weight: 800; color: #003528; letter-spacing: 6px;">
           ${challenge.code}
@@ -105,8 +105,8 @@ export async function POST(request: Request) {
       <p style="font-size: 13px; color: #64748b; line-height: 1.6;">
         ${
           lang === "fr"
-            ? "Entrez ce code dans l'application pour confirmer l'enregistrement de votre numéro."
-            : "Enter this code in the app to confirm your phone number."
+            ? "Entrez ce code dans l'application pour confirmer l'enregistrement de votre numéro WhatsApp."
+            : "Enter this code in the app to confirm your WhatsApp number."
         }
       </p>
     `;

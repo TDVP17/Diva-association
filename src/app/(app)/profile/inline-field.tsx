@@ -145,8 +145,8 @@ export function InlineField({
                     <span className="material-symbols-outlined text-[18px] text-emerald-700 flex-shrink-0">mark_email_read</span>
                     <span>
                       {lang === "fr"
-                        ? "Le code pour confirmer que c'est votre numéro vous sera envoyé par e-mail."
-                        : "The code to confirm this number will be sent to your email address."}
+                        ? "Le code pour confirmer que c'est votre numéro WhatsApp vous sera envoyé par e-mail."
+                        : "The code to confirm this WhatsApp number will be sent to your email address."}
                     </span>
                   </p>
                 )}
