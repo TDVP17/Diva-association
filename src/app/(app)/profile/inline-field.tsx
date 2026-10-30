@@ -140,6 +140,16 @@ export function InlineField({
                   }
                   className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
                 />
+                {purpose === "PHONE_CHANGE" && (
+                  <p className="font-label-sm text-label-sm text-emerald-800 bg-emerald-50 border border-emerald-200/80 rounded-lg p-2.5 flex items-start gap-2">
+                    <span className="material-symbols-outlined text-[18px] text-emerald-700 flex-shrink-0">mark_email_read</span>
+                    <span>
+                      {lang === "fr"
+                        ? "Le code pour confirmer que c'est votre numéro vous sera envoyé par e-mail."
+                        : "The code to confirm this number will be sent to your email address."}
+                    </span>
+                  </p>
+                )}
                 {error && <p className="font-label-sm text-label-sm text-error">{error}</p>}
                 <button
                   onClick={sendCode}
@@ -153,7 +163,16 @@ export function InlineField({
 
             {step === "otp" && (
               <div className="flex flex-col gap-3">
-                <p className="font-label-sm text-label-sm text-on-surface-variant">{t("otpSent")}</p>
+                <p className="font-label-sm text-label-sm text-on-surface-variant font-medium flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[18px] text-emerald-700">mark_email_read</span>
+                  <span>
+                    {purpose === "PHONE_CHANGE"
+                      ? (lang === "fr"
+                          ? "Un code unique à 6 chiffres a été envoyé à votre adresse e-mail."
+                          : "A unique 6-digit code was sent to your email address.")
+                      : t("otpSent")}
+                  </span>
+                </p>
                 <input
                   value={code}
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}

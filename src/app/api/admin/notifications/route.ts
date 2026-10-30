@@ -12,7 +12,7 @@ const TONTINE_LABELS: Record<string, string> = {
 };
 
 const broadcastSchema = z.object({
-  target: z.enum(["ALL", "GROUP"]),
+  target: z.enum(["ALL", "GROUP", "NO_PHONE"]),
   tontineSessionId: z.string().optional(),
   title: z.string().trim().min(1, "Title is required").max(200),
   message: z.string().trim().min(1, "Message is required").max(5000),
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
     ...(memberQuery ? { user: { name: { contains: memberQuery, mode: "insensitive" as const } } } : {}),
   };
 
-  const [notifications, sessions] = await Promise.all([
+  const [notifications, sessions, noPhoneCount] = await Promise.all([
     prisma.notification.findMany({
       where,
       include: { user: { select: { name: true } }, tontineSession: { select: { id: true, title: true, type: true } } },
@@ -45,9 +45,11 @@ export async function GET(request: Request) {
       take: PAGE_SIZE,
     }),
     prisma.tontineSession.findMany({ select: { id: true, title: true, type: true }, orderBy: { startDate: "desc" } }),
+    prisma.user.count({ where: { isBanned: false, OR: [{ phone: null }, { phone: "" }] } }),
   ]);
 
   return NextResponse.json({
+    noPhoneCount,
     notifications: notifications.map((n) => ({
       id: n.id,
       userName: n.user.name,
@@ -89,6 +91,15 @@ export async function POST(request: Request) {
       select: { id: true },
     });
     userIds = users.map((u) => u.id);
+  } else if (target === "NO_PHONE") {
+    const users = await prisma.user.findMany({
+      where: {
+        isBanned: false,
+        OR: [{ phone: null }, { phone: "" }],
+      },
+      select: { id: true },
+    });
+    userIds = users.map((u) => u.id);
   } else {
     if (!tontineSessionId) {
       return NextResponse.json({ error: "tontineSessionId is required for group alerts" }, { status: 400 });
@@ -118,7 +129,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, count: 0, message: "No recipients found" });
   }
 
-  const actionUrl = tontineSessionId ? `/sessions/${tontineSessionId}` : "/notifications";
+  const actionUrl = target === "NO_PHONE" ? "/profile" : (tontineSessionId ? `/sessions/${tontineSessionId}` : "/notifications");
   const formattedMessage = `${title}\n\n${message}`;
 
   const count = await scheduleInAppNotifications({

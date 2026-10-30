@@ -146,69 +146,75 @@ async function deliverInstantNotifications(params: {
     const baseUrl =
       process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? "https://www.divaasso.com";
 
-    await Promise.all(
-      params.recipients.map(async (r) => {
-        const user = userMap.get(r.userId);
-        const lang: Lang = user?.preferredLang === "en" ? "en" : "fr";
-        const rawName = user?.name?.trim() || "";
-        const firstName = rawName.split(/\s+/)[0] || rawName;
-        const greeting = firstName ? (lang === "en" ? `Hello, ${firstName} 👋` : `Salut, ${firstName} 👋`) : "";
-        const typeKey = NOTIFICATION_TYPE_KEY[params.type];
-        let title = typeKey ? translate(lang, typeKey) : "DIVA Asso.";
-        let body = r.message;
+    for (let i = 0; i < params.recipients.length; i += 5) {
+      const batch = params.recipients.slice(i, i + 5);
+      await Promise.all(
+        batch.map(async (r) => {
+          const user = userMap.get(r.userId);
+          const lang: Lang = user?.preferredLang === "en" ? "en" : "fr";
+          const rawName = user?.name?.trim() || "";
+          const firstName = rawName.split(/\s+/)[0] || rawName;
+          const greeting = firstName ? (lang === "en" ? `Hello, ${firstName} 👋` : `Salut, ${firstName} 👋`) : "";
+          const typeKey = NOTIFICATION_TYPE_KEY[params.type];
+          let title = typeKey ? translate(lang, typeKey) : "DIVA Asso.";
+          let body = r.message;
 
-        // Ensure push/body begins with personalized greeting with emoji
-        const hasGreeting =
-          body.startsWith("Salut") ||
-          body.startsWith("Bonjour") ||
-          body.startsWith("Hello") ||
-          body.startsWith("Hi");
+          // Ensure push/body begins with personalized greeting with emoji
+          const hasGreeting =
+            body.startsWith("Salut") ||
+            body.startsWith("Bonjour") ||
+            body.startsWith("Hello") ||
+            body.startsWith("Hi");
 
-        if (greeting && !hasGreeting) {
-          body = `${greeting} ! ${body}`;
-        }
-
-        if (params.type === "ADMIN_BROADCAST" && r.message.includes("\n\n")) {
-          const [parsedSubject, ...rest] = r.message.split("\n\n");
-          if (parsedSubject?.trim()) {
-            title = parsedSubject.trim();
-            body = rest.join("\n\n").trim() || body;
+          if (greeting && !hasGreeting) {
+            body = `${greeting} ! ${body}`;
           }
-        }
 
-        // 1. Deliver instant Web Push to phone
-        try {
-          const badgeCount = (await getUnreadInAppNotificationCount(r.userId)) || 1;
+          if (params.type === "ADMIN_BROADCAST" && r.message.includes("\n\n")) {
+            const [parsedSubject, ...rest] = r.message.split("\n\n");
+            if (parsedSubject?.trim()) {
+              title = parsedSubject.trim();
+              body = rest.join("\n\n").trim() || body;
+            }
+          }
 
-          await sendPushToUser(r.userId, {
-            title,
-            body,
-            url: r.actionUrl,
-            badgeCount,
-          });
-        } catch (pushErr) {
-          console.error("[push] instant delivery failed:", pushErr);
-        }
-
-        // Deliver instant Email notification via Resend with official DIVA logo and direct CTA button
-        if (user?.email) {
+          // 1. Deliver instant Web Push to phone
           try {
-            const emailHtml = renderBrandedEmailHtml({
+            const badgeCount = (await getUnreadInAppNotificationCount(r.userId)) || 1;
+
+            await sendPushToUser(r.userId, {
               title,
-              bodyText: body,
-              actionUrl: r.actionUrl,
-              actionLabel: lang === "en" ? "View in App" : "Consulter dans l'application",
-              lang,
-              baseUrl,
-              recipientName: user.name,
+              body,
+              url: r.actionUrl,
+              badgeCount,
             });
-            await sendEmailSafe(user.email, title, emailHtml);
-          } catch (emailErr) {
-            console.error("[email] instant delivery failed:", emailErr);
+          } catch (pushErr) {
+            console.error("[push] instant delivery failed:", pushErr);
           }
-        }
-      }),
-    );
+
+          // Deliver instant Email notification via Resend with official DIVA logo and direct CTA button
+          if (user?.email) {
+            try {
+              const emailHtml = renderBrandedEmailHtml({
+                title,
+                bodyText: body,
+                actionUrl: r.actionUrl,
+                actionLabel: lang === "en" ? "View in App" : "Consulter dans l'application",
+                lang,
+                baseUrl,
+                recipientName: user.name,
+              });
+              await sendEmailSafe(user.email, title, emailHtml);
+            } catch (emailErr) {
+              console.error("[email] instant delivery failed:", emailErr);
+            }
+          }
+        }),
+      );
+      if (i + 5 < params.recipients.length) {
+        await new Promise((resolve) => setTimeout(resolve, 600));
+      }
+    }
   } catch (err) {
     console.error("[notifications] deliverInstantNotifications failed:", err);
   }

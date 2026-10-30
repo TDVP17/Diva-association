@@ -44,7 +44,8 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
 
   // Broadcast Alert modal state
   const [showAlertModal, setShowAlertModal] = useState(false);
-  const [alertTarget, setAlertTarget] = useState<"ALL" | "GROUP">("ALL");
+  const [alertTarget, setAlertTarget] = useState<"ALL" | "GROUP" | "NO_PHONE">("ALL");
+  const [noPhoneCount, setNoPhoneCount] = useState(0);
   const [alertGroupId, setAlertGroupId] = useState("");
   const [alertTitle, setAlertTitle] = useState("");
   const [alertMessage, setAlertMessage] = useState("");
@@ -71,6 +72,9 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
           if (cancelled) return;
           setNotifications(b.notifications ?? []);
           setContributions(b.contributions ?? []);
+          if (typeof b.noPhoneCount === "number") {
+            setNoPhoneCount(b.noPhoneCount);
+          }
           if (b.contributions?.length > 0 && !alertGroupId) {
             setAlertGroupId(b.contributions[0].id);
           }
@@ -142,17 +146,35 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
           </h2>
           <p className="text-on-surface-variant font-body-lg mt-1">{t("notificationCenterSubtitle")}</p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setAlertFeedback(null);
-            setShowAlertModal(true);
-          }}
-          className="self-start sm:self-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-on-primary font-label-md text-label-md hover:bg-primary/90 transition-all shadow-sm"
-        >
-          <span className="material-symbols-outlined text-[20px]">campaign</span>
-          {t("adminAlertModalTitle")}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {noPhoneCount > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setAlertFeedback(null);
+                setAlertTarget("NO_PHONE");
+                setAlertTitle(t("adminAlertMissingPhoneDefaultTitle"));
+                setAlertMessage(t("adminAlertMissingPhoneDefaultMessage"));
+                setShowAlertModal(true);
+              }}
+              className="self-start sm:self-auto inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-label-md text-label-md transition-all shadow-sm"
+            >
+              <span className="material-symbols-outlined text-[18px]">phone_disabled</span>
+              {t("adminAlertNotifyMissingPhoneAction", { count: String(noPhoneCount) })}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setAlertFeedback(null);
+              setShowAlertModal(true);
+            }}
+            className="self-start sm:self-auto inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-on-primary font-label-md text-label-md hover:bg-primary/90 transition-all shadow-sm"
+          >
+            <span className="material-symbols-outlined text-[20px]">campaign</span>
+            {t("adminAlertModalTitle")}
+          </button>
+        </div>
       </div>
 
       {alertFeedback && (
@@ -241,6 +263,34 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
                       {alertTarget === "GROUP" ? "radio_button_checked" : "radio_button_unchecked"}
                     </span>
                     <span className="text-sm">{t("adminAlertTargetGroup")}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAlertTarget("NO_PHONE");
+                      if (!alertTitle) setAlertTitle(t("adminAlertMissingPhoneDefaultTitle"));
+                      if (!alertMessage) setAlertMessage(t("adminAlertMissingPhoneDefaultMessage"));
+                    }}
+                    className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all sm:col-span-2 ${
+                      alertTarget === "NO_PHONE"
+                        ? "border-amber-600 bg-amber-50 text-amber-900 font-semibold shadow-sm"
+                        : "border-outline-variant text-on-surface hover:bg-surface"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[20px] text-amber-600">
+                      {alertTarget === "NO_PHONE" ? "radio_button_checked" : "radio_button_unchecked"}
+                    </span>
+                    <div className="flex-1 flex items-center justify-between">
+                      <span className="text-sm font-medium">
+                        {t("adminAlertTargetNoPhone", { count: String(noPhoneCount) })}
+                      </span>
+                      {noPhoneCount > 0 && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-200 text-amber-900">
+                          {noPhoneCount}
+                        </span>
+                      )}
+                    </div>
                   </button>
                 </div>
               </div>

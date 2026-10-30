@@ -351,15 +351,56 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     });
   }
 
+  function handleSelectFirstPlace(slotId: string) {
+    const fromIndex = order.findIndex((s) => s.id === slotId);
+    if (fromIndex <= 0) return;
+    moveItem(fromIndex, 0);
+  }
+
+  const [savingPositions, setSavingPositions] = useState(false);
+  const [positionsFeedback, setPositionsFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  async function savePositionsOnly() {
+    setSavingPositions(true);
+    setPositionsFeedback(null);
+    try {
+      const res = await fetch(`/api/admin/sessions/${tontineSessionId}/publish-ranking`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order: order.map((m) => m.id), saveOnly: true }),
+      });
+      if (res.ok) {
+        await refreshSession();
+        setPositionsFeedback({ type: "success", text: t("positionsSavedSuccess") });
+        setTimeout(() => setPositionsFeedback(null), 3500);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setPositionsFeedback({ type: "error", text: data.error || t("somethingWentWrong") });
+      }
+    } catch {
+      setPositionsFeedback({ type: "error", text: t("somethingWentWrong") });
+    } finally {
+      setSavingPositions(false);
+    }
+  }
+
   async function publishRanking() {
     setPublishing(true);
+    setPositionsFeedback(null);
     try {
       const res = await fetch(`/api/admin/sessions/${tontineSessionId}/publish-ranking`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ order: order.map((m) => m.id) }),
       });
-      if (res.ok) await refreshSession();
+      if (res.ok) {
+        await refreshSession();
+        setPositionsFeedback({ type: "success", text: t("positionsSavedSuccess") });
+        setTimeout(() => setPositionsFeedback(null), 3500);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setPositionsFeedback({ type: "error", text: data.error || t("somethingWentWrong") });
+      }
     } finally {
       setPublishing(false);
     }
@@ -367,9 +408,19 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
 
   async function startDrawingPhase() {
     setStartingDraw(true);
+    setPositionsFeedback(null);
     try {
-      const res = await fetch(`/api/admin/sessions/${tontineSessionId}/start-drawing`, { method: "POST" });
-      if (res.ok) await refreshSession();
+      const res = await fetch(`/api/admin/sessions/${tontineSessionId}/start-drawing`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order: order.map((m) => m.id) }),
+      });
+      if (res.ok) {
+        await refreshSession();
+      } else {
+        const body = await res.json().catch(() => ({}));
+        window.alert(body.error || t("somethingWentWrong"));
+      }
     } finally {
       setStartingDraw(false);
     }
@@ -918,13 +969,56 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
           {deleteError && <p className="font-label-sm text-label-sm text-error">{deleteError}</p>}
 
           <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4 flex flex-col h-full">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center mb-3">
               <h3 className="font-title-md text-title-md text-primary flex items-center gap-2">
                 <span className="material-symbols-outlined">format_list_numbered</span>
                 {t("payoutOrder")}
               </h3>
             </div>
-            <p className="font-label-sm text-label-sm text-on-surface-variant mb-4">{t("dragToReorder")}</p>
+
+            {positionsFeedback && (
+              <div
+                className={`p-3 rounded-xl mb-3 flex items-center justify-between text-xs font-semibold ${
+                  positionsFeedback.type === "success"
+                    ? "bg-[#ecfdf5] text-[#065f46] border border-[#a7f3d0]"
+                    : "bg-error-container text-on-error-container border border-error/20"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px]">
+                    {positionsFeedback.type === "success" ? "check_circle" : "error"}
+                  </span>
+                  <span>{positionsFeedback.text}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Quick 1st Place Selector Card */}
+            {order.length > 0 && (
+              <div className="bg-gradient-to-r from-amber-500/10 via-amber-400/10 to-emerald-500/10 border border-amber-500/30 rounded-xl p-3.5 mb-4 shadow-sm">
+                <div className="flex items-center gap-2 mb-1.5 text-amber-950 font-bold text-sm">
+                  <span className="material-symbols-outlined text-amber-600 text-[20px]">military_tech</span>
+                  <span>{t("selectFirstPlaceTitle")}</span>
+                </div>
+                <p className="text-xs text-on-surface-variant mb-2.5">
+                  {t("selectFirstPlaceDesc")}
+                </p>
+                <select
+                  value={order[0]?.id || ""}
+                  onChange={(e) => handleSelectFirstPlace(e.target.value)}
+                  className="w-full border border-amber-400/80 rounded-xl px-3 py-2 text-sm bg-white font-semibold text-on-surface focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 shadow-sm cursor-pointer"
+                >
+                  {order.map((slot, idx) => (
+                    <option key={slot.id} value={slot.id}>
+                      {idx === 0 ? "🥇 [1ère Place actuelle] " : `#${idx + 1} - `}{slot.beneficiaryName} ({slot.name})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <p className="font-label-sm text-label-sm text-on-surface-variant mb-3">{t("dragToReorder")}</p>
+
             <div className="flex-grow flex flex-col gap-2 mb-4">
               {order.map((m, index) => (
                 <div
@@ -936,25 +1030,67 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                     if (dragIndex !== null && dragIndex !== index) moveItem(dragIndex, index);
                     setDragIndex(null);
                   }}
-                  className="flex items-center bg-surface-container-lowest border border-outline-variant/50 p-3 rounded-lg shadow-sm cursor-grab active:cursor-grabbing hover:bg-surface-container-low transition-colors"
+                  className={`flex items-center p-3 rounded-lg shadow-sm cursor-grab active:cursor-grabbing hover:bg-surface-container-low transition-colors ${
+                    index === 0
+                      ? "bg-amber-50/70 border-2 border-amber-400/70"
+                      : "bg-surface-container-lowest border border-outline-variant/50"
+                  }`}
                 >
-                  <span className="material-symbols-outlined text-outline mr-3">drag_indicator</span>
-                  <div className="w-8 h-8 rounded bg-secondary-fixed-dim/30 text-on-secondary-fixed-variant flex items-center justify-center font-label-md text-label-md mr-3 font-bold">
+                  <span className="material-symbols-outlined text-outline mr-2.5">drag_indicator</span>
+                  <div
+                    className={`w-8 h-8 rounded flex items-center justify-center font-label-md text-label-md mr-2.5 font-bold flex-shrink-0 ${
+                      index === 0
+                        ? "bg-amber-200 text-amber-900 shadow-sm"
+                        : "bg-secondary-fixed-dim/30 text-on-secondary-fixed-variant"
+                    }`}
+                  >
                     {index + 1}
                   </div>
                   <div className="flex-grow min-w-0">
-                    <p className="font-label-md text-label-md text-on-surface truncate">{m.beneficiaryName}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="font-label-md text-label-md text-on-surface font-semibold truncate">{m.beneficiaryName}</p>
+                      {index === 0 && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                          {t("firstPlaceBadge")}
+                        </span>
+                      )}
+                    </div>
                     <p className="font-label-sm text-label-sm text-on-surface-variant truncate">
                       {m.name}
                       {` — ~${getCycleDateForRound(session.type as TontineType, new Date(session.startDate), index + 1).toLocaleDateString("en-US", { day: "numeric", month: "short" })}`}
                     </p>
                     {!m.hasPhone && <p className="font-label-sm text-label-sm text-error">{t("noWhatsappOnFile")}</p>}
                   </div>
-                  <div className="flex flex-col gap-0.5">
+
+                  {/* Direct Position Selector Dropdown per slot */}
+                  <div className="flex items-center gap-1.5 ml-2 mr-1 flex-shrink-0">
+                    <span className="text-[11px] text-on-surface-variant font-medium hidden sm:inline">{t("positionLabel")} :</span>
+                    <select
+                      value={index + 1}
+                      onChange={(e) => {
+                        const newPos = Number(e.target.value) - 1;
+                        moveItem(index, newPos);
+                      }}
+                      aria-label={`${t("positionLabel")} ${m.beneficiaryName}`}
+                      className={`border rounded-lg px-2 py-1 text-xs font-numeric-data font-bold bg-white text-on-surface focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer ${
+                        index === 0
+                          ? "border-amber-500 bg-amber-50 text-amber-900 font-extrabold"
+                          : "border-outline-variant/60"
+                      }`}
+                    >
+                      {order.map((_, i) => (
+                        <option key={i + 1} value={i + 1}>
+                          #{i + 1} {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-0.5 flex-shrink-0">
                     <button
                       aria-label={t("moveUp")}
                       onClick={() => moveItem(index, index - 1)}
-                      className="text-outline hover:text-primary disabled:opacity-30"
+                      className="text-outline hover:text-primary disabled:opacity-30 p-0.5"
                       disabled={index === 0}
                     >
                       <span className="material-symbols-outlined text-[18px]">keyboard_arrow_up</span>
@@ -962,7 +1098,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                     <button
                       aria-label={t("moveDown")}
                       onClick={() => moveItem(index, index + 1)}
-                      className="text-outline hover:text-primary disabled:opacity-30"
+                      className="text-outline hover:text-primary disabled:opacity-30 p-0.5"
                       disabled={index === order.length - 1}
                     >
                       <span className="material-symbols-outlined text-[18px]">keyboard_arrow_down</span>
@@ -971,14 +1107,40 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                 </div>
               ))}
             </div>
-            <button
-              onClick={publishRanking}
-              disabled={publishing || order.length === 0 || !drawUnlocked}
-              title={drawUnlocked ? undefined : t("drawUnlocksAt", { date: drawUnlocksAtLabel })}
-              className="w-full bg-primary text-on-primary font-label-md text-label-md py-3 rounded-lg hover:opacity-90 active:scale-95 transition-all shadow-sm mt-auto disabled:opacity-60"
-            >
-              {publishing ? t("publishingEllipsis") : drawUnlocked ? t("publishOfficialRanking") : t("drawUnlocksAt", { date: drawUnlocksAtLabel })}
-            </button>
+
+            <div className="flex flex-col sm:flex-row gap-2 mt-auto pt-2">
+              <button
+                type="button"
+                onClick={savePositionsOnly}
+                disabled={savingPositions || order.length === 0}
+                className="flex-1 px-4 py-2.5 rounded-xl border-2 border-primary/40 text-primary hover:bg-primary/5 font-label-md text-label-md transition-all font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-sm"
+              >
+                <span className="material-symbols-outlined text-[18px]">save</span>
+                {savingPositions ? t("savingPositionsAction") : t("savePositionsAction")}
+              </button>
+
+              {session.status === "DRAFT" ? (
+                <button
+                  type="button"
+                  onClick={startDrawingPhase}
+                  disabled={startingDraw || order.length === 0}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-on-primary font-label-md text-label-md hover:bg-primary/95 transition-all shadow-sm font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">casino</span>
+                  {startingDraw ? t("startingEllipsis") : t("startDrawingPhase")}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={publishRanking}
+                  disabled={publishing || order.length === 0}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-on-primary font-label-md text-label-md hover:bg-primary/95 transition-all shadow-sm font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">publish</span>
+                  {publishing ? t("publishingEllipsis") : t("publishOfficialRanking")}
+                </button>
+              )}
+            </div>
           </section>
 
           <section className="bg-primary text-on-primary rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4 relative overflow-hidden">

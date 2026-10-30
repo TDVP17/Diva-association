@@ -11,7 +11,7 @@ import { TutorialPopup } from "@/components/tutorial-popup";
 import { NotificationBadgeSync } from "@/components/notification-badge-sync";
 import { PushPermissionPrompt } from "@/components/push-permission-prompt";
 import { OfflineDraftSync } from "@/components/offline-draft-sync";
-import { WhatsAppPhonePrompt } from "@/components/whatsapp-phone-prompt";
+import { WhatsAppPhonePrompt, WhatsAppPhoneBanner } from "@/components/whatsapp-phone-prompt";
 import { InactivityAutoLogout } from "@/components/inactivity-auto-logout";
 import { AppLockGate } from "@/components/app-lock-gate";
 import { isAdminRole } from "@/lib/constants";
@@ -35,7 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const [dbUser, unreadMessages, unreadNotifList, unpaidFines, totalCotisations] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { avatar: true, image: true, phone: true, isBanned: true },
+      select: { avatar: true, image: true, phone: true, isBanned: true, email: true },
     }),
     prisma.chatMessage.count({ where: { receiverId: session.user.id, readAt: null } }),
     prisma.notification.findMany({
@@ -72,6 +72,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     "/notifications": unreadNotifications,
   };
 
+  const userEmail = dbUser?.email ?? session.user.email ?? "";
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <TopAppBar
@@ -83,6 +85,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <MemberSidebar lang={lang} badges={navBadges} />
       <div className="flex-1 pb-24 md:pb-8 md:pl-60">
         <BackBar lang={lang} area="member" />
+        <WhatsAppPhoneBanner lang={lang} hasPhone={!!dbUser?.phone} userEmail={userEmail} />
         {children}
       </div>
       <BottomNav lang={lang} badges={navBadges} />
@@ -90,7 +93,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <PushPermissionPrompt lang={lang} />
       <OfflineDraftSync lang={lang} />
       <NotificationBadgeSync />
-      <WhatsAppPhonePrompt lang={lang} hasPhone={!!dbUser?.phone} />
+      <WhatsAppPhonePrompt lang={lang} hasPhone={!!dbUser?.phone} userEmail={userEmail} />
       <InactivityAutoLogout />
       <AppLockGate lang={lang} />
     </div>

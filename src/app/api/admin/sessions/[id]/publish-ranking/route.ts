@@ -3,7 +3,10 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
 
-const bodySchema = z.object({ order: z.array(z.string().min(1)).min(1) });
+const bodySchema = z.object({
+  order: z.array(z.string().min(1)).min(1),
+  saveOnly: z.boolean().optional(),
+});
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin();
@@ -22,11 +25,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!tontineSession) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
-  if (!tontineSession.drawDate || new Date() < tontineSession.drawDate) {
-    return NextResponse.json(
-      { error: "The draw is not unlocked yet — check the cotisation's draw date" },
-      { status: 403 },
-    );
+
+  const isSaveOnly = parsed.data.saveOnly || tontineSession.status === "DRAFT";
+  if (!isSaveOnly && (!tontineSession.drawDate || new Date() < tontineSession.drawDate)) {
+    // If admin is publishing the official ranking, align drawDate
+    await prisma.tontineSession.update({ where: { id }, data: { drawDate: new Date() } });
   }
 
   const existingIds = new Set(tontineSession.memberships.flatMap((m) => m.slots.map((s) => s.id)));
@@ -47,10 +50,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         data: { officialPosition: index + 1 },
       }),
     ),
-    ...(tontineSession.status === "DRAWING"
+    ...(tontineSession.status === "DRAWING" && !isSaveOnly
       ? [prisma.tontineSession.update({ where: { id }, data: { status: "ACTIVE" } })]
       : []),
   ]);
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, saved: isSaveOnly });
 }
