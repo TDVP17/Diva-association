@@ -390,8 +390,16 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   }
 
   const [savingPositions, setSavingPositions] = useState(false);
-  const [openSlotDropdown, setOpenSlotDropdown] = useState<number | null>(null);
+  const [selectedPlaceIndex, setSelectedPlaceIndex] = useState<number>(0);
+  const [memberSearchQuery, setMemberSearchQuery] = useState("");
   const [positionsFeedback, setPositionsFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  function handlePlaceMember(slotId: string) {
+    assignMemberToPosition(slotId, selectedPlaceIndex);
+    if (selectedPlaceIndex < order.length - 1) {
+      setSelectedPlaceIndex((prev) => prev + 1);
+    }
+  }
 
   async function savePositionsOnly() {
     setSavingPositions(true);
@@ -1026,214 +1034,277 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
               </div>
             )}
 
-            {/* Header with instructions & quick shuffle options */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3.5">
-              <div>
-                <p className="font-label-md text-label-md font-bold text-on-surface flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-primary text-[20px]">assignment_ind</span>
-                  {t("assignPositionsTitle")}
-                </p>
-                <p className="font-label-sm text-label-sm text-on-surface-variant">
-                  {t("assignPositionsSubtitle")}
-                </p>
+            {/* Header / Mode Deux Listes Action Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 p-3.5 rounded-2xl bg-surface-container-low border border-outline-variant/60 shadow-sm">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <span className="material-symbols-outlined text-[24px]">view_column</span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-sm sm:text-base text-on-surface">
+                      {t("twoListsTitle")}
+                    </p>
+                    <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      Simple & Rapide
+                    </span>
+                  </div>
+                  <p className="text-xs text-on-surface-variant mt-0.5">
+                    {t("membersColumnSubtitle")}
+                  </p>
+                </div>
               </div>
 
-              {order.length > 1 && (
-                <div className="flex items-center gap-1.5 self-start sm:self-center flex-wrap">
-                  {order.length > 2 && (
-                    <button
-                      type="button"
-                      onClick={shuffleRemainingPositions}
-                      title="Conserve la 1ère place et mélange aléatoirement les autres places"
-                      className="px-2.5 py-1 rounded-lg border border-outline-variant text-[12px] font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors flex items-center gap-1 cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[15px]">shuffle</span>
-                      {t("shuffleOthersAction")}
-                    </button>
-                  )}
+              <div className="flex items-center gap-1.5 flex-wrap self-start sm:self-center">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPlaceIndex(0)}
+                  title="Repartir de la 1ère place"
+                  className="px-3 py-1.5 rounded-xl bg-white border border-outline-variant text-xs font-bold text-primary hover:bg-primary/5 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+                  {t("startFromFirstAction")}
+                </button>
+                {order.length > 2 && (
                   <button
                     type="button"
-                    onClick={shuffleAllPositions}
-                    title="Mélange aléatoirement toutes les places"
-                    className="px-2.5 py-1 rounded-lg border border-outline-variant text-[12px] font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors flex items-center gap-1 cursor-pointer"
+                    onClick={shuffleRemainingPositions}
+                    title="Conserve la 1ère place et mélange aléatoirement les autres places"
+                    className="px-3 py-1.5 rounded-xl bg-white border border-outline-variant text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
                   >
-                    <span className="material-symbols-outlined text-[15px]">casino</span>
-                    {t("shuffleAllAction")}
+                    <span className="material-symbols-outlined text-[15px]">shuffle</span>
+                    {t("shuffleOthersAction")}
                   </button>
-                </div>
-              )}
+                )}
+                <button
+                  type="button"
+                  onClick={shuffleAllPositions}
+                  title="Mélange aléatoirement toutes les places"
+                  className="px-3 py-1.5 rounded-xl bg-white border border-outline-variant text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-[15px]">casino</span>
+                  {t("shuffleAllAction")}
+                </button>
+              </div>
             </div>
 
-            {/* List of positions, each with a direct member dropdown selector */}
-            <div className="flex-grow flex flex-col gap-2.5 mb-4">
-              {order.map((m, index) => {
-                const isFirst = index === 0;
-                const isSecond = index === 1;
-                const isThird = index === 2;
-                return (
-                  <div
-                    key={m.id}
-                    className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl transition-all shadow-sm ${
-                      isFirst
-                        ? "bg-amber-50/80 border-2 border-amber-400/90 ring-1 ring-amber-300/40"
-                        : "bg-surface-container-lowest border border-outline-variant/60 hover:border-outline-variant"
-                    }`}
-                  >
-                    {/* Position indicator */}
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      <div
-                        className={`w-12 h-11 rounded-xl flex flex-col items-center justify-center font-bold font-numeric-data shadow-sm flex-shrink-0 ${
-                          isFirst
-                            ? "bg-amber-400 text-amber-950 ring-2 ring-amber-300"
-                            : isSecond
-                            ? "bg-slate-200 text-slate-800"
-                            : isThird
-                            ? "bg-amber-700/20 text-amber-900"
-                            : "bg-surface-container-high text-on-surface-variant"
-                        }`}
-                      >
-                        <span className="text-[11px] leading-none">
-                          {isFirst ? "🥇" : isSecond ? "🥈" : isThird ? "🥉" : "#"}
-                        </span>
-                        <span className="text-sm font-black leading-none mt-0.5">{index + 1}</span>
-                      </div>
+            {/* TWO-COLUMN GRID: Left = Members, Right = Payout Places */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4 items-start">
 
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-bold text-sm text-on-surface">
-                            {isFirst ? "🥇 1ère Place" : `Place #${index + 1}`}
-                          </span>
-                          {isFirst && (
-                            <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-200 text-amber-950 border border-amber-300">
-                              {t("firstBeneficiaryBadge")}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-on-surface-variant">
-                          ~{getCycleDateForRound(session.type as TontineType, new Date(session.startDate), index + 1).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
-                        </p>
-                      </div>
-                    </div>
+              {/* COLONNE 1 (Gauche) : Liste des participants */}
+              <div className="lg:col-span-5 flex flex-col gap-2.5 p-4 rounded-2xl bg-surface-container-lowest border-2 border-outline-variant/60 shadow-sm">
+                <div className="flex items-center justify-between gap-2 pb-2 border-b border-surface-variant/40">
+                  <div className="flex items-center gap-1.5 font-bold text-sm text-on-surface">
+                    <span className="material-symbols-outlined text-primary text-[20px]">group</span>
+                    <span>{t("membersColumnTitle")}</span>
+                    <span className="text-xs font-semibold text-on-surface-variant">({order.length})</span>
+                  </div>
+                  <span className="text-[11px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                    Cliquez pour placer
+                  </span>
+                </div>
 
-                    {/* Member Selector Dropdown & reorder arrows */}
-                    <div className="flex items-center gap-2 flex-grow sm:max-w-md w-full relative">
-                      {/* Backdrop for closing open dropdown */}
-                      {openSlotDropdown === index && (
-                        <div
-                          className="fixed inset-0 z-30"
-                          onClick={() => setOpenSlotDropdown(null)}
-                        />
-                      )}
+                {/* Recherche rapide si plusieurs participants */}
+                {order.length > 5 && (
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant text-[16px]">
+                      search
+                    </span>
+                    <input
+                      type="text"
+                      value={memberSearchQuery}
+                      onChange={(e) => setMemberSearchQuery(e.target.value)}
+                      placeholder={t("searchMemberPlaceholder")}
+                      className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-outline-variant bg-white focus:outline-none focus:ring-1 focus:ring-primary font-medium"
+                    />
+                  </div>
+                )}
 
-                      <div className="relative flex-grow">
-                        {/* Trigger button */}
+                <div className="flex flex-col gap-2 max-h-[540px] overflow-y-auto pr-1">
+                  {order
+                    .filter((m) => {
+                      if (!memberSearchQuery.trim()) return true;
+                      const q = memberSearchQuery.toLowerCase();
+                      return (
+                        m.beneficiaryName.toLowerCase().includes(q) ||
+                        m.name.toLowerCase().includes(q)
+                      );
+                    })
+                    .map((m) => {
+                      const currentPos = order.findIndex((s) => s.id === m.id);
+                      const isCurrentTarget = currentPos === selectedPlaceIndex;
+                      const isFirst = currentPos === 0;
+
+                      return (
                         <button
+                          key={m.id}
                           type="button"
-                          onClick={() => setOpenSlotDropdown(openSlotDropdown === index ? null : index)}
-                          aria-label={`Place #${index + 1}`}
-                          className={`w-full flex items-center justify-between border-2 rounded-xl pl-3 pr-2.5 py-2.5 text-sm font-bold bg-white text-on-surface focus:outline-none focus:ring-2 focus:ring-primary shadow-sm cursor-pointer transition-all text-left ${
-                            isFirst
-                              ? "border-amber-500 bg-amber-50/40 text-amber-950 ring-1 ring-amber-300/50"
-                              : "border-outline-variant hover:border-primary/60"
+                          onClick={() => handlePlaceMember(m.id)}
+                          className={`w-full p-2.5 rounded-xl border-2 text-left flex items-center justify-between gap-2.5 transition-all cursor-pointer shadow-sm active:scale-[0.98] ${
+                            isCurrentTarget
+                              ? "border-primary bg-primary/10 ring-2 ring-primary/40"
+                              : isFirst
+                              ? "border-amber-400 bg-amber-50/70 hover:bg-amber-100"
+                              : "border-outline-variant/60 bg-white hover:border-primary/60 hover:bg-surface-container-low"
                           }`}
                         >
-                          <div className="flex items-center gap-2 min-w-0 pr-1">
-                            <span className="material-symbols-outlined text-emerald-600 text-[18px] flex-shrink-0">
-                              check_circle
-                            </span>
-                            <span className="truncate">
-                              {m.beneficiaryName} ({m.name})
-                            </span>
-                          </div>
-                          <span className="material-symbols-outlined text-on-surface-variant text-[20px] flex-shrink-0 transition-transform">
-                            {openSlotDropdown === index ? "expand_less" : "unfold_more"}
-                          </span>
-                        </button>
-
-                        {/* Dropdown Menu with checkboxes */}
-                        {openSlotDropdown === index && (
-                          <div className="absolute left-0 right-0 top-full mt-1.5 z-40 bg-white rounded-xl shadow-2xl border-2 border-primary/20 max-h-64 overflow-y-auto py-1 animate-in fade-in zoom-in-95">
-                            <div className="px-3 py-1.5 border-b border-surface-variant/40 bg-surface-container-lowest flex items-center justify-between text-[11px] font-bold text-on-surface-variant">
-                              <span>Place #{index + 1}</span>
-                              <span className="text-emerald-700">✓ {t("checkedBadge")}</span>
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center flex-shrink-0">
+                              {m.beneficiaryName.charAt(0).toUpperCase()}
                             </div>
-                            {order.map((candidate, candIdx) => {
-                              const isSelected = candidate.id === m.id;
-                              return (
-                                <button
-                                  key={candidate.id}
-                                  type="button"
-                                  onClick={() => {
-                                    assignMemberToPosition(candidate.id, index);
-                                    setOpenSlotDropdown(null);
-                                  }}
-                                  className={`w-full px-3 py-2 flex items-center justify-between gap-2.5 text-left transition-colors cursor-pointer text-sm border-b border-surface-variant/20 last:border-b-0 ${
-                                    isSelected
-                                      ? "bg-emerald-50 text-emerald-950 font-bold"
-                                      : "hover:bg-surface-container-low text-on-surface font-medium"
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <span
-                                      className={`material-symbols-outlined text-[20px] flex-shrink-0 ${
-                                        isSelected ? "text-emerald-600 font-bold" : "text-outline-variant"
-                                      }`}
-                                    >
-                                      {isSelected ? "check_box" : "check_box_outline_blank"}
-                                    </span>
-                                    <div className="min-w-0">
-                                      <p className="truncate leading-tight">
-                                        {candidate.beneficiaryName} ({candidate.name})
-                                      </p>
-                                      {candIdx !== index && (
-                                        <p className="text-[11px] text-on-surface-variant mt-0.5">
-                                          {t("currentlyAtPlace", { pos: String(candIdx + 1) })}
-                                        </p>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  {isSelected ? (
-                                    <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 flex-shrink-0 flex items-center gap-1">
-                                      <span className="material-symbols-outlined text-[13px]">check</span>
-                                      {t("checkedBadge")}
-                                    </span>
-                                  ) : (
-                                    <span className="text-xs text-on-surface-variant font-numeric-data flex-shrink-0">
-                                      #{candIdx + 1}
-                                    </span>
-                                  )}
-                                </button>
-                              );
-                            })}
+                            <div className="min-w-0">
+                              <p className="font-bold text-xs sm:text-sm text-on-surface truncate">
+                                {m.beneficiaryName}
+                              </p>
+                              <p className="text-[11px] text-on-surface-variant truncate">
+                                {m.name} {!m.hasPhone && <span className="text-error font-medium">⚠️ Pas WhatsApp</span>}
+                              </p>
+                            </div>
                           </div>
-                        )}
-                      </div>
 
-                      <div className="flex items-center gap-0.5 flex-shrink-0">
-                        <button
-                          type="button"
-                          aria-label={t("moveUp")}
-                          onClick={() => moveItem(index, index - 1)}
-                          className="w-8 h-8 rounded-lg border border-outline-variant/60 hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-primary disabled:opacity-25 disabled:pointer-events-none transition-colors cursor-pointer"
-                          disabled={index === 0}
-                        >
-                          <span className="material-symbols-outlined text-[18px]">keyboard_arrow_up</span>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <span
+                              className={`px-2 py-0.5 rounded-lg text-[11px] font-extrabold ${
+                                isFirst
+                                  ? "bg-amber-300 text-amber-950"
+                                  : currentPos === 1
+                                  ? "bg-slate-200 text-slate-800"
+                                  : currentPos === 2
+                                  ? "bg-amber-700/20 text-amber-900"
+                                  : "bg-surface-container-high text-on-surface-variant"
+                              }`}
+                            >
+                              Place #{currentPos + 1}
+                            </span>
+                            <span className="material-symbols-outlined text-primary text-[18px]">
+                              arrow_forward
+                            </span>
+                          </div>
                         </button>
-                        <button
-                          type="button"
-                          aria-label={t("moveDown")}
-                          onClick={() => moveItem(index, index + 1)}
-                          className="w-8 h-8 rounded-lg border border-outline-variant/60 hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-primary disabled:opacity-25 disabled:pointer-events-none transition-colors cursor-pointer"
-                          disabled={index === order.length - 1}
-                        >
-                          <span className="material-symbols-outlined text-[18px]">keyboard_arrow_down</span>
-                        </button>
-                      </div>
-                    </div>
+                      );
+                    })}
+                </div>
+              </div>
+
+              {/* COLONNE 2 (Droite) : Ordre des Places */}
+              <div className="lg:col-span-7 flex flex-col gap-2.5 p-4 rounded-2xl bg-surface-container-lowest border-2 border-outline-variant/60 shadow-sm">
+                <div className="flex items-center justify-between gap-2 pb-2 border-b border-surface-variant/40">
+                  <div className="flex items-center gap-1.5 font-bold text-sm text-on-surface">
+                    <span className="material-symbols-outlined text-primary text-[20px]">format_list_numbered</span>
+                    <span>{t("placesColumnTitle")}</span>
                   </div>
-                );
-              })}
+
+                  <div className="flex items-center gap-1 text-xs font-black text-primary bg-primary/10 border border-primary/20 px-3 py-1 rounded-full shadow-sm">
+                    <span className="material-symbols-outlined text-[16px]">touch_app</span>
+                    <span>Place ciblée : #{selectedPlaceIndex + 1} {selectedPlaceIndex === 0 ? "🥇" : ""}</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2.5 max-h-[540px] overflow-y-auto pr-1">
+                  {order.map((m, index) => {
+                    const isTargeted = selectedPlaceIndex === index;
+                    const isFirst = index === 0;
+                    const isSecond = index === 1;
+                    const isThird = index === 2;
+
+                    return (
+                      <div
+                        key={m.id}
+                        onClick={() => setSelectedPlaceIndex(index)}
+                        className={`p-3 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 shadow-sm ${
+                          isTargeted
+                            ? "border-primary bg-primary/5 ring-2 ring-primary ring-offset-2 shadow-md"
+                            : isFirst
+                            ? "border-amber-400 bg-amber-50/70 hover:bg-amber-100/50"
+                            : "border-outline-variant/60 bg-white hover:border-primary/40"
+                        }`}
+                      >
+                        {/* Numéro de Place & Badge */}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className={`w-11 h-11 rounded-xl flex flex-col items-center justify-center font-bold font-numeric-data shadow-sm flex-shrink-0 ${
+                              isFirst
+                                ? "bg-amber-400 text-amber-950 ring-2 ring-amber-300"
+                                : isSecond
+                                ? "bg-slate-200 text-slate-800"
+                                : isThird
+                                ? "bg-amber-700/20 text-amber-900"
+                                : "bg-surface-container-high text-on-surface-variant"
+                            }`}
+                          >
+                            <span className="text-[11px] leading-none">
+                              {isFirst ? "🥇" : isSecond ? "🥈" : isThird ? "🥉" : "#"}
+                            </span>
+                            <span className="text-sm font-black leading-none mt-0.5">{index + 1}</span>
+                          </div>
+
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-sm text-on-surface truncate">
+                                {m.beneficiaryName}
+                              </span>
+                              <span className="text-xs text-on-surface-variant truncate">
+                                ({m.name})
+                              </span>
+                              {isFirst && (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-200 text-amber-950 border border-amber-300">
+                                  {t("firstBeneficiaryBadge")}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-on-surface-variant mt-0.5 flex items-center gap-2">
+                              <span>
+                                ~{getCycleDateForRound(session.type as TontineType, new Date(session.startDate), index + 1).toLocaleDateString("en-US", { day: "numeric", month: "short" })}
+                              </span>
+                              {isTargeted && (
+                                <span className="font-bold text-primary flex items-center gap-0.5 bg-primary/10 px-1.5 py-0.5 rounded">
+                                  {t("activeTargetPlaceBadge")}
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Actions à droite de la place */}
+                        <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPlaceIndex(index)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-sm ${
+                              isTargeted
+                                ? "bg-primary text-on-primary ring-2 ring-primary/40"
+                                : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
+                            }`}
+                          >
+                            {isTargeted ? "Ciblée ✓" : "Cibler"}
+                          </button>
+
+                          <div className="flex items-center gap-0.5">
+                            <button
+                              type="button"
+                              aria-label={t("moveUp")}
+                              onClick={() => moveItem(index, index - 1)}
+                              className="w-7 h-7 rounded-lg border border-outline-variant/60 hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-primary disabled:opacity-20 disabled:pointer-events-none transition-colors cursor-pointer"
+                              disabled={index === 0}
+                            >
+                              <span className="material-symbols-outlined text-[16px]">keyboard_arrow_up</span>
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={t("moveDown")}
+                              onClick={() => moveItem(index, index + 1)}
+                              className="w-7 h-7 rounded-lg border border-outline-variant/60 hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-primary disabled:opacity-20 disabled:pointer-events-none transition-colors cursor-pointer"
+                              disabled={index === order.length - 1}
+                            >
+                              <span className="material-symbols-outlined text-[16px]">keyboard_arrow_down</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-2 mt-auto pt-2">

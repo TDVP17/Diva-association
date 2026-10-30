@@ -1102,6 +1102,14 @@ export const translations = {
     placeLabel: "Position",
     checkedBadge: "Checked ✓",
     currentlyAtPlace: "(Currently Position #{pos})",
+    twoListsTitle: "Two-List Easy Ranking",
+    membersColumnTitle: "1. Participants",
+    membersColumnSubtitle: "Click a member on the left to place them in the targeted slot on the right:",
+    placesColumnTitle: "2. Payout Order",
+    placesColumnSubtitle: "Targeted place gets filled next:",
+    activeTargetPlaceBadge: "👈 Next place to fill",
+    searchMemberPlaceholder: "Search participant...",
+    startFromFirstAction: "Restart from Place #1",
 
     // Cotisation Video Design & Celebration
     memberPaidCelebrationQuote: "“Just contributed, thanks team!”",
@@ -2247,6 +2255,14 @@ export const translations = {
     placeLabel: "Place",
     checkedBadge: "Coché ✓",
     currentlyAtPlace: "(Actuellement Place #{pos})",
+    twoListsTitle: "Classement facile en deux listes",
+    membersColumnTitle: "1. Participants",
+    membersColumnSubtitle: "Cliquez sur un membre pour le placer sur la place ciblée à droite :",
+    placesColumnTitle: "2. Ordre de bouffe",
+    placesColumnSubtitle: "La place ciblée reçoit le prochain membre cliqué :",
+    activeTargetPlaceBadge: "👈 Prochaine place à attribuer",
+    searchMemberPlaceholder: "Rechercher un participant...",
+    startFromFirstAction: "Repartir de la Place #1",
 
     // Cotisation Video Design & Celebration
     memberPaidCelebrationQuote: "« J'ai cotisé, merci la team ! »",
