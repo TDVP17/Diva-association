@@ -351,10 +351,42 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     });
   }
 
-  function handleSelectFirstPlace(slotId: string) {
-    const fromIndex = order.findIndex((s) => s.id === slotId);
-    if (fromIndex <= 0) return;
-    moveItem(fromIndex, 0);
+  function assignMemberToPosition(selectedSlotId: string, targetIndex: number) {
+    setOrder((current) => {
+      const currentIndex = current.findIndex((s) => s.id === selectedSlotId);
+      if (currentIndex === -1 || currentIndex === targetIndex) return current;
+      const next = [...current];
+      // Clean, predictable 2-way swap
+      const temp = next[targetIndex];
+      next[targetIndex] = next[currentIndex];
+      next[currentIndex] = temp;
+      return next;
+    });
+  }
+
+  function shuffleRemainingPositions() {
+    if (order.length <= 2) return;
+    setOrder((current) => {
+      const first = current[0];
+      const rest = [...current.slice(1)];
+      for (let i = rest.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [rest[i], rest[j]] = [rest[j], rest[i]];
+      }
+      return [first, ...rest];
+    });
+  }
+
+  function shuffleAllPositions() {
+    if (order.length <= 1) return;
+    setOrder((current) => {
+      const next = [...current];
+      for (let i = next.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [next[i], next[j]] = [next[j], next[i]];
+      }
+      return next;
+    });
   }
 
   const [savingPositions, setSavingPositions] = useState(false);
@@ -993,119 +1025,143 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
               </div>
             )}
 
-            {/* Quick 1st Place Selector Card */}
-            {order.length > 0 && (
-              <div className="bg-gradient-to-r from-amber-500/10 via-amber-400/10 to-emerald-500/10 border border-amber-500/30 rounded-xl p-3.5 mb-4 shadow-sm">
-                <div className="flex items-center gap-2 mb-1.5 text-amber-950 font-bold text-sm">
-                  <span className="material-symbols-outlined text-amber-600 text-[20px]">military_tech</span>
-                  <span>{t("selectFirstPlaceTitle")}</span>
-                </div>
-                <p className="text-xs text-on-surface-variant mb-2.5">
-                  {t("selectFirstPlaceDesc")}
+            {/* Header with instructions & quick shuffle options */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3.5">
+              <div>
+                <p className="font-label-md text-label-md font-bold text-on-surface flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-primary text-[20px]">assignment_ind</span>
+                  {t("assignPositionsTitle")}
                 </p>
-                <select
-                  value={order[0]?.id || ""}
-                  onChange={(e) => handleSelectFirstPlace(e.target.value)}
-                  className="w-full border border-amber-400/80 rounded-xl px-3 py-2 text-sm bg-white font-semibold text-on-surface focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 shadow-sm cursor-pointer"
-                >
-                  {order.map((slot, idx) => (
-                    <option key={slot.id} value={slot.id}>
-                      {idx === 0 ? "🥇 [1ère Place actuelle] " : `#${idx + 1} - `}{slot.beneficiaryName} ({slot.name})
-                    </option>
-                  ))}
-                </select>
+                <p className="font-label-sm text-label-sm text-on-surface-variant">
+                  {t("assignPositionsSubtitle")}
+                </p>
               </div>
-            )}
 
-            <p className="font-label-sm text-label-sm text-on-surface-variant mb-3">{t("dragToReorder")}</p>
+              {order.length > 1 && (
+                <div className="flex items-center gap-1.5 self-start sm:self-center flex-wrap">
+                  {order.length > 2 && (
+                    <button
+                      type="button"
+                      onClick={shuffleRemainingPositions}
+                      title="Conserve la 1ère place et mélange aléatoirement les autres places"
+                      className="px-2.5 py-1 rounded-lg border border-outline-variant text-[12px] font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">shuffle</span>
+                      {t("shuffleOthersAction")}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={shuffleAllPositions}
+                    title="Mélange aléatoirement toutes les places"
+                    className="px-2.5 py-1 rounded-lg border border-outline-variant text-[12px] font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">casino</span>
+                    {t("shuffleAllAction")}
+                  </button>
+                </div>
+              )}
+            </div>
 
-            <div className="flex-grow flex flex-col gap-2 mb-4">
-              {order.map((m, index) => (
-                <div
-                  key={m.id}
-                  draggable
-                  onDragStart={() => setDragIndex(index)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => {
-                    if (dragIndex !== null && dragIndex !== index) moveItem(dragIndex, index);
-                    setDragIndex(null);
-                  }}
-                  className={`flex items-center p-3 rounded-lg shadow-sm cursor-grab active:cursor-grabbing hover:bg-surface-container-low transition-colors ${
-                    index === 0
-                      ? "bg-amber-50/70 border-2 border-amber-400/70"
-                      : "bg-surface-container-lowest border border-outline-variant/50"
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-outline mr-2.5">drag_indicator</span>
+            {/* List of positions, each with a direct member dropdown selector */}
+            <div className="flex-grow flex flex-col gap-2.5 mb-4">
+              {order.map((m, index) => {
+                const isFirst = index === 0;
+                const isSecond = index === 1;
+                const isThird = index === 2;
+                return (
                   <div
-                    className={`w-8 h-8 rounded flex items-center justify-center font-label-md text-label-md mr-2.5 font-bold flex-shrink-0 ${
-                      index === 0
-                        ? "bg-amber-200 text-amber-900 shadow-sm"
-                        : "bg-secondary-fixed-dim/30 text-on-secondary-fixed-variant"
+                    key={m.id}
+                    className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl transition-all shadow-sm ${
+                      isFirst
+                        ? "bg-amber-50/80 border-2 border-amber-400/90 ring-1 ring-amber-300/40"
+                        : "bg-surface-container-lowest border border-outline-variant/60 hover:border-outline-variant"
                     }`}
                   >
-                    {index + 1}
-                  </div>
-                  <div className="flex-grow min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <p className="font-label-md text-label-md text-on-surface font-semibold truncate">{m.beneficiaryName}</p>
-                      {index === 0 && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                          {t("firstPlaceBadge")}
+                    {/* Position indicator */}
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <div
+                        className={`w-12 h-11 rounded-xl flex flex-col items-center justify-center font-bold font-numeric-data shadow-sm flex-shrink-0 ${
+                          isFirst
+                            ? "bg-amber-400 text-amber-950 ring-2 ring-amber-300"
+                            : isSecond
+                            ? "bg-slate-200 text-slate-800"
+                            : isThird
+                            ? "bg-amber-700/20 text-amber-900"
+                            : "bg-surface-container-high text-on-surface-variant"
+                        }`}
+                      >
+                        <span className="text-[11px] leading-none">
+                          {isFirst ? "🥇" : isSecond ? "🥈" : isThird ? "🥉" : "#"}
                         </span>
-                      )}
+                        <span className="text-sm font-black leading-none mt-0.5">{index + 1}</span>
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-sm text-on-surface">
+                            {isFirst ? "🥇 1ère Place" : `Place #${index + 1}`}
+                          </span>
+                          {isFirst && (
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-200 text-amber-950 border border-amber-300">
+                              {t("firstBeneficiaryBadge")}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-on-surface-variant">
+                          ~{getCycleDateForRound(session.type as TontineType, new Date(session.startDate), index + 1).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
+                        </p>
+                      </div>
                     </div>
-                    <p className="font-label-sm text-label-sm text-on-surface-variant truncate">
-                      {m.name}
-                      {` — ~${getCycleDateForRound(session.type as TontineType, new Date(session.startDate), index + 1).toLocaleDateString("en-US", { day: "numeric", month: "short" })}`}
-                    </p>
-                    {!m.hasPhone && <p className="font-label-sm text-label-sm text-error">{t("noWhatsappOnFile")}</p>}
-                  </div>
 
-                  {/* Direct Position Selector Dropdown per slot */}
-                  <div className="flex items-center gap-1.5 ml-2 mr-1 flex-shrink-0">
-                    <span className="text-[11px] text-on-surface-variant font-medium hidden sm:inline">{t("positionLabel")} :</span>
-                    <select
-                      value={index + 1}
-                      onChange={(e) => {
-                        const newPos = Number(e.target.value) - 1;
-                        moveItem(index, newPos);
-                      }}
-                      aria-label={`${t("positionLabel")} ${m.beneficiaryName}`}
-                      className={`border rounded-lg px-2 py-1 text-xs font-numeric-data font-bold bg-white text-on-surface focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer ${
-                        index === 0
-                          ? "border-amber-500 bg-amber-50 text-amber-900 font-extrabold"
-                          : "border-outline-variant/60"
-                      }`}
-                    >
-                      {order.map((_, i) => (
-                        <option key={i + 1} value={i + 1}>
-                          #{i + 1} {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                    {/* Member Selector Dropdown & reorder arrows */}
+                    <div className="flex items-center gap-2 flex-grow sm:max-w-md w-full">
+                      <div className="relative flex-grow">
+                        <select
+                          value={m.id}
+                          onChange={(e) => assignMemberToPosition(e.target.value, index)}
+                          aria-label={`Place #${index + 1}`}
+                          className={`w-full appearance-none border-2 rounded-xl pl-3.5 pr-9 py-2.5 text-sm font-bold bg-white text-on-surface focus:outline-none focus:ring-2 focus:ring-primary shadow-sm cursor-pointer transition-all ${
+                            isFirst
+                              ? "border-amber-500 bg-amber-50/40 text-amber-950 ring-1 ring-amber-300/50"
+                              : "border-outline-variant hover:border-primary/60"
+                          }`}
+                        >
+                          {order.map((candidate) => (
+                            <option key={candidate.id} value={candidate.id}>
+                              {candidate.beneficiaryName} ({candidate.name}) {!candidate.hasPhone ? "⚠️" : ""}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant pointer-events-none text-[20px]">
+                          unfold_more
+                        </span>
+                      </div>
 
-                  <div className="flex flex-col gap-0.5 flex-shrink-0">
-                    <button
-                      aria-label={t("moveUp")}
-                      onClick={() => moveItem(index, index - 1)}
-                      className="text-outline hover:text-primary disabled:opacity-30 p-0.5"
-                      disabled={index === 0}
-                    >
-                      <span className="material-symbols-outlined text-[18px]">keyboard_arrow_up</span>
-                    </button>
-                    <button
-                      aria-label={t("moveDown")}
-                      onClick={() => moveItem(index, index + 1)}
-                      className="text-outline hover:text-primary disabled:opacity-30 p-0.5"
-                      disabled={index === order.length - 1}
-                    >
-                      <span className="material-symbols-outlined text-[18px]">keyboard_arrow_down</span>
-                    </button>
+                      <div className="flex items-center gap-0.5 flex-shrink-0">
+                        <button
+                          type="button"
+                          aria-label={t("moveUp")}
+                          onClick={() => moveItem(index, index - 1)}
+                          className="w-8 h-8 rounded-lg border border-outline-variant/60 hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-primary disabled:opacity-25 disabled:pointer-events-none transition-colors cursor-pointer"
+                          disabled={index === 0}
+                        >
+                          <span className="material-symbols-outlined text-[18px]">keyboard_arrow_up</span>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={t("moveDown")}
+                          onClick={() => moveItem(index, index + 1)}
+                          className="w-8 h-8 rounded-lg border border-outline-variant/60 hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-primary disabled:opacity-25 disabled:pointer-events-none transition-colors cursor-pointer"
+                          disabled={index === order.length - 1}
+                        >
+                          <span className="material-symbols-outlined text-[18px]">keyboard_arrow_down</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="flex flex-col sm:flex-row gap-2 mt-auto pt-2">

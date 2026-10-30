@@ -1094,6 +1094,12 @@ export const translations = {
     savePositionsAction: "Save positions",
     savingPositionsAction: "Saving positions...",
     positionsSavedSuccess: "Positions saved successfully!",
+    assignPositionsTitle: "Slot Assignment for the Draw",
+    assignPositionsSubtitle: "Select the member of your choice for each position directly:",
+    firstBeneficiaryBadge: "First Beneficiary",
+    shuffleOthersAction: "Shuffle remaining positions",
+    shuffleAllAction: "Shuffle all",
+    placeLabel: "Position",
 
     // Cotisation Video Design & Celebration
     memberPaidCelebrationQuote: "“Just contributed, thanks team!”",
@@ -2231,6 +2237,12 @@ export const translations = {
     savePositionsAction: "Enregistrer les positions",
     savingPositionsAction: "Enregistrement...",
     positionsSavedSuccess: "Positions enregistrées avec succès !",
+    assignPositionsTitle: "Attribution directe des places",
+    assignPositionsSubtitle: "Pour chaque place ci-dessous, sélectionnez directement le membre dans la liste déroulante :",
+    firstBeneficiaryBadge: "Premier bénéficiaire",
+    shuffleOthersAction: "Mélanger les autres places",
+    shuffleAllAction: "Tout mélanger",
+    placeLabel: "Place",
 
     // Cotisation Video Design & Celebration
     memberPaidCelebrationQuote: "« J'ai cotisé, merci la team ! »",
