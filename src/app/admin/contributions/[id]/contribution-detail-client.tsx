@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
@@ -118,6 +118,8 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [session, setSession] = useState<AdminSession | null>(null);
   const [order, setOrder] = useState<AdminSlot[]>([]);
+  const [assignedSlots, setAssignedSlots] = useState<(AdminSlot | null)[]>([]);
+  const [placeFilterQuery, setPlaceFilterQuery] = useState("");
   const [ledger, setLedger] = useState<Ledger | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [payoutClaims, setPayoutClaims] = useState<PayoutClaim[]>([]);
@@ -243,11 +245,31 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   const [relaunchError, setRelaunchError] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
 
+  function buildInitialAssignedSlots(slots: AdminSlot[]): (AdminSlot | null)[] {
+    const hasOfficial = slots.some((s) => s.officialPosition !== null);
+    if (hasOfficial) {
+      const arr: (AdminSlot | null)[] = Array(slots.length).fill(null);
+      slots.forEach((s) => {
+        if (s.officialPosition !== null && s.officialPosition >= 1 && s.officialPosition <= slots.length) {
+          arr[s.officialPosition - 1] = s;
+        }
+      });
+      return arr;
+    }
+    return Array(slots.length).fill(null);
+  }
+
   const refreshSession = useCallback(async () => {
     const s: AdminSession = await fetch(`/api/admin/sessions/${tontineSessionId}`).then((r) => r.json());
     if (!s.id) return;
     setSession(s);
     setOrder(s.slots);
+    setAssignedSlots((current) => {
+      if (current.length === s.slots.length && current.some((x) => x !== null)) {
+        return current.map((c) => (c ? s.slots.find((ns) => ns.id === c.id) ?? c : null));
+      }
+      return buildInitialAssignedSlots(s.slots);
+    });
   }, [tontineSessionId]);
 
   // Initial load. Inlined (rather than calling refreshSession) so each
@@ -260,6 +282,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
         if (!s.id) return;
         setSession(s);
         setOrder(s.slots);
+        setAssignedSlots(buildInitialAssignedSlots(s.slots));
       });
     fetch(`/api/admin/sessions/${tontineSessionId}/ledger`)
       .then((r) => r.json())
@@ -341,74 +364,161 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     }
   }
 
-  function moveItem(from: number, to: number) {
-    if (to < 0 || to >= order.length) return;
-    setOrder((current) => {
-      const next = [...current];
-      const [item] = next.splice(from, 1);
-      next.splice(to, 0, item);
-      return next;
+  const assignedIds = useMemo(
+    () => new Set(assignedSlots.filter((s): s is AdminSlot => s !== null).map((s) => s.id)),
+    [assignedSlots]
+  );
+  const unassignedSlots = useMemo(
+    () => (session?.slots ?? []).filter((s) => !assignedIds.has(s.id)),
+    [session?.slots, assignedIds]
+  );
+  const sortedUnassignedSlots = useMemo(
+    () => [...unassignedSlots].sort((a, b) => a.beneficiaryName.localeCompare(b.beneficiaryName)),
+    [unassignedSlots]
+  );
+
+  function handleAssignMember(positionIndex: number, slotId: string) {
+    if (!slotId) {
+      setAssignedSlots((prev) => {
+        const copy = [...prev];
+        copy[positionIndex] = null;
+        return copy;
+      });
+      return;
+    }
+    const slotToAssign = session?.slots.find((s) => s.id === slotId);
+    if (!slotToAssign) return;
+
+    setAssignedSlots((prev) => {
+      const copy = [...prev];
+      const prevIdx = copy.findIndex((s) => s?.id === slotId);
+      if (prevIdx !== -1 && prevIdx !== positionIndex) {
+        copy[prevIdx] = null;
+      }
+      copy[positionIndex] = slotToAssign;
+      return copy;
     });
   }
 
-  function assignMemberToPosition(selectedSlotId: string, targetIndex: number) {
-    setOrder((current) => {
-      const currentIndex = current.findIndex((s) => s.id === selectedSlotId);
-      if (currentIndex === -1 || currentIndex === targetIndex) return current;
-      const next = [...current];
-      // Clean, predictable 2-way swap
-      const temp = next[targetIndex];
-      next[targetIndex] = next[currentIndex];
-      next[currentIndex] = temp;
-      return next;
+  function handleUnassignMember(positionIndex: number) {
+    setAssignedSlots((prev) => {
+      const copy = [...prev];
+      copy[positionIndex] = null;
+      return copy;
     });
+  }
+
+  function autoAssignRemaining() {
+    if (!session?.slots) return;
+    const remaining = [...unassignedSlots];
+    for (let i = remaining.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+    }
+    setAssignedSlots((prev) => {
+      const copy = [...prev];
+      let remIdx = 0;
+      for (let i = 0; i < copy.length; i++) {
+        if (copy[i] === null && remIdx < remaining.length) {
+          copy[i] = remaining[remIdx];
+          remIdx++;
+        }
+      }
+      return copy;
+    });
+  }
+
+  function clearAllAssignments() {
+    if (!session?.slots) return;
+    setAssignedSlots(Array(session.slots.length).fill(null));
+  }
+
+  function fillFromRegistrationOrder() {
+    if (!session?.slots) return;
+    setAssignedSlots([...session.slots]);
   }
 
   function shuffleRemainingPositions() {
-    if (order.length <= 2) return;
-    setOrder((current) => {
-      const first = current[0];
-      const rest = [...current.slice(1)];
-      for (let i = rest.length - 1; i > 0; i--) {
+    if (assignedSlots.length <= 2) return;
+    let full = [...assignedSlots];
+    if (full.some((s) => s === null)) {
+      const remaining = [...unassignedSlots];
+      for (let i = remaining.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [rest[i], rest[j]] = [rest[j], rest[i]];
+        [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
       }
-      return [first, ...rest];
-    });
+      let r = 0;
+      full = full.map((s) => (s === null && r < remaining.length ? remaining[r++] : s));
+    }
+    const first = full[0];
+    const rest = full.slice(1);
+    for (let i = rest.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [rest[i], rest[j]] = [rest[j], rest[i]];
+    }
+    setAssignedSlots([first, ...rest]);
   }
 
   function shuffleAllPositions() {
-    if (order.length <= 1) return;
-    setOrder((current) => {
+    if (!session?.slots) return;
+    const full = [...session.slots];
+    for (let i = full.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [full[i], full[j]] = [full[j], full[i]];
+    }
+    setAssignedSlots(full);
+  }
+
+  function moveItem(from: number, to: number) {
+    if (to < 0 || to >= assignedSlots.length) return;
+    setAssignedSlots((current) => {
       const next = [...current];
-      for (let i = next.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [next[i], next[j]] = [next[j], next[i]];
-      }
+      const temp = next[from];
+      next[from] = next[to];
+      next[to] = temp;
       return next;
     });
   }
 
   const [savingPositions, setSavingPositions] = useState(false);
-  const [selectedPlaceIndex, setSelectedPlaceIndex] = useState<number>(0);
-  const [memberSearchQuery, setMemberSearchQuery] = useState("");
   const [positionsFeedback, setPositionsFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  function handlePlaceMember(slotId: string) {
-    assignMemberToPosition(slotId, selectedPlaceIndex);
-    if (selectedPlaceIndex < order.length - 1) {
-      setSelectedPlaceIndex((prev) => prev + 1);
+  function prepareOrderForSubmission(): string[] | null {
+    if (!session?.slots || session.slots.length === 0) return null;
+    let list = [...assignedSlots];
+    if (list.some((s) => s === null)) {
+      const remainingCount = session.slots.length - list.filter((s) => s !== null).length;
+      const confirm = window.confirm(
+        lang === "fr"
+          ? `Il reste encore ${remainingCount} place(s) non attribuée(s). Voulez-vous attribuer automatiquement le reste des places avant d'enregistrer ?`
+          : `There are ${remainingCount} unassigned place(s). Would you like to auto-assign the remaining places before saving?`
+      );
+      if (!confirm) return null;
+
+      const assignedNow = new Set(list.filter((s): s is AdminSlot => s !== null).map((s) => s.id));
+      const remaining = session.slots.filter((s) => !assignedNow.has(s.id));
+      for (let i = remaining.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+      }
+      let r = 0;
+      list = list.map((s) => (s === null && r < remaining.length ? remaining[r++] : s));
+      setAssignedSlots(list);
     }
+    return list.map((s) => s!.id);
   }
 
   async function savePositionsOnly() {
+    const slotIds = prepareOrderForSubmission();
+    if (!slotIds) return;
+
     setSavingPositions(true);
     setPositionsFeedback(null);
     try {
       const res = await fetch(`/api/admin/sessions/${tontineSessionId}/publish-ranking`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order: order.map((m) => m.id), saveOnly: true }),
+        body: JSON.stringify({ order: slotIds, saveOnly: true }),
       });
       if (res.ok) {
         await refreshSession();
@@ -426,13 +536,16 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   }
 
   async function publishRanking() {
+    const slotIds = prepareOrderForSubmission();
+    if (!slotIds) return;
+
     setPublishing(true);
     setPositionsFeedback(null);
     try {
       const res = await fetch(`/api/admin/sessions/${tontineSessionId}/publish-ranking`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order: order.map((m) => m.id) }),
+        body: JSON.stringify({ order: slotIds }),
       });
       if (res.ok) {
         await refreshSession();
@@ -448,13 +561,16 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   }
 
   async function startDrawingPhase() {
+    const slotIds = prepareOrderForSubmission();
+    if (!slotIds) return;
+
     setStartingDraw(true);
     setPositionsFeedback(null);
     try {
       const res = await fetch(`/api/admin/sessions/${tontineSessionId}/start-drawing`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order: order.map((m) => m.id) }),
+        body: JSON.stringify({ order: slotIds }),
       });
       if (res.ok) {
         await refreshSession();
@@ -1034,249 +1150,201 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
               </div>
             )}
 
-            {/* Header / Mode Deux Listes Action Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 p-3.5 rounded-2xl bg-surface-container-low border border-outline-variant/60 shadow-sm">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center flex-shrink-0 shadow-sm">
-                  <span className="material-symbols-outlined text-[24px]">view_column</span>
+            {/* Header / Action Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 p-4 rounded-2xl bg-surface-container-low border border-outline-variant/60 shadow-sm">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-sm sm:text-base text-on-surface">
+                    {t("rankingAssignmentTitle")}
+                  </span>
+                  <span
+                    className={`text-xs font-black px-2.5 py-0.5 rounded-full ${
+                      unassignedSlots.length === 0
+                        ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                        : "bg-primary/10 text-primary border border-primary/20"
+                    }`}
+                  >
+                    {t("assignedCountBadge", {
+                      assigned: String(assignedIds.size),
+                      total: String(session?.slots.length ?? 0),
+                    })}
+                  </span>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-bold text-sm sm:text-base text-on-surface">
-                      {t("twoListsTitle")}
-                    </p>
-                    <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                      Simple & Rapide
-                    </span>
-                  </div>
-                  <p className="text-xs text-on-surface-variant mt-0.5">
-                    {t("membersColumnSubtitle")}
-                  </p>
-                </div>
+                <p className="text-xs text-on-surface-variant mt-1">
+                  {unassignedSlots.length === 0
+                    ? t("allPlacesAssignedSuccess")
+                    : t("rankingAssignmentSubtitle")}
+                </p>
               </div>
 
               <div className="flex items-center gap-1.5 flex-wrap self-start sm:self-center">
-                <button
-                  type="button"
-                  onClick={() => setSelectedPlaceIndex(0)}
-                  title="Repartir de la 1ère place"
-                  className="px-3 py-1.5 rounded-xl bg-white border border-outline-variant text-xs font-bold text-primary hover:bg-primary/5 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-                >
-                  <span className="material-symbols-outlined text-[16px]">restart_alt</span>
-                  {t("startFromFirstAction")}
-                </button>
-                {order.length > 2 && (
+                {unassignedSlots.length > 0 && (
                   <button
                     type="button"
-                    onClick={shuffleRemainingPositions}
-                    title="Conserve la 1ère place et mélange aléatoirement les autres places"
-                    className="px-3 py-1.5 rounded-xl bg-white border border-outline-variant text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                    onClick={autoAssignRemaining}
+                    title={t("autoAssignRemainingAction", { count: String(unassignedSlots.length) })}
+                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
                   >
-                    <span className="material-symbols-outlined text-[15px]">shuffle</span>
-                    {t("shuffleOthersAction")}
+                    <span className="material-symbols-outlined text-[16px]">casino</span>
+                    {t("autoAssignRemainingAction", { count: String(unassignedSlots.length) })}
                   </button>
                 )}
                 <button
                   type="button"
-                  onClick={shuffleAllPositions}
-                  title="Mélange aléatoirement toutes les places"
+                  onClick={clearAllAssignments}
+                  title={t("clearAllPositionsAction")}
+                  className="px-3 py-1.5 rounded-xl bg-white border border-outline-variant text-xs font-bold text-error hover:bg-error/5 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+                  {t("clearAllPositionsAction")}
+                </button>
+                <button
+                  type="button"
+                  onClick={fillFromRegistrationOrder}
+                  title={t("fillFromRegistrationOrderAction")}
                   className="px-3 py-1.5 rounded-xl bg-white border border-outline-variant text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
                 >
-                  <span className="material-symbols-outlined text-[15px]">casino</span>
+                  <span className="material-symbols-outlined text-[15px]">list_alt</span>
+                  {t("fillFromRegistrationOrderAction")}
+                </button>
+                <button
+                  type="button"
+                  onClick={shuffleAllPositions}
+                  title={t("shuffleAllAction")}
+                  className="px-3 py-1.5 rounded-xl bg-white border border-outline-variant text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-[15px]">shuffle</span>
                   {t("shuffleAllAction")}
                 </button>
               </div>
             </div>
 
-            {/* TWO-COLUMN GRID: Left = Members, Right = Payout Places */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4 items-start">
-
-              {/* COLONNE 1 (Gauche) : Liste des participants */}
-              <div className="lg:col-span-5 flex flex-col gap-2.5 p-4 rounded-2xl bg-surface-container-lowest border-2 border-outline-variant/60 shadow-sm">
-                <div className="flex items-center justify-between gap-2 pb-2 border-b border-surface-variant/40">
-                  <div className="flex items-center gap-1.5 font-bold text-sm text-on-surface">
-                    <span className="material-symbols-outlined text-primary text-[20px]">group</span>
-                    <span>{t("membersColumnTitle")}</span>
-                    <span className="text-xs font-semibold text-on-surface-variant">({order.length})</span>
-                  </div>
-                  <span className="text-[11px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                    Cliquez pour placer
-                  </span>
-                </div>
-
-                {/* Recherche rapide si plusieurs participants */}
-                {order.length > 5 && (
-                  <div className="relative">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant text-[16px]">
-                      search
-                    </span>
-                    <input
-                      type="text"
-                      value={memberSearchQuery}
-                      onChange={(e) => setMemberSearchQuery(e.target.value)}
-                      placeholder={t("searchMemberPlaceholder")}
-                      className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-outline-variant bg-white focus:outline-none focus:ring-1 focus:ring-primary font-medium"
-                    />
-                  </div>
+            {/* Quick Filter Bar if more than 5 places */}
+            {(session?.slots.length ?? 0) > 5 && (
+              <div className="relative mb-3">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant text-[18px]">
+                  search
+                </span>
+                <input
+                  type="text"
+                  value={placeFilterQuery}
+                  onChange={(e) => setPlaceFilterQuery(e.target.value)}
+                  placeholder={t("filterPlacesPlaceholder")}
+                  className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm rounded-xl border border-outline-variant bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
+                />
+                {placeFilterQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setPlaceFilterQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">close</span>
+                  </button>
                 )}
-
-                <div className="flex flex-col gap-2 max-h-[540px] overflow-y-auto pr-1">
-                  {order
-                    .filter((m) => {
-                      if (!memberSearchQuery.trim()) return true;
-                      const q = memberSearchQuery.toLowerCase();
-                      return (
-                        m.beneficiaryName.toLowerCase().includes(q) ||
-                        m.name.toLowerCase().includes(q)
-                      );
-                    })
-                    .map((m) => {
-                      const currentPos = order.findIndex((s) => s.id === m.id);
-                      const isCurrentTarget = currentPos === selectedPlaceIndex;
-                      const isFirst = currentPos === 0;
-
-                      return (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => handlePlaceMember(m.id)}
-                          className={`w-full p-2.5 rounded-xl border-2 text-left flex items-center justify-between gap-2.5 transition-all cursor-pointer shadow-sm active:scale-[0.98] ${
-                            isCurrentTarget
-                              ? "border-primary bg-primary/10 ring-2 ring-primary/40"
-                              : isFirst
-                              ? "border-amber-400 bg-amber-50/70 hover:bg-amber-100"
-                              : "border-outline-variant/60 bg-white hover:border-primary/60 hover:bg-surface-container-low"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center flex-shrink-0">
-                              {m.beneficiaryName.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-bold text-xs sm:text-sm text-on-surface truncate">
-                                {m.beneficiaryName}
-                              </p>
-                              <p className="text-[11px] text-on-surface-variant truncate">
-                                {m.name} {!m.hasPhone && <span className="text-error font-medium">⚠️ Pas WhatsApp</span>}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 flex-shrink-0">
-                            <span
-                              className={`px-2 py-0.5 rounded-lg text-[11px] font-extrabold ${
-                                isFirst
-                                  ? "bg-amber-300 text-amber-950"
-                                  : currentPos === 1
-                                  ? "bg-slate-200 text-slate-800"
-                                  : currentPos === 2
-                                  ? "bg-amber-700/20 text-amber-900"
-                                  : "bg-surface-container-high text-on-surface-variant"
-                              }`}
-                            >
-                              Place #{currentPos + 1}
-                            </span>
-                            <span className="material-symbols-outlined text-primary text-[18px]">
-                              arrow_forward
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    })}
-                </div>
               </div>
+            )}
 
-              {/* COLONNE 2 (Droite) : Ordre des Places */}
-              <div className="lg:col-span-7 flex flex-col gap-2.5 p-4 rounded-2xl bg-surface-container-lowest border-2 border-outline-variant/60 shadow-sm">
-                <div className="flex items-center justify-between gap-2 pb-2 border-b border-surface-variant/40">
-                  <div className="flex items-center gap-1.5 font-bold text-sm text-on-surface">
-                    <span className="material-symbols-outlined text-primary text-[20px]">format_list_numbered</span>
-                    <span>{t("placesColumnTitle")}</span>
-                  </div>
+            {/* Positions List */}
+            <div className="flex flex-col gap-2.5 max-h-[640px] overflow-y-auto pr-1 mb-4">
+              {assignedSlots.map((slot, index) => {
+                if (placeFilterQuery.trim()) {
+                  const q = placeFilterQuery.toLowerCase().trim();
+                  const posNum = String(index + 1);
+                  const matchesPos = posNum === q || `#${posNum}` === q;
+                  const matchesMember = slot
+                    ? slot.beneficiaryName.toLowerCase().includes(q) || slot.name.toLowerCase().includes(q)
+                    : "libre".includes(q) || "vide".includes(q) || "unassigned".includes(q);
+                  if (!matchesPos && !matchesMember) return null;
+                }
 
-                  <div className="flex items-center gap-1 text-xs font-black text-primary bg-primary/10 border border-primary/20 px-3 py-1 rounded-full shadow-sm">
-                    <span className="material-symbols-outlined text-[16px]">touch_app</span>
-                    <span>Place ciblée : #{selectedPlaceIndex + 1} {selectedPlaceIndex === 0 ? "🥇" : ""}</span>
-                  </div>
-                </div>
+                const isFirst = index === 0;
+                const isSecond = index === 1;
+                const isThird = index === 2;
+                const isAssigned = slot !== null;
 
-                <div className="flex flex-col gap-2.5 max-h-[540px] overflow-y-auto pr-1">
-                  {order.map((m, index) => {
-                    const isTargeted = selectedPlaceIndex === index;
-                    const isFirst = index === 0;
-                    const isSecond = index === 1;
-                    const isThird = index === 2;
-
-                    return (
+                return (
+                  <div
+                    key={`position-${index}`}
+                    className={`p-3 rounded-2xl border-2 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm ${
+                      isAssigned
+                        ? isFirst
+                          ? "border-amber-400 bg-amber-50/80 hover:bg-amber-100/60"
+                          : isSecond
+                          ? "border-slate-300 bg-slate-50/80 hover:bg-slate-100/60"
+                          : isThird
+                          ? "border-amber-600/30 bg-amber-50/40 hover:bg-amber-100/40"
+                          : "border-outline-variant/60 bg-white hover:border-primary/40"
+                        : "border-dashed border-primary/40 bg-primary/[0.02] hover:bg-primary/[0.04]"
+                    }`}
+                  >
+                    {/* Place info */}
+                    <div className="flex items-center gap-3 min-w-0">
                       <div
-                        key={m.id}
-                        onClick={() => setSelectedPlaceIndex(index)}
-                        className={`p-3 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 shadow-sm ${
-                          isTargeted
-                            ? "border-primary bg-primary/5 ring-2 ring-primary ring-offset-2 shadow-md"
-                            : isFirst
-                            ? "border-amber-400 bg-amber-50/70 hover:bg-amber-100/50"
-                            : "border-outline-variant/60 bg-white hover:border-primary/40"
+                        className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center font-bold font-numeric-data shadow-sm flex-shrink-0 ${
+                          isFirst
+                            ? "bg-amber-400 text-amber-950 ring-2 ring-amber-300"
+                            : isSecond
+                            ? "bg-slate-200 text-slate-800"
+                            : isThird
+                            ? "bg-amber-700/20 text-amber-900"
+                            : isAssigned
+                            ? "bg-surface-container-high text-on-surface"
+                            : "bg-surface-container text-on-surface-variant border border-dashed border-outline-variant"
                         }`}
                       >
-                        {/* Numéro de Place & Badge */}
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div
-                            className={`w-11 h-11 rounded-xl flex flex-col items-center justify-center font-bold font-numeric-data shadow-sm flex-shrink-0 ${
-                              isFirst
-                                ? "bg-amber-400 text-amber-950 ring-2 ring-amber-300"
-                                : isSecond
-                                ? "bg-slate-200 text-slate-800"
-                                : isThird
-                                ? "bg-amber-700/20 text-amber-900"
-                                : "bg-surface-container-high text-on-surface-variant"
-                            }`}
-                          >
-                            <span className="text-[11px] leading-none">
-                              {isFirst ? "🥇" : isSecond ? "🥈" : isThird ? "🥉" : "#"}
-                            </span>
-                            <span className="text-sm font-black leading-none mt-0.5">{index + 1}</span>
-                          </div>
+                        <span className="text-[12px] leading-none">
+                          {isFirst ? "🥇" : isSecond ? "🥈" : isThird ? "🥉" : "#"}
+                        </span>
+                        <span className="text-sm font-black leading-none mt-0.5">{index + 1}</span>
+                      </div>
 
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-bold text-sm text-on-surface truncate">
-                                {m.beneficiaryName}
-                              </span>
-                              <span className="text-xs text-on-surface-variant truncate">
-                                ({m.name})
-                              </span>
-                              {isFirst && (
-                                <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-200 text-amber-950 border border-amber-300">
-                                  {t("firstBeneficiaryBadge")}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[11px] text-on-surface-variant mt-0.5 flex items-center gap-2">
-                              <span>
-                                ~{getCycleDateForRound(session.type as TontineType, new Date(session.startDate), index + 1).toLocaleDateString("en-US", { day: "numeric", month: "short" })}
-                              </span>
-                              {isTargeted && (
-                                <span className="font-bold text-primary flex items-center gap-0.5 bg-primary/10 px-1.5 py-0.5 rounded">
-                                  {t("activeTargetPlaceBadge")}
-                                </span>
-                              )}
-                            </p>
-                          </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-bold text-on-surface-variant">
+                            Place #{index + 1} {isFirst && `• ${t("firstBeneficiaryBadge")}`}
+                          </span>
+                          {session?.startDate && (
+                            <span className="text-[11px] text-on-surface-variant/80 font-medium bg-surface-container px-2 py-0.5 rounded-md">
+                              ~{getCycleDateForRound(session.type as TontineType, new Date(session.startDate), index + 1).toLocaleDateString("en-US", { day: "numeric", month: "short" })}
+                            </span>
+                          )}
                         </div>
 
-                        {/* Actions à droite de la place */}
-                        <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                        {isAssigned ? (
+                          <div className="flex items-center gap-2 mt-1 min-w-0">
+                            <div className="w-7 h-7 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center flex-shrink-0">
+                              {slot.beneficiaryName.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-bold text-sm text-on-surface truncate">
+                                {slot.beneficiaryName}
+                              </p>
+                              <p className="text-[11px] text-on-surface-variant truncate">
+                                {slot.name} {!slot.hasPhone && <span className="text-error font-medium">⚠️ Pas WhatsApp</span>}
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-xs font-semibold text-primary/80 mt-1 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[16px]">touch_app</span>
+                            {t("unassignedPlaceNotice")}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Selector or Actions */}
+                    <div className="flex items-center gap-2 flex-shrink-0 self-stretch sm:self-center">
+                      {isAssigned ? (
+                        <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
                           <button
                             type="button"
-                            onClick={() => setSelectedPlaceIndex(index)}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-sm ${
-                              isTargeted
-                                ? "bg-primary text-on-primary ring-2 ring-primary/40"
-                                : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
-                            }`}
+                            onClick={() => handleUnassignMember(index)}
+                            title={t("unassignMemberAction")}
+                            className="px-3 py-1.5 rounded-xl border border-error/40 text-error hover:bg-error/5 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-sm"
                           >
-                            {isTargeted ? "Ciblée ✓" : "Cibler"}
+                            <span className="material-symbols-outlined text-[15px]">close</span>
+                            {t("unassignMemberAction")}
                           </button>
 
                           <div className="flex items-center gap-0.5">
@@ -1284,34 +1352,53 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                               type="button"
                               aria-label={t("moveUp")}
                               onClick={() => moveItem(index, index - 1)}
-                              className="w-7 h-7 rounded-lg border border-outline-variant/60 hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-primary disabled:opacity-20 disabled:pointer-events-none transition-colors cursor-pointer"
+                              className="w-8 h-8 rounded-lg border border-outline-variant/60 hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-primary disabled:opacity-20 disabled:pointer-events-none transition-colors cursor-pointer"
                               disabled={index === 0}
                             >
-                              <span className="material-symbols-outlined text-[16px]">keyboard_arrow_up</span>
+                              <span className="material-symbols-outlined text-[18px]">keyboard_arrow_up</span>
                             </button>
                             <button
                               type="button"
                               aria-label={t("moveDown")}
                               onClick={() => moveItem(index, index + 1)}
-                              className="w-7 h-7 rounded-lg border border-outline-variant/60 hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-primary disabled:opacity-20 disabled:pointer-events-none transition-colors cursor-pointer"
-                              disabled={index === order.length - 1}
+                              className="w-8 h-8 rounded-lg border border-outline-variant/60 hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-primary disabled:opacity-20 disabled:pointer-events-none transition-colors cursor-pointer"
+                              disabled={index === assignedSlots.length - 1}
                             >
-                              <span className="material-symbols-outlined text-[16px]">keyboard_arrow_down</span>
+                              <span className="material-symbols-outlined text-[18px]">keyboard_arrow_down</span>
                             </button>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+                      ) : (
+                        <div className="w-full sm:w-auto flex-1 sm:min-w-[280px]">
+                          <select
+                            value=""
+                            onChange={(e) => handleAssignMember(index, e.target.value)}
+                            className="w-full py-2 px-3 text-xs sm:text-sm font-semibold rounded-xl border-2 border-primary/40 bg-white text-on-surface hover:border-primary focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer shadow-sm"
+                          >
+                            <option value="">
+                              {index === 0
+                                ? t("chooseFirstPlacePlaceholder", { count: String(unassignedSlots.length) })
+                                : t("choosePlacePlaceholder", { place: String(index + 1), count: String(unassignedSlots.length) })}
+                            </option>
+                            {sortedUnassignedSlots.map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.beneficiaryName} ({m.name}) {!m.hasPhone ? "⚠️" : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             <div className="flex flex-col sm:flex-row gap-2 mt-auto pt-2">
               <button
                 type="button"
                 onClick={savePositionsOnly}
-                disabled={savingPositions || order.length === 0}
+                disabled={savingPositions || (session?.slots.length ?? 0) === 0}
                 className="flex-1 px-4 py-2.5 rounded-xl border-2 border-primary/40 text-primary hover:bg-primary/5 font-label-md text-label-md transition-all font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-sm"
               >
                 <span className="material-symbols-outlined text-[18px]">save</span>
@@ -1322,7 +1409,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                 <button
                   type="button"
                   onClick={startDrawingPhase}
-                  disabled={startingDraw || order.length === 0}
+                  disabled={startingDraw || (session?.slots.length ?? 0) === 0}
                   className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-on-primary font-label-md text-label-md hover:bg-primary/95 transition-all shadow-sm font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[18px]">casino</span>
@@ -1332,7 +1419,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                 <button
                   type="button"
                   onClick={publishRanking}
-                  disabled={publishing || order.length === 0}
+                  disabled={publishing || (session?.slots.length ?? 0) === 0}
                   className="flex-1 px-4 py-2.5 rounded-xl bg-primary text-on-primary font-label-md text-label-md hover:bg-primary/95 transition-all shadow-sm font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[18px]">publish</span>
