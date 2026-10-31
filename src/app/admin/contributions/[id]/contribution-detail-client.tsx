@@ -120,6 +120,8 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   const [order, setOrder] = useState<AdminSlot[]>([]);
   const [assignedSlots, setAssignedSlots] = useState<(AdminSlot | null)[]>([]);
   const [placeFilterQuery, setPlaceFilterQuery] = useState("");
+  const [modalPlaceIndex, setModalPlaceIndex] = useState<number | null>(null);
+  const [modalSearchQuery, setModalSearchQuery] = useState("");
   const [ledger, setLedger] = useState<Ledger | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [payoutClaims, setPayoutClaims] = useState<PayoutClaim[]>([]);
@@ -377,6 +379,51 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     [unassignedSlots]
   );
 
+  const modalAvailableSlots = useMemo(() => {
+    if (modalPlaceIndex === null) return [];
+    let list = [...unassignedSlots];
+    list.sort((a, b) => a.beneficiaryName.localeCompare(b.beneficiaryName));
+    if (modalSearchQuery.trim()) {
+      const q = modalSearchQuery.toLowerCase().trim();
+      list = list.filter(
+        (m) => m.beneficiaryName.toLowerCase().includes(q) || m.name.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [modalPlaceIndex, unassignedSlots, modalSearchQuery]);
+
+  function openPickerForPlace(index: number) {
+    setModalPlaceIndex(index);
+    setModalSearchQuery("");
+  }
+
+  function closePicker() {
+    setModalPlaceIndex(null);
+    setModalSearchQuery("");
+  }
+
+  function handleSelectInModal(slotId: string) {
+    if (modalPlaceIndex === null) return;
+    const curIdx = modalPlaceIndex;
+    handleAssignMember(curIdx, slotId);
+
+    const nextIdx = curIdx + 1;
+    const total = session?.slots.length ?? 0;
+    if (nextIdx < total && assignedSlots[nextIdx] === null) {
+      setModalPlaceIndex(nextIdx);
+      setModalSearchQuery("");
+    } else {
+      closePicker();
+    }
+  }
+
+  function handleAssignNextEmpty(slotId: string) {
+    const emptyIdx = assignedSlots.findIndex((s) => s === null);
+    if (emptyIdx !== -1) {
+      handleAssignMember(emptyIdx, slotId);
+    }
+  }
+
   function handleAssignMember(positionIndex: number, slotId: string) {
     if (!slotId) {
       setAssignedSlots((prev) => {
@@ -430,6 +477,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
 
   function clearAllAssignments() {
     if (!session?.slots) return;
+    if (!window.confirm(t("clearAllConfirmMessage"))) return;
     setAssignedSlots(Array(session.slots.length).fill(null));
   }
 
@@ -1219,6 +1267,62 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
               </div>
             </div>
 
+            {/* Panel: Membres non encore cochés */}
+            <div className="p-4 rounded-2xl bg-surface-container-low border border-outline-variant/60 shadow-sm mb-4">
+              <div className="flex items-center justify-between gap-2 mb-2.5 pb-2 border-b border-surface-variant/40">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary text-[20px]">
+                    group
+                  </span>
+                  <h4 className="font-bold text-sm sm:text-base text-on-surface">
+                    {t("unassignedMembersPoolTitle")}
+                  </h4>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-black ${
+                      unassignedSlots.length === 0
+                        ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                        : "bg-primary/10 text-primary border border-primary/20"
+                    }`}
+                  >
+                    {unassignedSlots.length} restant(s)
+                  </span>
+                </div>
+
+                {unassignedSlots.length > 0 && (
+                  <span className="text-[11px] text-on-surface-variant hidden sm:inline">
+                    {t("unassignedMembersPoolSubtitle")}
+                  </span>
+                )}
+              </div>
+
+              {unassignedSlots.length === 0 ? (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm font-semibold flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px] text-emerald-600">check_circle</span>
+                  <span>{t("allMembersAssignedMessage")}</span>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2 max-h-[160px] overflow-y-auto pr-1">
+                  {sortedUnassignedSlots.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => handleAssignNextEmpty(m.id)}
+                      title={`Attribuer ${m.beneficiaryName} à la prochaine place disponible`}
+                      className="px-3 py-1.5 rounded-xl border border-outline-variant bg-white hover:border-primary hover:bg-primary/5 hover:text-primary transition-all text-xs font-bold text-on-surface flex items-center gap-2 shadow-xs cursor-pointer active:scale-95 group"
+                    >
+                      <div className="w-5 h-5 rounded-full bg-primary/10 text-primary font-bold text-[10px] flex items-center justify-center flex-shrink-0 group-hover:bg-primary group-hover:text-white transition-colors">
+                        {m.beneficiaryName.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="truncate max-w-[140px]">{m.beneficiaryName}</span>
+                      <span className="material-symbols-outlined text-[14px] text-primary/60 group-hover:text-primary">
+                        add
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Quick Filter Bar if more than 5 places */}
             {(session?.slots.length ?? 0) > 5 && (
               <div className="relative mb-3">
@@ -1245,7 +1349,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
             )}
 
             {/* Positions List */}
-            <div className="flex flex-col gap-2.5 max-h-[640px] overflow-y-auto pr-1 mb-4">
+            <div className="flex flex-col gap-2.5 max-h-[600px] overflow-y-auto pr-1 mb-4">
               {assignedSlots.map((slot, index) => {
                 if (placeFilterQuery.trim()) {
                   const q = placeFilterQuery.toLowerCase().trim();
@@ -1262,19 +1366,60 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                 const isThird = index === 2;
                 const isAssigned = slot !== null;
 
+                if (!isAssigned) {
+                  return (
+                    <div
+                      key={`position-${index}`}
+                      onClick={() => openPickerForPlace(index)}
+                      className="p-3.5 rounded-2xl border-2 border-dashed border-primary/40 bg-primary/[0.02] hover:bg-primary/5 hover:border-primary transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-xl flex flex-col items-center justify-center font-bold font-numeric-data shadow-sm flex-shrink-0 bg-surface-container text-on-surface-variant border border-dashed border-outline-variant group-hover:border-primary group-hover:text-primary transition-colors">
+                          <span className="text-[12px] leading-none">
+                            {isFirst ? "🥇" : isSecond ? "🥈" : isThird ? "🥉" : "#"}
+                          </span>
+                          <span className="text-sm font-black leading-none mt-0.5">{index + 1}</span>
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-bold text-on-surface-variant">
+                              Place #{index + 1} {isFirst && `• ${t("firstBeneficiaryBadge")}`}
+                            </span>
+                            {session?.startDate && (
+                              <span className="text-[11px] text-on-surface-variant/80 font-medium bg-surface-container px-2 py-0.5 rounded-md">
+                                ~{getCycleDateForRound(session.type as TontineType, new Date(session.startDate), index + 1).toLocaleDateString("en-US", { day: "numeric", month: "short" })}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs sm:text-sm font-bold text-primary flex items-center gap-1.5 mt-0.5">
+                            <span className="material-symbols-outlined text-[18px]">person_add</span>
+                            <span>
+                              {isFirst
+                                ? t("clickToChooseFirstPlace")
+                                : t("clickToChoosePlace", { place: String(index + 1) })}
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <span className="px-3 py-1.5 rounded-xl bg-primary/10 text-primary text-xs font-bold group-hover:bg-primary group-hover:text-white transition-all shadow-xs flex items-center gap-1 self-start sm:self-center">
+                        {t("chooseAction")}
+                      </span>
+                    </div>
+                  );
+                }
+
                 return (
                   <div
                     key={`position-${index}`}
-                    className={`p-3 rounded-2xl border-2 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm ${
-                      isAssigned
-                        ? isFirst
-                          ? "border-amber-400 bg-amber-50/80 hover:bg-amber-100/60"
-                          : isSecond
-                          ? "border-slate-300 bg-slate-50/80 hover:bg-slate-100/60"
-                          : isThird
-                          ? "border-amber-600/30 bg-amber-50/40 hover:bg-amber-100/40"
-                          : "border-outline-variant/60 bg-white hover:border-primary/40"
-                        : "border-dashed border-primary/40 bg-primary/[0.02] hover:bg-primary/[0.04]"
+                    className={`p-3.5 rounded-2xl border-2 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm ${
+                      isFirst
+                        ? "border-amber-400 bg-amber-50/80 hover:bg-amber-100/60"
+                        : isSecond
+                        ? "border-slate-300 bg-slate-50/80 hover:bg-slate-100/60"
+                        : isThird
+                        ? "border-amber-600/30 bg-amber-50/40 hover:bg-amber-100/40"
+                        : "border-outline-variant/60 bg-white hover:border-primary/40"
                     }`}
                   >
                     {/* Place info */}
@@ -1287,9 +1432,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                             ? "bg-slate-200 text-slate-800"
                             : isThird
                             ? "bg-amber-700/20 text-amber-900"
-                            : isAssigned
-                            ? "bg-surface-container-high text-on-surface"
-                            : "bg-surface-container text-on-surface-variant border border-dashed border-outline-variant"
+                            : "bg-surface-container-high text-on-surface"
                         }`}
                       >
                         <span className="text-[12px] leading-none">
@@ -1310,84 +1453,63 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                           )}
                         </div>
 
-                        {isAssigned ? (
-                          <div className="flex items-center gap-2 mt-1 min-w-0">
-                            <div className="w-7 h-7 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center flex-shrink-0">
-                              {slot.beneficiaryName.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-bold text-sm text-on-surface truncate">
-                                {slot.beneficiaryName}
-                              </p>
-                              <p className="text-[11px] text-on-surface-variant truncate">
-                                {slot.name} {!slot.hasPhone && <span className="text-error font-medium">⚠️ Pas WhatsApp</span>}
-                              </p>
-                            </div>
+                        <div className="flex items-center gap-2 mt-1 min-w-0">
+                          <div className="w-7 h-7 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center flex-shrink-0">
+                            {slot.beneficiaryName.charAt(0).toUpperCase()}
                           </div>
-                        ) : (
-                          <p className="text-xs font-semibold text-primary/80 mt-1 flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[16px]">touch_app</span>
-                            {t("unassignedPlaceNotice")}
-                          </p>
-                        )}
+                          <div className="min-w-0">
+                            <p className="font-bold text-sm text-on-surface truncate">
+                              {slot.beneficiaryName}
+                            </p>
+                            <p className="text-[11px] text-on-surface-variant truncate">
+                              {slot.name} {!slot.hasPhone && <span className="text-error font-medium">⚠️ Pas WhatsApp</span>}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Selector or Actions */}
-                    <div className="flex items-center gap-2 flex-shrink-0 self-stretch sm:self-center">
-                      {isAssigned ? (
-                        <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end">
-                          <button
-                            type="button"
-                            onClick={() => handleUnassignMember(index)}
-                            title={t("unassignMemberAction")}
-                            className="px-3 py-1.5 rounded-xl border border-error/40 text-error hover:bg-error/5 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-sm"
-                          >
-                            <span className="material-symbols-outlined text-[15px]">close</span>
-                            {t("unassignMemberAction")}
-                          </button>
+                    {/* Actions */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0 w-full sm:w-auto justify-end">
+                      <button
+                        type="button"
+                        onClick={() => openPickerForPlace(index)}
+                        title={t("changeMemberAction")}
+                        className="px-2.5 py-1.5 rounded-xl border border-outline-variant hover:border-primary text-primary hover:bg-primary/5 text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer active:scale-95"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">edit</span>
+                        {t("changeMemberAction")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleUnassignMember(index)}
+                        title={t("unassignMemberAction")}
+                        className="px-2.5 py-1.5 rounded-xl border border-error/40 text-error hover:bg-error/5 text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer active:scale-95"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">close</span>
+                        {t("unassignMemberAction")}
+                      </button>
 
-                          <div className="flex items-center gap-0.5">
-                            <button
-                              type="button"
-                              aria-label={t("moveUp")}
-                              onClick={() => moveItem(index, index - 1)}
-                              className="w-8 h-8 rounded-lg border border-outline-variant/60 hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-primary disabled:opacity-20 disabled:pointer-events-none transition-colors cursor-pointer"
-                              disabled={index === 0}
-                            >
-                              <span className="material-symbols-outlined text-[18px]">keyboard_arrow_up</span>
-                            </button>
-                            <button
-                              type="button"
-                              aria-label={t("moveDown")}
-                              onClick={() => moveItem(index, index + 1)}
-                              className="w-8 h-8 rounded-lg border border-outline-variant/60 hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-primary disabled:opacity-20 disabled:pointer-events-none transition-colors cursor-pointer"
-                              disabled={index === assignedSlots.length - 1}
-                            >
-                              <span className="material-symbols-outlined text-[18px]">keyboard_arrow_down</span>
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="w-full sm:w-auto flex-1 sm:min-w-[280px]">
-                          <select
-                            value=""
-                            onChange={(e) => handleAssignMember(index, e.target.value)}
-                            className="w-full py-2 px-3 text-xs sm:text-sm font-semibold rounded-xl border-2 border-primary/40 bg-white text-on-surface hover:border-primary focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer shadow-sm"
-                          >
-                            <option value="">
-                              {index === 0
-                                ? t("chooseFirstPlacePlaceholder", { count: String(unassignedSlots.length) })
-                                : t("choosePlacePlaceholder", { place: String(index + 1), count: String(unassignedSlots.length) })}
-                            </option>
-                            {sortedUnassignedSlots.map((m) => (
-                              <option key={m.id} value={m.id}>
-                                {m.beneficiaryName} ({m.name}) {!m.hasPhone ? "⚠️" : ""}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-0.5">
+                        <button
+                          type="button"
+                          aria-label={t("moveUp")}
+                          onClick={() => moveItem(index, index - 1)}
+                          className="w-7 h-7 rounded-lg border border-outline-variant/60 hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-primary disabled:opacity-20 disabled:pointer-events-none transition-colors cursor-pointer"
+                          disabled={index === 0}
+                        >
+                          <span className="material-symbols-outlined text-[16px]">keyboard_arrow_up</span>
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={t("moveDown")}
+                          onClick={() => moveItem(index, index + 1)}
+                          className="w-7 h-7 rounded-lg border border-outline-variant/60 hover:bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-primary disabled:opacity-20 disabled:pointer-events-none transition-colors cursor-pointer"
+                          disabled={index === assignedSlots.length - 1}
+                        >
+                          <span className="material-symbols-outlined text-[16px]">keyboard_arrow_down</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1427,6 +1549,149 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                 </button>
               )}
             </div>
+
+            {/* Modal: Choisir un membre pour la place */}
+            {modalPlaceIndex !== null && (
+              <div
+                className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
+                onClick={closePicker}
+              >
+                <div
+                  className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl border border-outline-variant/60 overflow-hidden"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Modal Header */}
+                  <div className="p-4 border-b border-surface-variant flex items-center justify-between gap-3 bg-surface-container-low">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="w-7 h-7 rounded-lg bg-primary text-on-primary font-black text-xs flex items-center justify-center flex-shrink-0">
+                          #{modalPlaceIndex + 1}
+                        </span>
+                        <h3 className="font-bold text-sm sm:text-base text-on-surface truncate">
+                          {t("chooseMemberModalTitle", { place: String(modalPlaceIndex + 1) })}
+                        </h3>
+                        {modalPlaceIndex === 0 && (
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-200 text-amber-950 border border-amber-300">
+                            🥇 1er
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-on-surface-variant mt-0.5">
+                        {t("chooseMemberModalSubtitle", { count: String(unassignedSlots.length) })}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={closePicker}
+                      className="w-8 h-8 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant flex items-center justify-center transition-colors cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">close</span>
+                    </button>
+                  </div>
+
+                  {/* Search Input */}
+                  <div className="p-3 border-b border-surface-variant/40 bg-surface-container-lowest">
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant text-[18px]">
+                        search
+                      </span>
+                      <input
+                        autoFocus
+                        type="text"
+                        value={modalSearchQuery}
+                        onChange={(e) => setModalSearchQuery(e.target.value)}
+                        placeholder={t("searchMemberInModal")}
+                        className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm rounded-xl border border-outline-variant bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
+                      />
+                      {modalSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setModalSearchQuery("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">close</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Current slot at this place if already assigned */}
+                  {assignedSlots[modalPlaceIndex] && (
+                    <div className="p-3 bg-amber-50/80 border-b border-amber-200 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xs text-amber-900 font-medium">{t("currentlyAssignedToThisPlace")}</span>
+                        <span className="text-xs font-bold text-amber-950 truncate">
+                          {assignedSlots[modalPlaceIndex]!.beneficiaryName}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleUnassignMember(modalPlaceIndex);
+                        }}
+                        className="text-xs text-error font-bold hover:underline flex items-center gap-1 cursor-pointer flex-shrink-0"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">close</span>
+                        {t("clearThisPlaceAction")}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Available Members List */}
+                  <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
+                    {modalAvailableSlots.length === 0 ? (
+                      <div className="py-8 text-center text-on-surface-variant text-xs sm:text-sm">
+                        {unassignedSlots.length === 0
+                          ? t("allMembersAssignedMessage")
+                          : "Aucun membre ne correspond à votre recherche."}
+                      </div>
+                    ) : (
+                      modalAvailableSlots.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => handleSelectInModal(m.id)}
+                          className="w-full p-2.5 rounded-xl border border-outline-variant/60 hover:border-primary hover:bg-primary/5 bg-white text-left flex items-center justify-between gap-3 transition-all cursor-pointer shadow-xs active:scale-[0.99] group"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-9 h-9 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center flex-shrink-0 group-hover:bg-primary group-hover:text-white transition-colors">
+                              {m.beneficiaryName.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-bold text-xs sm:text-sm text-on-surface group-hover:text-primary transition-colors truncate">
+                                {m.beneficiaryName}
+                              </p>
+                              <p className="text-[11px] text-on-surface-variant truncate">
+                                {m.name} {!m.hasPhone && <span className="text-error font-medium">⚠️ Pas WhatsApp</span>}
+                              </p>
+                            </div>
+                          </div>
+
+                          <span className="px-3 py-1 rounded-lg bg-primary/10 group-hover:bg-primary text-primary group-hover:text-white font-bold text-xs flex items-center gap-1 flex-shrink-0 transition-colors shadow-xs">
+                            {t("chooseAction")}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div className="p-3 border-t border-surface-variant bg-surface-container-low flex items-center justify-between gap-2">
+                    <span className="text-xs text-on-surface-variant font-medium">
+                      {unassignedSlots.length} membre(s) non encore coché(s)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={closePicker}
+                      className="px-4 py-1.5 rounded-xl bg-white border border-outline-variant text-xs font-bold text-on-surface hover:bg-surface-container transition-all cursor-pointer shadow-xs"
+                    >
+                      Fermer
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="bg-primary text-on-primary rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4 relative overflow-hidden">
