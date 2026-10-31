@@ -375,22 +375,46 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     [session?.slots, assignedIds]
   );
   const sortedUnassignedSlots = useMemo(
-    () => [...unassignedSlots].sort((a, b) => a.beneficiaryName.localeCompare(b.beneficiaryName)),
+    () =>
+      [...unassignedSlots].sort((a, b) =>
+        a.beneficiaryName.localeCompare(b.beneficiaryName, undefined, { sensitivity: "base" })
+      ),
     [unassignedSlots]
   );
 
+  // Les membres déjà placés en haut (places 0 à modalPlaceIndex - 1) sont masqués
+  const higherAssignedIds = useMemo(() => {
+    if (modalPlaceIndex === null) return new Set<string>();
+    const ids = new Set<string>();
+    for (let i = 0; i < modalPlaceIndex; i++) {
+      const s = assignedSlots[i];
+      if (s) ids.add(s.id);
+    }
+    return ids;
+  }, [modalPlaceIndex, assignedSlots]);
+
+  // Tout les noms qui sont en bas (non attribués aux places supérieures 0..modalPlaceIndex-1)
   const modalAvailableSlots = useMemo(() => {
-    if (modalPlaceIndex === null) return [];
-    let list = [...unassignedSlots];
-    list.sort((a, b) => a.beneficiaryName.localeCompare(b.beneficiaryName));
+    if (modalPlaceIndex === null || !session?.slots) return [];
+    let list = session.slots.filter((s) => !higherAssignedIds.has(s.id));
+    list.sort((a, b) =>
+      a.beneficiaryName.localeCompare(b.beneficiaryName, undefined, { sensitivity: "base" })
+    );
     if (modalSearchQuery.trim()) {
-      const q = modalSearchQuery.toLowerCase().trim();
-      list = list.filter(
-        (m) => m.beneficiaryName.toLowerCase().includes(q) || m.name.toLowerCase().includes(q)
-      );
+      const q = modalSearchQuery
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+      list = list.filter((m) => {
+        const b = m.beneficiaryName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        const n = m.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        const code = (m.memberCode ?? "").toLowerCase();
+        return b.includes(q) || n.includes(q) || code.includes(q);
+      });
     }
     return list;
-  }, [modalPlaceIndex, unassignedSlots, modalSearchQuery]);
+  }, [modalPlaceIndex, session?.slots, higherAssignedIds, modalSearchQuery]);
 
   function openPickerForPlace(index: number) {
     setModalPlaceIndex(index);
@@ -409,7 +433,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
 
     const nextIdx = curIdx + 1;
     const total = session?.slots.length ?? 0;
-    if (nextIdx < total && assignedSlots[nextIdx] === null) {
+    if (nextIdx < total) {
       setModalPlaceIndex(nextIdx);
       setModalSearchQuery("");
     } else {
@@ -439,8 +463,10 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     setAssignedSlots((prev) => {
       const copy = [...prev];
       const prevIdx = copy.findIndex((s) => s?.id === slotId);
+      const currentSlotAtPos = copy[positionIndex];
       if (prevIdx !== -1 && prevIdx !== positionIndex) {
-        copy[prevIdx] = null;
+        // Swap: previous position gets what was currently at positionIndex
+        copy[prevIdx] = currentSlotAtPos;
       }
       copy[positionIndex] = slotToAssign;
       return copy;
@@ -1562,29 +1588,52 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                 >
                   {/* Modal Header */}
                   <div className="p-4 border-b border-surface-variant flex items-center justify-between gap-3 bg-surface-container-low">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="w-7 h-7 rounded-lg bg-primary text-on-primary font-black text-xs flex items-center justify-center flex-shrink-0">
-                          #{modalPlaceIndex + 1}
-                        </span>
-                        <h3 className="font-bold text-sm sm:text-base text-on-surface truncate">
-                          {t("chooseMemberModalTitle", { place: String(modalPlaceIndex + 1) })}
-                        </h3>
-                        {modalPlaceIndex === 0 && (
-                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-200 text-amber-950 border border-amber-300">
-                            🥇 1er
-                          </span>
-                        )}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <button
+                        type="button"
+                        disabled={modalPlaceIndex === 0}
+                        onClick={() => openPickerForPlace(modalPlaceIndex - 1)}
+                        title={t("previousPlaceButton")}
+                        className="w-8 h-8 rounded-xl bg-white border border-outline-variant hover:bg-surface-container text-on-surface-variant disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center transition-colors cursor-pointer flex-shrink-0 shadow-2xs"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+                      </button>
+
+                      <span className="w-8 h-8 rounded-xl bg-primary text-on-primary font-black text-xs flex items-center justify-center flex-shrink-0 shadow-xs">
+                        #{modalPlaceIndex + 1}
+                      </span>
+
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h3 className="font-bold text-sm sm:text-base text-on-surface truncate">
+                            {t("chooseMemberModalTitle", { place: String(modalPlaceIndex + 1) })}
+                          </h3>
+                          {modalPlaceIndex === 0 && (
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-200 text-amber-950 border border-amber-300">
+                              🥇 1er
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-on-surface-variant mt-0.5 truncate">
+                          {t("chooseMemberModalSubtitleEnHaut", { count: String(modalAvailableSlots.length) })}
+                        </p>
                       </div>
-                      <p className="text-xs text-on-surface-variant mt-0.5">
-                        {t("chooseMemberModalSubtitle", { count: String(unassignedSlots.length) })}
-                      </p>
+
+                      <button
+                        type="button"
+                        disabled={modalPlaceIndex >= (session?.slots.length ?? 0) - 1}
+                        onClick={() => openPickerForPlace(modalPlaceIndex + 1)}
+                        title={t("nextPlaceButton")}
+                        className="w-8 h-8 rounded-xl bg-white border border-outline-variant hover:bg-surface-container text-on-surface-variant disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center transition-colors cursor-pointer flex-shrink-0 shadow-2xs"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+                      </button>
                     </div>
 
                     <button
                       type="button"
                       onClick={closePicker}
-                      className="w-8 h-8 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant flex items-center justify-center transition-colors cursor-pointer"
+                      className="w-8 h-8 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface-variant flex items-center justify-center transition-colors cursor-pointer flex-shrink-0"
                     >
                       <span className="material-symbols-outlined text-[20px]">close</span>
                     </button>
@@ -1614,11 +1663,18 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                         </button>
                       )}
                     </div>
+
+                    {modalPlaceIndex > 0 && (
+                      <div className="mt-2 text-[11px] text-on-surface-variant flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[15px] text-primary">visibility_off</span>
+                        <span>{t("higherMembersHiddenNotice")}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Current slot at this place if already assigned */}
                   {assignedSlots[modalPlaceIndex] && (
-                    <div className="p-3 bg-amber-50/80 border-b border-amber-200 flex items-center justify-between gap-2">
+                    <div className="p-3 bg-amber-50/90 border-b border-amber-200 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="text-xs text-amber-900 font-medium">{t("currentlyAssignedToThisPlace")}</span>
                         <span className="text-xs font-bold text-amber-950 truncate">
@@ -1642,52 +1698,96 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                   <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
                     {modalAvailableSlots.length === 0 ? (
                       <div className="py-8 text-center text-on-surface-variant text-xs sm:text-sm">
-                        {unassignedSlots.length === 0
+                        {session?.slots.length === higherAssignedIds.size
                           ? t("allMembersAssignedMessage")
                           : "Aucun membre ne correspond à votre recherche."}
                       </div>
                     ) : (
-                      modalAvailableSlots.map((m) => (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => handleSelectInModal(m.id)}
-                          className="w-full p-2.5 rounded-xl border border-outline-variant/60 hover:border-primary hover:bg-primary/5 bg-white text-left flex items-center justify-between gap-3 transition-all cursor-pointer shadow-xs active:scale-[0.99] group"
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-9 h-9 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center flex-shrink-0 group-hover:bg-primary group-hover:text-white transition-colors">
-                              {m.beneficiaryName.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-bold text-xs sm:text-sm text-on-surface group-hover:text-primary transition-colors truncate">
-                                {m.beneficiaryName}
-                              </p>
-                              <p className="text-[11px] text-on-surface-variant truncate">
-                                {m.name} {!m.hasPhone && <span className="text-error font-medium">⚠️ Pas WhatsApp</span>}
-                              </p>
-                            </div>
-                          </div>
+                      modalAvailableSlots.map((m) => {
+                        const isCurrent = assignedSlots[modalPlaceIndex]?.id === m.id;
+                        const currentPos = assignedSlots.findIndex((s) => s?.id === m.id);
 
-                          <span className="px-3 py-1 rounded-lg bg-primary/10 group-hover:bg-primary text-primary group-hover:text-white font-bold text-xs flex items-center gap-1 flex-shrink-0 transition-colors shadow-xs">
-                            {t("chooseAction")}
-                          </span>
-                        </button>
-                      ))
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => handleSelectInModal(m.id)}
+                            className={`w-full p-2.5 rounded-xl border text-left flex items-center justify-between gap-3 transition-all cursor-pointer shadow-xs active:scale-[0.99] group ${
+                              isCurrent
+                                ? "border-amber-400 bg-amber-50/70 ring-2 ring-amber-300/40"
+                                : "border-outline-variant/60 hover:border-primary hover:bg-primary/5 bg-white"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-9 h-9 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center flex-shrink-0 group-hover:bg-primary group-hover:text-white transition-colors">
+                                {m.beneficiaryName.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <p className="font-bold text-xs sm:text-sm text-on-surface group-hover:text-primary transition-colors truncate">
+                                    {m.beneficiaryName}
+                                  </p>
+                                  {isCurrent && (
+                                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-200 text-amber-950 border border-amber-300">
+                                      {t("currentlyAtThisPlaceBadge")}
+                                    </span>
+                                  )}
+                                  {!isCurrent && currentPos !== -1 && (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant">
+                                      {t("currentlyAtPlaceBadge", { place: String(currentPos + 1) })}
+                                    </span>
+                                  )}
+                                  {!isCurrent && currentPos === -1 && (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                                      {t("unassignedBadge")}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-on-surface-variant truncate">
+                                  {m.name} {!m.hasPhone && <span className="text-error font-medium">⚠️ Pas WhatsApp</span>}
+                                </p>
+                              </div>
+                            </div>
+
+                            <span
+                              className={`px-3 py-1 rounded-lg font-bold text-xs flex items-center gap-1 flex-shrink-0 transition-colors shadow-xs ${
+                                isCurrent
+                                  ? "bg-amber-200 text-amber-950"
+                                  : "bg-primary/10 group-hover:bg-primary text-primary group-hover:text-white"
+                              }`}
+                            >
+                              {isCurrent ? "✓ Déjà choisi" : t("chooseAction")}
+                            </span>
+                          </button>
+                        );
+                      })
                     )}
                   </div>
 
                   {/* Modal Footer */}
                   <div className="p-3 border-t border-surface-variant bg-surface-container-low flex items-center justify-between gap-2">
-                    <span className="text-xs text-on-surface-variant font-medium">
-                      {unassignedSlots.length} membre(s) non encore coché(s)
+                    <span className="text-xs text-on-surface-variant font-medium truncate">
+                      {modalAvailableSlots.length} disponible(s) en bas
                     </span>
-                    <button
-                      type="button"
-                      onClick={closePicker}
-                      className="px-4 py-1.5 rounded-xl bg-white border border-outline-variant text-xs font-bold text-on-surface hover:bg-surface-container transition-all cursor-pointer shadow-xs"
-                    >
-                      Fermer
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {modalPlaceIndex < (session?.slots.length ?? 0) - 1 && (
+                        <button
+                          type="button"
+                          onClick={() => openPickerForPlace(modalPlaceIndex + 1)}
+                          className="px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-xs font-bold text-primary transition-all cursor-pointer shadow-xs flex items-center gap-1"
+                        >
+                          {t("nextPlaceButton")}
+                          <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={closePicker}
+                        className="px-4 py-1.5 rounded-xl bg-white border border-outline-variant text-xs font-bold text-on-surface hover:bg-surface-container transition-all cursor-pointer shadow-xs"
+                      >
+                        {t("finishAction")}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
