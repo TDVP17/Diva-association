@@ -63,7 +63,7 @@ export function WhatsAppPhonePrompt({
       if (!isSnoozed) {
         const handle = setTimeout(() => {
           setVisible(true);
-        }, 1200);
+        }, 400);
         return () => clearTimeout(handle);
       }
     }
@@ -206,6 +206,10 @@ export function WhatsAppPhonePrompt({
               <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center shadow-inner">
                 <WhatsAppIcon className="w-10 h-10 text-[#25D366]" />
               </div>
+              <span className="text-[11px] font-black uppercase tracking-wider px-3 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 shadow-2xs">
+                <span className="material-symbols-outlined text-[15px] text-amber-700">warning</span>
+                {lang === "fr" ? "Alerte : Action requise" : "Alert: Action required"}
+              </span>
               <h2 className="font-headline-sm text-headline-sm text-on-surface font-bold">
                 {t("whatsappPromptTitle")}
               </h2>

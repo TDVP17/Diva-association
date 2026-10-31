@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
-import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
+import { scheduleInAppNotifications, scheduleNotifications } from "@/lib/notifications/dispatch";
 import { logAudit } from "@/lib/audit";
 
 const TONTINE_LABELS: Record<string, string> = {
@@ -132,15 +132,40 @@ export async function POST(request: Request) {
   const actionUrl = target === "NO_PHONE" ? "/profile" : (tontineSessionId ? `/sessions/${tontineSessionId}` : "/notifications");
   const formattedMessage = `${title}\n\n${message}`;
 
-  const count = await scheduleInAppNotifications({
-    tontineSessionId: tontineSessionId || undefined,
-    type: "ADMIN_BROADCAST",
-    recipients: userIds.map((userId) => ({
-      userId,
-      message: formattedMessage,
-      actionUrl,
-    })),
-  });
+  let count = 0;
+  if (target === "NO_PHONE") {
+    // Les rappels de numéro WhatsApp ne sont jamais envoyés par email : notification in-app uniquement
+    count = await scheduleNotifications({
+      channel: "IN_APP",
+      type: "ADMIN_BROADCAST",
+      recipients: userIds.map((userId) => ({
+        userId,
+        message: formattedMessage,
+        actionUrl,
+      })),
+    });
+    if (count > 0) {
+      await prisma.notification.updateMany({
+        where: {
+          userId: { in: userIds },
+          type: "ADMIN_BROADCAST",
+          channel: "IN_APP",
+          status: "SCHEDULED",
+        },
+        data: { status: "SENT", sentAt: new Date() },
+      });
+    }
+  } else {
+    count = await scheduleInAppNotifications({
+      tontineSessionId: tontineSessionId || undefined,
+      type: "ADMIN_BROADCAST",
+      recipients: userIds.map((userId) => ({
+        userId,
+        message: formattedMessage,
+        actionUrl,
+      })),
+    });
+  }
 
   await logAudit({
     actorId: admin.user.id,

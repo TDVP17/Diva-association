@@ -39,6 +39,20 @@ export async function GET(request: Request) {
     try {
       if (n.channel === "EMAIL") {
         if (!n.user.email) throw new Error("Recipient has no email on file");
+
+        // Les rappels de numéro WhatsApp ne sont jamais envoyés par email (alerte uniquement in-app à l'entrée dans l'application)
+        const msgLower = (n.message ?? "").toLowerCase();
+        if (
+          n.actionUrl === "/profile" ||
+          (msgLower.includes("whatsapp") && (msgLower.includes("numéro") || msgLower.includes("numero") || msgLower.includes("number")))
+        ) {
+          await prisma.notification.update({
+            where: { id: n.id },
+            data: { status: "FAILED", errorMessage: "Cancelled: WhatsApp registration reminder is in-app only" },
+          });
+          continue;
+        }
+
         const { subject, body } = splitSubjectAndBody(n.type, n.message, lang);
         const emailHtml = renderBrandedEmailHtml({
           title: subject,
