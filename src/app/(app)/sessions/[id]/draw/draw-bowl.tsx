@@ -217,9 +217,9 @@ export function DrawBowl({
                 ? t("youDrewBalls", { count: String(results.length) })
                 : t("youDrewBall", { number: String(results[0]?.ballDrawn) })}
             </h3>
-            <div className="flex items-center gap-2 bg-secondary-fixed-dim/20 text-on-secondary-container px-4 py-2 rounded-lg mb-stack-gap-lg">
-              <span className="material-symbols-outlined text-[18px]">pending_actions</span>
-              <p className="font-label-sm text-label-sm">{t("pendingAdminValidation")}</p>
+            <div className="flex items-center justify-center gap-2 bg-emerald-50 border border-emerald-200/80 text-emerald-950 px-4 py-2.5 rounded-xl mb-stack-gap-lg shadow-2xs">
+              <span className="text-lg">💪</span>
+              <p className="font-label-md text-xs sm:text-sm font-semibold text-center">{t("pendingAdminValidation")}</p>
             </div>
 
             {remainingUndrawnCount > 0 ? (

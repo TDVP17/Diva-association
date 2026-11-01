@@ -83,7 +83,7 @@ export function CotisationMembersList({
 
   async function handleMainCotiserAction() {
     playUiTapSound();
-    if (lockedReason) return;
+    if (isDraftSession || lockedReason) return;
     if (!hasUnpaid) return;
 
     // Offline draft handling
@@ -114,7 +114,9 @@ export function CotisationMembersList({
 
   function handlePaySingle(slotId: string) {
     playUiTapSound();
-    if (lockedReason) return;
+    if (isDraftSession || lockedReason) return;
+    const targetSlot = members.find((m) => m.id === slotId);
+    if (!targetSlot?.ballDrawn) return;
     setActiveSlotIdForPay(slotId);
   }
 
@@ -175,7 +177,7 @@ export function CotisationMembersList({
                   <button
                     type="button"
                     onClick={() => handlePaySingle(slot.id)}
-                    disabled={isDraftSession || slot.officialPosition === null || !!lockedReason}
+                    disabled={isDraftSession || slot.officialPosition === null || !slot.ballDrawn || !!lockedReason}
                     className="px-3 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {lang === "fr" ? "Cotiser" : "Pay"}

@@ -270,10 +270,11 @@ export function NotificationsClient({ lang }: { lang: Lang }) {
                     e.stopPropagation();
                     dismiss(n.id);
                   }}
-                  aria-label={t("dismissNotification")}
-                  className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-low hover:text-error transition-colors cursor-pointer"
+                  aria-label={lang === "fr" ? "Supprimer la notification" : t("dismissNotification")}
+                  title={lang === "fr" ? "Supprimer la notification" : "Delete notification"}
+                  className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[16px]">close</span>
+                  <span className="material-symbols-outlined text-[18px]">close</span>
                 </button>
                 <button
                   type="button"

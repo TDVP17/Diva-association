@@ -20,6 +20,8 @@ import { PaymentToastBanner } from "./payment-toast-banner";
 import { CotisationHeroCard } from "./cotisation-hero-card";
 import { TonTourBanner } from "./ton-tour-banner";
 import { CotisationMembersList } from "./cotisation-members-list";
+import { WaitingContributionsBanner } from "./waiting-contributions-banner";
+import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { getDesignatedSlot, assertPriorCyclePaidOut } from "@/lib/round-robin-lock";
 import { sessionStatusKey } from "@/lib/session-status-label";
 import { assertJoinable, sumRegisteredSlots } from "@/lib/session-joinability";
@@ -548,11 +550,13 @@ export default async function SessionDetailPage({
         null
       : null;
 
-  // Check if every slot in the group has an assigned position
+  // Check if every slot in the group has drawn its lucky ball AND has an assigned position
+  const hasAllBallsDrawn =
+    allSlotsFlat.length > 0 && allSlotsFlat.every((s) => s.ballDrawn !== null);
   const hasAllPositions =
     allSlotsFlat.length > 0 && allSlotsFlat.every((s) => s.officialPosition !== null);
   const isDrawCompleted =
-    hasAllPositions && tontineSession.status !== "DRAFT";
+    hasAllBallsDrawn && hasAllPositions && tontineSession.status !== "DRAFT";
 
   if (tontineSession.status === "DRAWING" && isDrawCompleted) {
     prisma.tontineSession
@@ -698,21 +702,13 @@ export default async function SessionDetailPage({
 
             {/* If beneficiary has drawn their ball, but not all members have contributed yet */}
             {isBeneficiaryTurn && !myActivePayoutClaim && !canFillPayoutDetails && (
-              <div className="mb-stack-gap-lg rounded-2xl border border-emerald-500/30 bg-emerald-50/60 p-4 text-emerald-950 flex items-start gap-3 shadow-xs">
-                <span className="material-symbols-outlined text-emerald-700 text-[24px] flex-shrink-0 mt-0.5">
-                  hourglass_empty
-                </span>
-                <div className="min-w-0 flex-1">
-                  <h4 className="font-label-md text-sm font-bold text-emerald-950">
-                    {lang === "fr" ? "Ordre de bouffe : En attente des cotisations" : "Payout Turn: Waiting for Contributions"}
-                  </h4>
-                  <p className="font-body-sm text-xs text-emerald-900/90 mt-1 leading-relaxed">
-                    {lang === "fr"
-                      ? `L'envoi de vos coordonnées de paiement s'activera dès que tout le monde aura cotisé (${paidCount}/${totalSlotsCount} cotisations reçues). N'oubliez pas que tout le monde, y compris vous-même pour vos parts, a l'obligation de cotiser !`
-                      : `The prompt to provide your payout details will activate once all members have contributed (${paidCount}/${totalSlotsCount} contributions received). Remember that everyone, including yourself for your parts, must contribute!`}
-                  </p>
-                </div>
-              </div>
+              <WaitingContributionsBanner
+                sessionId={id}
+                dueDateStr={dueDate.toISOString()}
+                paidCount={paidCount}
+                totalSlotsCount={totalSlotsCount}
+                lang={lang}
+              />
             )}
 
             {/* PayoutTurnPanel is only rendered if an active claim exists, OR if the beneficiary can fill details (ball drawn, >= 50% paid, and time >= 18:30) */}
@@ -758,7 +754,9 @@ export default async function SessionDetailPage({
           isSessionFinished
             ? (lang === "fr" ? "Cette session de cotisation est terminée pour ce cycle." : "This cotisation session is finished for this cycle.")
             : !isDrawCompleted
-            ? t("paymentsLockedNoPayoutOrder")
+            ? (lang === "fr"
+                ? "Impossible de cotiser tant que tous les membres n'ont pas tiré leur boule et que l'ordre de bouffe n'est pas établi."
+                : "Contributions are locked until all members finish drawing and payout order is established.")
             : !roundLock.ok && currentBeneficiaryName && !isBeneficiaryTurn
             ? t("paymentsLockedUntilPayout", { name: currentBeneficiaryName })
             : undefined

@@ -90,7 +90,7 @@ async function loadAndValidateSlots(
     if (slot.membership.tontineSession.isPaused) {
       return { ok: false as const, status: 409, error: `${slot.beneficiaryName}'s cotisation is temporarily paused` };
     }
-    if (slot.officialPosition === null) {
+    if (slot.officialPosition === null || slot.ballDrawn === null) {
       return { ok: false as const, status: 409, error: `Impossible de cotiser tant que l'ordre de bouffe n'est pas établi (${slot.beneficiaryName})` };
     }
 
@@ -170,7 +170,7 @@ export async function listUnpaidSlotsForBulkPayment(userId: string): Promise<Unp
 
       const { amount, fee } = getContributionTotal({ amount: Number(tontineSession.amount), fee: Number(tontineSession.fee) });
 
-      const isLockedNoOrder = (tontineSession.status !== "ACTIVE" && tontineSession.status !== "DRAWING") || slot.officialPosition === null;
+      const isLockedNoOrder = (tontineSession.status !== "ACTIVE" && tontineSession.status !== "DRAWING") || slot.officialPosition === null || slot.ballDrawn === null;
       results.push({
         membershipSlotId: slot.id,
         beneficiaryName: slot.beneficiaryName,

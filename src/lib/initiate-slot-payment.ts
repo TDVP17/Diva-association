@@ -97,7 +97,7 @@ export async function getSlotPaymentQuote(
   if (slot.membership.tontineSession.isPaused) {
     return { ok: false, status: 409, error: "This cotisation is temporarily paused — payments will resume shortly" };
   }
-  if (slot.officialPosition === null) {
+  if (slot.officialPosition === null || slot.ballDrawn === null) {
     return { ok: false, status: 409, error: "Impossible de cotiser tant que l'ordre de bouffe (position) n'est pas établi" };
   }
 
@@ -176,7 +176,7 @@ export async function initiateSlotPayment(
   if (slot.membership.tontineSession.isPaused) {
     return { ok: false, status: 409, error: "This cotisation is temporarily paused — payments will resume shortly" };
   }
-  if (slot.officialPosition === null) {
+  if (slot.officialPosition === null || slot.ballDrawn === null) {
     return { ok: false, status: 409, error: "Impossible de cotiser tant que l'ordre de bouffe (position) n'est pas établi" };
   }
 
