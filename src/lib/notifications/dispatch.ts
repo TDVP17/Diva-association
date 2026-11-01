@@ -82,9 +82,14 @@ export async function scheduleNotifications(params: {
     const firstName = rawName.split(/\s+/)[0] || rawName;
     const greeting = firstName ? (lang === "en" ? `Hello, ${firstName} 👋` : `Salut, ${firstName} 👋`) : "";
 
+    const vars: Record<string, string> = {
+      ...(r.messageVars ?? {}),
+      ...(firstName ? { name: firstName } : {}),
+    };
+
     let msg =
       r.messageKey && r.messageKey in translations[lang]
-        ? translate(lang, r.messageKey as TranslationKey, r.messageVars)
+        ? translate(lang, r.messageKey as TranslationKey, vars)
         : r.message;
     const hasGreeting =
       msg.startsWith("Salut") ||
@@ -95,11 +100,6 @@ export async function scheduleNotifications(params: {
     if (greeting && !hasGreeting) {
       msg = `${greeting} ! ${msg}`;
     }
-
-    const vars = {
-      ...(r.messageVars ?? {}),
-      ...(firstName ? { name: firstName } : {}),
-    };
 
     return {
       ...r,
@@ -160,9 +160,13 @@ async function deliverInstantNotifications(params: {
           const greeting = firstName ? (lang === "en" ? `Hello, ${firstName} 👋` : `Salut, ${firstName} 👋`) : "";
           const typeKey = NOTIFICATION_TYPE_KEY[params.type];
           let title = typeKey ? translate(lang, typeKey) : "DIVA Asso.";
+          const vars: Record<string, string> = {
+            ...(r.messageVars ?? {}),
+            ...(firstName ? { name: firstName } : {}),
+          };
           let body =
             r.messageKey && r.messageKey in translations[lang]
-              ? translate(lang, r.messageKey as TranslationKey, r.messageVars)
+              ? translate(lang, r.messageKey as TranslationKey, vars)
               : r.message;
 
           // Ensure push/body begins with personalized greeting with emoji

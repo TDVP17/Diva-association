@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 
   const due = await prisma.notification.findMany({
     where: { status: { in: ["PENDING", "SCHEDULED"] }, scheduledAt: { lte: new Date() } },
-    include: { user: { select: { email: true, phone: true, preferredLang: true } } },
+    include: { user: { select: { email: true, phone: true, preferredLang: true, name: true } } },
     orderBy: { scheduledAt: "asc" },
     take: BATCH_SIZE,
   });
@@ -60,6 +60,7 @@ export async function GET(request: Request) {
           actionUrl: n.actionUrl ?? undefined,
           actionLabel: lang === "en" ? "View in App" : "Consulter dans l'application",
           lang,
+          recipientName: n.user.name ?? undefined,
         });
         await sendEmail(n.user.email, subject, emailHtml);
       } else if (n.channel === "WHATSAPP") {

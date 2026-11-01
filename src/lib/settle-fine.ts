@@ -6,11 +6,7 @@ import { translate } from "@/lib/i18n/translations";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { formatXAF } from "@/lib/format-currency";
 
-const TONTINE_LABELS: Record<string, string> = {
-  HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
-  MONTHLY_28: "Monthly Tontine (28th)",
-  MONTHLY_25: "Monthly Tontine (25th)",
-};
+import { TONTINE_TYPE_LABELS as TONTINE_LABELS } from "@/lib/tontine-labels";
 
 type FineWithSlot = Fine & {
   membershipSlot: MembershipSlot & {

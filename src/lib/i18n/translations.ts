@@ -834,8 +834,8 @@ export const translations = {
     notifTypePaymentSuccess: "Payment Confirmation",
     notifTypePaymentFailed: "Payment Failed",
     notifTypePaymentRefundEscalated: "Refund Needs Manual Review",
-    paymentSuccessNotifMessage: "Your payment of {amount} for {session} was received. Thank you!",
-    paymentFailedNotifMessage: "Your {amount} payment for {session} did not go through. Insufficient balance or the transaction was declined — please try again.",
+    paymentSuccessNotifMessage: "Your payment of {amount} for {session} was received. Thank you! ✅🎉",
+    paymentFailedNotifMessage: "Your {amount} payment for {session} did not go through. Please check your phone authorization or try again. ⚠️",
     paymentRefundEscalatedNotifMessage: "Automated refund failed 3 times for a duplicate payment of {amount} on slot \"{slot}\". Please refund the payer manually.",
     notifTypeAdminBroadcast: "Announcement",
     notifTypeMemberApproved: "Cotisation Membership Approved",
@@ -2029,8 +2029,8 @@ export const translations = {
     notifTypePaymentSuccess: "Confirmation de paiement",
     notifTypePaymentFailed: "Échec du paiement",
     notifTypePaymentRefundEscalated: "Remboursement à traiter manuellement",
-    paymentSuccessNotifMessage: "Salut, {name} 👋 ! Votre paiement de {amount} pour {session} a été reçu. Merci ! ✅🎉",
-    paymentFailedNotifMessage: "Salut, {name} 👋 ! Votre paiement de {amount} pour {session} n'a pas abouti. Solde insuffisant ou transaction refusée — veuillez réessayer. ⚠️",
+    paymentSuccessNotifMessage: "Votre paiement de {amount} pour {session} a été reçu. Merci ! ✅🎉",
+    paymentFailedNotifMessage: "Votre paiement de {amount} pour {session} n'a pas abouti. Veuillez vérifier la validation sur votre téléphone ou réessayer. ⚠️",
     paymentRefundEscalatedNotifMessage: "Le remboursement automatique a échoué 3 fois pour un double paiement de {amount} sur le nom « {slot} ». Veuillez rembourser le payeur manuellement.",
     notifTypeAdminBroadcast: "Annonce",
     notifTypeMemberApproved: "Adhésion à la cotisation validée",
@@ -2390,9 +2390,26 @@ export const translations = {
 
 export type TranslationKey = keyof (typeof translations)["en"];
 
-/** Simple {placeholder} substitution for the handful of keys that need it. */
+/** Safe {placeholder} substitution — replaces variables and cleans up missing placeholders so raw tokens never leak to users. */
 export function formatTranslation(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{(\w+)\}/g, (match, key) => vars[key] ?? match);
+  let result = template;
+  const nameVal = vars.name?.trim();
+  if (!nameVal) {
+    result = result
+      .replace(/Salut,\s*\{name\}\s*👋/g, "Salut 👋")
+      .replace(/Bonjour,\s*\{name\}\s*👋/g, "Bonjour 👋")
+      .replace(/Hello,\s*\{name\}\s*👋/g, "Hello 👋")
+      .replace(/Hi,\s*\{name\}\s*👋/g, "Hi 👋")
+      .replace(/,\s*\{name\}/g, "")
+      .replace(/\{name\}\s*/g, "");
+  }
+
+  result = result.replace(/\{(\w+)\}/g, (_match, key) => {
+    const val = vars[key];
+    return val !== undefined && val !== null ? String(val) : "";
+  });
+
+  return result.replace(/[ \t]{2,}/g, " ").trim();
 }
 
 /**

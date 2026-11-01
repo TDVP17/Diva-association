@@ -62,22 +62,33 @@ export function renderBrandedEmailHtml(params: BrandedEmailParams): string {
       }</p>`
     : "";
 
+  const sanitizeEmailBody = (str: string) => {
+    return str
+      .replace(/Salut,\s*\{name\}\s*👋/g, firstName ? `Salut, ${firstName} 👋` : "Salut 👋")
+      .replace(/Hello,\s*\{name\}\s*👋/g, firstName ? `Hello, ${firstName} 👋` : "Hello 👋")
+      .replace(/Bonjour,\s*\{name\}\s*👋/g, firstName ? `Bonjour, ${firstName} 👋` : "Bonjour 👋")
+      .replace(/,\s*\{name\}/g, firstName ? `, ${firstName}` : "")
+      .replace(/\{name\}/g, firstName || "");
+  };
+
   let content = "";
   if (params.bodyHtml) {
+    const cleanHtml = sanitizeEmailBody(params.bodyHtml);
     const hasGreeting =
-      params.bodyHtml.includes("Salut") ||
-      params.bodyHtml.includes("Bonjour") ||
-      params.bodyHtml.includes("Hello");
-    content = hasGreeting ? params.bodyHtml : `${greetingHtml}${params.bodyHtml}`;
+      cleanHtml.includes("Salut") ||
+      cleanHtml.includes("Bonjour") ||
+      cleanHtml.includes("Hello");
+    content = hasGreeting ? cleanHtml : `${greetingHtml}${cleanHtml}`;
   } else {
-    const text = params.bodyText || "";
+    const rawText = params.bodyText || "";
+    const cleanText = sanitizeEmailBody(rawText);
     const hasGreeting =
-      text.startsWith("Salut") ||
-      text.startsWith("Bonjour") ||
-      text.startsWith("Hello");
+      cleanText.startsWith("Salut") ||
+      cleanText.startsWith("Bonjour") ||
+      cleanText.startsWith("Hello");
     content = hasGreeting
-      ? `<p style="font-size: 15px; line-height: 1.65; color: #334155; margin: 0; white-space: pre-line;">${text}</p>`
-      : `${greetingHtml}<p style="font-size: 15px; line-height: 1.65; color: #334155; margin: 0; white-space: pre-line;">${text}</p>`;
+      ? `<p style="font-size: 15px; line-height: 1.65; color: #334155; margin: 0; white-space: pre-line;">${cleanText}</p>`
+      : `${greetingHtml}<p style="font-size: 15px; line-height: 1.65; color: #334155; margin: 0; white-space: pre-line;">${cleanText}</p>`;
   }
 
   return `

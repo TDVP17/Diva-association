@@ -30,6 +30,25 @@ describe("notification message personalization", () => {
     expect(msg).toContain("Tontine de septembre");
   });
 
+  it("never outputs raw {name} or unhandled placeholders even if name is omitted in vars", () => {
+    const failedMsgFr = translate("fr", "paymentFailedNotifMessage", { amount: "1 550 FCFA", session: "Chaque lundi" });
+    expect(failedMsgFr).not.toContain("{name}");
+    expect(failedMsgFr).toContain("1 550 FCFA");
+    expect(failedMsgFr).toContain("Chaque lundi");
+
+    const failedMsgEn = translate("en", "paymentFailedNotifMessage", { amount: "1 550 FCFA", session: "Chaque lundi" });
+    expect(failedMsgEn).not.toContain("{name}");
+    expect(failedMsgEn).toContain("1 550 FCFA");
+
+    const successMsgFr = translate("fr", "paymentSuccessNotifMessage", { amount: "1 550 FCFA", session: "Chaque lundi" });
+    expect(successMsgFr).not.toContain("{name}");
+    expect(successMsgFr).toContain("1 550 FCFA");
+
+    // Even on templates that originally had {name}, if name is omitted, it should not leak raw "{name}"
+    const foodMsg = translate("fr", "foodTurnMessage", {});
+    expect(foodMsg).not.toContain("{name}");
+  });
+
   describe("payoutReleasedMessage — recipient language, not hardcoded English", () => {
     it("renders in French for a French-preferring recipient", () => {
       const msg = payoutReleasedMessage("fr", "Marie Fotso", "Marie Fotso (fille)", 5000, 0);

@@ -32,11 +32,7 @@ export type BulkPaymentQuoteResult = { ok: true; quote: BulkPaymentQuote } | { o
 
 export type InitiateBulkPaymentResult = { ok: true; transId: string; link?: string } | { ok: false; status: number; error: string };
 
-const TONTINE_LABELS: Record<string, string> = {
-  HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
-  MONTHLY_28: "Monthly Tontine (28th)",
-  MONTHLY_25: "Monthly Tontine (25th)",
-};
+import { TONTINE_TYPE_LABELS as TONTINE_LABELS } from "@/lib/tontine-labels";
 
 /**
  * Loads and validates every requested slot for a bulk payment — shared by

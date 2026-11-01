@@ -7,11 +7,7 @@ import { triggerAutomatedRefund } from "@/lib/trigger-fapshi-refund";
 import { formatXAF } from "@/lib/format-currency";
 import type { PaymentAttempt } from "@/generated/prisma/client";
 
-const TONTINE_LABELS: Record<string, string> = {
-  HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
-  MONTHLY_28: "Monthly Tontine (28th)",
-  MONTHLY_25: "Monthly Tontine (25th)",
-};
+import { TONTINE_TYPE_LABELS as TONTINE_LABELS } from "@/lib/tontine-labels";
 
 export interface ProcessedTransaction {
   status: FapshiPaymentStatus;
