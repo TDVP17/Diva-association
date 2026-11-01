@@ -178,7 +178,7 @@ export function PaymentConfirmDialog({
     }, POLL_INTERVAL_MS);
   }
 
-  async function handleConfirm() {
+  async function handleConfirm(useCheckout = false) {
     let normalized: string;
     if (!usingNewNumber) {
       // A saved method's phone was already validated/normalized when it was
@@ -208,6 +208,7 @@ export function PaymentConfirmDialog({
           ...(membershipSlotId ? { membershipSlotId } : {}),
           ...(fineId ? { fineId } : {}),
           phone: normalized,
+          useCheckout,
         }),
       });
       const body = await parseJsonOrThrow<{ transId: string; link?: string }>(res, t("paymentInitiationFailed"));
@@ -293,18 +294,12 @@ export function PaymentConfirmDialog({
                     <span className="font-label-md text-label-md text-on-surface">{formatXAF(quote.baseTotal)}</span>
                   </div>
                 )}
-                {quote.providerFeeAmount > 0 && (
-                  <div className="flex justify-between items-center text-sm text-on-surface-variant">
-                    <span className="font-body-md text-body-md">{t("paymentFeeRateLabel")}</span>
-                    <span className="font-label-md text-label-md">+{formatXAF(quote.providerFeeAmount)}</span>
-                  </div>
-                )}
                 <div className="flex justify-between items-center border-t border-outline-variant pt-2 mt-1">
                   <span className="font-label-md text-label-md text-on-surface font-bold">
                     {t("totalLabel")}
                   </span>
                   <span className="font-headline-sm text-headline-sm text-primary font-bold">
-                    {formatXAF(quote.totalCharged ?? quote.baseTotal)}
+                    {formatXAF(quote.baseTotal)}
                   </span>
                 </div>
               </div>
@@ -434,7 +429,7 @@ export function PaymentConfirmDialog({
             <h2 className="font-headline-sm text-headline-sm text-on-surface">{t("waitingForUssdConfirmationTitle")}</h2>
             {quote && (
               <p className="font-headline-sm text-headline-sm text-primary font-bold">
-                {formatXAF(quote.totalCharged ?? quote.baseTotal)}
+                {formatXAF(quote.baseTotal)}
               </p>
             )}
             <p className="font-label-sm text-label-sm text-on-surface-variant">
@@ -468,6 +463,15 @@ export function PaymentConfirmDialog({
             <p className="font-body-md text-body-md text-on-surface">
               {failedReason || t("paymentFailedGeneric")}
             </p>
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={() => handleConfirm(true)}
+              className="w-full px-3 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-[18px]">lock</span>
+              {t("payViaSecureCheckout")}
+            </button>
             <div className="flex gap-3 w-full">
               <button
                 type="button"

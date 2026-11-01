@@ -632,9 +632,9 @@ export const translations = {
     paymentFailedInsufficientFunds: "Insufficient balance. Please top up your account and try again.",
     paymentFailedGeneric:
       "The payment could not be completed on your phone. Please verify your balance or network connection and try again.",
-    payViaSecureCheckout: "Pay",
+    payViaSecureCheckout: "Pay via secure link",
     payViaSecureCheckoutDesc: "",
-    useSecureCheckoutOption: "Pay",
+    useSecureCheckoutOption: "Pay via secure link",
     stillWaitingForConfirmation: "Still waiting — you can leave this open, or check back later from your history.",
     globalPaymentNavLabel: "Global Payment",
     globalPaymentTitle: "Global Payment",
@@ -1824,9 +1824,9 @@ export const translations = {
     paymentFailedInsufficientFunds: "Solde insuffisant. Veuillez recharger votre compte et réessayer.",
     paymentFailedGeneric:
       "Le paiement n'a pas pu aboutir sur votre téléphone. Veuillez vérifier votre solde ou votre connexion et réessayer.",
-    payViaSecureCheckout: "Payer",
+    payViaSecureCheckout: "Payer via le lien sécurisé",
     payViaSecureCheckoutDesc: "",
-    useSecureCheckoutOption: "Payer",
+    useSecureCheckoutOption: "Payer via le lien sécurisé",
     stillWaitingForConfirmation:
       "Toujours en attente — vous pouvez laisser cette fenêtre ouverte, ou revenir plus tard depuis votre historique.",
     globalPaymentNavLabel: "Paiement global",
