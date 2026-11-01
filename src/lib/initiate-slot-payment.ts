@@ -126,7 +126,6 @@ export async function getSlotPaymentQuote(
 
   // Les amendes ne sont pas obligatoires sur-le-champ lors du paiement de cotisation.
   const baseTotal = amount + fee;
-  const providerFee = computeProviderFee(provider, baseTotal);
 
   return {
     ok: true,
@@ -136,8 +135,8 @@ export async function getSlotPaymentQuote(
       fineAmount: 0,
       baseTotal,
       provider,
-      providerFeeAmount: providerFee.providerFeeAmount,
-      totalCharged: providerFee.totalCharged,
+      providerFeeAmount: 0,
+      totalCharged: baseTotal,
     },
   };
 }
@@ -247,9 +246,9 @@ export async function initiateSlotPayment(
         failureReason: null,
         paidByUserId: options?.paidByUserId,
         paymentProvider: provider,
-        providerFeeAmount: providerFee.providerFeeAmount,
-        providerShareAmount: providerFee.providerShareAmount,
-        presidentFeeShareAmount: providerFee.presidentFeeShareAmount,
+        providerFeeAmount: 0,
+        providerShareAmount: 0,
+        presidentFeeShareAmount: 0,
       };
 
       return existing
@@ -283,18 +282,18 @@ export async function initiateSlotPayment(
 
     const result = options?.useCheckout
       ? await initiateHostedPayment({
-          amount: providerFee.totalCharged,
+          amount: baseTotal,
           userId: slot.membership.userId,
           externalId: contribution.id,
           message: `DIVA cotisation — ${slot.beneficiaryName} (${tontineSession.type})`,
           redirectUrl,
         })
       : await initiateDirectPayment({
-          amount: providerFee.totalCharged,
+          amount: baseTotal,
           phone: normalizedPhone,
           userId: slot.membership.userId,
           externalId: contribution.id,
-          message: `DIVA tontine contribution — ${slot.beneficiaryName} (${tontineSession.type})`,
+          message: `DIVA cotisation — ${slot.beneficiaryName} (${tontineSession.type})`,
           medium: detectedProvider ? fapshiMediumFor(detectedProvider) : undefined,
           redirectUrl,
         });
@@ -313,7 +312,7 @@ export async function initiateSlotPayment(
           transId: result.transId,
           contributionId: contribution.id,
           payerPhone: normalizedPhone,
-          amount: providerFee.totalCharged,
+          amount: baseTotal,
         },
       }),
     ]);

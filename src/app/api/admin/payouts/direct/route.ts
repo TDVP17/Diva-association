@@ -137,7 +137,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: err.message }, { status: 502 });
     }
     return NextResponse.json(
-      { error: "Le virement Fapshi a échoué. Veuillez vérifier le solde Fapshi ou le numéro." },
+      { error: "Le virement a échoué. Veuillez vérifier le solde ou le numéro." },
       { status: 502 },
     );
   }

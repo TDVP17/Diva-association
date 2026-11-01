@@ -48,15 +48,14 @@ export async function getFinePaymentQuote(fineId: string, userId: string): Promi
 
   const provider: PaymentProvider = "FAPSHI";
   const baseTotal = Number(fine.amount);
-  const providerFee = computeProviderFee(provider, baseTotal);
 
   return {
     ok: true,
     quote: {
       baseTotal,
       provider,
-      providerFeeAmount: providerFee.providerFeeAmount,
-      totalCharged: providerFee.totalCharged,
+      providerFeeAmount: 0,
+      totalCharged: baseTotal,
     },
   };
 }
@@ -78,7 +77,7 @@ export async function initiateFinePayment(
   }
 
   const provider: PaymentProvider = "FAPSHI";
-  const providerFee = computeProviderFee(provider, Number(fine.amount));
+  const baseTotal = Number(fine.amount);
 
   let claimed: { id: string };
   try {
@@ -120,7 +119,7 @@ export async function initiateFinePayment(
   try {
     const detectedProvider = detectMobileMoneyProvider(normalizedPhone);
     const result = await initiateDirectPayment({
-      amount: providerFee.totalCharged,
+      amount: baseTotal,
       phone: normalizedPhone,
       userId,
       externalId: fine.id,
@@ -135,7 +134,7 @@ export async function initiateFinePayment(
           transId: result.transId,
           fineId: claimed.id,
           payerPhone: normalizedPhone,
-          amount: providerFee.totalCharged,
+          amount: baseTotal,
         },
       }),
     ]);

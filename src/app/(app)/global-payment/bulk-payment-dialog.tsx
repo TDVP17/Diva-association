@@ -113,7 +113,7 @@ export function BulkPaymentDialog({
     }, POLL_INTERVAL_MS);
   }
 
-  async function handleConfirm(options?: { forceCheckout?: boolean }) {
+  async function handleConfirm() {
     const digits = phone.replace(/\D/g, "");
     const normalized = digits.startsWith("237") ? digits.slice(3) : digits;
     if (!/^[6-9]\d{8}$/.test(normalized)) {
@@ -131,7 +131,6 @@ export function BulkPaymentDialog({
           membershipSlotIds,
           phone: normalized,
           isRelative,
-          useCheckout: options?.forceCheckout,
         }),
       });
       const body = await parseJsonOrThrow<{ transId: string; link?: string }>(res, t("paymentInitiationFailed"));
@@ -263,32 +262,21 @@ export function BulkPaymentDialog({
             <p className="font-body-md text-body-md text-on-surface">
               {failedReason || t("paymentFailedGeneric")}
             </p>
-            <div className="w-full space-y-2">
+            <div className="flex gap-3 w-full">
               <button
                 type="button"
-                onClick={() => handleConfirm({ forceCheckout: true })}
-                disabled={submitting}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all shadow-sm"
+                onClick={onClose}
+                className="flex-1 px-3 py-2.5 rounded-lg border border-outline text-on-surface font-label-md text-label-md hover:bg-surface-variant/50 transition-colors"
               >
-                <span className="material-symbols-outlined text-[18px]">open_in_new</span>
-                {t("payViaSecureCheckout")}
+                {t("cancelAction")}
               </button>
-              <div className="flex gap-3 w-full">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex-1 px-3 py-2.5 rounded-lg border border-outline text-on-surface font-label-md text-label-md hover:bg-surface-variant/50 transition-colors"
-                >
-                  {t("cancelAction")}
-                </button>
-                <button
-                  type="button"
-                  onClick={retry}
-                  className="flex-1 px-3 py-2.5 rounded-lg border border-primary text-primary font-label-md text-label-md hover:bg-primary/10 active:scale-95 transition-all"
-                >
-                  {t("tryAgain")}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={retry}
+                className="flex-1 px-3 py-2.5 rounded-lg border border-primary text-primary font-label-md text-label-md hover:bg-primary/10 active:scale-95 transition-all"
+              >
+                {t("tryAgain")}
+              </button>
             </div>
             {transId && <p className="font-label-sm text-[11px] text-on-surface-variant">Ref: {transId}</p>}
           </div>

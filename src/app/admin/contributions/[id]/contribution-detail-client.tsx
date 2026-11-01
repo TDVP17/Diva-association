@@ -727,7 +727,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
         setPayoutError(body?.error || t("failedToReleasePayout"));
         return;
       }
-      const refMsg = body.transId ? ` (Réf Fapshi: ${body.transId})` : "";
+      const refMsg = body.transId ? ` (Réf: ${body.transId})` : "";
       setPayoutResult(
         `${t("payoutResultLine", {
           pot: formatXAF(body.pot),
@@ -793,7 +793,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
       if (!res.ok) {
         setDirectPayoutError(data?.error || t("failedToReleasePayout"));
       } else {
-        const refStr = data?.transId ? ` — Réf Fapshi: ${data.transId}` : "";
+        const refStr = data?.transId ? ` — Réf: ${data.transId}` : "";
         setDirectPayoutResult(
           `${t("payoutSentSuccess")} (${formatXAF(data.netPayout)})${refStr}`
         );
@@ -2382,7 +2382,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                         <div className="flex items-center justify-between flex-wrap gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-200">
                           <div className="flex items-center gap-1.5 font-mono text-slate-700">
                             <span className="material-symbols-outlined text-[15px] text-primary">tag</span>
-                            <span><strong>Réf Fapshi :</strong> {c.fapshiTransId}</span>
+                            <span><strong>Réf :</strong> {c.fapshiTransId}</span>
                           </div>
                           <button
                             type="button"
@@ -2492,8 +2492,8 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                         </div>
                         <p className="font-label-sm text-xs text-slate-600 bg-amber-50 border border-amber-200 rounded p-2">
                           {lang === "fr"
-                            ? "Fapshi débitera votre compte administrateur et transférera les fonds directement au nom et au numéro ci-dessus."
-                            : "Fapshi will debit your admin account and transfer the funds directly to the name and number above."}
+                            ? "Le compte administrateur sera débité et les fonds transférés directement au nom et au numéro ci-dessus."
+                            : "The admin account will be debited and funds transferred directly to the name and number above."}
                         </p>
                         <div className="flex flex-col gap-2 mt-1">
                           <button

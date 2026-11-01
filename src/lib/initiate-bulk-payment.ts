@@ -227,11 +227,10 @@ export async function getBulkPaymentQuote(
 
   const baseTotal = items.reduce((sum, item) => sum + item.baseTotal, 0);
   const provider: PaymentProvider = "FAPSHI";
-  const providerFee = computeProviderFee(provider, baseTotal);
 
   return {
     ok: true,
-    quote: { items, baseTotal, provider, providerFeeAmount: providerFee.providerFeeAmount, totalCharged: providerFee.totalCharged },
+    quote: { items, baseTotal, provider, providerFeeAmount: 0, totalCharged: baseTotal },
   };
 }
 
@@ -292,11 +291,10 @@ export async function initiateBulkPayment(
         items.push({ slotId: slot.id, beneficiaryName: slot.beneficiaryName, dueDate, amount, fee, fineAmount: 0 });
       }
 
-      const combinedFee = computeProviderFee(provider, baseTotal);
-      totalCharged = combinedFee.totalCharged;
+      totalCharged = baseTotal;
 
       const created = await tx.bulkPayment.create({
-        data: { userId, payerPhone: normalizedPhone, amount: combinedFee.totalCharged, status: "PENDING" },
+        data: { userId, payerPhone: normalizedPhone, amount: baseTotal, status: "PENDING" },
       });
 
       for (const item of items) {
@@ -315,9 +313,9 @@ export async function initiateBulkPayment(
           bulkPaymentId: created.id,
           paidByUserId: isRelativePayment ? userId : undefined,
           paymentProvider: provider,
-          providerFeeAmount: slotFee.providerFeeAmount,
-          providerShareAmount: slotFee.providerShareAmount,
-          presidentFeeShareAmount: slotFee.presidentFeeShareAmount,
+          providerFeeAmount: 0,
+          providerShareAmount: 0,
+          presidentFeeShareAmount: 0,
         };
         const existing = await tx.contribution.findUnique({
           where: { membershipSlotId_dueDate: { membershipSlotId: item.slotId, dueDate: item.dueDate } },
@@ -352,7 +350,7 @@ export async function initiateBulkPayment(
           amount: totalCharged,
           userId,
           externalId: bulkPayment.id,
-          message: `DIVA tontine — paiement groupé pour ${names.length} nom(s) : ${namesLabel}`,
+          message: `DIVA — paiement groupé pour ${names.length} nom(s) : ${namesLabel}`,
           redirectUrl,
         })
       : await initiateDirectPayment({
@@ -360,7 +358,7 @@ export async function initiateBulkPayment(
           phone: normalizedPhone,
           userId,
           externalId: bulkPayment.id,
-          message: `DIVA tontine — combined payment for ${names.length} names: ${namesLabel}`,
+          message: `DIVA — paiement groupé pour ${names.length} nom(s) : ${namesLabel}`,
           medium: detectedProvider ? fapshiMediumFor(detectedProvider) : undefined,
           redirectUrl,
         });
