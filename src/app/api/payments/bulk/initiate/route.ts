@@ -7,6 +7,7 @@ const bodySchema = z.object({
   membershipSlotIds: z.array(z.string().min(1)).min(1),
   phone: z.string().min(1),
   isRelative: z.boolean().optional(),
+  useCheckout: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
@@ -21,11 +22,18 @@ export async function POST(request: Request) {
   }
 
   try {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || new URL(request.url).origin;
+    const redirectUrl = `${baseUrl}/global-payment`;
+
     const result = await initiateBulkPayment(
       session.user.id,
       parsed.data.membershipSlotIds,
       parsed.data.phone,
-      { isRelative: parsed.data.isRelative },
+      {
+        isRelative: parsed.data.isRelative,
+        useCheckout: parsed.data.useCheckout,
+        redirectUrl,
+      },
     );
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status });

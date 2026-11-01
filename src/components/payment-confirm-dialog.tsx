@@ -50,6 +50,7 @@ export function PaymentConfirmDialog({
   defaultPhone,
   onSettled,
   onClose,
+  onDiscardDraft,
 }: {
   lang: Lang;
   /** Exactly one of membershipSlotId/fineId must be set. */
@@ -63,6 +64,8 @@ export function PaymentConfirmDialog({
   /** Called once the payment is confirmed SUCCESSFUL and settled server-side. */
   onSettled: () => void;
   onClose: () => void;
+  /** Optional callback to discard a draft contribution. */
+  onDiscardDraft?: () => void;
 }) {
   const t = (key: TranslationKey, vars?: Record<string, string>) => translate(lang, key, vars);
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -75,6 +78,7 @@ export function PaymentConfirmDialog({
   const [transId, setTransId] = useState<string | null>(null);
   const [failedReason, setFailedReason] = useState<string | null>(null);
   const [showWaitingHint, setShowWaitingHint] = useState(false);
+  const [useCheckoutMode, setUseCheckoutMode] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hintRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -172,7 +176,7 @@ export function PaymentConfirmDialog({
     }, POLL_INTERVAL_MS);
   }
 
-  async function handleConfirm() {
+  async function handleConfirm(options?: { forceCheckout?: boolean }) {
     let normalized: string;
     if (!usingNewNumber) {
       // A saved method's phone was already validated/normalized when it was
@@ -195,12 +199,15 @@ export function PaymentConfirmDialog({
     setSubmitting(true);
     setPayError(null);
     try {
+      const shouldCheckout = options?.forceCheckout ?? useCheckoutMode;
       const res = await fetch(payEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...(membershipSlotId ? { membershipSlotId } : {}),
+          ...(fineId ? { fineId } : {}),
           phone: normalized,
+          useCheckout: shouldCheckout,
         }),
       });
       const body = await parseJsonOrThrow<{ transId: string; link?: string }>(res, t("paymentInitiationFailed"));
@@ -352,6 +359,23 @@ export function PaymentConfirmDialog({
                         </span>
                       </p>
                     )}
+                    {detectedProvider === "ORANGE" && (
+                      <div className="mt-2 p-2.5 rounded-lg bg-orange-50 border border-orange-200 text-orange-950 font-label-sm text-[12px] flex items-start gap-2">
+                        <span className="material-symbols-outlined text-[18px] text-orange-600 flex-shrink-0 mt-0.5">info</span>
+                        <span>{t("payViaSecureCheckoutDesc")}</span>
+                      </div>
+                    )}
+                    <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={useCheckoutMode}
+                        onChange={(e) => setUseCheckoutMode(e.target.checked)}
+                        className="accent-primary"
+                      />
+                      <span className="font-label-sm text-label-sm text-on-surface">
+                        {t("useSecureCheckoutOption")}
+                      </span>
+                    </label>
                     {phoneError && <p className="font-label-sm text-label-sm text-error mt-1">{phoneError}</p>}
                     {canManageSavedMethods && (
                       <label className="flex items-center gap-2 mt-2 cursor-pointer">
@@ -381,7 +405,7 @@ export function PaymentConfirmDialog({
                 {t("cancelAction")}
               </button>
               <button
-                onClick={handleConfirm}
+                onClick={() => handleConfirm()}
                 disabled={!quote || submitting || (usingNewNumber ? !phone.trim() : !selectedMethodId)}
                 className="flex-1 px-3 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-60"
               >
@@ -429,22 +453,45 @@ export function PaymentConfirmDialog({
           <div className="flex flex-col items-center text-center gap-4">
             <span className="material-symbols-outlined text-error text-4xl">error</span>
             <p className="font-body-md text-body-md text-on-surface">
-              {failedReason || t("paymentFailedInsufficientFunds")}
+              {failedReason || t("paymentFailedGeneric")}
             </p>
-            <div className="flex gap-3 w-full">
+            <div className="w-full space-y-2">
               <button
-                onClick={onClose}
-                className="flex-1 px-3 py-2.5 rounded-lg border border-outline text-on-surface font-label-md text-label-md hover:bg-surface-variant/50 transition-colors"
+                type="button"
+                onClick={() => handleConfirm({ forceCheckout: true })}
+                disabled={submitting}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all shadow-sm"
               >
-                {t("cancelAction")}
+                <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+                {t("payViaSecureCheckout")}
               </button>
-              <button
-                onClick={retry}
-                className="flex-1 px-3 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all"
-              >
-                {t("tryAgain")}
-              </button>
+              <div className="flex gap-3 w-full">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 px-3 py-2.5 rounded-lg border border-outline text-on-surface font-label-md text-label-md hover:bg-surface-variant/50 transition-colors"
+                >
+                  {t("cancelAction")}
+                </button>
+                <button
+                  type="button"
+                  onClick={retry}
+                  className="flex-1 px-3 py-2.5 rounded-lg border border-primary text-primary font-label-md text-label-md hover:bg-primary/10 active:scale-95 transition-all"
+                >
+                  {t("tryAgain")}
+                </button>
+              </div>
             </div>
+            {onDiscardDraft && (
+              <button
+                type="button"
+                onClick={onDiscardDraft}
+                className="text-error font-label-sm text-label-sm hover:underline flex items-center gap-1 mt-1"
+              >
+                <span className="material-symbols-outlined text-[16px]">delete</span>
+                {t("deleteDraftAction")}
+              </button>
+            )}
             {transId && (
               <p className="font-label-sm text-[11px] text-on-surface-variant">Ref: {transId}</p>
             )}

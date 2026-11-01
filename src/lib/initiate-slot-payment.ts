@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getContributionTotal, getNextDueDate, isSessionCycleFinished } from "@/lib/tontine-engine";
-import { initiateDirectPayment, normalizeCameroonPhone, FapshiError } from "@/lib/fapshi";
+import { initiateDirectPayment, initiateHostedPayment, normalizeCameroonPhone, FapshiError } from "@/lib/fapshi";
 import { assertPriorCyclePaidOut } from "@/lib/round-robin-lock";
 import { computeProviderFee } from "@/lib/payment-fees";
 import { detectMobileMoneyProvider, fapshiMediumFor } from "@/lib/mobile-money-provider";
@@ -155,7 +155,7 @@ export async function getSlotPaymentQuote(
 export async function initiateSlotPayment(
   membershipSlotId: string,
   phone: string,
-  options?: { paidByUserId?: string },
+  options?: { paidByUserId?: string; useCheckout?: boolean; redirectUrl?: string },
 ): Promise<InitiateSlotPaymentResult> {
   const normalizedPhone = normalizeCameroonPhone(phone);
   if (!normalizedPhone) {
@@ -277,14 +277,27 @@ export async function initiateSlotPayment(
     // client input); an unrecognized prefix just falls back to undefined
     // (today's behavior) rather than blocking the payment.
     const detectedProvider = detectMobileMoneyProvider(normalizedPhone);
-    const result = await initiateDirectPayment({
-      amount: providerFee.totalCharged,
-      phone: normalizedPhone,
-      userId: slot.membership.userId,
-      externalId: contribution.id,
-      message: `DIVA tontine contribution — ${slot.beneficiaryName} (${tontineSession.type})`,
-      medium: detectedProvider ? fapshiMediumFor(detectedProvider) : undefined,
-    });
+    const redirectUrl =
+      options?.redirectUrl ||
+      `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://www.divaasso.com"}/sessions/${slot.membership.tontineSessionId}`;
+
+    const result = options?.useCheckout
+      ? await initiateHostedPayment({
+          amount: providerFee.totalCharged,
+          userId: slot.membership.userId,
+          externalId: contribution.id,
+          message: `DIVA cotisation — ${slot.beneficiaryName} (${tontineSession.type})`,
+          redirectUrl,
+        })
+      : await initiateDirectPayment({
+          amount: providerFee.totalCharged,
+          phone: normalizedPhone,
+          userId: slot.membership.userId,
+          externalId: contribution.id,
+          message: `DIVA tontine contribution — ${slot.beneficiaryName} (${tontineSession.type})`,
+          medium: detectedProvider ? fapshiMediumFor(detectedProvider) : undefined,
+          redirectUrl,
+        });
 
     await prisma.$transaction([
       prisma.contribution.update({

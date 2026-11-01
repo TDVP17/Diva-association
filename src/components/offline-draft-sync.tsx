@@ -73,6 +73,13 @@ export function OfflineDraftSync({ lang }: { lang: Lang }) {
     setReviewing(null);
   }
 
+  async function handleDeleteDraft(id: string) {
+    if (!window.confirm(t("deleteDraftConfirm"))) return;
+    await deleteDraftContribution(id);
+    if (reviewing?.id === id) setReviewing(null);
+    refreshDrafts();
+  }
+
   async function handleSettled() {
     if (reviewing) await deleteDraftContribution(reviewing.id);
     setReviewing(null);
@@ -98,12 +105,24 @@ export function OfflineDraftSync({ lang }: { lang: Lang }) {
               </p>
               <p className="font-label-sm text-label-sm text-on-surface-variant truncate">{drafts[0].beneficiaryName}</p>
             </div>
-            <button
-              onClick={() => setReviewing(drafts[0])}
-              className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 transition-all"
-            >
-              {t("reviewDraftsAction")}
-            </button>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => handleDeleteDraft(drafts[0].id)}
+                className="p-1.5 rounded-lg text-on-surface-variant hover:text-error hover:bg-error-container/20 transition-all flex items-center justify-center"
+                title={t("deleteDraftAction")}
+                aria-label={t("deleteDraftAction")}
+              >
+                <span className="material-symbols-outlined text-[20px]">delete</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setReviewing(drafts[0])}
+                className="px-3 py-1.5 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 transition-all"
+              >
+                {t("reviewDraftsAction")}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -117,6 +136,7 @@ export function OfflineDraftSync({ lang }: { lang: Lang }) {
           defaultPhone={reviewing.phone}
           onSettled={handleSettled}
           onClose={closeReview}
+          onDiscardDraft={() => handleDeleteDraft(reviewing.id)}
         />
       )}
     </>

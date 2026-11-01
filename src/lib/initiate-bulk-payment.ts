@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getContributionTotal, getNextDueDate } from "@/lib/tontine-engine";
-import { initiateDirectPayment, normalizeCameroonPhone, FapshiError } from "@/lib/fapshi";
+import { initiateDirectPayment, initiateHostedPayment, normalizeCameroonPhone, FapshiError } from "@/lib/fapshi";
 import { assertPriorCyclePaidOut } from "@/lib/round-robin-lock";
 import { computeProviderFee } from "@/lib/payment-fees";
 import { detectMobileMoneyProvider, fapshiMediumFor } from "@/lib/mobile-money-provider";
@@ -251,7 +251,7 @@ export async function initiateBulkPayment(
   userId: string,
   membershipSlotIds: string[],
   phone: string,
-  options?: { isRelative?: boolean },
+  options?: { isRelative?: boolean; useCheckout?: boolean; redirectUrl?: string },
 ): Promise<InitiateBulkPaymentResult> {
   const normalizedPhone = normalizeCameroonPhone(phone);
   if (!normalizedPhone) {
@@ -347,14 +347,27 @@ export async function initiateBulkPayment(
 
   try {
     const detectedProvider = detectMobileMoneyProvider(normalizedPhone);
-    const result = await initiateDirectPayment({
-      amount: totalCharged,
-      phone: normalizedPhone,
-      userId,
-      externalId: bulkPayment.id,
-      message: `DIVA tontine — combined payment for ${names.length} names: ${namesLabel}`,
-      medium: detectedProvider ? fapshiMediumFor(detectedProvider) : undefined,
-    });
+    const redirectUrl =
+      options?.redirectUrl ||
+      `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://www.divaasso.com"}/global-payment`;
+
+    const result = options?.useCheckout
+      ? await initiateHostedPayment({
+          amount: totalCharged,
+          userId,
+          externalId: bulkPayment.id,
+          message: `DIVA tontine — paiement groupé pour ${names.length} nom(s) : ${namesLabel}`,
+          redirectUrl,
+        })
+      : await initiateDirectPayment({
+          amount: totalCharged,
+          phone: normalizedPhone,
+          userId,
+          externalId: bulkPayment.id,
+          message: `DIVA tontine — combined payment for ${names.length} names: ${namesLabel}`,
+          medium: detectedProvider ? fapshiMediumFor(detectedProvider) : undefined,
+          redirectUrl,
+        });
 
     await prisma.$transaction([
       prisma.bulkPayment.update({ where: { id: bulkPayment.id }, data: { transId: result.transId } }),

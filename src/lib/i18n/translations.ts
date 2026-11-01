@@ -180,6 +180,8 @@ export const translations = {
     offlineBannerText: "You're offline — showing your last-seen data.",
     draftContributionsReady: "{count} contribution draft(s) ready to submit",
     reviewDraftsAction: "Review",
+    deleteDraftAction: "Delete draft",
+    deleteDraftConfirm: "Are you sure you want to delete this draft contribution?",
     contributionSavedOfflineTitle: "Saved for when you're back online",
     contributionSavedOfflineBody:
       "You're offline, so this contribution couldn't be sent yet. We've saved it — you'll be prompted to review and confirm it as soon as your connection is back.",
@@ -628,6 +630,11 @@ export const translations = {
     ussdSentToPhone: "USSD prompt sent to {phone}",
     paymentReceivedTitle: "Payment received!",
     paymentFailedInsufficientFunds: "Insufficient balance. Please top up your account and try again.",
+    paymentFailedGeneric:
+      "The payment could not be completed on your phone. If your balance is sufficient, this may be due to mobile operator security verification (especially Orange Money). You can pay via the secure checkout page below or try again.",
+    payViaSecureCheckout: "Pay via secure Fapshi page",
+    payViaSecureCheckoutDesc: "Recommended for Orange Money (requires #150*4*4# code) or if direct prompt does not appear.",
+    useSecureCheckoutOption: "Pay via secure checkout page (Fapshi)",
     stillWaitingForConfirmation: "Still waiting — you can leave this open, or check back later from your history.",
     globalPaymentNavLabel: "Global Payment",
     globalPaymentTitle: "Global Payment",
@@ -1364,6 +1371,8 @@ export const translations = {
     offlineBannerText: "Vous êtes hors ligne — affichage de vos dernières données connues.",
     draftContributionsReady: "{count} brouillon(s) de cotisation prêt(s) à soumettre",
     reviewDraftsAction: "Examiner",
+    deleteDraftAction: "Supprimer le brouillon",
+    deleteDraftConfirm: "Voulez-vous vraiment supprimer ce brouillon de cotisation ?",
     contributionSavedOfflineTitle: "Enregistré pour votre retour en ligne",
     contributionSavedOfflineBody:
       "Vous êtes hors ligne, cette cotisation n'a pas pu être envoyée. Nous l'avons enregistrée — vous serez invité à l'examiner et la confirmer dès que votre connexion sera rétablie.",
@@ -1813,6 +1822,11 @@ export const translations = {
     ussdSentToPhone: "Demande USSD envoyée au {phone}",
     paymentReceivedTitle: "Paiement reçu !",
     paymentFailedInsufficientFunds: "Solde insuffisant. Veuillez recharger votre compte et réessayer.",
+    paymentFailedGeneric:
+      "Le paiement n'a pas pu aboutir sur votre téléphone. Si votre solde est suffisant, cela est dû aux exigences de sécurité de l'opérateur (notamment Orange Money). Vous pouvez payer via la page sécurisée Fapshi ci-dessous ou réessayer.",
+    payViaSecureCheckout: "Payer via la page sécurisée Fapshi",
+    payViaSecureCheckoutDesc: "Recommandé pour Orange Money (code #150*4*4#) ou si l'invite USSD n'apparaît pas.",
+    useSecureCheckoutOption: "Payer via la page sécurisée (Fapshi)",
     stillWaitingForConfirmation:
       "Toujours en attente — vous pouvez laisser cette fenêtre ouverte, ou revenir plus tard depuis votre historique.",
     globalPaymentNavLabel: "Paiement global",

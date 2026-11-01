@@ -113,7 +113,7 @@ export function BulkPaymentDialog({
     }, POLL_INTERVAL_MS);
   }
 
-  async function handleConfirm() {
+  async function handleConfirm(options?: { forceCheckout?: boolean }) {
     const digits = phone.replace(/\D/g, "");
     const normalized = digits.startsWith("237") ? digits.slice(3) : digits;
     if (!/^[6-9]\d{8}$/.test(normalized)) {
@@ -127,7 +127,12 @@ export function BulkPaymentDialog({
       const res = await fetch("/api/payments/bulk/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ membershipSlotIds, phone: normalized, isRelative }),
+        body: JSON.stringify({
+          membershipSlotIds,
+          phone: normalized,
+          isRelative,
+          useCheckout: options?.forceCheckout,
+        }),
       });
       const body = await parseJsonOrThrow<{ transId: string; link?: string }>(res, t("paymentInitiationFailed"));
       if (body.link) {
@@ -216,7 +221,7 @@ export function BulkPaymentDialog({
                 {t("cancelAction")}
               </button>
               <button
-                onClick={handleConfirm}
+                onClick={() => handleConfirm()}
                 disabled={!quote || submitting || !phone.trim()}
                 className="flex-1 px-3 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-60"
               >
@@ -256,21 +261,34 @@ export function BulkPaymentDialog({
           <div className="flex flex-col items-center text-center gap-4">
             <span className="material-symbols-outlined text-error text-4xl">error</span>
             <p className="font-body-md text-body-md text-on-surface">
-              {failedReason || t("paymentFailedInsufficientFunds")}
+              {failedReason || t("paymentFailedGeneric")}
             </p>
-            <div className="flex gap-3 w-full">
+            <div className="w-full space-y-2">
               <button
-                onClick={onClose}
-                className="flex-1 px-3 py-2.5 rounded-lg border border-outline text-on-surface font-label-md text-label-md hover:bg-surface-variant/50 transition-colors"
+                type="button"
+                onClick={() => handleConfirm({ forceCheckout: true })}
+                disabled={submitting}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all shadow-sm"
               >
-                {t("cancelAction")}
+                <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+                {t("payViaSecureCheckout")}
               </button>
-              <button
-                onClick={retry}
-                className="flex-1 px-3 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all"
-              >
-                {t("tryAgain")}
-              </button>
+              <div className="flex gap-3 w-full">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 px-3 py-2.5 rounded-lg border border-outline text-on-surface font-label-md text-label-md hover:bg-surface-variant/50 transition-colors"
+                >
+                  {t("cancelAction")}
+                </button>
+                <button
+                  type="button"
+                  onClick={retry}
+                  className="flex-1 px-3 py-2.5 rounded-lg border border-primary text-primary font-label-md text-label-md hover:bg-primary/10 active:scale-95 transition-all"
+                >
+                  {t("tryAgain")}
+                </button>
+              </div>
             </div>
             {transId && <p className="font-label-sm text-[11px] text-on-surface-variant">Ref: {transId}</p>}
           </div>

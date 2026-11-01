@@ -6,6 +6,7 @@ import { initiateSlotPayment } from "@/lib/initiate-slot-payment";
 const bodySchema = z.object({
   membershipSlotId: z.string().min(1),
   phone: z.string().min(1),
+  useCheckout: z.boolean().optional(),
 });
 
 // Contributing for a relative strictly requires the user to have an account
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
   try {
     const result = await initiateSlotPayment(parsed.data.membershipSlotId, parsed.data.phone, {
       paidByUserId: session.user.id,
+      useCheckout: parsed.data.useCheckout,
     });
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status });

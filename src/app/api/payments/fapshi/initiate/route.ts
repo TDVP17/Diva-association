@@ -7,6 +7,7 @@ import { initiateSlotPayment } from "@/lib/initiate-slot-payment";
 const bodySchema = z.object({
   membershipSlotId: z.string().min(1),
   phone: z.string().min(1),
+  useCheckout: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
@@ -19,18 +20,25 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
-  const { membershipSlotId, phone } = parsed.data;
+  const { membershipSlotId, phone, useCheckout } = parsed.data;
 
   try {
     const slot = await prisma.membershipSlot.findUnique({
       where: { id: membershipSlotId },
-      select: { membership: { select: { userId: true } } },
+      select: { membership: { select: { userId: true, tontineSessionId: true } } },
     });
     if (!slot || slot.membership.userId !== session.user.id) {
       return NextResponse.json({ error: "You don't own this slot" }, { status: 403 });
     }
 
-    const result = await initiateSlotPayment(membershipSlotId, phone);
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || new URL(request.url).origin;
+    const redirectUrl = `${baseUrl}/sessions/${slot.membership.tontineSessionId}`;
+
+    const result = await initiateSlotPayment(membershipSlotId, phone, {
+      paidByUserId: session.user.id,
+      useCheckout,
+      redirectUrl,
+    });
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }

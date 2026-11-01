@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getContributionTotal, getNextDueDate, getCycleDateForRound, getTontineConfig, isPayoutInfoUnlockTime, isSessionCycleFinished } from "@/lib/tontine-engine";
+import { processFapshiTransaction } from "@/lib/process-fapshi-transaction";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { formatXAF } from "@/lib/format-currency";
 import { FinesInfoAccordion } from "./fines-info-accordion";
@@ -65,10 +66,14 @@ export default async function SessionDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ payment?: string }>;
+  searchParams: Promise<{ payment?: string; transId?: string }>;
 }) {
   const { id } = await params;
-  const { payment: paymentId } = await searchParams;
+  const { payment: paymentId, transId } = await searchParams;
+  if (transId) {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://www.divaasso.com";
+    await processFapshiTransaction(transId, baseUrl).catch(() => {});
+  }
   const session = await auth();
   if (!session?.user) redirect("/login");
   const userId = session.user.id;

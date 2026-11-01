@@ -190,6 +190,63 @@ export async function initiateDirectPayment(params: InitiateDirectPayParams): Pr
   throw new FapshiError(body?.message ?? "Fapshi payment request failed", res.status);
 }
 
+export interface InitiateHostedPayParams {
+  amount: number;
+  email?: string;
+  userId?: string;
+  externalId?: string;
+  message?: string;
+  redirectUrl?: string;
+}
+
+/**
+ * Generates a hosted Fapshi checkout link (checkout.fapshi.com).
+ * Supported by both Orange Money and MTN MoMo, essential for Orange Money
+ * which requires subscriber OTP/code authorization (#150*4*4#).
+ */
+export async function initiateHostedPayment(params: InitiateHostedPayParams): Promise<InitiateDirectPayResult> {
+  if (params.amount < 100) {
+    throw new FapshiError("Amount must be at least 100 XAF", 400);
+  }
+  const apiUser = getFapshiApiUser();
+  const apiKey = getFapshiApiKey();
+  if (!apiUser || !apiKey) {
+    throw new FapshiError("Fapshi is not configured", 500);
+  }
+
+  const baseUrl = getFapshiBaseUrl();
+  const fallbackAppUrl =
+    params.redirectUrl ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXTAUTH_URL ||
+    "https://www.divaasso.com";
+
+  const initRes = await fetch(`${baseUrl}/initiate-pay`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({
+      amount: Math.round(params.amount),
+      email: params.email,
+      userId: params.userId,
+      externalId: params.externalId,
+      message: params.message,
+      redirectUrl: fallbackAppUrl,
+    }),
+  });
+
+  const initBody = await initRes.json().catch(() => null);
+  if (initRes.ok && initBody?.link && initBody?.transId) {
+    return {
+      message: initBody.message ?? "Request successful",
+      transId: initBody.transId,
+      dateInitiated: initBody.dateInitiated ?? new Date().toISOString(),
+      link: initBody.link,
+    };
+  }
+
+  throw new FapshiError(initBody?.message ?? "Fapshi hosted payment request failed", initRes.status);
+}
+
 export interface PayoutParams {
   amount: number;
   /** Mobile Money / Orange Money number the refund is sent to. */
