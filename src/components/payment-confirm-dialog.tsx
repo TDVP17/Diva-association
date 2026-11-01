@@ -9,6 +9,9 @@ import { playSuccessChimeSound, playUiTapSound } from "@/lib/sound-effects";
 import type { MobileMoneyProvider } from "@/generated/prisma/enums";
 
 interface Quote {
+  amount?: number;
+  fee?: number;
+  fineAmount?: number;
   baseTotal: number;
   providerFeeAmount: number;
   totalCharged: number;
@@ -261,17 +264,47 @@ export function PaymentConfirmDialog({
             )}
 
             {quote && (
-              <div className="flex flex-col gap-2 mb-4">
-                <div className="flex justify-between items-center">
+              <div className="flex flex-col gap-2 mb-4 bg-surface-container-low p-3.5 rounded-xl border border-outline-variant">
+                <div className="flex justify-between items-center text-sm">
                   <span className="font-body-md text-body-md text-on-surface-variant">{t("paymentPurposeLabel")}</span>
-                  <span className="font-label-md text-label-md text-on-surface text-right">{description}</span>
+                  <span className="font-label-md text-label-md text-on-surface font-medium text-right">{description}</span>
                 </div>
+                {quote.amount !== undefined && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="font-body-md text-body-md text-on-surface-variant">{t("amountToContributeLabel")}</span>
+                    <span className="font-label-md text-label-md text-on-surface">{formatXAF(quote.amount)}</span>
+                  </div>
+                )}
+                {quote.fee !== undefined && quote.fee > 0 && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="font-body-md text-body-md text-on-surface-variant">{t("feeLabel")}</span>
+                    <span className="font-label-md text-label-md text-on-surface">+{formatXAF(quote.fee)}</span>
+                  </div>
+                )}
+                {quote.fineAmount !== undefined && quote.fineAmount > 0 && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="font-body-md text-body-md text-on-surface-variant">{t("fineDetailLabel")}</span>
+                    <span className="font-label-md text-label-md text-error font-medium">+{formatXAF(quote.fineAmount)}</span>
+                  </div>
+                )}
+                {fineId && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="font-body-md text-body-md text-on-surface-variant">{t("amountLabel")}</span>
+                    <span className="font-label-md text-label-md text-on-surface">{formatXAF(quote.baseTotal)}</span>
+                  </div>
+                )}
+                {quote.providerFeeAmount > 0 && (
+                  <div className="flex justify-between items-center text-sm text-on-surface-variant">
+                    <span className="font-body-md text-body-md">{t("paymentFeeRateLabel")}</span>
+                    <span className="font-label-md text-label-md">+{formatXAF(quote.providerFeeAmount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center border-t border-outline-variant pt-2 mt-1">
                   <span className="font-label-md text-label-md text-on-surface font-bold">
-                    {fineId ? t("amountLabel") : t("amountToContributeLabel")}
+                    {t("totalLabel")}
                   </span>
                   <span className="font-headline-sm text-headline-sm text-primary font-bold">
-                    {formatXAF(quote.baseTotal)}
+                    {formatXAF(quote.totalCharged ?? quote.baseTotal)}
                   </span>
                 </div>
               </div>
@@ -400,8 +433,8 @@ export function PaymentConfirmDialog({
             <span className="material-symbols-outlined text-primary text-4xl animate-pulse">smartphone</span>
             <h2 className="font-headline-sm text-headline-sm text-on-surface">{t("waitingForUssdConfirmationTitle")}</h2>
             {quote && (
-              <p className="font-label-md text-label-md text-on-surface">
-                {formatXAF(quote.baseTotal)}
+              <p className="font-headline-sm text-headline-sm text-primary font-bold">
+                {formatXAF(quote.totalCharged ?? quote.baseTotal)}
               </p>
             )}
             <p className="font-label-sm text-label-sm text-on-surface-variant">

@@ -210,9 +210,9 @@ describe("initiateBulkPayment", () => {
     if (result.ok) expect(result.transId).toBe("tx-combined");
 
     // amount+fee per slot = 2600, x2 slots = 5200 base — Fapshi is charged
-    // the exact combined base total displayed to the user.
+    // the totalCharged including the 3.1% provider fee displayed to the user (5361).
     expect(initiateDirectPayment).toHaveBeenCalledTimes(1);
-    expect(initiateDirectPayment.mock.calls[0][0].amount).toBe(5200);
+    expect(initiateDirectPayment.mock.calls[0][0].amount).toBe(5361);
 
     expect(txCreateContribution).toHaveBeenCalledTimes(2);
     for (const call of txCreateContribution.mock.calls) {

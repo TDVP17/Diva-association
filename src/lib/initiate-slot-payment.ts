@@ -126,6 +126,7 @@ export async function getSlotPaymentQuote(
 
   // Les amendes ne sont pas obligatoires sur-le-champ lors du paiement de cotisation.
   const baseTotal = amount + fee;
+  const providerFee = computeProviderFee(provider, baseTotal);
 
   return {
     ok: true,
@@ -135,8 +136,8 @@ export async function getSlotPaymentQuote(
       fineAmount: 0,
       baseTotal,
       provider,
-      providerFeeAmount: 0,
-      totalCharged: baseTotal,
+      providerFeeAmount: providerFee.providerFeeAmount,
+      totalCharged: providerFee.totalCharged,
     },
   };
 }
@@ -246,9 +247,9 @@ export async function initiateSlotPayment(
         failureReason: null,
         paidByUserId: options?.paidByUserId,
         paymentProvider: provider,
-        providerFeeAmount: 0,
-        providerShareAmount: 0,
-        presidentFeeShareAmount: 0,
+        providerFeeAmount: providerFee.providerFeeAmount,
+        providerShareAmount: providerFee.providerShareAmount,
+        presidentFeeShareAmount: providerFee.presidentFeeShareAmount,
       };
 
       return existing
@@ -282,14 +283,14 @@ export async function initiateSlotPayment(
 
     const result = options?.useCheckout
       ? await initiateHostedPayment({
-          amount: baseTotal,
+          amount: providerFee.totalCharged,
           userId: slot.membership.userId,
           externalId: contribution.id,
           message: `DIVA cotisation — ${slot.beneficiaryName} (${tontineSession.type})`,
           redirectUrl,
         })
       : await initiateDirectPayment({
-          amount: baseTotal,
+          amount: providerFee.totalCharged,
           phone: normalizedPhone,
           userId: slot.membership.userId,
           externalId: contribution.id,
@@ -312,7 +313,7 @@ export async function initiateSlotPayment(
           transId: result.transId,
           contributionId: contribution.id,
           payerPhone: normalizedPhone,
-          amount: baseTotal,
+          amount: providerFee.totalCharged,
         },
       }),
     ]);

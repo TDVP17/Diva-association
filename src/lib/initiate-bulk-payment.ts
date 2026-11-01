@@ -227,10 +227,11 @@ export async function getBulkPaymentQuote(
 
   const baseTotal = items.reduce((sum, item) => sum + item.baseTotal, 0);
   const provider: PaymentProvider = "FAPSHI";
+  const combinedFee = computeProviderFee(provider, baseTotal);
 
   return {
     ok: true,
-    quote: { items, baseTotal, provider, providerFeeAmount: 0, totalCharged: baseTotal },
+    quote: { items, baseTotal, provider, providerFeeAmount: combinedFee.providerFeeAmount, totalCharged: combinedFee.totalCharged },
   };
 }
 
@@ -291,10 +292,11 @@ export async function initiateBulkPayment(
         items.push({ slotId: slot.id, beneficiaryName: slot.beneficiaryName, dueDate, amount, fee, fineAmount: 0 });
       }
 
-      totalCharged = baseTotal;
+      const combinedFee = computeProviderFee(provider, baseTotal);
+      totalCharged = combinedFee.totalCharged;
 
       const created = await tx.bulkPayment.create({
-        data: { userId, payerPhone: normalizedPhone, amount: baseTotal, status: "PENDING" },
+        data: { userId, payerPhone: normalizedPhone, amount: combinedFee.totalCharged, status: "PENDING" },
       });
 
       for (const item of items) {
@@ -313,9 +315,9 @@ export async function initiateBulkPayment(
           bulkPaymentId: created.id,
           paidByUserId: isRelativePayment ? userId : undefined,
           paymentProvider: provider,
-          providerFeeAmount: 0,
-          providerShareAmount: 0,
-          presidentFeeShareAmount: 0,
+          providerFeeAmount: slotFee.providerFeeAmount,
+          providerShareAmount: slotFee.providerShareAmount,
+          presidentFeeShareAmount: slotFee.presidentFeeShareAmount,
         };
         const existing = await tx.contribution.findUnique({
           where: { membershipSlotId_dueDate: { membershipSlotId: item.slotId, dueDate: item.dueDate } },

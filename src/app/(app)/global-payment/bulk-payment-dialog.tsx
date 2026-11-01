@@ -177,16 +177,28 @@ export function BulkPaymentDialog({
             )}
 
             {quote && (
-              <div className="flex flex-col gap-1 mb-4">
-                {quote.items.map((item) => (
-                  <div key={item.membershipSlotId} className="flex justify-between items-center gap-2">
-                    <span className="font-body-md text-body-md text-on-surface-variant truncate">{item.beneficiaryName}</span>
-                    <span className="font-label-md text-label-md text-on-surface flex-shrink-0">{formatXAF(item.baseTotal)}</span>
+              <div className="flex flex-col gap-2 mb-4 bg-surface-container-low p-3.5 rounded-xl border border-outline-variant">
+                <div className="flex flex-col gap-1 max-h-36 overflow-y-auto pr-1">
+                  {quote.items.map((item) => (
+                    <div key={item.membershipSlotId} className="flex justify-between items-center gap-2 text-sm">
+                      <span className="font-body-md text-body-md text-on-surface-variant truncate">{item.beneficiaryName}</span>
+                      <span className="font-label-md text-label-md text-on-surface flex-shrink-0">{formatXAF(item.baseTotal)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between items-center text-sm pt-2 border-t border-outline-variant">
+                  <span className="font-body-md text-body-md text-on-surface-variant">{t("amountToContributeLabel")}</span>
+                  <span className="font-label-md text-label-md text-on-surface">{formatXAF(quote.baseTotal)}</span>
+                </div>
+                {quote.providerFeeAmount > 0 && (
+                  <div className="flex justify-between items-center text-sm text-on-surface-variant">
+                    <span className="font-body-md text-body-md">{t("paymentFeeRateLabel")}</span>
+                    <span className="font-label-md text-label-md">+{formatXAF(quote.providerFeeAmount)}</span>
                   </div>
-                ))}
-                <div className="flex justify-between items-center pt-2 mt-1 border-t border-outline-variant">
-                  <span className="font-label-md text-label-md text-on-surface font-bold">{t("amountToContributeLabel")}</span>
-                  <span className="font-headline-sm text-headline-sm text-primary font-bold">{formatXAF(quote.baseTotal)}</span>
+                )}
+                <div className="flex justify-between items-center border-t border-outline-variant pt-2 mt-1">
+                  <span className="font-label-md text-label-md text-on-surface font-bold">{t("totalLabel")}</span>
+                  <span className="font-headline-sm text-headline-sm text-primary font-bold">{formatXAF(quote.totalCharged ?? quote.baseTotal)}</span>
                 </div>
               </div>
             )}
@@ -234,7 +246,11 @@ export function BulkPaymentDialog({
           <div className="flex flex-col items-center text-center gap-3">
             <span className="material-symbols-outlined text-primary text-4xl animate-pulse">smartphone</span>
             <h2 className="font-headline-sm text-headline-sm text-on-surface">{t("waitingForUssdConfirmationTitle")}</h2>
-            {quote && <p className="font-label-md text-label-md text-on-surface">{formatXAF(quote.baseTotal)}</p>}
+            {quote && (
+              <p className="font-headline-sm text-headline-sm text-primary font-bold">
+                {formatXAF(quote.totalCharged ?? quote.baseTotal)}
+              </p>
+            )}
             <p className="font-label-sm text-label-sm text-on-surface-variant">{t("ussdSentToPhone", { phone })}</p>
             <p className="font-body-md text-body-md text-on-surface-variant">{t("ussdInstructions")}</p>
             {showWaitingHint && (
