@@ -103,7 +103,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       type: "DRAW_LAUNCHED",
       recipients: approvedMembers.map((m) => ({
         userId: m.userId,
-        message: "The draw has started — come pick your number!",
+        message: "Le tirage au sort a commencé — venez choisir votre numéro !",
         messageKey: "drawStartedMessage",
         actionUrl: `/sessions/${id}/draw`,
       })),
@@ -112,6 +112,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[start-drawing] unexpected error:", err);
-    return NextResponse.json({ error: "Could not start the drawing phase. Please try again." }, { status: 500 });
+    return NextResponse.json({ error: "Impossible de lancer la phase de tirage. Veuillez réessayer." }, { status: 500 });
   }
 }

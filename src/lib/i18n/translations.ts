@@ -1732,7 +1732,7 @@ export const translations = {
     memberRejectedMessage:
       "Votre demande n'a pas été approuvée par l'association. Vous ne pouvez pas rejoindre cette cotisation pour le moment.",
     memberRejectedReasonSuffix: " Raison : {reason}",
-    drawStartedMessage: "Le tirage a commencé — venez choisir votre numéro !",
+    drawStartedMessage: "Le tirage au sort a commencé — venez choisir votre numéro !",
     swapApprovedRequesterMessage: "Votre demande d'échange de position a été approuvée.",
     swapRejectedRequesterMessage: "Votre demande d'échange de position a été rejetée.",
     swapApprovedTargetMessage: "Un échange de position que vous avez accepté a été approuvé.",
@@ -2026,7 +2026,7 @@ export const translations = {
     notifTypeSwapRequestApproved: "Échange approuvé",
     notifTypeSwapRequestRejected: "Échange refusé",
     notifTypeNewMembershipRequest: "Nouvelle demande d'adhésion",
-    notifTypeDrawLaunched: "Tirage commencé",
+    notifTypeDrawLaunched: "Tirage au sort commencé",
     notifTypePayoutTurn: "Votre tour de versement",
     noNotificationsYet: "Vous n'avez aucune notification pour le moment.",
     dismissNotification: "Ignorer",

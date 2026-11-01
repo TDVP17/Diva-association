@@ -19,7 +19,6 @@ export interface CotisationMemberItem {
   ballDrawn: number | null;
   officialPosition: number | null;
   userAvatar?: string | null;
-  isDesignatedWinner?: boolean;
 }
 
 const AVATAR_BG_COLORS = [
@@ -156,12 +155,6 @@ export function CotisationMembersList({
                     {slot.isMine && (
                       <span className="text-primary font-bold text-xs">
                         {lang === "fr" ? "(toi)" : "(you)"}
-                      </span>
-                    )}
-                    {slot.isDesignatedWinner && (
-                      <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[10px] shadow-2xs">
-                        <span>🍲</span>
-                        <span>{lang === "fr" ? "Bouffe ce tour" : "Payout turn"}</span>
                       </span>
                     )}
                   </p>

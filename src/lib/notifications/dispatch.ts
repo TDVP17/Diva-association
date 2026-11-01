@@ -5,7 +5,7 @@ import { sendPushToUser } from "@/lib/push/send";
 import { sendEmailSafe } from "@/lib/email/resend";
 import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { NOTIFICATION_TYPE_KEY } from "@/lib/notifications/type-labels";
-import { translate, type Lang } from "@/lib/i18n/translations";
+import { translate, translations, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 
 const STAGGER_MS = 5 * 60 * 1000;
 
@@ -82,7 +82,10 @@ export async function scheduleNotifications(params: {
     const firstName = rawName.split(/\s+/)[0] || rawName;
     const greeting = firstName ? (lang === "en" ? `Hello, ${firstName} 👋` : `Salut, ${firstName} 👋`) : "";
 
-    let msg = r.message;
+    let msg =
+      r.messageKey && r.messageKey in translations[lang]
+        ? translate(lang, r.messageKey as TranslationKey, r.messageVars)
+        : r.message;
     const hasGreeting =
       msg.startsWith("Salut") ||
       msg.startsWith("Bonjour") ||
@@ -157,7 +160,10 @@ async function deliverInstantNotifications(params: {
           const greeting = firstName ? (lang === "en" ? `Hello, ${firstName} 👋` : `Salut, ${firstName} 👋`) : "";
           const typeKey = NOTIFICATION_TYPE_KEY[params.type];
           let title = typeKey ? translate(lang, typeKey) : "DIVA Asso.";
-          let body = r.message;
+          let body =
+            r.messageKey && r.messageKey in translations[lang]
+              ? translate(lang, r.messageKey as TranslationKey, r.messageVars)
+              : r.message;
 
           // Ensure push/body begins with personalized greeting with emoji
           const hasGreeting =

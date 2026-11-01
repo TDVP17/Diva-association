@@ -510,7 +510,6 @@ export default async function SessionDetailPage({
       paidByRelativeName: c?.paidByUser?.name ?? null,
       fineAmount: f ? Number(f.amount) : null,
       estimatedDateLabel: slotDateLabel,
-      isDesignatedWinner: s.id === designatedSlot?.id,
     };
   }).sort((a, b) => a.beneficiaryName.localeCompare(b.beneficiaryName, "fr", { sensitivity: "base" }));
 
@@ -745,7 +744,6 @@ export default async function SessionDetailPage({
           fineAmount: s.fineAmount,
           ballDrawn: s.ballDrawn,
           officialPosition: s.officialPosition,
-          isDesignatedWinner: s.isDesignatedWinner,
         }))}
         myUnpaidSlotIds={mySlots
           .filter((s) => contributionBySlot.get(s.id)?.status !== "PAID")

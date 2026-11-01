@@ -90,6 +90,22 @@ describe("scheduleNotifications", () => {
     expect(data[0].actionUrl).toBe("/chat");
     expect(data[1].actionUrl).toBeUndefined();
   });
+
+  it("translates messageKey into French when user prefers French or has no override", async () => {
+    await scheduleNotifications({
+      channel: "IN_APP",
+      type: "DRAW_LAUNCHED",
+      recipients: [
+        {
+          userId: "u1",
+          message: "The draw has started — come pick your number!",
+          messageKey: "drawStartedMessage",
+        },
+      ],
+    });
+    const { data } = createMany.mock.calls[0][0];
+    expect(data[0].message).toContain("Le tirage au sort a commencé");
+  });
 });
 
 describe("scheduleInAppNotifications", () => {
