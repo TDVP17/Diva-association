@@ -16,12 +16,7 @@ const BATCH_SIZE = 25;
  * scheduledAt, this cron is the only thing that ever sends anything, so
  * delivery survives the admin closing their browser.
  */
-export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+export async function processDueNotifications() {
   const due = await prisma.notification.findMany({
     where: { status: { in: ["PENDING", "SCHEDULED"] }, scheduledAt: { lte: new Date() } },
     include: { user: { select: { email: true, phone: true, preferredLang: true, name: true } } },
@@ -31,8 +26,17 @@ export async function GET(request: Request) {
 
   let sent = 0;
   let failed = 0;
+  let broadcastEmailSentThisRun = false;
 
   for (const n of due) {
+    // Anti-spam safeguard: if multiple broadcast emails are due, process at most 1 per cron run
+    // to strictly enforce the 3-minute spacing between outgoing broadcast emails.
+    if (n.channel === "EMAIL" && n.type === "ADMIN_BROADCAST") {
+      if (broadcastEmailSentThisRun) {
+        continue;
+      }
+    }
+
     await prisma.notification.update({ where: { id: n.id }, data: { status: "PROCESSING" } });
     const lang: Lang = n.user.preferredLang === "en" ? "en" : "fr";
 
@@ -63,6 +67,9 @@ export async function GET(request: Request) {
           recipientName: n.user.name ?? undefined,
         });
         await sendEmail(n.user.email, subject, emailHtml);
+        if (n.type === "ADMIN_BROADCAST") {
+          broadcastEmailSentThisRun = true;
+        }
       } else if (n.channel === "WHATSAPP") {
         // WhatsApp notifications are retired; mark as processed without external dispatch
       } else if (n.channel === "PUSH") {
@@ -108,7 +115,17 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, processed: due.length, sent, failed });
+  return { ok: true, processed: due.length, sent, failed };
+}
+
+export async function GET(request: Request) {
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const result = await processDueNotifications();
+  return NextResponse.json(result);
 }
 
 /** Reuses the same type→label map the in-app feed renders with, so an email/push subject is never stuck in the wrong language for the recipient. */

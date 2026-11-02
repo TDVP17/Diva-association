@@ -31,7 +31,7 @@ describe("scheduleNotifications", () => {
     expect(createMany).not.toHaveBeenCalled();
   });
 
-  it("stages recipients 5 minutes apart, in order", async () => {
+  it("stages recipients 3 minutes apart, in order", async () => {
     const before = Date.now();
     await scheduleNotifications({
       tontineSessionId: "session-1",
@@ -55,8 +55,8 @@ describe("scheduleNotifications", () => {
 
     const gap12 = row2.scheduledAt.getTime() - row1.scheduledAt.getTime();
     const gap23 = row3.scheduledAt.getTime() - row2.scheduledAt.getTime();
-    expect(gap12).toBe(5 * 60 * 1000);
-    expect(gap23).toBe(5 * 60 * 1000);
+    expect(gap12).toBe(3 * 60 * 1000);
+    expect(gap23).toBe(3 * 60 * 1000);
     expect(row1.scheduledAt.getTime()).toBeGreaterThanOrEqual(before);
     expect(row1.status).toBe("SCHEDULED");
   });

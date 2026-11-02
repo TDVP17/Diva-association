@@ -633,7 +633,7 @@ export const translations = {
     paymentFailedGeneric:
       "The payment could not be completed on your phone. Please verify your balance or network connection and try again.",
     payViaSecureCheckout: "Pay via secure link",
-    payViaSecureCheckoutDesc: "",
+    payViaSecureCheckoutDesc: "Pay via secure link",
     useSecureCheckoutOption: "Pay via secure link",
     stillWaitingForConfirmation: "Still waiting — you can leave this open, or check back later from your history.",
     globalPaymentNavLabel: "Global Payment",
@@ -1079,7 +1079,8 @@ export const translations = {
     adminAlertSendingAction: "Broadcasting...",
     adminAlertSuccessMessage: "Alert broadcast successfully to {count} recipient(s)!",
     adminAlertErrorMessage: "Could not send alert. Please try again.",
-    adminAlertChannelsNotice: "Alerts are delivered immediately via In-App, Push notification, and Email.",
+    adminAlertChannelsNotice:
+      "Alerts appear immediately In-App and via Push, with emails spaced 3 minutes apart between recipients to prevent spam.",
     adminAlertTargetNoPhone: "Members without a WhatsApp number ({count})",
     adminAlertNotifyMissingPhoneAction: "Remind members without WhatsApp ({count})",
     adminAlertMissingPhoneDefaultTitle: "Action Required: Register your WhatsApp number",
@@ -1825,7 +1826,7 @@ export const translations = {
     paymentFailedGeneric:
       "Le paiement n'a pas pu aboutir sur votre téléphone. Veuillez vérifier votre solde ou votre connexion et réessayer.",
     payViaSecureCheckout: "Payer via le lien sécurisé",
-    payViaSecureCheckoutDesc: "",
+    payViaSecureCheckoutDesc: "Payer via le lien sécurisé",
     useSecureCheckoutOption: "Payer via le lien sécurisé",
     stillWaitingForConfirmation:
       "Toujours en attente — vous pouvez laisser cette fenêtre ouverte, ou revenir plus tard depuis votre historique.",
@@ -2274,7 +2275,8 @@ export const translations = {
     adminAlertSendingAction: "Diffusion en cours...",
     adminAlertSuccessMessage: "Alerte diffusée avec succès à {count} destinataire(s) !",
     adminAlertErrorMessage: "Impossible d'envoyer l'alerte. Veuillez réessayer.",
-    adminAlertChannelsNotice: "Les alertes sont transmises immédiatement par In-App, Notification push et E-mail.",
+    adminAlertChannelsNotice:
+      "Les alertes s'affichent immédiatement dans l'app et par notification push, avec un espacement de 3 minutes entre chaque e-mail pour éviter les spams.",
     adminAlertTargetNoPhone: "Membres sans numéro WhatsApp ({count})",
     adminAlertNotifyMissingPhoneAction: "Rappeler les sans WhatsApp ({count})",
     adminAlertMissingPhoneDefaultTitle: "Action requise : Enregistrez votre numéro WhatsApp",

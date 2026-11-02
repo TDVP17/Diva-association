@@ -7,7 +7,8 @@ import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { NOTIFICATION_TYPE_KEY } from "@/lib/notifications/type-labels";
 import { translate, translations, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 
-const STAGGER_MS = 5 * 60 * 1000;
+// 3-minute stagger for outgoing broadcast messages to prevent email spam flags
+export const STAGGER_MS = 3 * 60 * 1000;
 
 export interface NotificationRecipient {
   userId: string;
@@ -203,7 +204,9 @@ async function deliverInstantNotifications(params: {
           }
 
           // Deliver instant Email notification via Resend with official DIVA logo and direct CTA button
-          if (user?.email) {
+          // For ADMIN_BROADCAST (global alerts), DO NOT blast all emails at once here!
+          // They are queued with 3 minutes of spacing between each recipient so they never go to spam.
+          if (user?.email && params.type !== "ADMIN_BROADCAST") {
             try {
               const emailHtml = renderBrandedEmailHtml({
                 title,
@@ -263,8 +266,14 @@ export async function scheduleInAppNotifications(params: {
   await scheduleNotifications({ ...params, channel: "PUSH" });
   await scheduleNotifications({ ...params, channel: "EMAIL" });
 
-  // Trigger instant delivery (Push & Email) in background
+  // Trigger instant delivery (Push & transactional email) in background
   void deliverInstantNotifications(params);
+
+  // Trigger immediate dispatch of the first due notification (recipient 0, scheduled for now)
+  // while subsequent recipients will be dispatched by the cron every 3 minutes.
+  import("@/app/api/crons/process-notifications/route")
+    .then((mod) => mod.processDueNotifications())
+    .catch((err) => console.error("[notifications] initial queue process error:", err));
 
   return count;
 }
