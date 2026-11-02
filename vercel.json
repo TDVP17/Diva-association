@@ -31,10 +31,6 @@
     {
       "path": "/api/crons/process-refund-queue",
       "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/crons/process-notifications",
-      "schedule": "* * * * *"
     }
   ]
 }
