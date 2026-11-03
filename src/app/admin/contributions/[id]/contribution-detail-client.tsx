@@ -98,6 +98,10 @@ interface Transaction {
   dueDate: string;
   paidAt: string | null;
   transRef: string;
+  membershipSlotId?: string;
+  proofImageUrl?: string | null;
+  proofUploadedAt?: string | null;
+  payerPhone?: string | null;
 }
 
 interface FineRow {
@@ -682,6 +686,55 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
         .then((b) => setTransactions(b.transactions ?? []));
     } finally {
       setRecordingContribution(false);
+    }
+  }
+
+  const [validatingProofId, setValidatingProofId] = useState<string | null>(null);
+
+  async function handleValidateProof(slotId: string, dueDateStr: string, txId: string) {
+    if (!slotId) return;
+    setValidatingProofId(txId);
+    try {
+      const res = await fetch("/api/admin/contributions/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          membershipSlotId: slotId,
+          dueDate: dueDateStr ? new Date(dueDateStr) : undefined,
+        }),
+      });
+      if (res.ok) {
+        await refreshSession();
+        fetch(`/api/admin/sessions/${tontineSessionId}/ledger`).then((r) => r.json()).then(setLedger);
+        fetch(`/api/admin/transactions?tontineSessionId=${tontineSessionId}`)
+          .then((r) => r.json())
+          .then((b) => setTransactions(b.transactions ?? []));
+      } else {
+        const err = await res.json().catch(() => ({}));
+        window.alert(err.error || t("couldNotRecordContribution"));
+      }
+    } finally {
+      setValidatingProofId(null);
+    }
+  }
+
+  async function handleRejectProof(contributionId: string) {
+    const reason = window.prompt("Motif du rejet (optionnel) :", "Capture illisible ou paiement non reçu");
+    if (reason === null) return;
+    setValidatingProofId(contributionId);
+    try {
+      const res = await fetch("/api/admin/contributions/proofs/reject", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contributionId, reason }),
+      });
+      if (res.ok) {
+        fetch(`/api/admin/transactions?tontineSessionId=${tontineSessionId}`)
+          .then((r) => r.json())
+          .then((b) => setTransactions(b.transactions ?? []));
+      }
+    } finally {
+      setValidatingProofId(null);
     }
   }
 
@@ -2064,6 +2117,93 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
 
       {activeTab === "payments" && (
         <div className="flex flex-col gap-stack-gap-lg">
+          {/* Section: Preuves de paiement en attente */}
+          {(() => {
+            const pendingProofs = transactions.filter((tx) => tx.proofImageUrl && tx.status !== "PAID");
+            if (pendingProofs.length === 0) return null;
+            return (
+              <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border-2 border-primary/30 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-title-md text-title-md text-primary flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary">add_photo_alternate</span>
+                    {t("pendingPaymentProofs")}
+                  </h3>
+                  <span className="bg-primary/10 text-primary font-bold text-xs px-2.5 py-1 rounded-full">
+                    {pendingProofs.length} en attente
+                  </span>
+                </div>
+                <p className="text-xs text-on-surface-variant mb-4">
+                  {t("pendingPaymentProofsSubtitle")}
+                </p>
+
+                <div className="flex flex-col gap-3">
+                  {pendingProofs.map((tx) => (
+                    <div
+                      key={tx.id}
+                      className="p-3.5 rounded-xl border border-outline-variant bg-surface-container-lowest flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs"
+                    >
+                      <div className="flex items-start sm:items-center gap-3 min-w-0">
+                        {tx.proofImageUrl && (
+                          <a
+                            href={tx.proofImageUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="relative group block flex-shrink-0"
+                            title={t("viewProofImage")}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={tx.proofImageUrl}
+                              alt="Preuve"
+                              className="w-16 h-16 object-cover rounded-lg border border-outline-variant group-hover:opacity-90 transition-opacity"
+                            />
+                            <span className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center text-white text-xs font-bold transition-opacity">
+                              <span className="material-symbols-outlined text-[18px]">zoom_in</span>
+                            </span>
+                          </a>
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-bold text-sm text-on-surface truncate">
+                            {tx.beneficiaryName} <span className="font-normal text-on-surface-variant">({tx.memberName})</span>
+                          </p>
+                          <p className="text-xs text-on-surface-variant mt-0.5">
+                            Montant : <span className="font-bold text-primary">{formatXAF(tx.amount)}</span>
+                            {tx.payerPhone && ` · Tél : ${tx.payerPhone}`}
+                          </p>
+                          {tx.proofUploadedAt && (
+                            <p className="text-[11px] text-on-surface-variant/80 mt-0.5">
+                              Envoyé le {new Date(tx.proofUploadedAt).toLocaleString("fr-FR", { timeZone: "Africa/Douala" })}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-end md:self-center flex-shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleRejectProof(tx.id)}
+                          disabled={validatingProofId === tx.id}
+                          className="px-3 py-1.5 rounded-lg border border-error/40 text-error hover:bg-error/5 text-xs font-bold transition-colors disabled:opacity-50"
+                        >
+                          {t("rejectProofAction")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleValidateProof(tx.membershipSlotId || "", tx.dueDate, tx.id)}
+                          disabled={validatingProofId === tx.id}
+                          className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold transition-all flex items-center gap-1 shadow-xs disabled:opacity-50"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">check</span>
+                          {validatingProofId === tx.id ? "Validation..." : t("validateContributionAction")}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            );
+          })()}
+
           <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4">
             <h3 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-4">
               <span className="material-symbols-outlined">edit_note</span>
@@ -2113,6 +2253,17 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                           {tx.paidByName && tx.paidByName !== tx.memberName ? `${t("paidByLabel")} ${tx.paidByName} · ` : ""}
                           {tx.paidAt ? new Date(tx.paidAt).toLocaleString("en-GB", { timeZone: "Africa/Douala" }) : t("pending")}
                         </p>
+                        {tx.proofImageUrl && (
+                          <a
+                            href={tx.proofImageUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline mt-0.5"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">image</span>
+                            {t("viewProofImage")}
+                          </a>
+                        )}
                       </div>
                       <div className="text-right flex-shrink-0 ml-2">
                         <p className="font-numeric-data text-[14px] text-on-surface">{formatXAF(tx.amount)}</p>

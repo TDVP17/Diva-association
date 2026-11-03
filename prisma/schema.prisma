@@ -656,6 +656,9 @@ model Contribution {
   failureReason           String?
   paidAt                  DateTime?
   receiptPdfUrl           String?
+  /// Uploaded payment screenshot/proof for manual verification when USSD/network fails.
+  proofImageUrl           String?
+  proofUploadedAt         DateTime?
   createdAt               DateTime           @default(now())
   /// Bumped on every payment attempt — used to tell a fresh in-flight
   /// attempt apart from an abandoned one when guarding against a second

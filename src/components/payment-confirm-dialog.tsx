@@ -86,6 +86,15 @@ export function PaymentConfirmDialog({
   const [showWaitingHint, setShowWaitingHint] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hintRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Manual payment proof upload & merchant USSD code states
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofPreviewUrl, setProofPreviewUrl] = useState<string | null>(null);
+  const [uploadingProof, setUploadingProof] = useState(false);
+  const [proofSuccess, setProofSuccess] = useState(false);
+  const [proofError, setProofError] = useState<string | null>(null);
+  const [copiedCode, setCopiedCode] = useState(false);
 
   // null while loading; [] once loaded (empty, or the fetch 401'd — the
   // public/anonymous pay-slot flow has no session, so this silently
@@ -152,29 +161,50 @@ export function PaymentConfirmDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [membershipSlotId, fineId, dueDate]);
 
+  function stopPolling() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    if (hintRef.current) {
+      clearTimeout(hintRef.current);
+      hintRef.current = null;
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }
+
   useEffect(() => {
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-      if (hintRef.current) clearTimeout(hintRef.current);
+      stopPolling();
     };
   }, []);
 
   function startPolling(id: string) {
-    hintRef.current = setTimeout(() => setShowWaitingHint(true), 60_000);
+    stopPolling();
+    hintRef.current = setTimeout(() => setShowWaitingHint(true), 45_000);
+    // Hard timeout after 70 seconds to prevent indefinite loading
+    timeoutRef.current = setTimeout(() => {
+      stopPolling();
+      setFailedReason(t("ussdTimeoutReason"));
+      setFailCount((c) => c + 1);
+      setStep("failed");
+    }, 70_000);
+
     pollRef.current = setInterval(async () => {
       try {
         const res = await fetch(`/api/payments/fapshi/status?transId=${encodeURIComponent(id)}`);
         if (!res.ok) return;
         const body = (await res.json()) as { status: string; failureReason?: string | null };
         if (body.status === "SUCCESSFUL" || body.status === "COMPLETED") {
-          if (pollRef.current) clearInterval(pollRef.current);
-          if (hintRef.current) clearTimeout(hintRef.current);
+          stopPolling();
           playSuccessChimeSound();
           setStep("success");
           setTimeout(() => onSettled(), 1500);
         } else if (body.status === "FAILED" || body.status === "EXPIRED") {
-          if (pollRef.current) clearInterval(pollRef.current);
-          if (hintRef.current) clearTimeout(hintRef.current);
+          stopPolling();
           setFailedReason(body.failureReason ?? null);
           setFailCount((c) => c + 1);
           setStep("failed");
@@ -242,11 +272,54 @@ export function PaymentConfirmDialog({
   }
 
   function retry() {
+    stopPolling();
     setStep("form");
     setPayError(null);
     setFailedReason(null);
     setShowWaitingHint(false);
     setTransId(null);
+    setProofFile(null);
+    setProofPreviewUrl(null);
+    setProofSuccess(false);
+    setProofError(null);
+    setCopiedCode(false);
+  }
+
+  function handleProofFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setProofFile(file);
+    setProofError(null);
+    const url = URL.createObjectURL(file);
+    setProofPreviewUrl(url);
+  }
+
+  async function submitPaymentProof() {
+    if (!proofFile || !membershipSlotId) return;
+    setUploadingProof(true);
+    setProofError(null);
+    try {
+      const fd = new FormData();
+      fd.append("membershipSlotId", membershipSlotId);
+      if (dueDate) fd.append("dueDate", dueDate);
+      fd.append("phone", usedPhone || phone);
+      fd.append("file", proofFile);
+
+      const res = await fetch("/api/payments/proof", {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setProofError(data?.error || t("somethingWentWrong"));
+        return;
+      }
+      setProofSuccess(true);
+    } catch {
+      setProofError(t("somethingWentWrong"));
+    } finally {
+      setUploadingProof(false);
+    }
   }
 
   return (
@@ -256,7 +329,10 @@ export function PaymentConfirmDialog({
       aria-modal="true"
       onClick={step === "form" ? onClose : undefined}
     >
-      <div className="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-surface p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         {step === "form" && (
           <>
             <h2 className="font-headline-sm text-headline-sm text-on-surface mb-4">{t("confirmPaymentTitle")}</h2>
@@ -440,6 +516,30 @@ export function PaymentConfirmDialog({
               {t("ussdSentToPhone", { phone: usedPhone })}
             </p>
             <p className="font-body-md text-body-md text-on-surface-variant">{t("ussdInstructions")}</p>
+
+            {/* Operator-specific waiting tips */}
+            {(() => {
+              const num = usedPhone.replace(/\D/g, "").replace(/^237/, "");
+              const p = detectMobileMoneyProvider(num);
+              if (p === "MTN") {
+                return (
+                  <div className="w-full p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-left text-xs text-on-surface flex items-start gap-2 mt-1">
+                    <span className="material-symbols-outlined text-amber-700 text-lg flex-shrink-0 mt-0.5">info</span>
+                    <p className="font-medium text-amber-950 leading-relaxed">{t("mtnApprovalTip")}</p>
+                  </div>
+                );
+              }
+              if (p === "ORANGE") {
+                return (
+                  <div className="w-full p-3 bg-orange-500/10 border border-orange-500/30 rounded-xl text-left text-xs text-on-surface flex items-start gap-2 mt-1">
+                    <span className="material-symbols-outlined text-orange-700 text-lg flex-shrink-0 mt-0.5">info</span>
+                    <p className="font-medium text-orange-950 leading-relaxed">{t("orangeApprovalTip")}</p>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
             {showWaitingHint && (
               <p className="font-label-sm text-label-sm text-on-surface-variant italic">
                 {t("stillWaitingForConfirmation")}
@@ -467,41 +567,193 @@ export function PaymentConfirmDialog({
           const activeProvider = digits ? detectMobileMoneyProvider(digits) : null;
           const operatorName = activeProvider === "ORANGE" ? "Orange Money" : activeProvider === "MTN" ? "MTN MoMo" : "votre opérateur";
           const lowerReason = (failedReason || "").toLowerCase();
-          const isBalance = ["balance", "solde", "fund", "provision", "insufficient", "insuffisant"].some((k) => lowerReason.includes(k));
+          const isBalance = ["balance", "solde", "fund", "fonds", "provision", "insufficient", "insuffisant"].some((k) => lowerReason.includes(k));
           const isNetworkOrOperator = !isBalance;
+
+          const targetAmount = quote?.baseTotal ?? 0;
+          const merchantUssdCode = targetAmount > 0
+            ? `#150*11*698416666*${targetAmount}#`
+            : `#150*11*698416666#`;
+
+          async function copyUssdCode() {
+            try {
+              await navigator.clipboard.writeText(merchantUssdCode);
+              setCopiedCode(true);
+              setTimeout(() => setCopiedCode(false), 3000);
+            } catch {
+              // fallback
+            }
+          }
+
+          if (proofSuccess) {
+            return (
+              <div className="flex flex-col items-center text-center gap-4 py-2">
+                <span className="material-symbols-outlined text-primary text-5xl">task_alt</span>
+                <h3 className="font-headline-sm text-headline-sm text-on-surface font-bold">
+                  {t("uploadPaymentProofTitle")}
+                </h3>
+                <div className="w-full p-4 rounded-xl border border-primary/30 bg-primary/5 text-left text-sm text-on-surface">
+                  <p className="font-medium text-primary mb-2">
+                    {t("proofSubmittedSuccess")}
+                  </p>
+                  <p className="text-xs text-on-surface-variant">
+                    Réf de vérification : {membershipSlotId}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-full px-4 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 transition-opacity"
+                >
+                  {t("finishAction")}
+                </button>
+              </div>
+            );
+          }
 
           return (
             <div className="flex flex-col items-center text-center gap-4">
               <span className="material-symbols-outlined text-error text-4xl">error</span>
 
-              {failCount >= 2 ? (
-                <div className="w-full text-left p-3.5 rounded-xl border border-warning/40 bg-warning/10 text-on-surface flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-warning text-xl">
-                      {isNetworkOrOperator ? "signal_wifi_off" : "account_balance_wallet"}
-                    </span>
-                    <span className="font-label-md text-label-md font-bold text-on-surface">
-                      {isNetworkOrOperator ? t("networkUnavailableTitle") : t("checkBalanceTitle")}
-                    </span>
-                    <span className="ml-auto font-label-sm text-[10px] bg-warning/20 text-on-surface-variant px-1.5 py-0.5 rounded-full font-medium">
+              {/* Error Explanation Card */}
+              <div
+                className={`w-full text-left p-3.5 rounded-xl border text-on-surface flex flex-col gap-2 ${
+                  isBalance ? "border-error/40 bg-error/5" : "border-warning/40 bg-warning/10"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`material-symbols-outlined text-xl ${isBalance ? "text-error" : "text-warning"}`}>
+                    {isBalance ? "account_balance_wallet" : "signal_wifi_off"}
+                  </span>
+                  <span className="font-label-md text-label-md font-bold text-on-surface">
+                    {isBalance ? t("checkBalanceTitle") : t("networkUnavailableTitle")}
+                  </span>
+                  {failCount > 0 && (
+                    <span className="ml-auto font-label-sm text-[10px] bg-black/5 text-on-surface-variant px-1.5 py-0.5 rounded-full font-medium">
                       {t("failureAttemptCount", { count: String(failCount) })}
                     </span>
-                  </div>
-                  <p className="font-body-md text-body-md text-on-surface">
-                    {isNetworkOrOperator
-                      ? t("paymentFailedOperatorNetwork", { operator: operatorName })
-                      : t("paymentFailedCheckBalance", { operator: operatorName })}
-                  </p>
-                  {activeProvider === "ORANGE" && (
-                    <p className="font-label-sm text-label-sm text-on-surface-variant bg-surface/70 p-2 rounded-lg border border-outline-variant">
-                      {t("paymentFailedOrangeTip")}
-                    </p>
                   )}
                 </div>
-              ) : (
-                <p className="font-body-md text-body-md text-on-surface">
-                  {failedReason || t("paymentFailedGeneric")}
+                <p className="font-body-md text-body-md text-on-surface leading-relaxed">
+                  {isBalance
+                    ? t("paymentFailedCheckBalance", { operator: operatorName })
+                    : t("paymentFailedOperatorNetwork", { operator: operatorName })}
                 </p>
+              </div>
+
+              {/* If network/operator issue: Provide Alternative Orange Money Merchant Payment & Proof Upload */}
+              {isNetworkOrOperator && (
+                <div className="w-full flex flex-col gap-3">
+                  {/* Merchant USSD Code Box */}
+                  <div className="w-full text-left p-3.5 rounded-xl border-2 border-orange-400 bg-orange-50/70 text-on-surface flex flex-col gap-2.5 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded font-label-sm text-[11px] font-bold bg-[#FF6600] text-white">
+                        Orange Money
+                      </span>
+                      <span className="font-label-md text-label-md font-bold text-orange-950">
+                        {t("orangeMerchantCodeTitle")}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-orange-900 leading-snug">
+                      {t("orangeMerchantCodeDesc")}
+                    </p>
+
+                    <div className="bg-white border-2 border-orange-300 rounded-lg p-2.5 flex items-center justify-between gap-2 shadow-inner">
+                      <code className="font-mono text-sm sm:text-base font-black text-orange-950 tracking-wide select-all">
+                        {merchantUssdCode}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={copyUssdCode}
+                        className="px-2.5 py-1 rounded-md bg-orange-500 hover:bg-orange-600 active:scale-95 text-white text-xs font-bold transition-all flex items-center gap-1 flex-shrink-0 shadow-xs"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">
+                          {copiedCode ? "check" : "content_copy"}
+                        </span>
+                        {copiedCode ? t("ussdCodeCopied") : t("copyUssdCodeAction")}
+                      </button>
+                    </div>
+
+                    <div className="bg-orange-100/60 rounded-lg p-2 text-xs text-orange-950 border border-orange-200">
+                      <span className="text-orange-800 font-medium block">
+                        {t("orangeMerchantBeneficiaryLabel")}
+                      </span>
+                      <span className="font-bold text-sm text-orange-950">
+                        Valentine Parfaite Silong Diagon
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Screenshot Proof Upload Section */}
+                  {membershipSlotId && (
+                    <div className="w-full text-left p-3.5 rounded-xl border border-outline-variant bg-surface-container-lowest flex flex-col gap-2.5 shadow-xs">
+                      <div className="flex items-center gap-2 text-primary">
+                        <span className="material-symbols-outlined text-lg">add_a_photo</span>
+                        <span className="font-label-md text-label-md font-bold text-on-surface">
+                          {t("uploadPaymentProofTitle")}
+                        </span>
+                      </div>
+                      <p className="text-xs text-on-surface-variant leading-snug">
+                        {t("uploadPaymentProofDesc")}
+                      </p>
+
+                      <div className="flex flex-col gap-2">
+                        <input
+                          id="proof-upload-input"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleProofFileChange}
+                          className="hidden"
+                        />
+                        <label
+                          htmlFor="proof-upload-input"
+                          className="w-full border-2 border-dashed border-outline-variant hover:border-primary p-3 rounded-lg text-center cursor-pointer transition-colors flex flex-col items-center gap-1 bg-surface"
+                        >
+                          {proofPreviewUrl ? (
+                            <div className="flex items-center gap-2">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={proofPreviewUrl}
+                                alt="Preuve"
+                                className="w-14 h-14 object-cover rounded-md border border-outline-variant"
+                              />
+                              <div className="text-left">
+                                <span className="font-label-sm text-xs text-primary font-bold block truncate max-w-[180px]">
+                                  {proofFile?.name}
+                                </span>
+                                <span className="text-[11px] text-on-surface-variant">
+                                  Cliquer pour changer l&apos;image
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 text-on-surface-variant hover:text-primary">
+                              <span className="material-symbols-outlined text-2xl">photo_camera</span>
+                              <span className="font-label-sm text-xs font-semibold">
+                                {t("chooseScreenshotAction")}
+                              </span>
+                            </div>
+                          )}
+                        </label>
+
+                        {proofError && (
+                          <p className="text-xs text-error font-medium">{proofError}</p>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={submitPaymentProof}
+                          disabled={!proofFile || uploadingProof}
+                          className="w-full py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-xs font-bold hover:opacity-90 active:scale-95 transition-all disabled:opacity-40 flex items-center justify-center gap-1.5 shadow-sm"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">upload</span>
+                          {uploadingProof ? t("proofSubmitting") : t("submitProofAction")}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
 
               <div className="flex gap-3 w-full">

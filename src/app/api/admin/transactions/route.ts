@@ -72,6 +72,10 @@ export async function GET(request: Request) {
       dueDate: c.dueDate.toISOString(),
       paidAt: c.paidAt ? c.paidAt.toISOString() : null,
       transRef: c.fapshiTxRef ?? c.id,
+      membershipSlotId: c.membershipSlotId,
+      proofImageUrl: c.proofImageUrl,
+      proofUploadedAt: c.proofUploadedAt ? c.proofUploadedAt.toISOString() : null,
+      payerPhone: c.payerPhone,
     })),
   });
 }

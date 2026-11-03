@@ -62,6 +62,7 @@ export function BulkPaymentDialog({
   const [showWaitingHint, setShowWaitingHint] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hintRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,29 +84,50 @@ export function BulkPaymentDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function stopPolling() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    if (hintRef.current) {
+      clearTimeout(hintRef.current);
+      hintRef.current = null;
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }
+
   useEffect(() => {
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-      if (hintRef.current) clearTimeout(hintRef.current);
+      stopPolling();
     };
   }, []);
 
   function startPolling(id: string) {
-    hintRef.current = setTimeout(() => setShowWaitingHint(true), 60_000);
+    stopPolling();
+    hintRef.current = setTimeout(() => setShowWaitingHint(true), 45_000);
+    // Hard timeout after 70 seconds to prevent indefinite loading
+    timeoutRef.current = setTimeout(() => {
+      stopPolling();
+      setFailedReason(t("ussdTimeoutReason"));
+      setFailCount((c) => c + 1);
+      setStep("failed");
+    }, 70_000);
+
     pollRef.current = setInterval(async () => {
       try {
         const res = await fetch(`/api/payments/fapshi/status?transId=${encodeURIComponent(id)}`);
         if (!res.ok) return;
         const body = (await res.json()) as { status: string; failureReason?: string | null };
         if (body.status === "SUCCESSFUL" || body.status === "COMPLETED") {
-          if (pollRef.current) clearInterval(pollRef.current);
-          if (hintRef.current) clearTimeout(hintRef.current);
+          stopPolling();
           playSuccessChimeSound();
           setStep("success");
           setTimeout(() => onSettled(), 1500);
         } else if (body.status === "FAILED" || body.status === "EXPIRED") {
-          if (pollRef.current) clearInterval(pollRef.current);
-          if (hintRef.current) clearTimeout(hintRef.current);
+          stopPolling();
           setFailedReason(body.failureReason ?? null);
           setFailCount((c) => c + 1);
           setStep("failed");
@@ -247,6 +269,30 @@ export function BulkPaymentDialog({
             )}
             <p className="font-label-sm text-label-sm text-on-surface-variant">{t("ussdSentToPhone", { phone })}</p>
             <p className="font-body-md text-body-md text-on-surface-variant">{t("ussdInstructions")}</p>
+
+            {/* Operator-specific waiting tips */}
+            {(() => {
+              const num = phone.replace(/\D/g, "").replace(/^237/, "");
+              const p = detectMobileMoneyProvider(num);
+              if (p === "MTN") {
+                return (
+                  <div className="w-full p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-left text-xs text-on-surface flex items-start gap-2 mt-1">
+                    <span className="material-symbols-outlined text-amber-700 text-lg flex-shrink-0 mt-0.5">info</span>
+                    <p className="font-medium text-amber-950 leading-relaxed">{t("mtnApprovalTip")}</p>
+                  </div>
+                );
+              }
+              if (p === "ORANGE") {
+                return (
+                  <div className="w-full p-3 bg-orange-500/10 border border-orange-500/30 rounded-xl text-left text-xs text-on-surface flex items-start gap-2 mt-1">
+                    <span className="material-symbols-outlined text-orange-700 text-lg flex-shrink-0 mt-0.5">info</span>
+                    <p className="font-medium text-orange-950 leading-relaxed">{t("orangeApprovalTip")}</p>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
             {showWaitingHint && (
               <p className="font-label-sm text-label-sm text-on-surface-variant italic">{t("stillWaitingForConfirmation")}</p>
             )}
