@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getContributionTotal, getNextDueDate, isSessionCycleFinished } from "@/lib/tontine-engine";
+import { getContributionTotal, getNextDueDate, isSessionCycleFinished, getSlotNextUnpaidDueDate, toDueDateKey } from "@/lib/tontine-engine";
 import { initiateDirectPayment, initiateHostedPayment, normalizeCameroonPhone, FapshiError } from "@/lib/fapshi";
 import { assertPriorCyclePaidOut } from "@/lib/round-robin-lock";
 import { computeProviderFee } from "@/lib/payment-fees";
@@ -72,6 +72,44 @@ async function assertCycleNotFinished(
   return { ok: true as const };
 }
 
+export async function resolveDueDateForSlot(
+  membershipSlotId: string,
+  tontineSession: { id: string; type: TontineType; startDate: Date | null },
+  explicitDueDate?: Date | string | null,
+): Promise<Date> {
+  if (explicitDueDate) {
+    return toDueDateKey(new Date(explicitDueDate));
+  }
+
+  if (!tontineSession.startDate) {
+    return getNextDueDate(tontineSession.type, new Date());
+  }
+
+  const allSlots = await prisma.membershipSlot.findMany({
+    where: { membership: { tontineSessionId: tontineSession.id, status: "APPROVED" } },
+    select: { officialPosition: true },
+  });
+  const maxPos = Math.max(0, ...allSlots.map((s) => s.officialPosition ?? 0)) || allSlots.length || 1;
+
+  const paidContributions = await prisma.contribution.findMany({
+    where: { membershipSlotId, status: "PAID" },
+    select: { dueDate: true },
+  });
+
+  const nextUnpaid = getSlotNextUnpaidDueDate({
+    type: tontineSession.type,
+    startDate: tontineSession.startDate,
+    maxPosition: maxPos,
+    paidDueDates: paidContributions.map((c) => c.dueDate),
+  });
+
+  if (nextUnpaid.dueDate) {
+    return nextUnpaid.dueDate;
+  }
+
+  return getNextDueDate(tontineSession.type, new Date());
+}
+
 /**
  * Read-only preview of what a slot payment will cost, including the
  * payment-gateway fee — powers the pre-confirmation "Amount / Payment fee /
@@ -82,6 +120,7 @@ async function assertCycleNotFinished(
 export async function getSlotPaymentQuote(
   membershipSlotId: string,
   provider: PaymentProvider = "FAPSHI",
+  explicitDueDate?: Date | string | null,
 ): Promise<SlotPaymentQuoteResult> {
   const slot = await prisma.membershipSlot.findUnique({
     where: { id: membershipSlotId },
@@ -102,7 +141,7 @@ export async function getSlotPaymentQuote(
   }
 
   const { tontineSession } = slot.membership;
-  const dueDate = getNextDueDate(tontineSession.type, new Date());
+  const dueDate = await resolveDueDateForSlot(membershipSlotId, tontineSession, explicitDueDate);
 
   const cycleCheck = await assertCycleNotFinished(tontineSession, new Date());
   if (!cycleCheck.ok) {
@@ -155,7 +194,7 @@ export async function getSlotPaymentQuote(
 export async function initiateSlotPayment(
   membershipSlotId: string,
   phone: string,
-  options?: { paidByUserId?: string; useCheckout?: boolean; redirectUrl?: string },
+  options?: { paidByUserId?: string; useCheckout?: boolean; redirectUrl?: string; dueDate?: Date | string },
 ): Promise<InitiateSlotPaymentResult> {
   const normalizedPhone = normalizeCameroonPhone(phone);
   if (!normalizedPhone) {
@@ -182,7 +221,7 @@ export async function initiateSlotPayment(
 
   const { tontineSession } = slot.membership;
   const now = new Date();
-  const dueDate = getNextDueDate(tontineSession.type, now);
+  const dueDate = await resolveDueDateForSlot(membershipSlotId, tontineSession, options?.dueDate);
 
   const cycleCheck = await assertCycleNotFinished(tontineSession, now);
   if (!cycleCheck.ok) {

@@ -19,6 +19,8 @@ export interface CotisationMemberItem {
   ballDrawn: number | null;
   officialPosition: number | null;
   userAvatar?: string | null;
+  targetDueDate?: string | null;
+  targetDueDateLabel?: string | null;
 }
 
 const AVATAR_BG_COLORS = [
@@ -51,6 +53,7 @@ export function CotisationMembersList({
   myUnpaidSlotIds,
   slotTotal,
   paymentDescription,
+  sessionTitle,
   defaultPhone,
   lang,
   isDraftSession,
@@ -61,6 +64,7 @@ export function CotisationMembersList({
   myUnpaidSlotIds: string[];
   slotTotal: number;
   paymentDescription: string;
+  sessionTitle?: string;
   defaultPhone?: string | null;
   lang: Lang;
   isDraftSession?: boolean;
@@ -160,10 +164,17 @@ export function CotisationMembersList({
                       </span>
                     )}
                   </p>
-                  <p className="text-xs text-slate-500 font-medium flex items-center gap-1 mt-0.5">
-                    <span className="text-emerald-600 font-bold text-xs">✓</span>
-                    <span>{t("identityVerified")}</span>
-                  </p>
+                  <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                    <p className="text-xs text-slate-500 font-medium flex items-center gap-1">
+                      <span className="text-emerald-600 font-bold text-xs">✓</span>
+                      <span>{t("identityVerified")}</span>
+                    </p>
+                    {!slot.paid && slot.targetDueDateLabel && (
+                      <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200/80 px-1.5 py-0.5 rounded shadow-2xs">
+                        {slot.targetDueDateLabel}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -260,20 +271,28 @@ export function CotisationMembersList({
       )}
 
       {/* Single slot payment confirm modal */}
-      {activeSlotIdForPay && (
-        <PaymentConfirmDialog
-          lang={lang}
-          membershipSlotId={activeSlotIdForPay}
-          payEndpoint="/api/payments/fapshi/initiate"
-          description={paymentDescription}
-          defaultPhone={defaultPhone}
-          onSettled={() => {
-            setActiveSlotIdForPay(null);
-            router.refresh();
-          }}
-          onClose={() => setActiveSlotIdForPay(null)}
-        />
-      )}
+      {activeSlotIdForPay && (() => {
+        const activeSlot = members.find((m) => m.id === activeSlotIdForPay);
+        const modalDescription = activeSlot?.targetDueDateLabel
+          ? `${t("paymentDescriptionPrefix")}: ${sessionTitle || "Cotisation"} — ${activeSlot.targetDueDateLabel}`
+          : paymentDescription;
+
+        return (
+          <PaymentConfirmDialog
+            lang={lang}
+            membershipSlotId={activeSlotIdForPay}
+            dueDate={activeSlot?.targetDueDate ?? null}
+            payEndpoint="/api/payments/fapshi/initiate"
+            description={modalDescription}
+            defaultPhone={defaultPhone}
+            onSettled={() => {
+              setActiveSlotIdForPay(null);
+              router.refresh();
+            }}
+            onClose={() => setActiveSlotIdForPay(null)}
+          />
+        );
+      })()}
 
       {/* Bulk slot payment dialog */}
       {showBulkDialog && (

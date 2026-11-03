@@ -4,6 +4,7 @@ import { getSlotPaymentQuote } from "@/lib/initiate-slot-payment";
 
 const bodySchema = z.object({
   membershipSlotId: z.string().min(1),
+  dueDate: z.string().optional(),
 });
 
 // Deliberately no auth() call — mirrors /api/payments/public/pay-slot. This
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await getSlotPaymentQuote(parsed.data.membershipSlotId);
+    const result = await getSlotPaymentQuote(parsed.data.membershipSlotId, "FAPSHI", parsed.data.dueDate);
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }

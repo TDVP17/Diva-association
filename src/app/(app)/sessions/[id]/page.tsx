@@ -2,7 +2,16 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getContributionTotal, getNextDueDate, getCycleDateForRound, getTontineConfig, isPayoutInfoUnlockTime, isSessionCycleFinished } from "@/lib/tontine-engine";
+import {
+  getContributionTotal,
+  getNextDueDate,
+  getCycleDateForRound,
+  getSessionActiveRoundAndDueDate,
+  getSlotNextUnpaidDueDate,
+  getTontineConfig,
+  isPayoutInfoUnlockTime,
+  isSessionCycleFinished,
+} from "@/lib/tontine-engine";
 import { processFapshiTransaction } from "@/lib/process-fapshi-transaction";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { formatXAF } from "@/lib/format-currency";
@@ -83,6 +92,9 @@ export default async function SessionDetailPage({
   const tontineSession = await prisma.tontineSession.findUnique({
     where: { id },
     include: {
+      payouts: {
+        select: { id: true, status: true, dueDate: true, releasedAt: true, membershipSlotId: true },
+      },
       memberships: {
         orderBy: { joinedAt: "asc" },
         include: {
@@ -430,7 +442,21 @@ export default async function SessionDetailPage({
   );
 
   const now = new Date();
-  const dueDate = getNextDueDate(tontineSession.type, now);
+  const allSlotIds = approvedMemberships.flatMap((m) => m.slots.map((s) => s.id));
+  const totalSlotsCount = totalRegisteredSlots > 0 ? totalRegisteredSlots : allSlotIds.length || 1;
+
+  const releasedPayoutDates = (tontineSession.payouts ?? [])
+    .filter((p) => p.releasedAt || p.status === "CONFIRMED" || p.status === "RELEASED")
+    .map((p) => p.dueDate);
+
+  const { round: activeRound, dueDate: sessionDueDate } = getSessionActiveRoundAndDueDate({
+    type: tontineSession.type,
+    startDate: tontineSession.startDate,
+    maxPosition: totalSlotsCount,
+    releasedPayoutDates,
+  });
+  const dueDate = sessionDueDate;
+
   const { total: perSlotTotal } = getContributionTotal({
     amount: Number(tontineSession.amount),
     fee: Number(tontineSession.fee),
@@ -442,19 +468,15 @@ export default async function SessionDetailPage({
     year: "numeric",
   })}`;
 
-  const allSlotIds = approvedMemberships.flatMap((m) => m.slots.map((s) => s.id));
   const [contributions, fines] = allSlotIds.length
     ? await Promise.all([
         prisma.contribution.findMany({
-      where: { membershipSlotId: { in: allSlotIds }, dueDate },
-      include: { paidByUser: { select: { name: true } } },
-    }),
-        prisma.fine.findMany({ where: { membershipSlotId: { in: allSlotIds }, dueDate, status: "UNPAID" } }),
+          where: { membershipSlotId: { in: allSlotIds } },
+          include: { paidByUser: { select: { name: true } } },
+        }),
+        prisma.fine.findMany({ where: { membershipSlotId: { in: allSlotIds }, status: "UNPAID" } }),
       ])
     : [[], []];
-
-  const contributionBySlot = new Map(contributions.map((c) => [c.membershipSlotId, c]));
-  const fineBySlot = new Map(fines.map((f) => [f.membershipSlotId, f]));
 
   const allSlotsFlat = approvedMemberships
     .flatMap((m) =>
@@ -468,7 +490,15 @@ export default async function SessionDetailPage({
       if (b.officialPosition !== null) return 1;
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
-  const paidCount = allSlotsFlat.filter((s) => contributionBySlot.get(s.id)?.status === "PAID").length;
+
+  const paidCount = allSlotsFlat.filter((s) =>
+    contributions.some(
+      (c) =>
+        c.membershipSlotId === s.id &&
+        c.dueDate.toISOString().slice(0, 10) === sessionDueDate.toISOString().slice(0, 10) &&
+        c.status === "PAID",
+    ),
+  ).length;
 
   const perSlotAmount = Number(tontineSession.amount);
   const perSlotFee = Number(tontineSession.fee);
@@ -497,15 +527,45 @@ export default async function SessionDetailPage({
     !hasUndrawnSlots && !!myDesignatedSlot && myDesignatedSlot.ballDrawn !== null;
 
   const memberStatusSlots = allSlotsFlat.map((s) => {
-    const c = contributionBySlot.get(s.id);
-    const f = fineBySlot.get(s.id);
-    const paid = c?.status === "PAID";
+    const slotContributions = contributions.filter((c) => c.membershipSlotId === s.id);
+    const nextUnpaid = getSlotNextUnpaidDueDate({
+      type: tontineSession.type,
+      startDate: tontineSession.startDate,
+      maxPosition: totalSlotsCount,
+      paidDueDates: slotContributions.filter((c) => c.status === "PAID").map((c) => c.dueDate),
+    });
+    const targetDueDate = nextUnpaid.dueDate;
+    const isPaidForCycle = nextUnpaid.isAllPaid;
+    const activeRoundContribution = slotContributions.find(
+      (c) => c.dueDate.toISOString().slice(0, 10) === sessionDueDate.toISOString().slice(0, 10) && c.status === "PAID",
+    );
+    const paid = !!activeRoundContribution || isPaidForCycle;
+    const relevantContribution = activeRoundContribution || slotContributions.find((c) => c.status === "PAID");
+
+    const targetDueDateLabel = targetDueDate
+      ? targetDueDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-GB", {
+          timeZone: "Africa/Douala",
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : null;
+
+    const f =
+      (targetDueDate &&
+        fines.find(
+          (fine) =>
+            fine.membershipSlotId === s.id &&
+            fine.dueDate.toISOString().slice(0, 10) === targetDueDate.toISOString().slice(0, 10),
+        )) ||
+      fines.find((fine) => fine.membershipSlotId === s.id);
     const slotDateLabel = s.officialPosition
       ? getCycleDateForRound(tontineSession.type, tontineSession.startDate, s.officialPosition).toLocaleDateString(
           lang === "fr" ? "fr-FR" : "en-GB",
           { timeZone: "Africa/Douala", day: "numeric", month: "short", year: "numeric" },
         )
       : null;
+
     return {
       id: s.id,
       beneficiaryName: s.beneficiaryName,
@@ -513,10 +573,14 @@ export default async function SessionDetailPage({
       officialPosition: s.officialPosition,
       isMine: s.isMine,
       paid,
-      paidAtLabel: c?.paidAt ? c.paidAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : null,
-      paidByRelativeName: c?.paidByUser?.name ?? null,
+      paidAtLabel: relevantContribution?.paidAt
+        ? relevantContribution.paidAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+        : null,
+      paidByRelativeName: relevantContribution?.paidByUser?.name ?? null,
       fineAmount: f ? Number(f.amount) : null,
       estimatedDateLabel: slotDateLabel,
+      targetDueDate: targetDueDate ? targetDueDate.toISOString() : null,
+      targetDueDateLabel,
     };
   }).sort((a, b) => a.beneficiaryName.localeCompare(b.beneficiaryName, "fr", { sensitivity: "base" }));
 
@@ -528,7 +592,7 @@ export default async function SessionDetailPage({
   const roundLock = await assertPriorCyclePaidOut(
     tontineSession.id,
     tontineSession.type,
-    dueDate,
+    sessionDueDate,
     tontineSession.startDate,
   );
   const currentBeneficiaryName = roundLock.ok ? null : designatedSlot?.beneficiaryName;
@@ -745,12 +809,24 @@ export default async function SessionDetailPage({
           fineAmount: s.fineAmount,
           ballDrawn: s.ballDrawn,
           officialPosition: s.officialPosition,
+          targetDueDate: s.targetDueDate,
+          targetDueDateLabel: s.targetDueDateLabel,
         }))}
         myUnpaidSlotIds={mySlots
-          .filter((s) => contributionBySlot.get(s.id)?.status !== "PAID")
+          .filter((s) => {
+            const slotContributions = contributions.filter((c) => c.membershipSlotId === s.id);
+            const nextUnpaid = getSlotNextUnpaidDueDate({
+              type: tontineSession.type,
+              startDate: tontineSession.startDate,
+              maxPosition: totalSlotsCount,
+              paidDueDates: slotContributions.filter((c) => c.status === "PAID").map((c) => c.dueDate),
+            });
+            return !nextUnpaid.isAllPaid;
+          })
           .map((s) => s.id)}
         slotTotal={perSlotTotal}
         paymentDescription={paymentDescription}
+        sessionTitle={sessionLabel}
         defaultPhone={myMembership.user.phone}
         lang={lang}
         isDraftSession={!isDrawCompleted}

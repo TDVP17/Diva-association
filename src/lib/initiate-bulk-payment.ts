@@ -4,6 +4,7 @@ import { initiateDirectPayment, initiateHostedPayment, normalizeCameroonPhone, F
 import { assertPriorCyclePaidOut } from "@/lib/round-robin-lock";
 import { computeProviderFee } from "@/lib/payment-fees";
 import { detectMobileMoneyProvider, fapshiMediumFor } from "@/lib/mobile-money-provider";
+import { resolveDueDateForSlot } from "@/lib/initiate-slot-payment";
 import type { PaymentProvider } from "@/generated/prisma/enums";
 
 const MAX_SLOTS_PER_BULK_PAYMENT = 20;
@@ -91,10 +92,11 @@ async function loadAndValidateSlots(
     }
 
     const tontineSessionId = slot.membership.tontineSessionId;
-    if (!roundLockCache.has(tontineSessionId)) {
-      const dueDate = getNextDueDate(slot.membership.tontineSession.type, now);
+    const dueDate = await resolveDueDateForSlot(slot.id, slot.membership.tontineSession);
+    const roundLockKey = `${tontineSessionId}-${dueDate.getTime()}`;
+    if (!roundLockCache.has(roundLockKey)) {
       roundLockCache.set(
-        tontineSessionId,
+        roundLockKey,
         await assertPriorCyclePaidOut(
           tontineSessionId,
           slot.membership.tontineSession.type,
@@ -103,7 +105,7 @@ async function loadAndValidateSlots(
         ),
       );
     }
-    const roundLock = roundLockCache.get(tontineSessionId)!;
+    const roundLock = roundLockCache.get(roundLockKey)!;
     if (!roundLock.ok) {
       return { ok: false as const, status: roundLock.status, error: `${slot.beneficiaryName}: ${roundLock.error}` };
     }
@@ -142,17 +144,17 @@ export async function listUnpaidSlotsForBulkPayment(userId: string): Promise<Unp
   for (const membership of memberships) {
     if (membership.tontineSession.isPaused) continue;
     const { tontineSession } = membership;
-    const dueDate = getNextDueDate(tontineSession.type, now);
-
-    if (!roundLockCache.has(membership.tontineSessionId)) {
-      roundLockCache.set(
-        membership.tontineSessionId,
-        await assertPriorCyclePaidOut(membership.tontineSessionId, tontineSession.type, dueDate, tontineSession.startDate),
-      );
-    }
-    const roundLock = roundLockCache.get(membership.tontineSessionId)!;
-
     for (const slot of membership.slots) {
+      const dueDate = await resolveDueDateForSlot(slot.id, tontineSession);
+      const roundLockKey = `${membership.tontineSessionId}-${dueDate.getTime()}`;
+      if (!roundLockCache.has(roundLockKey)) {
+        roundLockCache.set(
+          roundLockKey,
+          await assertPriorCyclePaidOut(membership.tontineSessionId, tontineSession.type, dueDate, tontineSession.startDate),
+        );
+      }
+      const roundLock = roundLockCache.get(roundLockKey)!;
+
       const existing = await prisma.contribution.findUnique({
         where: { membershipSlotId_dueDate: { membershipSlotId: slot.id, dueDate } },
       });
@@ -197,7 +199,7 @@ export async function getBulkPaymentQuote(
   const items: BulkPaymentQuoteItem[] = [];
   for (const slot of validated.slots) {
     const { tontineSession } = slot.membership;
-    const dueDate = getNextDueDate(tontineSession.type, now);
+    const dueDate = await resolveDueDateForSlot(slot.id, tontineSession);
     const existing = await prisma.contribution.findUnique({
       where: { membershipSlotId_dueDate: { membershipSlotId: slot.id, dueDate } },
     });
@@ -273,7 +275,7 @@ export async function initiateBulkPayment(
       let baseTotal = 0;
       for (const slot of slots) {
         const { tontineSession } = slot.membership;
-        const dueDate = getNextDueDate(tontineSession.type, now);
+        const dueDate = await resolveDueDateForSlot(slot.id, tontineSession);
         const existing = await tx.contribution.findUnique({
           where: { membershipSlotId_dueDate: { membershipSlotId: slot.id, dueDate } },
         });

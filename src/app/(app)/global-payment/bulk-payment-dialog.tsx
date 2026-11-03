@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 import { formatXAF } from "@/lib/format-currency";
+import { detectMobileMoneyProvider } from "@/lib/mobile-money-provider";
 import { playSuccessChimeSound, playUiTapSound } from "@/lib/sound-effects";
 
 interface QuoteItem {
@@ -57,6 +58,7 @@ export function BulkPaymentDialog({
   const [payError, setPayError] = useState<string | null>(null);
   const [transId, setTransId] = useState<string | null>(null);
   const [failedReason, setFailedReason] = useState<string | null>(null);
+  const [failCount, setFailCount] = useState(0);
   const [showWaitingHint, setShowWaitingHint] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hintRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -105,6 +107,7 @@ export function BulkPaymentDialog({
           if (pollRef.current) clearInterval(pollRef.current);
           if (hintRef.current) clearTimeout(hintRef.current);
           setFailedReason(body.failureReason ?? null);
+          setFailCount((c) => c + 1);
           setStep("failed");
         }
       } catch {
@@ -143,6 +146,7 @@ export function BulkPaymentDialog({
       setStep("waiting");
       startPolling(body.transId);
     } catch (err) {
+      setFailCount((c) => c + 1);
       setPayError(friendlyErrorMessage(err, t("paymentInitiationFailed")));
     } finally {
       setSubmitting(false);
@@ -267,40 +271,77 @@ export function BulkPaymentDialog({
           </div>
         )}
 
-        {step === "failed" && (
-          <div className="flex flex-col items-center text-center gap-4">
-            <span className="material-symbols-outlined text-error text-4xl">error</span>
-            <p className="font-body-md text-body-md text-on-surface">
-              {failedReason || t("paymentFailedGeneric")}
-            </p>
-            <button
-              type="button"
-              disabled={submitting}
-              onClick={() => handleConfirm(true)}
-              className="w-full px-3 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2"
-            >
-              <span className="material-symbols-outlined text-[18px]">lock</span>
-              {t("payViaSecureCheckout")}
-            </button>
-            <div className="flex gap-3 w-full">
+        {step === "failed" && (() => {
+          const digits = phone.replace(/\D/g, "").replace(/^237/, "");
+          const activeProvider = digits ? detectMobileMoneyProvider(digits) : null;
+          const operatorName = activeProvider === "ORANGE" ? "Orange Money" : activeProvider === "MTN" ? "MTN MoMo" : "votre opérateur";
+          const lowerReason = (failedReason || "").toLowerCase();
+          const isBalance = ["balance", "solde", "fund", "provision", "insufficient", "insuffisant"].some((k) => lowerReason.includes(k));
+          const isNetworkOrOperator = !isBalance;
+
+          return (
+            <div className="flex flex-col items-center text-center gap-4">
+              <span className="material-symbols-outlined text-error text-4xl">error</span>
+
+              {failCount >= 2 ? (
+                <div className="w-full text-left p-3.5 rounded-xl border border-warning/40 bg-warning/10 text-on-surface flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-warning text-xl">
+                      {isNetworkOrOperator ? "signal_wifi_off" : "account_balance_wallet"}
+                    </span>
+                    <span className="font-label-md text-label-md font-bold text-on-surface">
+                      {isNetworkOrOperator ? t("networkUnavailableTitle") : t("checkBalanceTitle")}
+                    </span>
+                    <span className="ml-auto font-label-sm text-[10px] bg-warning/20 text-on-surface-variant px-1.5 py-0.5 rounded-full font-medium">
+                      {t("failureAttemptCount", { count: String(failCount) })}
+                    </span>
+                  </div>
+                  <p className="font-body-md text-body-md text-on-surface">
+                    {isNetworkOrOperator
+                      ? t("paymentFailedOperatorNetwork", { operator: operatorName })
+                      : t("paymentFailedCheckBalance", { operator: operatorName })}
+                  </p>
+                  {activeProvider === "ORANGE" && (
+                    <p className="font-label-sm text-label-sm text-on-surface-variant bg-surface/70 p-2 rounded-lg border border-outline-variant">
+                      {t("paymentFailedOrangeTip")}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="font-body-md text-body-md text-on-surface">
+                  {failedReason || t("paymentFailedGeneric")}
+                </p>
+              )}
+
               <button
                 type="button"
-                onClick={onClose}
-                className="flex-1 px-3 py-2.5 rounded-lg border border-outline text-on-surface font-label-md text-label-md hover:bg-surface-variant/50 transition-colors"
+                disabled={submitting}
+                onClick={() => handleConfirm(true)}
+                className="w-full px-3 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2"
               >
-                {t("cancelAction")}
+                <span className="material-symbols-outlined text-[18px]">lock</span>
+                {t("payViaSecureCheckout")}
               </button>
-              <button
-                type="button"
-                onClick={retry}
-                className="flex-1 px-3 py-2.5 rounded-lg border border-primary text-primary font-label-md text-label-md hover:bg-primary/10 active:scale-95 transition-all"
-              >
-                {t("tryAgain")}
-              </button>
+              <div className="flex gap-3 w-full">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 px-3 py-2.5 rounded-lg border border-outline text-on-surface font-label-md text-label-md hover:bg-surface-variant/50 transition-colors"
+                >
+                  {t("cancelAction")}
+                </button>
+                <button
+                  type="button"
+                  onClick={retry}
+                  className="flex-1 px-3 py-2.5 rounded-lg border border-primary text-primary font-label-md text-label-md hover:bg-primary/10 active:scale-95 transition-all"
+                >
+                  {t("tryAgain")}
+                </button>
+              </div>
+              {transId && <p className="font-label-sm text-[11px] text-on-surface-variant">Ref: {transId}</p>}
             </div>
-            {transId && <p className="font-label-sm text-[11px] text-on-surface-variant">Ref: {transId}</p>}
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

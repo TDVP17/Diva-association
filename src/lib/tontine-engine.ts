@@ -342,3 +342,68 @@ export function isSessionCycleFinished(params: {
   return dueDate > sessionEndDate;
 }
 
+/**
+ * Computes the session's active cycle due date and round index.
+ * A round r remains active until its pot has been released to its designated beneficiary.
+ * If all rounds have released payouts or the session has not started, returns the appropriate boundary date.
+ */
+export function getSessionActiveRoundAndDueDate(params: {
+  type: TontineType;
+  startDate: Date | null;
+  maxPosition?: number | null;
+  releasedPayoutDates?: (Date | string)[];
+}): { round: number; dueDate: Date; isFinished: boolean } {
+  if (!params.startDate) {
+    const fallback = getNextDueDate(params.type, new Date());
+    return { round: 1, dueDate: fallback, isFinished: false };
+  }
+
+  const maxRounds = params.maxPosition && params.maxPosition > 0 ? params.maxPosition : 1;
+  const releasedTimestamps = new Set(
+    (params.releasedPayoutDates ?? []).map((d) => toDueDateKey(new Date(d)).getTime()),
+  );
+
+  for (let r = 1; r <= maxRounds; r++) {
+    const rDueDate = getCycleDateForRound(params.type, params.startDate, r);
+    if (!releasedTimestamps.has(rDueDate.getTime())) {
+      return { round: r, dueDate: rDueDate, isFinished: false };
+    }
+  }
+
+  // All rounds have released payouts
+  const lastDueDate = getCycleDateForRound(params.type, params.startDate, maxRounds);
+  return { round: maxRounds, dueDate: lastDueDate, isFinished: true };
+}
+
+/**
+ * Computes the earliest unpaid cycle due date for a specific slot.
+ * Ensures a member who missed a previous week must first contribute for that past date
+ * before they can contribute for subsequent rounds.
+ */
+export function getSlotNextUnpaidDueDate(params: {
+  type: TontineType;
+  startDate: Date | null;
+  maxPosition?: number | null;
+  paidDueDates: (Date | string)[];
+}): { round: number | null; dueDate: Date | null; isAllPaid: boolean } {
+  if (!params.startDate) {
+    const fallback = getNextDueDate(params.type, new Date());
+    return { round: 1, dueDate: fallback, isAllPaid: false };
+  }
+
+  const maxRounds = params.maxPosition && params.maxPosition > 0 ? params.maxPosition : 1;
+  const paidTimestamps = new Set(
+    params.paidDueDates.map((d) => toDueDateKey(new Date(d)).getTime()),
+  );
+
+  for (let r = 1; r <= maxRounds; r++) {
+    const rDueDate = getCycleDateForRound(params.type, params.startDate, r);
+    if (!paidTimestamps.has(rDueDate.getTime())) {
+      return { round: r, dueDate: rDueDate, isAllPaid: false };
+    }
+  }
+
+  return { round: null, dueDate: null, isAllPaid: true };
+}
+
+

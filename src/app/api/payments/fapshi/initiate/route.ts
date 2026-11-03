@@ -8,6 +8,7 @@ const bodySchema = z.object({
   membershipSlotId: z.string().min(1),
   phone: z.string().min(1),
   useCheckout: z.boolean().optional(),
+  dueDate: z.string().optional(),
 });
 
 export async function POST(request: Request) {
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
-  const { membershipSlotId, phone, useCheckout } = parsed.data;
+  const { membershipSlotId, phone, useCheckout, dueDate } = parsed.data;
 
   try {
     const slot = await prisma.membershipSlot.findUnique({
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
       paidByUserId: session.user.id,
       useCheckout,
       redirectUrl,
+      dueDate,
     });
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status });

@@ -8,6 +8,8 @@ import {
   computeFeeSplitAmounts,
   getTontineConfig,
   isSessionCycleFinished,
+  getSessionActiveRoundAndDueDate,
+  getSlotNextUnpaidDueDate,
 } from "@/lib/tontine-engine";
 import type { TontineType } from "@/generated/prisma/enums";
 
@@ -227,4 +229,77 @@ describe("isSessionCycleFinished", () => {
     ).toBe(false);
   });
 });
+
+describe("getSessionActiveRoundAndDueDate", () => {
+  const startDate = new Date("2026-11-02T00:00:00Z"); // Monday Nov 2
+
+  it("returns round 1 (Nov 2) when round 1 payout has not been released yet", () => {
+    const res = getSessionActiveRoundAndDueDate({
+      type: "EVERY_MONDAY",
+      startDate,
+      maxPosition: 2,
+      releasedPayoutDates: [],
+    });
+    expect(res.round).toBe(1);
+    expect(res.dueDate.toISOString().startsWith("2026-11-02")).toBe(true);
+    expect(res.isFinished).toBe(false);
+  });
+
+  it("advances to round 2 (Nov 9) once round 1 payout is released", () => {
+    const round1Date = new Date("2026-11-02T00:00:00Z");
+    const res = getSessionActiveRoundAndDueDate({
+      type: "EVERY_MONDAY",
+      startDate,
+      maxPosition: 2,
+      releasedPayoutDates: [round1Date],
+    });
+    expect(res.round).toBe(2);
+    expect(res.dueDate.toISOString().startsWith("2026-11-09")).toBe(true);
+    expect(res.isFinished).toBe(false);
+  });
+});
+
+describe("getSlotNextUnpaidDueDate", () => {
+  const startDate = new Date("2026-11-02T00:00:00Z"); // Monday Nov 2
+
+  it("returns round 1 for a member who has not contributed for round 1, even if date passed", () => {
+    const res = getSlotNextUnpaidDueDate({
+      type: "EVERY_MONDAY",
+      startDate,
+      maxPosition: 2,
+      paidDueDates: [],
+    });
+    expect(res.round).toBe(1);
+    expect(res.dueDate?.toISOString().startsWith("2026-11-02")).toBe(true);
+    expect(res.isAllPaid).toBe(false);
+  });
+
+  it("returns round 2 for a member who already paid round 1", () => {
+    const round1Date = new Date("2026-11-02T00:00:00Z");
+    const res = getSlotNextUnpaidDueDate({
+      type: "EVERY_MONDAY",
+      startDate,
+      maxPosition: 2,
+      paidDueDates: [round1Date],
+    });
+    expect(res.round).toBe(2);
+    expect(res.dueDate?.toISOString().startsWith("2026-11-09")).toBe(true);
+    expect(res.isAllPaid).toBe(false);
+  });
+
+  it("returns isAllPaid: true when all rounds in the cycle are paid", () => {
+    const round1Date = new Date("2026-11-02T00:00:00Z");
+    const round2Date = new Date("2026-11-09T00:00:00Z");
+    const res = getSlotNextUnpaidDueDate({
+      type: "EVERY_MONDAY",
+      startDate,
+      maxPosition: 2,
+      paidDueDates: [round1Date, round2Date],
+    });
+    expect(res.round).toBe(null);
+    expect(res.dueDate).toBe(null);
+    expect(res.isAllPaid).toBe(true);
+  });
+});
+
 
