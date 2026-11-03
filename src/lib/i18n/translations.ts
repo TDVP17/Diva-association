@@ -632,9 +632,9 @@ export const translations = {
     paymentFailedInsufficientFunds: "Insufficient balance. Please top up your account and try again.",
     paymentFailedGeneric:
       "The payment could not be completed on your phone. Please verify your balance or network connection and try again.",
-    paymentFailedOperatorNetwork: "Payments via {operator} are currently unavailable on the operator's network. Please try again later or use the secure payment link.",
+    paymentFailedOperatorNetwork: "Payments via {operator} are currently unavailable on the operator's network. Please try again later.",
     paymentFailedCheckBalance: "Please check your {operator} balance. Your account does not appear to have sufficient funds for this payment.",
-    paymentFailedOrangeTip: "Tip for Orange Money: Dial #150*4*4# on your phone to get your authorization code, then click 'Pay via secure link'.",
+    paymentFailedOrangeTip: "Orange Money is currently experiencing network disruptions on the operator side. Please try again later or use an MTN MoMo number.",
     networkUnavailableTitle: "Operator network unavailable",
     checkBalanceTitle: "Check your balance",
     failureAttemptCount: "Attempt {count}",
@@ -1831,9 +1831,9 @@ export const translations = {
     paymentFailedInsufficientFunds: "Solde insuffisant. Veuillez recharger votre compte et réessayer.",
     paymentFailedGeneric:
       "Le paiement n'a pas pu aboutir sur votre téléphone. Veuillez vérifier votre solde ou votre connexion et réessayer.",
-    paymentFailedOperatorNetwork: "Les paiements via {operator} sont indisponibles actuellement sur le réseau de l'opérateur. Veuillez réessayer plus tard ou utiliser le paiement par lien sécurisé.",
+    paymentFailedOperatorNetwork: "Les paiements via {operator} sont indisponibles actuellement sur le réseau de l'opérateur. Veuillez réessayer plus tard.",
     paymentFailedCheckBalance: "Veuillez vérifier votre solde {operator}. Votre solde semble insuffisant pour effectuer cette cotisation.",
-    paymentFailedOrangeTip: "Conseil Orange Money : Composez le #150*4*4# sur votre téléphone pour générer votre code d'autorisation, puis cliquez sur « Payer via le lien sécurisé ».",
+    paymentFailedOrangeTip: "Orange Money rencontre actuellement des perturbations sur le réseau de l'opérateur. Veuillez réessayer plus tard ou utiliser un numéro MTN MoMo.",
     networkUnavailableTitle: "Réseau opérateur indisponible",
     checkBalanceTitle: "Vérifiez votre solde",
     failureAttemptCount: "Tentative {count}",

@@ -185,7 +185,7 @@ export function PaymentConfirmDialog({
     }, POLL_INTERVAL_MS);
   }
 
-  async function handleConfirm(useCheckout = false) {
+  async function handleConfirm() {
     let normalized: string;
     if (!usingNewNumber) {
       // A saved method's phone was already validated/normalized when it was
@@ -216,14 +216,9 @@ export function PaymentConfirmDialog({
           ...(fineId ? { fineId } : {}),
           ...(dueDate ? { dueDate } : {}),
           phone: normalized,
-          useCheckout,
         }),
       });
-      const body = await parseJsonOrThrow<{ transId: string; link?: string }>(res, t("paymentInitiationFailed"));
-      if (body.link) {
-        window.location.href = body.link;
-        return;
-      }
+      const body = await parseJsonOrThrow<{ transId: string }>(res, t("paymentInitiationFailed"));
       setTransId(body.transId);
       setUsedPhone(normalized);
       setStep("waiting");
@@ -509,15 +504,6 @@ export function PaymentConfirmDialog({
                 </p>
               )}
 
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => handleConfirm(true)}
-                className="w-full px-3 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2"
-              >
-                <span className="material-symbols-outlined text-[18px]">lock</span>
-                {t("payViaSecureCheckout")}
-              </button>
               <div className="flex gap-3 w-full">
                 <button
                   type="button"

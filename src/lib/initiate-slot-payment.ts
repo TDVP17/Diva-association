@@ -27,12 +27,9 @@ export type SlotPaymentQuoteResult =
   | { ok: true; quote: SlotPaymentQuote }
   | { ok: false; status: number; error: string };
 
-// A PENDING row with a live fapshiTxRef younger than this is treated as "a
-// payment is already in flight" and blocks a second concurrent attempt —
-// see the race-condition guard in initiateSlotPayment(). Long enough to
-// cover someone actually completing the USSD prompt, short enough that an
-// abandoned attempt doesn't lock the slot out for good.
-const IN_FLIGHT_WINDOW_MS = 10 * 60 * 1000;
+// USSD push prompts expire within 60-90 seconds. A PENDING row within this
+// window blocks rapid double-taps while the member confirms on their phone.
+const IN_FLIGHT_WINDOW_MS = 90 * 1000;
 
 function isPaymentInFlight(
   existing: { status: string; fapshiTxRef?: string | null; bulkPaymentId?: string | null; updatedAt: Date } | null,
@@ -153,9 +150,6 @@ export async function getSlotPaymentQuote(
   });
   if (existing?.status === "PAID") {
     return { ok: false, status: 409, error: "This slot is already paid for this cycle" };
-  }
-  if (isPaymentInFlight(existing)) {
-    return { ok: false, status: 409, error: "A payment is already in progress for this slot — please wait a moment" };
   }
 
   const { amount, fee } = getContributionTotal({

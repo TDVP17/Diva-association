@@ -116,7 +116,7 @@ export function BulkPaymentDialog({
     }, POLL_INTERVAL_MS);
   }
 
-  async function handleConfirm(useCheckout = false) {
+  async function handleConfirm() {
     const digits = phone.replace(/\D/g, "");
     const normalized = digits.startsWith("237") ? digits.slice(3) : digits;
     if (!/^[6-9]\d{8}$/.test(normalized)) {
@@ -134,14 +134,9 @@ export function BulkPaymentDialog({
           membershipSlotIds,
           phone: normalized,
           isRelative,
-          useCheckout,
         }),
       });
-      const body = await parseJsonOrThrow<{ transId: string; link?: string }>(res, t("paymentInitiationFailed"));
-      if (body.link) {
-        window.location.href = body.link;
-        return;
-      }
+      const body = await parseJsonOrThrow<{ transId: string }>(res, t("paymentInitiationFailed"));
       setTransId(body.transId);
       setStep("waiting");
       startPolling(body.transId);
@@ -313,15 +308,6 @@ export function BulkPaymentDialog({
                 </p>
               )}
 
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={() => handleConfirm(true)}
-                className="w-full px-3 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2"
-              >
-                <span className="material-symbols-outlined text-[18px]">lock</span>
-                {t("payViaSecureCheckout")}
-              </button>
               <div className="flex gap-3 w-full">
                 <button
                   type="button"
