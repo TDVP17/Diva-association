@@ -13,7 +13,7 @@ export function ShareAppSection({
 }) {
   const [copied, setCopied] = useState(false);
 
-  const shareUrl = typeof window !== "undefined" ? window.location.origin : "https://diva-association.vercel.app";
+  const shareUrl = typeof window !== "undefined" ? window.location.origin : "https://divaasso.com";
   const shareTitle = "DIVA Asso — Application de Cotisations";
   const shareText =
     lang === "fr"

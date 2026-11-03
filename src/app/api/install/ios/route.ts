@@ -8,6 +8,6 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: NextRequest) {
   const proto = req.headers.get("x-forwarded-proto") || "https";
-  const host = req.headers.get("host") || "diva-association.vercel.app";
+  const host = req.headers.get("host") || "divaasso.com";
   return NextResponse.redirect(`${proto}://${host}/dashboard`);
 }

@@ -101,7 +101,7 @@ export async function POST(request: Request) {
         ? parsed.data.content.slice(0, 70) + "..."
         : parsed.data.content;
     const chatUrl = `/chat?with=${session.user.id}`;
-    const baseUrl = process.env.NEXTAUTH_URL ?? "https://diva-association.vercel.app";
+    const baseUrl = process.env.NEXTAUTH_URL ?? "https://divaasso.com";
 
     const unreadChatCount =
       (await prisma.chatMessage.count({

@@ -7,6 +7,6 @@ export async function GET() {
   }
 
   // Fallback: If no hosted APK binary is configured yet, guide the member to the install flow
-  const appUrl = process.env.NEXTAUTH_URL ?? "https://diva-association.vercel.app";
+  const appUrl = process.env.NEXTAUTH_URL ?? "https://divaasso.com";
   return NextResponse.redirect(new URL("/?pwa=install", appUrl), 302);
 }
