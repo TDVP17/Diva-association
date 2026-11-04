@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
 import { logAudit } from "@/lib/audit";
-import { getNextDueDate } from "@/lib/tontine-engine";
+import { getSessionActiveRoundAndDueDate, getSlotNextUnpaidDueDate } from "@/lib/tontine-engine";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin();
@@ -13,6 +13,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const s = await prisma.tontineSession.findUnique({
     where: { id },
     include: {
+      payouts: {
+        select: { dueDate: true, status: true, releasedAt: true },
+      },
       memberships: {
         where: { status: "APPROVED" },
         orderBy: { joinedAt: "asc" },
@@ -27,17 +30,59 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
 
-  const dueDate = getNextDueDate(s.type, new Date());
+  const registeredSlots = s.memberships.reduce((sum, m) => sum + (m.slotCount ? Number(m.slotCount) : 0), 0);
   const allSlotIds = s.memberships.flatMap((m) => m.slots.map((sl) => sl.id));
-  const paidContributions = allSlotIds.length
+  const totalSlotsCount = registeredSlots > 0 ? registeredSlots : allSlotIds.length || 1;
+
+  const releasedPayoutDates = s.payouts
+    .filter((p) => p.releasedAt || p.status === "CONFIRMED" || p.status === "RELEASED")
+    .map((p) => p.dueDate);
+
+  const { dueDate: sessionDueDate } = getSessionActiveRoundAndDueDate({
+    type: s.type,
+    startDate: s.startDate,
+    maxPosition: totalSlotsCount,
+    releasedPayoutDates,
+  });
+
+  const slotContributions = allSlotIds.length
     ? await prisma.contribution.findMany({
-        where: { membershipSlotId: { in: allSlotIds }, dueDate, status: "PAID" },
-        select: { membershipSlotId: true },
+        where: { membershipSlotId: { in: allSlotIds } },
+        select: {
+          id: true,
+          membershipSlotId: true,
+          dueDate: true,
+          status: true,
+          proofImageUrl: true,
+          proofImageUrls: true,
+        },
       })
     : [];
-  const paidSlotIds = new Set(paidContributions.map((c) => c.membershipSlotId));
 
-  const registeredSlots = s.memberships.reduce((sum, m) => sum + (m.slotCount ? Number(m.slotCount) : 0), 0);
+  const sessionDueDateKey = sessionDueDate.toISOString().slice(0, 10);
+  const paidSlotIds = new Set<string>();
+  const pendingProofSlotIds = new Set<string>();
+
+  for (const slotId of allSlotIds) {
+    const rows = slotContributions.filter((c) => c.membershipSlotId === slotId);
+    const paidRows = rows.filter((c) => c.status === "PAID");
+    const nextUnpaid = getSlotNextUnpaidDueDate({
+      type: s.type,
+      startDate: s.startDate,
+      maxPosition: totalSlotsCount,
+      paidDueDates: paidRows.map((c) => c.dueDate),
+    });
+    const paidActiveCycle = paidRows.some((c) => c.dueDate.toISOString().slice(0, 10) === sessionDueDateKey);
+    if (paidActiveCycle || nextUnpaid.isAllPaid) {
+      paidSlotIds.add(slotId);
+    }
+    const hasPendingProof = rows.some(
+      (c) => c.status !== "PAID" && Boolean(c.proofImageUrl || (c.proofImageUrls && c.proofImageUrls.length > 0)),
+    );
+    if (hasPendingProof) {
+      pendingProofSlotIds.add(slotId);
+    }
+  }
   return NextResponse.json({
     id: s.id,
     title: s.title,
@@ -71,6 +116,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
           ballDrawn: slot.ballDrawn,
           createdAt: slot.createdAt,
           paidThisCycle: paidSlotIds.has(slot.id),
+          hasPendingProof: pendingProofSlotIds.has(slot.id),
         })),
       )
       .sort((a, b) => {

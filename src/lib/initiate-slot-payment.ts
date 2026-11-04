@@ -88,10 +88,12 @@ export async function resolveDueDateForSlot(
   });
   const maxPos = Math.max(0, ...allSlots.map((s) => s.officialPosition ?? 0)) || allSlots.length || 1;
 
-  const paidContributions = await prisma.contribution.findMany({
-    where: { membershipSlotId, status: "PAID" },
-    select: { dueDate: true },
-  });
+  const paidContributions = prisma.contribution?.findMany
+    ? await prisma.contribution.findMany({
+        where: { membershipSlotId, status: "PAID" },
+        select: { dueDate: true },
+      })
+    : [];
 
   const nextUnpaid = getSlotNextUnpaidDueDate({
     type: tontineSession.type,

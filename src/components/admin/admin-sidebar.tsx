@@ -23,6 +23,7 @@ export interface AdminNavCounts {
   notifications?: number;
   paymentIssues?: number;
   membershipRequests?: number;
+  pendingProofs?: number;
 }
 
 export function AdminSidebar({
@@ -51,7 +52,9 @@ export function AdminSidebar({
                 ? counts?.paymentIssues
                 : item.href === "/admin/membership-requests"
                   ? counts?.membershipRequests
-                  : undefined;
+                  : item.href === "/admin/contributions"
+                    ? counts?.pendingProofs
+                    : undefined;
 
         return (
           <Link

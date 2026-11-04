@@ -108,7 +108,14 @@ export function GlobalPaymentForm({
           lang={lang}
           membershipSlotIds={selectedItems.map((s) => s.membershipSlotId)}
           defaultPhone={defaultPhone}
-          onSettled={() => router.refresh()}
+          onSettled={() => {
+            setShowConfirm(false);
+            router.refresh();
+          }}
+          onProofSubmitted={() => {
+            setShowConfirm(false);
+            router.refresh();
+          }}
           onClose={() => setShowConfirm(false)}
         />
       )}

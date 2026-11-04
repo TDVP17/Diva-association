@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
-import { getContributionTotal, getNextDueDate } from "@/lib/tontine-engine";
+import { getContributionTotal, getSessionActiveRoundAndDueDate } from "@/lib/tontine-engine";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine",
@@ -18,6 +18,9 @@ export async function GET() {
 
   const sessions = await prisma.tontineSession.findMany({
     include: {
+      payouts: {
+        select: { dueDate: true, status: true, releasedAt: true },
+      },
       memberships: {
         where: { status: "APPROVED" },
         include: { slots: true },
@@ -26,17 +29,33 @@ export async function GET() {
     orderBy: { startDate: "desc" },
   });
 
-  const now = new Date();
   const cards = await Promise.all(
     sessions.map(async (s) => {
       const slots = s.memberships.flatMap((m) => m.slots);
       const slotIds = slots.map((sl) => sl.id);
-      const dueDate = getNextDueDate(s.type, now);
+      const releasedPayoutDates = s.payouts
+        .filter((p) => p.releasedAt || p.status === "CONFIRMED" || p.status === "RELEASED")
+        .map((p) => p.dueDate);
+      const { dueDate } = getSessionActiveRoundAndDueDate({
+        type: s.type,
+        startDate: s.startDate,
+        maxPosition: slots.length || 1,
+        releasedPayoutDates,
+      });
       const { total: perSlotTotal } = getContributionTotal({ amount: Number(s.amount), fee: Number(s.fee) });
 
-      const [paidCount, feesAgg, unpaidFinesAgg, paidFinesAgg, notifCounts] = await Promise.all([
+      const [paidCount, pendingProofsCount, feesAgg, unpaidFinesAgg, paidFinesAgg, notifCounts] = await Promise.all([
         slotIds.length
           ? prisma.contribution.count({ where: { membershipSlotId: { in: slotIds }, dueDate, status: "PAID" } })
+          : 0,
+        slotIds.length
+          ? prisma.contribution.count({
+              where: {
+                membershipSlotId: { in: slotIds },
+                status: { not: "PAID" },
+                OR: [{ proofImageUrl: { not: null } }, { proofImageUrls: { isEmpty: false } }],
+              },
+            })
           : 0,
         slotIds.length
           ? prisma.contribution.aggregate({
@@ -77,7 +96,8 @@ export async function GET() {
         status: s.status,
         totalMembers: slots.length,
         paidMembers: paidCount,
-        unpaidMembers: slots.length - paidCount,
+        unpaidMembers: Math.max(0, slots.length - paidCount),
+        pendingProofsCount,
         expectedAmount: expected,
         receivedAmount: totalReceived,
         outstandingAmount: Math.max(0, expected - totalReceived),
@@ -90,5 +110,7 @@ export async function GET() {
     }),
   );
 
-  return NextResponse.json({ contributions: cards });
+  const totalPendingProofs = cards.reduce((acc, c) => acc + c.pendingProofsCount, 0);
+
+  return NextResponse.json({ contributions: cards, totalPendingProofs });
 }

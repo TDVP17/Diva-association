@@ -42,6 +42,7 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
   const [membershipCount, setMembershipCount] = useState<number | null>(null);
   const [contributionsCount, setContributionsCount] = useState<number | null>(null);
+  const [pendingProofsCount, setPendingProofsCount] = useState<number | null>(null);
   const [paymentIssueCount, setPaymentIssueCount] = useState<number | null>(null);
   const [totalUsersCount, setTotalUsersCount] = useState<number | null>(null);
   const [supportCount, setSupportCount] = useState<number | null>(null);
@@ -53,7 +54,15 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
       .then((b) => setMembershipCount((b.memberships ?? []).length));
     fetch("/api/admin/contributions/stats")
       .then((r) => r.json())
-      .then((b) => setContributionsCount((b.contributions ?? []).length));
+      .then((b) => {
+        const list = b.contributions ?? [];
+        setContributionsCount(list.length);
+        const proofsTotal =
+          typeof b.totalPendingProofs === "number"
+            ? b.totalPendingProofs
+            : list.reduce((acc: number, item: { pendingProofsCount?: number }) => acc + (item.pendingProofsCount ?? 0), 0);
+        setPendingProofsCount(proofsTotal);
+      });
     fetch("/api/admin/payment-issues")
       .then((r) => r.json())
       .then((b) => setPaymentIssueCount((b.issues ?? []).filter((i: { status: string }) => i.status !== "REFUNDED").length));
@@ -79,6 +88,25 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
         </div>
         <p className="text-on-surface-variant font-body-lg">{t("adminDashboardSubtitle")}</p>
       </div>
+
+      {!!pendingProofsCount && pendingProofsCount > 0 && (
+        <Link
+          href="/admin/contributions"
+          className="w-full p-4 rounded-xl bg-amber-50 border-2 border-amber-400 text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm hover:bg-amber-100/70 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-amber-600 text-2xl flex-shrink-0">
+              add_photo_alternate
+            </span>
+            <span className="font-label-md text-sm font-bold">
+              {t("pendingProofsAlertBanner", { count: String(pendingProofsCount) })}
+            </span>
+          </div>
+          <span className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-bold self-start sm:self-center flex-shrink-0">
+            {t("viewAndValidateProofsAction", { count: String(pendingProofsCount) })}
+          </span>
+        </Link>
+      )}
 
       <Link
         href="/admin/sessions/new"
@@ -115,7 +143,8 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
           icon="account_balance"
           title={t("myCotisationsCard")}
           body={t("myCotisationsCardBody")}
-          count={contributionsCount}
+          count={pendingProofsCount}
+          stat={contributionsCount}
         />
         <DashboardCard
           href="/admin/payment-issues"

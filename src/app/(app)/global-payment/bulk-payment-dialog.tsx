@@ -5,7 +5,11 @@ import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translatio
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 import { formatXAF } from "@/lib/format-currency";
 import { detectMobileMoneyProvider } from "@/lib/mobile-money-provider";
-import { playSuccessChimeSound, playUiTapSound } from "@/lib/sound-effects";
+import { playSuccessChimeSound } from "@/lib/sound-effects";
+import {
+  NetworkFallbackProofStep,
+  type FallbackPayableSlot,
+} from "@/components/network-fallback-proof-step";
 
 interface QuoteItem {
   membershipSlotId: string;
@@ -39,6 +43,7 @@ export function BulkPaymentDialog({
   defaultPhone,
   isRelative = false,
   onSettled,
+  onProofSubmitted,
   onClose,
 }: {
   lang: Lang;
@@ -46,6 +51,7 @@ export function BulkPaymentDialog({
   defaultPhone?: string | null;
   isRelative?: boolean;
   onSettled: () => void;
+  onProofSubmitted?: () => void;
   onClose: () => void;
 }) {
   const t = (key: TranslationKey, vars?: Record<string, string>) => translate(lang, key, vars);
@@ -186,7 +192,7 @@ export function BulkPaymentDialog({
       onClick={step === "form" ? onClose : undefined}
     >
       <div
-        className="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-md rounded-2xl bg-surface p-6 shadow-xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {step === "form" && (
@@ -317,42 +323,62 @@ export function BulkPaymentDialog({
           const activeProvider = digits ? detectMobileMoneyProvider(digits) : null;
           const operatorName = activeProvider === "ORANGE" ? "Orange Money" : activeProvider === "MTN" ? "MTN MoMo" : "votre opérateur";
           const lowerReason = (failedReason || "").toLowerCase();
-          const isBalance = ["balance", "solde", "fund", "provision", "insufficient", "insuffisant"].some((k) => lowerReason.includes(k));
+          const isBalance = ["balance", "solde", "fund", "fonds", "provision", "insufficient", "insuffisant"].some((k) => lowerReason.includes(k));
           const isNetworkOrOperator = !isBalance;
+
+          if (isNetworkOrOperator) {
+            const slotsForFallback: FallbackPayableSlot[] = (quote?.items ?? []).map((item) => ({
+              id: item.membershipSlotId,
+              beneficiaryName: item.beneficiaryName,
+              baseTotal: item.baseTotal,
+            }));
+
+            return (
+              <NetworkFallbackProofStep
+                lang={lang}
+                operatorName={operatorName}
+                preferredProvider={
+                  activeProvider === "ORANGE" || activeProvider === "MTN" ? activeProvider : null
+                }
+                failCount={failCount}
+                payerPhone={phone}
+                availableSlots={slotsForFallback}
+                defaultSelectedSlotIds={membershipSlotIds}
+                transId={transId}
+                onProofSubmitted={() => {
+                  if (onProofSubmitted) {
+                    onProofSubmitted();
+                  } else {
+                    onClose();
+                  }
+                }}
+                onClose={onClose}
+              />
+            );
+          }
 
           return (
             <div className="flex flex-col items-center text-center gap-4">
               <span className="material-symbols-outlined text-error text-4xl">error</span>
 
-              {failCount >= 2 ? (
-                <div className="w-full text-left p-3.5 rounded-xl border border-warning/40 bg-warning/10 text-on-surface flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-warning text-xl">
-                      {isNetworkOrOperator ? "signal_wifi_off" : "account_balance_wallet"}
-                    </span>
-                    <span className="font-label-md text-label-md font-bold text-on-surface">
-                      {isNetworkOrOperator ? t("networkUnavailableTitle") : t("checkBalanceTitle")}
-                    </span>
-                    <span className="ml-auto font-label-sm text-[10px] bg-warning/20 text-on-surface-variant px-1.5 py-0.5 rounded-full font-medium">
+              <div className="w-full text-left p-3.5 rounded-xl border border-error/40 bg-error/5 text-on-surface flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-error text-xl">
+                    account_balance_wallet
+                  </span>
+                  <span className="font-label-md text-label-md font-bold text-on-surface">
+                    {t("checkBalanceTitle")}
+                  </span>
+                  {failCount > 0 && (
+                    <span className="ml-auto font-label-sm text-[10px] bg-black/5 text-on-surface-variant px-1.5 py-0.5 rounded-full font-medium">
                       {t("failureAttemptCount", { count: String(failCount) })}
                     </span>
-                  </div>
-                  <p className="font-body-md text-body-md text-on-surface">
-                    {isNetworkOrOperator
-                      ? t("paymentFailedOperatorNetwork", { operator: operatorName })
-                      : t("paymentFailedCheckBalance", { operator: operatorName })}
-                  </p>
-                  {activeProvider === "ORANGE" && (
-                    <p className="font-label-sm text-label-sm text-on-surface-variant bg-surface/70 p-2 rounded-lg border border-outline-variant">
-                      {t("paymentFailedOrangeTip")}
-                    </p>
                   )}
                 </div>
-              ) : (
-                <p className="font-body-md text-body-md text-on-surface">
-                  {failedReason || t("paymentFailedGeneric")}
+                <p className="font-body-md text-body-md text-on-surface leading-relaxed">
+                  {t("paymentFailedCheckBalance", { operator: operatorName })}
                 </p>
-              )}
+              </div>
 
               <div className="flex gap-3 w-full">
                 <button

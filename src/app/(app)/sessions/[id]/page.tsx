@@ -540,6 +540,13 @@ export default async function SessionDetailPage({
       (c) => c.dueDate.toISOString().slice(0, 10) === sessionDueDate.toISOString().slice(0, 10) && c.status === "PAID",
     );
     const paid = !!activeRoundContribution || isPaidForCycle;
+    const hasPendingProof =
+      !paid &&
+      slotContributions.some(
+        (c) =>
+          c.status !== "PAID" &&
+          Boolean(c.proofImageUrl || (c.proofImageUrls && c.proofImageUrls.length > 0)),
+      );
     const relevantContribution = activeRoundContribution || slotContributions.find((c) => c.status === "PAID");
 
     const targetDueDateLabel = targetDueDate
@@ -573,6 +580,7 @@ export default async function SessionDetailPage({
       officialPosition: s.officialPosition,
       isMine: s.isMine,
       paid,
+      hasPendingProof,
       paidAtLabel: relevantContribution?.paidAt
         ? relevantContribution.paidAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
         : null,
@@ -804,6 +812,7 @@ export default async function SessionDetailPage({
           beneficiaryName: s.beneficiaryName,
           isMine: s.isMine,
           paid: s.paid,
+          hasPendingProof: s.hasPendingProof,
           paidAtLabel: s.paidAtLabel,
           paidByRelativeName: s.paidByRelativeName,
           fineAmount: s.fineAmount,

@@ -20,7 +20,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const isPresident = session.user.role === "PRESIDENT";
 
-  const [unreadMessages, unreadNotifications, pendingPaymentIssues, pendingMembershipRequests] = await Promise.all([
+  const [unreadMessages, unreadNotifications, pendingPaymentIssues, pendingMembershipRequests, pendingPaymentProofs] = await Promise.all([
     prisma.chatMessage.count({
       where: {
         OR: [
@@ -37,6 +37,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     prisma.membership.count({
       where: { status: "PENDING" },
     }),
+    prisma.contribution.count({
+      where: {
+        status: { not: "PAID" },
+        OR: [{ proofImageUrl: { not: null } }, { proofImageUrls: { isEmpty: false } }],
+      },
+    }),
   ]);
 
   const counts: AdminNavCounts = {
@@ -44,6 +50,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     notifications: unreadNotifications,
     paymentIssues: pendingPaymentIssues,
     membershipRequests: pendingMembershipRequests,
+    pendingProofs: pendingPaymentProofs,
   };
 
   return (

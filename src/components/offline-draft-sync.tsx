@@ -131,10 +131,12 @@ export function OfflineDraftSync({ lang }: { lang: Lang }) {
         <PaymentConfirmDialog
           lang={lang}
           membershipSlotId={reviewing.membershipSlotId}
+          beneficiaryName={reviewing.beneficiaryName}
           payEndpoint="/api/payments/fapshi/initiate"
           description={reviewing.description}
           defaultPhone={reviewing.phone}
           onSettled={handleSettled}
+          onProofSubmitted={handleSettled}
           onClose={closeReview}
           onDiscardDraft={() => handleDeleteDraft(reviewing.id)}
         />

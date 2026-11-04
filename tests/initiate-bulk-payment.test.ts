@@ -24,7 +24,10 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     membershipSlot: { findMany: (...a: unknown[]) => findManySlot(...a) },
     bulkPayment: { update: (...a: unknown[]) => updateBulkPayment(...a) },
-    contribution: { updateMany: (...a: unknown[]) => updateManyContribution(...a) },
+    contribution: {
+      updateMany: (...a: unknown[]) => updateManyContribution(...a),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     paymentAttempt: { create: (...a: unknown[]) => createPaymentAttempt(...a) },
     $transaction: async (cbOrOps: ((tx: unknown) => unknown) | Promise<unknown>[]) => {
       if (typeof cbOrOps === "function") {

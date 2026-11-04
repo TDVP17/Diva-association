@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
-import { getContributionTotal, getNextDueDate } from "@/lib/tontine-engine";
+import { getContributionTotal } from "@/lib/tontine-engine";
+import { resolveDueDateForSlot } from "@/lib/initiate-slot-payment";
 import { settleContribution } from "@/lib/settle-contribution";
 import { logAudit } from "@/lib/audit";
 
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
     }
 
     const { tontineSession } = slot.membership;
-    const dueDate = parsed.data.dueDate ?? getNextDueDate(tontineSession.type, new Date());
+    const dueDate = await resolveDueDateForSlot(membershipSlotId, tontineSession, parsed.data.dueDate);
     const { amount, fee } = getContributionTotal({
       amount: Number(tontineSession.amount),
       fee: Number(tontineSession.fee),
@@ -47,30 +48,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "This contribution is already paid" }, { status: 409 });
     }
 
-    const outstandingFine = await prisma.fine.findUnique({
-      where: { membershipSlotId_dueDate: { membershipSlotId, dueDate } },
-    });
-    const fineAmount =
-      outstandingFine && outstandingFine.status === "UNPAID" ? Number(outstandingFine.amount) : 0;
+    const hasSubmittedProof = Boolean(
+      existing?.proofImageUrl || (existing?.proofImageUrls && existing.proofImageUrls.length > 0),
+    );
+    if (!hasSubmittedProof) {
+      return NextResponse.json(
+        {
+          error:
+            "Le cochage manuel par l'admin est uniquement autorisé lorsqu'un membre a envoyé une preuve de paiement suite à un problème réseau.",
+        },
+        { status: 400 },
+      );
+    }
 
-    const contribution = await prisma.contribution.upsert({
-      where: { membershipSlotId_dueDate: { membershipSlotId, dueDate } },
-      create: {
-        membershipSlotId,
-        dueDate,
+    const contribution = await prisma.contribution.update({
+      where: { id: existing!.id },
+      data: {
         amountPaid: amount,
         feePaid: fee,
-        finePaid: fineAmount,
-        status: "PENDING",
         recordedByAdminId: admin.user.id,
-        paidByUserId: admin.user.id,
-      },
-      update: {
-        amountPaid: amount,
-        feePaid: fee,
-        finePaid: fineAmount,
-        recordedByAdminId: admin.user.id,
-        paidByUserId: admin.user.id,
+        paidByUserId: existing!.paidByUserId ?? slot.membership.userId,
+        failureReason: null,
       },
       include: {
         membershipSlot: { include: { membership: { include: { user: true, tontineSession: true } } } },

@@ -10,6 +10,7 @@ import { NotificationsTab } from "./notifications-tab";
 import { ActivityTab } from "./activity-tab";
 import { LoadingSpinner } from "@/components/loading-spinner";
 import { MemberArchivesToggle } from "@/components/admin/member-archives-toggle";
+import { FallbackPaymentEditor } from "@/components/admin/fallback-payment-editor";
 import { formatXAF } from "@/lib/format-currency";
 import { sessionStatusKey } from "@/lib/session-status-label";
 import { CONTRIBUTION_STATUS_KEY } from "@/lib/contribution-status-label";
@@ -43,6 +44,7 @@ interface AdminSlot {
   officialPosition: number | null;
   ballDrawn: number | null;
   paidThisCycle: boolean;
+  hasPendingProof?: boolean;
 }
 
 interface AdminSession {
@@ -92,6 +94,7 @@ interface Transaction {
   id: string;
   beneficiaryName: string;
   memberName: string;
+  memberUserId?: string;
   paidByName: string | null;
   amount: number;
   status: string;
@@ -100,6 +103,7 @@ interface Transaction {
   transRef: string;
   membershipSlotId?: string;
   proofImageUrl?: string | null;
+  proofImageUrls?: string[];
   proofUploadedAt?: string | null;
   payerPhone?: string | null;
 }
@@ -197,9 +201,6 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   }
   const [publishing, setPublishing] = useState(false);
   const [startingDraw, setStartingDraw] = useState(false);
-  const [contributionSlotId, setContributionSlotId] = useState<string>("");
-  const [contributionResult, setContributionResult] = useState<string | null>(null);
-  const [recordingContribution, setRecordingContribution] = useState(false);
   const [userQuery, setUserQuery] = useState("");
   const [userResults, setUserResults] = useState<{ id: string; name: string; email: string }[]>([]);
   const [selectedUser, setSelectedUser] = useState<{ id: string; name: string } | null>(null);
@@ -661,47 +662,25 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     }
   }
 
-  async function recordManualContribution() {
-    if (!contributionSlotId) return;
-    setRecordingContribution(true);
-    setContributionResult(null);
-    try {
-      const res = await fetch("/api/admin/contributions/manual", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ membershipSlotId: contributionSlotId }),
-      });
-      const body = await res.json();
-      if (!res.ok) {
-        if (body?.error) console.error("[recordContribution] server error:", body.error);
-        setContributionResult(t("couldNotRecordContribution"));
-        return;
-      }
-      setContributionResult(t("contributionRecorded"));
-      setContributionSlotId("");
-      await refreshSession();
-      fetch(`/api/admin/sessions/${tontineSessionId}/ledger`).then((r) => r.json()).then(setLedger);
-      fetch(`/api/admin/transactions?tontineSessionId=${tontineSessionId}`)
-        .then((r) => r.json())
-        .then((b) => setTransactions(b.transactions ?? []));
-    } finally {
-      setRecordingContribution(false);
-    }
+  const [validatingProofKey, setValidatingProofKey] = useState<string | null>(null);
+  const [uncheckedProofTxIds, setUncheckedProofTxIds] = useState<Record<string, boolean>>({});
+  const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
+
+  function toggleProofTxChecked(txId: string) {
+    setUncheckedProofTxIds((prev) => ({
+      ...prev,
+      [txId]: !prev[txId],
+    }));
   }
 
-  const [validatingProofId, setValidatingProofId] = useState<string | null>(null);
-
-  async function handleValidateProof(slotId: string, dueDateStr: string, txId: string) {
-    if (!slotId) return;
-    setValidatingProofId(txId);
+  async function handleApproveProofGroup(groupKey: string, contributionIds: string[]) {
+    if (contributionIds.length === 0) return;
+    setValidatingProofKey(groupKey);
     try {
-      const res = await fetch("/api/admin/contributions/manual", {
+      const res = await fetch("/api/admin/contributions/proofs/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          membershipSlotId: slotId,
-          dueDate: dueDateStr ? new Date(dueDateStr) : undefined,
-        }),
+        body: JSON.stringify({ contributionIds }),
       });
       if (res.ok) {
         await refreshSession();
@@ -714,27 +693,32 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
         window.alert(err.error || t("couldNotRecordContribution"));
       }
     } finally {
-      setValidatingProofId(null);
+      setValidatingProofKey(null);
     }
   }
 
-  async function handleRejectProof(contributionId: string) {
-    const reason = window.prompt("Motif du rejet (optionnel) :", "Capture illisible ou paiement non reçu");
+  async function handleRejectProofGroup(groupKey: string, contributionIds: string[]) {
+    if (contributionIds.length === 0) return;
+    const reason = window.prompt(
+      lang === "fr" ? "Motif du rejet (optionnel) :" : "Rejection reason (optional):",
+      lang === "fr" ? "Capture illisible ou paiement non reçu" : "Unreadable screenshot or payment not received",
+    );
     if (reason === null) return;
-    setValidatingProofId(contributionId);
+    setValidatingProofKey(groupKey);
     try {
       const res = await fetch("/api/admin/contributions/proofs/reject", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contributionId, reason }),
+        body: JSON.stringify({ contributionIds, reason }),
       });
       if (res.ok) {
+        await refreshSession();
         fetch(`/api/admin/transactions?tontineSessionId=${tontineSessionId}`)
           .then((r) => r.json())
           .then((b) => setTransactions(b.transactions ?? []));
       }
     } finally {
-      setValidatingProofId(null);
+      setValidatingProofKey(null);
     }
   }
 
@@ -1105,6 +1089,12 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     activity: "history",
   };
   const foodTurnActionCount = payoutClaims.filter((c) => c.status !== "CONFIRMED").length;
+  const pendingProofTransactions = transactions.filter(
+    (tx) =>
+      tx.status !== "PAID" &&
+      Boolean(tx.proofImageUrl || (tx.proofImageUrls && tx.proofImageUrls.length > 0)),
+  );
+  const pendingProofsCount = pendingProofTransactions.length;
 
   return (
     <main className="px-container-padding pt-stack-gap-lg pb-32 max-w-4xl mx-auto w-full flex flex-col gap-stack-gap-lg">
@@ -1151,6 +1141,26 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
         )}
       </div>
 
+      {pendingProofsCount > 0 && activeTab !== "payments" && (
+        <div className="p-4 rounded-xl bg-amber-50 border-2 border-amber-400 text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-amber-600 text-2xl flex-shrink-0">
+              add_photo_alternate
+            </span>
+            <span className="font-label-md text-sm font-bold">
+              {t("pendingProofsAlertBanner", { count: String(pendingProofsCount) })}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab("payments")}
+            className="px-3.5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold self-start sm:self-center flex-shrink-0 cursor-pointer transition-colors"
+          >
+            {t("viewAndValidateProofsAction", { count: String(pendingProofsCount) })}
+          </button>
+        </div>
+      )}
+
       <div className="flex gap-1 overflow-x-auto border-b border-surface-variant">
         {TABS.map((tab) => (
           <button
@@ -1167,6 +1177,11 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
             {tab === "members" && membershipQueue.length > 0 && (
               <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-error text-on-error font-label-sm text-[10px] leading-none">
                 {membershipQueue.length}
+              </span>
+            )}
+            {tab === "payments" && pendingProofsCount > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-error text-on-error font-label-sm text-[10px] leading-none">
+                {pendingProofsCount}
               </span>
             )}
             {tab === "foodTurn" && foodTurnActionCount > 0 && (
@@ -2027,13 +2042,24 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                       <span className="material-symbols-outlined text-[14px]">block</span>
                       <span>{lang === "fr" ? "Bannir" : "Ban"}</span>
                     </button>
-                    <span
-                      className={`inline-flex items-center px-2 py-1 rounded-md font-label-sm text-label-sm flex-shrink-0 ${
-                        s.paidThisCycle ? "bg-[#d1fae5] text-[#065f46]" : "bg-secondary-fixed text-on-secondary-fixed-variant"
-                      }`}
-                    >
-                      {s.paidThisCycle ? t("paidStatus") : t("unpaidStatus")}
-                    </span>
+                    {s.paidThisCycle ? (
+                      <span className="inline-flex items-center px-2 py-1 rounded-md font-label-sm text-label-sm flex-shrink-0 bg-[#d1fae5] text-[#065f46]">
+                        {t("paidStatus")}
+                      </span>
+                    ) : s.hasPendingProof ? (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("payments")}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-label-sm text-xs font-bold flex-shrink-0 bg-amber-100 text-amber-950 border border-amber-300 hover:bg-amber-200 transition-colors cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">add_photo_alternate</span>
+                        <span>{lang === "fr" ? "Preuve à cocher" : "Proof to check"}</span>
+                      </button>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-1 rounded-md font-label-sm text-label-sm flex-shrink-0 bg-secondary-fixed text-on-secondary-fixed-variant">
+                        {t("unpaidStatus")}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -2117,121 +2143,279 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
 
       {activeTab === "payments" && (
         <div className="flex flex-col gap-stack-gap-lg">
-          {/* Section: Preuves de paiement en attente */}
+          {/* Section: Preuves de paiement en attente (uniquement lorsque le réseau dérange) */}
           {(() => {
-            const pendingProofs = transactions.filter((tx) => tx.proofImageUrl && tx.status !== "PAID");
-            if (pendingProofs.length === 0) return null;
+            if (pendingProofTransactions.length === 0) {
+              return (
+                <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-outline-variant/40 p-4 flex items-center gap-3">
+                  <span className="material-symbols-outlined text-emerald-600 text-2xl flex-shrink-0">
+                    verified
+                  </span>
+                  <div>
+                    <h3 className="font-title-sm text-sm font-bold text-on-surface">
+                      {t("pendingPaymentProofs")}
+                    </h3>
+                    <p className="text-xs text-on-surface-variant mt-0.5">
+                      {t("noPendingProofs")}{" "}
+                      {lang === "fr"
+                        ? "Lorsque le réseau Mobile Money / Orange Money fonctionne normalement, les cotisations se cochent automatiquement."
+                        : "When Mobile Money / Orange Money works normally, contributions are checked automatically."}
+                    </p>
+                  </div>
+                </section>
+              );
+            }
+
+            // Group multi-name proofs submitted together by the same member
+            const groupsMap = new Map<
+              string,
+              {
+                key: string;
+                memberName: string;
+                payerPhone: string | null;
+                proofUploadedAt: string | null;
+                images: string[];
+                items: Transaction[];
+              }
+            >();
+
+            for (const tx of pendingProofTransactions) {
+              const images =
+                tx.proofImageUrls && tx.proofImageUrls.length > 0
+                  ? tx.proofImageUrls
+                  : tx.proofImageUrl
+                    ? [tx.proofImageUrl]
+                    : [];
+              const batchKey = `${tx.memberUserId || tx.memberName}::${images[0] || tx.id}`;
+              const existingGroup = groupsMap.get(batchKey);
+              if (existingGroup) {
+                existingGroup.items.push(tx);
+                for (const img of images) {
+                  if (!existingGroup.images.includes(img)) existingGroup.images.push(img);
+                }
+              } else {
+                groupsMap.set(batchKey, {
+                  key: batchKey,
+                  memberName: tx.memberName,
+                  payerPhone: tx.payerPhone ?? null,
+                  proofUploadedAt: tx.proofUploadedAt ?? null,
+                  images: [...images],
+                  items: [tx],
+                });
+              }
+            }
+
+            const proofGroups = [...groupsMap.values()];
+
             return (
-              <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border-2 border-primary/30 p-4">
-                <div className="flex items-center justify-between mb-3">
+              <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border-2 border-amber-400 p-4">
+                <div className="flex items-center justify-between mb-2">
                   <h3 className="font-title-md text-title-md text-primary flex items-center gap-2">
-                    <span className="material-symbols-outlined text-primary">add_photo_alternate</span>
+                    <span className="material-symbols-outlined text-amber-600">add_photo_alternate</span>
                     {t("pendingPaymentProofs")}
                   </h3>
-                  <span className="bg-primary/10 text-primary font-bold text-xs px-2.5 py-1 rounded-full">
-                    {pendingProofs.length} en attente
+                  <span className="bg-amber-100 text-amber-950 font-bold text-xs px-2.5 py-1 rounded-full border border-amber-300">
+                    {pendingProofTransactions.length} {lang === "fr" ? "nom(s) à vérifier" : "name(s) to check"}
                   </span>
                 </div>
                 <p className="text-xs text-on-surface-variant mb-4">
-                  {t("pendingPaymentProofsSubtitle")}
+                  {lang === "fr"
+                    ? "Captures envoyées suite à une indisponibilité réseau. Vérifiez les images, cochez le(s) nom(s) payé(s) par le membre puis acceptez ou rejetez :"
+                    : "Screenshots sent after a network outage. Review the images, check the member's paid name(s), then accept or reject:"}
                 </p>
 
-                <div className="flex flex-col gap-3">
-                  {pendingProofs.map((tx) => (
-                    <div
-                      key={tx.id}
-                      className="p-3.5 rounded-xl border border-outline-variant bg-surface-container-lowest flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs"
-                    >
-                      <div className="flex items-start sm:items-center gap-3 min-w-0">
-                        {tx.proofImageUrl && (
-                          <a
-                            href={tx.proofImageUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="relative group block flex-shrink-0"
-                            title={t("viewProofImage")}
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={tx.proofImageUrl}
-                              alt="Preuve"
-                              className="w-16 h-16 object-cover rounded-lg border border-outline-variant group-hover:opacity-90 transition-opacity"
-                            />
-                            <span className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 rounded-lg flex items-center justify-center text-white text-xs font-bold transition-opacity">
-                              <span className="material-symbols-outlined text-[18px]">zoom_in</span>
-                            </span>
-                          </a>
-                        )}
-                        <div className="min-w-0">
-                          <p className="font-bold text-sm text-on-surface truncate">
-                            {tx.beneficiaryName} <span className="font-normal text-on-surface-variant">({tx.memberName})</span>
-                          </p>
-                          <p className="text-xs text-on-surface-variant mt-0.5">
-                            Montant : <span className="font-bold text-primary">{formatXAF(tx.amount)}</span>
-                            {tx.payerPhone && ` · Tél : ${tx.payerPhone}`}
-                          </p>
-                          {tx.proofUploadedAt && (
-                            <p className="text-[11px] text-on-surface-variant/80 mt-0.5">
-                              Envoyé le {new Date(tx.proofUploadedAt).toLocaleString("fr-FR", { timeZone: "Africa/Douala" })}
+                <div className="flex flex-col gap-4">
+                  {proofGroups.map((group) => {
+                    const checkedItems = group.items.filter((item) => !uncheckedProofTxIds[item.id]);
+                    const checkedIds = checkedItems.map((item) => item.id);
+                    const checkedTotal = checkedItems.reduce((sum, item) => sum + item.amount, 0);
+                    const allGroupIds = group.items.map((item) => item.id);
+                    const isBusy = validatingProofKey === group.key;
+
+                    return (
+                      <div
+                        key={group.key}
+                        className="p-4 rounded-xl border border-outline-variant bg-surface-container-lowest flex flex-col gap-3 shadow-xs"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-outline-variant/40 pb-2.5">
+                          <div>
+                            <p className="font-bold text-sm text-on-surface">
+                              {group.memberName}
+                              {group.payerPhone && (
+                                <span className="font-normal text-xs text-on-surface-variant">
+                                  {" "}
+                                  · Tél : {group.payerPhone}
+                                </span>
+                              )}
                             </p>
-                          )}
+                            {group.proofUploadedAt && (
+                              <p className="text-[11px] text-on-surface-variant/80">
+                                {lang === "fr" ? "Envoyé le " : "Sent on "}
+                                {new Date(group.proofUploadedAt).toLocaleString(
+                                  lang === "fr" ? "fr-FR" : "en-GB",
+                                  { timeZone: "Africa/Douala" },
+                                )}
+                              </p>
+                            )}
+                          </div>
+                          <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-lg self-start sm:self-center">
+                            {checkedItems.length}/{group.items.length}{" "}
+                            {lang === "fr" ? "nom(s) coché(s)" : "checked"} · {formatXAF(checkedTotal)}
+                          </span>
+                        </div>
+
+                        {/* Uploaded screenshots gallery */}
+                        {group.images.length > 0 && (
+                          <div className="flex flex-wrap gap-2.5">
+                            {group.images.map((imgUrl, idx) => (
+                              <button
+                                key={`${imgUrl}-${idx}`}
+                                type="button"
+                                onClick={() => setLightboxImageUrl(imgUrl)}
+                                className="relative group block rounded-lg overflow-hidden border border-outline-variant hover:border-primary transition-colors cursor-pointer"
+                                title={t("viewProofImage")}
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={imgUrl}
+                                  alt={`Capture ${idx + 1}`}
+                                  className="w-24 h-24 sm:w-28 sm:h-28 object-cover"
+                                />
+                                <span className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold transition-opacity">
+                                  <span className="material-symbols-outlined text-[20px]">zoom_in</span>
+                                </span>
+                                {group.images.length > 1 && (
+                                  <span className="absolute bottom-1 right-1 bg-black/70 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
+                                    {idx + 1}/{group.images.length}
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Checkboxes for member's name(s) */}
+                        <div className="flex flex-col gap-1.5 bg-white rounded-lg p-2.5 border border-outline-variant/60">
+                          <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wide">
+                            {lang === "fr"
+                              ? "Cocher le(s) nom(s) qui ont payé :"
+                              : "Check the name(s) that paid:"}
+                          </span>
+                          {group.items.map((item) => {
+                            const isChecked = !uncheckedProofTxIds[item.id];
+                            return (
+                              <label
+                                key={item.id}
+                                className={`flex items-center justify-between gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
+                                  isChecked
+                                    ? "border-emerald-400 bg-emerald-50/60"
+                                    : "border-outline-variant/50 bg-surface-container-low/50 opacity-75"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() => toggleProofTxChecked(item.id)}
+                                    className="w-4 h-4 accent-emerald-600 rounded cursor-pointer flex-shrink-0"
+                                  />
+                                  <span className="font-bold text-sm text-on-surface truncate">
+                                    {item.beneficiaryName}
+                                  </span>
+                                </div>
+                                <span className="text-xs font-bold text-emerald-800 flex-shrink-0">
+                                  {formatXAF(item.amount)}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleRejectProofGroup(group.key, allGroupIds)}
+                            disabled={isBusy}
+                            className="px-3.5 py-2 rounded-lg border border-error/40 text-error hover:bg-error/5 text-xs font-bold transition-colors disabled:opacity-50 cursor-pointer"
+                          >
+                            {t("rejectProofAction")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleApproveProofGroup(group.key, checkedIds)}
+                            disabled={isBusy || checkedIds.length === 0}
+                            className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs disabled:opacity-50 cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">check_box</span>
+                            {isBusy
+                              ? lang === "fr"
+                                ? "Validation..."
+                                : "Validating..."
+                              : `${t("acceptAndCheckNamesAction")} (${checkedIds.length})`}
+                          </button>
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-2 self-end md:self-center flex-shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => handleRejectProof(tx.id)}
-                          disabled={validatingProofId === tx.id}
-                          className="px-3 py-1.5 rounded-lg border border-error/40 text-error hover:bg-error/5 text-xs font-bold transition-colors disabled:opacity-50"
-                        >
-                          {t("rejectProofAction")}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleValidateProof(tx.membershipSlotId || "", tx.dueDate, tx.id)}
-                          disabled={validatingProofId === tx.id}
-                          className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold transition-all flex items-center gap-1 shadow-xs disabled:opacity-50"
-                        >
-                          <span className="material-symbols-outlined text-[16px]">check</span>
-                          {validatingProofId === tx.id ? "Validation..." : t("validateContributionAction")}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
             );
           })()}
 
-          <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4">
-            <h3 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-4">
-              <span className="material-symbols-outlined">edit_note</span>
-              {t("recordManualContribution")}
-            </h3>
-            <div className="flex gap-2 mb-3">
-              <select
-                value={contributionSlotId}
-                onChange={(e) => setContributionSlotId(e.target.value)}
-                className="flex-1 border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
-              >
-                <option value="">{t("selectSlotEllipsis")}</option>
-                {session.slots.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.beneficiaryName} ({s.name})
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={recordManualContribution}
-                disabled={!contributionSlotId || recordingContribution}
-                className="bg-primary text-on-primary font-label-md text-label-md px-4 rounded-lg hover:opacity-90 disabled:opacity-50"
-              >
-                {recordingContribution ? t("recordingEllipsis") : t("recordPaid")}
-              </button>
+          {/* Admin configuration shortcut for Fallback USSD Code & Beneficiary Name */}
+          <details className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-outline-variant/50 p-4 group">
+            <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-primary font-title-sm text-sm font-bold">
+                <span className="material-symbols-outlined text-[20px]">phonelink_setup</span>
+                <span>{t("fallbackConfigTitle")}</span>
+              </div>
+              <span className="material-symbols-outlined text-on-surface-variant group-open:rotate-180 transition-transform">
+                expand_more
+              </span>
+            </summary>
+            <div className="mt-4 pt-3 border-t border-outline-variant/40">
+              <FallbackPaymentEditor
+                lang={lang}
+                samplePerSlotAmount={(session.amount ?? 0) + (session.fee ?? 0)}
+              />
             </div>
-            {contributionResult && <p className="font-label-sm text-label-sm text-on-surface-variant">{contributionResult}</p>}
-          </section>
+          </details>
+
+          {lightboxImageUrl && (
+            <div
+              className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-4"
+              onClick={() => setLightboxImageUrl(null)}
+            >
+              <div
+                className="relative max-w-2xl w-full max-h-[88vh] flex flex-col items-center gap-3"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={lightboxImageUrl}
+                  alt="Capture de paiement"
+                  className="max-h-[78vh] w-auto max-w-full rounded-xl shadow-2xl border border-white/20 object-contain bg-black"
+                />
+                <div className="flex items-center gap-3">
+                  <a
+                    href={lightboxImageUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2 rounded-lg bg-white text-slate-900 text-xs font-bold hover:bg-slate-100"
+                  >
+                    {lang === "fr" ? "Ouvrir en plein écran" : "Open full size"}
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setLightboxImageUrl(null)}
+                    className="px-4 py-2 rounded-lg bg-error text-white text-xs font-bold hover:opacity-90 cursor-pointer"
+                  >
+                    {t("cancelAction")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4">
             <h3 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-4">

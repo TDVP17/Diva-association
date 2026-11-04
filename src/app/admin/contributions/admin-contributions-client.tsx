@@ -16,6 +16,7 @@ interface ContributionCard {
   totalMembers: number;
   paidMembers: number;
   unpaidMembers: number;
+  pendingProofsCount?: number;
   expectedAmount: number;
   receivedAmount: number;
   outstandingAmount: number;
@@ -108,6 +109,22 @@ export function AdminContributionsClient({ lang }: { lang: Lang }) {
               <p className="font-body-sm text-xs text-on-surface-variant line-clamp-2 -mt-1">
                 {c.description}
               </p>
+            )}
+            {!!c.pendingProofsCount && c.pendingProofsCount > 0 && (
+              <Link
+                href={`/admin/contributions/${c.id}?tab=payments`}
+                className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-300 text-amber-950 hover:bg-amber-100/80 transition-colors"
+              >
+                <span className="flex items-center gap-1.5 text-xs font-bold">
+                  <span className="material-symbols-outlined text-[16px] text-amber-700">
+                    add_photo_alternate
+                  </span>
+                  {t("proofCountToValidateBadge", { count: String(c.pendingProofsCount) })}
+                </span>
+                <span className="text-[11px] font-bold text-primary underline">
+                  {lang === "fr" ? "Ouvrir →" : "Open →"}
+                </span>
+              </Link>
             )}
             <Link href={`/admin/contributions/${c.id}`} className="grid grid-cols-2 gap-2">
               <Stat label={t("membersLabel")} value={`${c.paidMembers}/${c.totalMembers}`} />

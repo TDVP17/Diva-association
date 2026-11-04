@@ -415,6 +415,12 @@ export function MemberCodePayFlow({
         <PaymentConfirmDialog
           lang={lang}
           membershipSlotId={confirmSlot.slotId}
+          beneficiaryName={confirmSlot.beneficiaryName}
+          fallbackAvailableSlots={unpaidSlots.map((s) => ({
+            id: s.slotId,
+            beneficiaryName: `${s.beneficiaryName} (${s.tontineSessionTitle})`,
+            baseTotal: s.amount,
+          }))}
           payEndpoint={payEndpoint}
           description={`${t("paymentDescriptionPrefix")}: ${confirmSlot.tontineSessionTitle}`}
           onSettled={async () => {
@@ -431,6 +437,10 @@ export function MemberCodePayFlow({
                 receiptUrl: updatedSlot?.receiptUrl ?? null,
               });
             }
+          }}
+          onProofSubmitted={async () => {
+            setConfirmSlotId(null);
+            await fetchSlots(member.memberCode);
           }}
           onClose={() => setConfirmSlotId(null)}
         />
@@ -455,6 +465,10 @@ export function MemberCodePayFlow({
               amount: totalPaid,
               receiptUrl: freshSlots.find((s) => s.alreadyPaid)?.receiptUrl ?? null,
             });
+          }}
+          onProofSubmitted={async () => {
+            setShowBulkDialog(false);
+            await fetchSlots(member.memberCode);
           }}
           onClose={() => setShowBulkDialog(false)}
         />

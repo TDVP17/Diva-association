@@ -2,45 +2,104 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { saveFile } from "@/lib/storage";
-import { getContributionTotal, getNextDueDate } from "@/lib/tontine-engine";
+import { getContributionTotal } from "@/lib/tontine-engine";
+import { resolveDueDateForSlot } from "@/lib/initiate-slot-payment";
+import { normalizeCameroonPhone } from "@/lib/fapshi";
+import { sendPushToUser } from "@/lib/push/send";
+
+const MAX_IMAGES = 6;
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+function extractSlotIds(formData: FormData): string[] {
+  const ids = new Set<string>();
+
+  for (const entry of formData.getAll("membershipSlotIds")) {
+    if (typeof entry !== "string") continue;
+    const trimmed = entry.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          for (const item of parsed) {
+            if (typeof item === "string" && item.trim()) ids.add(item.trim());
+          }
+          continue;
+        }
+      } catch {
+        // treat as plain id
+      }
+    }
+    ids.add(trimmed);
+  }
+
+  const single = formData.get("membershipSlotId");
+  if (typeof single === "string" && single.trim()) {
+    ids.add(single.trim());
+  }
+
+  return [...ids];
+}
+
+function extractProofFiles(formData: FormData): File[] {
+  const raw = [...formData.getAll("files"), ...formData.getAll("file")];
+  const files: File[] = [];
+  for (const item of raw) {
+    if (item instanceof File && item.size > 0) {
+      files.push(item);
+    }
+  }
+  return files;
+}
 
 export async function POST(request: Request) {
   const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
 
   try {
     const formData = await request.formData();
-    const membershipSlotId = formData.get("membershipSlotId") as string | null;
+    const slotIds = extractSlotIds(formData);
     const dueDateStr = formData.get("dueDate") as string | null;
-    const phone = formData.get("phone") as string | null;
-    const file = formData.get("file") as File | null;
+    const rawPhone = (formData.get("phone") as string | null)?.trim() || null;
+    const files = extractProofFiles(formData);
 
-    if (!membershipSlotId || !file) {
+    if (slotIds.length === 0 || files.length === 0) {
       return NextResponse.json(
-        { error: "membershipSlotId and file are required" },
+        { error: "Veuillez sélectionner au moins un nom et une capture d'écran." },
         { status: 400 },
       );
     }
 
-    // Guard file type & size (max 8MB)
-    const mime = file.type;
-    if (!mime.startsWith("image/")) {
+    if (slotIds.length > 20) {
       return NextResponse.json(
-        { error: "Please upload an image file (PNG, JPEG, WebP)" },
-        { status: 400 },
-      );
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: "Image size must not exceed 8MB" },
+        { error: "Trop de noms sélectionnés en une seule fois." },
         { status: 400 },
       );
     }
 
-    const slot = await prisma.membershipSlot.findUnique({
-      where: { id: membershipSlotId },
+    if (files.length > MAX_IMAGES) {
+      return NextResponse.json(
+        { error: `Vous pouvez envoyer au maximum ${MAX_IMAGES} images à la fois.` },
+        { status: 400 },
+      );
+    }
+
+    for (const file of files) {
+      if (!file.type.startsWith("image/")) {
+        return NextResponse.json(
+          { error: "Veuillez téléverser uniquement des images (PNG, JPEG, WebP)." },
+          { status: 400 },
+        );
+      }
+      if (file.size > MAX_IMAGE_BYTES) {
+        return NextResponse.json(
+          { error: "Chaque image ne doit pas dépasser 8 Mo." },
+          { status: 400 },
+        );
+      }
+    }
+
+    const slots = await prisma.membershipSlot.findMany({
+      where: { id: { in: slotIds } },
       include: {
         membership: {
           include: {
@@ -51,88 +110,172 @@ export async function POST(request: Request) {
       },
     });
 
-    if (!slot) {
-      return NextResponse.json({ error: "Slot not found" }, { status: 404 });
+    if (slots.length !== slotIds.length) {
+      return NextResponse.json({ error: "Nom(s) introuvable(s)." }, { status: 404 });
     }
 
-    const tontineSession = slot.membership.tontineSession;
-    const dueDate = dueDateStr
-      ? new Date(dueDateStr)
-      : getNextDueDate(tontineSession.type, new Date());
+    for (const s of slots) {
+      if (
+        s.membership.status !== "APPROVED" ||
+        !["DRAWING", "ACTIVE"].includes(s.membership.tontineSession.status)
+      ) {
+        return NextResponse.json(
+          { error: "Cette cotisation n'accepte pas de paiement pour le moment." },
+          { status: 409 },
+        );
+      }
+    }
 
-    // Save image to Supabase storage
-    const ext = mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : "jpg";
-    const key = `payment-proofs/${session.user.id}/${slot.id}_${Date.now()}.${ext}`;
-    const arrayBuffer = await file.arrayBuffer();
-    await saveFile(key, Buffer.from(arrayBuffer));
-    const proofImageUrl = `/api/files/${key}`;
+    const ownerFolder = session?.user?.id ?? slots[0].membership.userId ?? "public";
+    const batchTimestamp = Date.now();
+    const proofImageUrls: string[] = [];
 
-    const { amount, fee } = getContributionTotal({
-      amount: Number(tontineSession.amount),
-      fee: Number(tontineSession.fee),
-    });
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const mime = file.type;
+      const ext = mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : "jpg";
+      const key = `payment-proofs/${ownerFolder}/${slots[0].id}_${batchTimestamp}_${i}.${ext}`;
+      const arrayBuffer = await file.arrayBuffer();
+      await saveFile(key, Buffer.from(arrayBuffer));
+      proofImageUrls.push(`/api/files/${key}`);
+    }
 
-    const outstandingFine = await prisma.fine.findUnique({
-      where: { membershipSlotId_dueDate: { membershipSlotId, dueDate } },
-    });
-    const fineAmount =
-      outstandingFine && outstandingFine.status === "UNPAID"
-        ? Number(outstandingFine.amount)
-        : 0;
+    const proofImageUrl = proofImageUrls[0];
+    const uploadedAt = new Date(batchTimestamp);
+    const normalizedPhone = rawPhone ? normalizeCameroonPhone(rawPhone) ?? rawPhone : null;
 
-    const contribution = await prisma.contribution.upsert({
-      where: { membershipSlotId_dueDate: { membershipSlotId, dueDate } },
-      create: {
-        membershipSlotId,
-        dueDate,
-        amountPaid: amount,
-        feePaid: fee,
-        finePaid: fineAmount,
-        status: "PENDING",
-        proofImageUrl,
-        proofUploadedAt: new Date(),
-        payerPhone: phone || null,
-        paidByUserId: session.user.id,
-        failureReason: null,
-      },
-      update: {
-        proofImageUrl,
-        proofUploadedAt: new Date(),
-        payerPhone: phone || undefined,
-        paidByUserId: session.user.id,
-        failureReason: null,
-      },
-    });
+    const updatedContributionIds: string[] = [];
+    const bySession = new Map<
+      string,
+      { sessionId: string; sessionTitle: string; memberName: string; beneficiaryNames: string[] }
+    >();
 
-    // Notify admins & president about the submitted proof
+    for (const slot of slots) {
+      const tontineSession = slot.membership.tontineSession;
+      const explicitDueDate = slotIds.length === 1 && dueDateStr ? dueDateStr : null;
+      const dueDate = await resolveDueDateForSlot(slot.id, tontineSession, explicitDueDate);
+
+      const existing = await prisma.contribution.findUnique({
+        where: { membershipSlotId_dueDate: { membershipSlotId: slot.id, dueDate } },
+      });
+      if (existing?.status === "PAID") {
+        continue;
+      }
+
+      const { amount, fee } = getContributionTotal({
+        amount: Number(tontineSession.amount),
+        fee: Number(tontineSession.fee),
+      });
+
+      const contribution = await prisma.contribution.upsert({
+        where: { membershipSlotId_dueDate: { membershipSlotId: slot.id, dueDate } },
+        create: {
+          membershipSlotId: slot.id,
+          dueDate,
+          amountPaid: amount,
+          feePaid: fee,
+          finePaid: 0,
+          status: "PENDING",
+          proofImageUrl,
+          proofImageUrls,
+          proofUploadedAt: uploadedAt,
+          payerPhone: normalizedPhone,
+          paidByUserId: session?.user?.id ?? null,
+          failureReason: null,
+        },
+        update: {
+          amountPaid: amount,
+          feePaid: fee,
+          status: "PENDING",
+          proofImageUrl,
+          proofImageUrls,
+          proofUploadedAt: uploadedAt,
+          payerPhone: normalizedPhone ?? undefined,
+          paidByUserId: session?.user?.id ?? undefined,
+          failureReason: null,
+        },
+      });
+
+      updatedContributionIds.push(contribution.id);
+
+      const group = bySession.get(tontineSession.id) ?? {
+        sessionId: tontineSession.id,
+        sessionTitle: tontineSession.title || tontineSession.type,
+        memberName: slot.membership.user.name,
+        beneficiaryNames: [],
+      };
+      group.beneficiaryNames.push(slot.beneficiaryName);
+      bySession.set(tontineSession.id, group);
+    }
+
+    if (updatedContributionIds.length === 0) {
+      return NextResponse.json(
+        { error: "Ces noms sont déjà enregistrés comme payés pour ce tour." },
+        { status: 409 },
+      );
+    }
+
     const admins = await prisma.user.findMany({
       where: { role: { in: ["ADMIN", "PRESIDENT"] } },
       select: { id: true },
     });
 
     if (admins.length > 0) {
-      await prisma.notification.createMany({
-        data: admins.map((admin) => ({
-          userId: admin.id,
-          tontineSessionId: tontineSession.id,
-          channel: "IN_APP",
-          type: "ADMIN_BROADCAST",
-          message: `Nouvelle capture de paiement reçue pour ${slot.beneficiaryName} (${slot.membership.user.name}) — ${tontineSession.title || tontineSession.type}. À valider.`,
-          actionUrl: `/admin/contributions/${tontineSession.id}`,
-          status: "SENT",
-        })),
-      });
+      const notifRows: Array<{
+        userId: string;
+        tontineSessionId: string;
+        channel: "IN_APP";
+        type: "ADMIN_BROADCAST";
+        message: string;
+        actionUrl: string;
+        status: "SENT";
+      }> = [];
+
+      for (const group of bySession.values()) {
+        const namesLabel = group.beneficiaryNames.join(", ");
+        const actionUrl = `/admin/contributions/${group.sessionId}?tab=payments`;
+        const message = `Preuve de paiement (${proofImageUrls.length} image${proofImageUrls.length > 1 ? "s" : ""}) reçue pour ${namesLabel} (${group.memberName}) — ${group.sessionTitle}. Cliquez pour vérifier et cocher.`;
+
+        for (const admin of admins) {
+          notifRows.push({
+            userId: admin.id,
+            tontineSessionId: group.sessionId,
+            channel: "IN_APP",
+            type: "ADMIN_BROADCAST",
+            message,
+            actionUrl,
+            status: "SENT",
+          });
+        }
+
+        // Best-effort instant Web Push to admins
+        void Promise.all(
+          admins.map((admin) =>
+            sendPushToUser(admin.id, {
+              title: "Nouvelle preuve de paiement reçue",
+              body: `${namesLabel} (${group.memberName}) — ${group.sessionTitle}`,
+              url: actionUrl,
+            }).catch(() => {}),
+          ),
+        );
+      }
+
+      if (notifRows.length > 0) {
+        await prisma.notification.createMany({ data: notifRows });
+      }
     }
 
     return NextResponse.json({
       ok: true,
-      contributionId: contribution.id,
+      contributionId: updatedContributionIds[0],
+      contributionIds: updatedContributionIds,
       proofImageUrl,
+      proofImageUrls,
     });
   } catch (err) {
     console.error("[payments/proof] error uploading proof:", err);
     return NextResponse.json(
-      { error: "Could not save payment proof. Please try again." },
+      { error: "Impossible d'envoyer la capture pour le moment. Veuillez réessayer." },
       { status: 500 },
     );
   }

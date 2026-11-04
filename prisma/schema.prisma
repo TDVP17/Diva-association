@@ -658,6 +658,8 @@ model Contribution {
   receiptPdfUrl           String?
   /// Uploaded payment screenshot/proof for manual verification when USSD/network fails.
   proofImageUrl           String?
+  /// One or multiple uploaded payment screenshot URLs (first entry mirrors proofImageUrl).
+  proofImageUrls          String[]           @default([])
   proofUploadedAt         DateTime?
   createdAt               DateTime           @default(now())
   /// Bumped on every payment attempt — used to tell a fresh in-flight
@@ -972,4 +974,19 @@ model AssociationRules {
   updatedByAdminId String?
 
   @@map("association_rules")
+}
+
+/// Singleton row (id is always "singleton") holding the admin-configured
+/// fallback USSD merchant payment codes and beneficiary names shown when
+/// Mobile Money / Orange Money USSD push fails due to operator/network issues.
+model FallbackPaymentConfig {
+  id                    String   @id @default("singleton")
+  orangeUssdCode        String   @default("")
+  orangeBeneficiaryName String   @default("")
+  mtnUssdCode           String   @default("")
+  mtnBeneficiaryName    String   @default("")
+  updatedAt             DateTime @updatedAt
+  updatedByAdminId      String?
+
+  @@map("fallback_payment_configs")
 }

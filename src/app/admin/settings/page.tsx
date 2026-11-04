@@ -7,6 +7,8 @@ import { InlineField } from "@/app/(app)/profile/inline-field";
 import { InlinePasswordField } from "@/app/(app)/profile/inline-password-field";
 import { updatePhoneAction, updateEmailAction } from "@/app/(app)/profile/actions";
 import { getAssociationRules } from "@/lib/association-rules";
+import { getFallbackPaymentConfig } from "@/lib/fallback-payment-config";
+import { FallbackPaymentEditor } from "@/components/admin/fallback-payment-editor";
 import { GeneralRulesEditor } from "./general-rules-editor";
 import { ROLE_KEY } from "@/lib/role-label";
 
@@ -22,7 +24,10 @@ export default async function AdminSettingsPage() {
   });
   if (!user) redirect("/login");
 
-  const generalRules = await getAssociationRules();
+  const [generalRules, fallbackConfig] = await Promise.all([
+    getAssociationRules(),
+    getFallbackPaymentConfig(),
+  ]);
 
   return (
     <main className="px-container-padding pt-stack-gap-lg pb-32 max-w-md mx-auto w-full">
@@ -58,6 +63,14 @@ export default async function AdminSettingsPage() {
 
       <section className="mb-stack-gap-lg">
         <InlinePasswordField lang={lang} />
+      </section>
+
+      <section className="mb-stack-gap-lg bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
+        <h2 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-2">
+          <span className="material-symbols-outlined">phonelink_setup</span>
+          {t("fallbackConfigTitle")}
+        </h2>
+        <FallbackPaymentEditor initialConfig={fallbackConfig} lang={lang} />
       </section>
 
       <section className="mb-stack-gap-lg bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">

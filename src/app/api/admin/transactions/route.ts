@@ -47,7 +47,7 @@ export async function GET(request: Request) {
         paidByUser: { select: { name: true } },
         recordedByAdmin: { select: { name: true } },
       },
-      orderBy: { dueDate: "desc" },
+      orderBy: [{ proofUploadedAt: { sort: "desc", nulls: "last" } }, { dueDate: "desc" }],
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
@@ -58,24 +58,34 @@ export async function GET(request: Request) {
     total,
     page,
     pageSize: PAGE_SIZE,
-    transactions: rows.map((c) => ({
-      id: c.id,
-      beneficiaryName: c.membershipSlot.beneficiaryName,
-      memberName: c.membershipSlot.membership.user.name,
-      paidByName: c.paidByUser?.name ?? c.recordedByAdmin?.name ?? null,
-      tontineSessionId: c.membershipSlot.membership.tontineSessionId,
-      contributionLabel:
-        c.membershipSlot.membership.tontineSession.title ||
-        TONTINE_LABELS[c.membershipSlot.membership.tontineSession.type],
-      amount: Number(c.amountPaid) + Number(c.feePaid) + Number(c.finePaid),
-      status: c.status,
-      dueDate: c.dueDate.toISOString(),
-      paidAt: c.paidAt ? c.paidAt.toISOString() : null,
-      transRef: c.fapshiTxRef ?? c.id,
-      membershipSlotId: c.membershipSlotId,
-      proofImageUrl: c.proofImageUrl,
-      proofUploadedAt: c.proofUploadedAt ? c.proofUploadedAt.toISOString() : null,
-      payerPhone: c.payerPhone,
-    })),
+    transactions: rows.map((c) => {
+      const urls =
+        c.proofImageUrls && c.proofImageUrls.length > 0
+          ? c.proofImageUrls
+          : c.proofImageUrl
+            ? [c.proofImageUrl]
+            : [];
+      return {
+        id: c.id,
+        beneficiaryName: c.membershipSlot.beneficiaryName,
+        memberName: c.membershipSlot.membership.user.name,
+        memberUserId: c.membershipSlot.membership.userId,
+        paidByName: c.paidByUser?.name ?? c.recordedByAdmin?.name ?? null,
+        tontineSessionId: c.membershipSlot.membership.tontineSessionId,
+        contributionLabel:
+          c.membershipSlot.membership.tontineSession.title ||
+          TONTINE_LABELS[c.membershipSlot.membership.tontineSession.type],
+        amount: Number(c.amountPaid) + Number(c.feePaid) + Number(c.finePaid),
+        status: c.status,
+        dueDate: c.dueDate.toISOString(),
+        paidAt: c.paidAt ? c.paidAt.toISOString() : null,
+        transRef: c.fapshiTxRef ?? c.id,
+        membershipSlotId: c.membershipSlotId,
+        proofImageUrl: c.proofImageUrl ?? urls[0] ?? null,
+        proofImageUrls: urls,
+        proofUploadedAt: c.proofUploadedAt ? c.proofUploadedAt.toISOString() : null,
+        payerPhone: c.payerPhone,
+      };
+    }),
   });
 }

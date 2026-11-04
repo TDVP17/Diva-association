@@ -112,10 +112,18 @@ export function PayButton({
         <PaymentConfirmDialog
           lang={lang}
           membershipSlotId={membershipSlotId}
+          beneficiaryName={beneficiaryName}
           payEndpoint="/api/payments/fapshi/initiate"
           description={description}
           defaultPhone={defaultPhone}
-          onSettled={() => router.refresh()}
+          onSettled={() => {
+            setShowConfirm(false);
+            router.refresh();
+          }}
+          onProofSubmitted={() => {
+            setShowConfirm(false);
+            router.refresh();
+          }}
           onClose={() => setShowConfirm(false)}
         />
       )}

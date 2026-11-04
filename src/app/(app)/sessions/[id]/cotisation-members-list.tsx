@@ -13,6 +13,7 @@ export interface CotisationMemberItem {
   beneficiaryName: string;
   isMine: boolean;
   paid: boolean;
+  hasPendingProof?: boolean;
   paidAtLabel: string | null;
   paidByRelativeName?: string | null;
   fineAmount?: number | null;
@@ -83,6 +84,14 @@ export function CotisationMembersList({
   const [savedOffline, setSavedOffline] = useState(false);
 
   const hasUnpaid = myUnpaidSlotIds.length > 0;
+  const myUnpaidFallbackSlots = members
+    .filter((m) => myUnpaidSlotIds.includes(m.id))
+    .map((m) => ({
+      id: m.id,
+      beneficiaryName: m.beneficiaryName,
+      baseTotal: slotTotal,
+      dueDate: m.targetDueDate ?? null,
+    }));
   const displayedMembers = showAllMembers || members.length <= 3 ? members : members.slice(0, 3);
 
   async function handleMainCotiserAction() {
@@ -174,6 +183,12 @@ export function CotisationMembersList({
                         {slot.targetDueDateLabel}
                       </span>
                     )}
+                    {!slot.paid && slot.hasPendingProof && (
+                      <span className="text-[10px] font-bold text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full shadow-2xs inline-flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[12px]">schedule</span>
+                        <span>{t("proofPendingAdminBadge")}</span>
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -189,9 +204,19 @@ export function CotisationMembersList({
                     type="button"
                     onClick={() => handlePaySingle(slot.id)}
                     disabled={isDraftSession || slot.officialPosition === null || !slot.ballDrawn || !!lockedReason}
-                    className="px-3 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`px-3 py-1 rounded-lg font-bold text-xs shadow-xs transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
+                      slot.hasPendingProof
+                        ? "bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300"
+                        : "bg-emerald-700 hover:bg-emerald-800 text-white"
+                    }`}
                   >
-                    {lang === "fr" ? "Cotiser" : "Pay"}
+                    {slot.hasPendingProof
+                      ? lang === "fr"
+                        ? "Renvoyer"
+                        : "Resend"
+                      : lang === "fr"
+                        ? "Cotiser"
+                        : "Pay"}
                   </button>
                 ) : (
                   <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 font-medium text-xs">
@@ -281,11 +306,17 @@ export function CotisationMembersList({
           <PaymentConfirmDialog
             lang={lang}
             membershipSlotId={activeSlotIdForPay}
+            beneficiaryName={activeSlot?.beneficiaryName}
+            fallbackAvailableSlots={myUnpaidFallbackSlots}
             dueDate={activeSlot?.targetDueDate ?? null}
             payEndpoint="/api/payments/fapshi/initiate"
             description={modalDescription}
             defaultPhone={defaultPhone}
             onSettled={() => {
+              setActiveSlotIdForPay(null);
+              router.refresh();
+            }}
+            onProofSubmitted={() => {
               setActiveSlotIdForPay(null);
               router.refresh();
             }}
@@ -301,6 +332,10 @@ export function CotisationMembersList({
           membershipSlotIds={myUnpaidSlotIds}
           defaultPhone={defaultPhone}
           onSettled={() => {
+            setShowBulkDialog(false);
+            router.refresh();
+          }}
+          onProofSubmitted={() => {
             setShowBulkDialog(false);
             router.refresh();
           }}
