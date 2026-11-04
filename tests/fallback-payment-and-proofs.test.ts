@@ -21,6 +21,13 @@ describe("fallback-ussd formatter & resolver", () => {
     expect(formatMerchantUssdCode(templateWithMontant, amount2)).toBe("#150*11*698416666*3100#");
     expect(formatMerchantUssdCode(templateWithMontant, amount3)).toBe("#150*11*698416666*4650#");
 
+    // Pattern 1b: Admin had accidental leftover digits right before {montant} (e.g. *1{montant}#)
+    const templateWithLeftoverDigit = "#150*11*698416666*1{montant}#";
+    expect(formatMerchantUssdCode(templateWithLeftoverDigit, 5200)).toBe("#150*11*698416666*5200#");
+
+    const templateWithLeftoverSample = "#150*11*698416666*1550{montant}#";
+    expect(formatMerchantUssdCode(templateWithLeftoverSample, 5200)).toBe("#150*11*698416666*5200#");
+
     // Pattern 2: Admin typed template with {amount} placeholder
     const templateWithAmount = "*126*1*1*677000000*{amount}#";
     expect(formatMerchantUssdCode(templateWithAmount, amount2, "MTN")).toBe("*126*1*1*677000000*3100#");

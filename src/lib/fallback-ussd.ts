@@ -32,12 +32,12 @@ export function formatMerchantUssdCode(
 
   const amt = Math.max(0, Math.round(Number.isFinite(totalAmount) ? totalAmount : 0));
 
-  // 1. Explicit {montant} / {amount} placeholder
+  // 1. Explicit {montant} / {amount} placeholder (also strips any accidental leftover prefix digits like *1{montant} or *1550{montant})
   if (/\{(montant|amount)\}/i.test(trimmed)) {
     if (amt > 0) {
-      return trimmed.replace(/\{(montant|amount)\}/gi, String(amt));
+      return trimmed.replace(/\d*\{(montant|amount)\}/gi, String(amt));
     }
-    return trimmed.replace(/\*?\{(montant|amount)\}/gi, "");
+    return trimmed.replace(/\*?\d*\{(montant|amount)\}/gi, "");
   }
 
   // 2. Plain digits (phone number or merchant code)
