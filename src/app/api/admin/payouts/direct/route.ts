@@ -22,6 +22,7 @@ const directPayoutSchema = z.object({
   payoutPhone: z.string().trim().min(9),
   payoutAccountName: z.string().trim().min(1).max(100),
   customAmount: z.coerce.number().positive().optional(),
+  channel: z.enum(["FAPSHI", "DIRECT"]).default("FAPSHI"),
 });
 
 function normalizePhone(raw: string): string {
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { tontineSessionId, membershipSlotId, payoutPhone, payoutAccountName, customAmount } = parsed.data;
+  const { tontineSessionId, membershipSlotId, payoutPhone, payoutAccountName, customAmount, channel } = parsed.data;
 
   const slot = await prisma.membershipSlot.findUnique({
     where: { id: membershipSlotId },
@@ -121,25 +122,32 @@ export async function POST(request: Request) {
   const provider = detectMobileMoneyProvider(normalized);
   const medium = provider ? fapshiMediumFor(provider) : undefined;
 
-  let fapshiResult;
-  try {
-    fapshiResult = await sendPayout({
-      amount: Math.round(netPayout),
-      phone: normalized,
-      medium,
-      name: payoutAccountName,
-      externalId: `${tontineSessionId}:${slot.id}:${dueDate.toISOString()}`,
-      message: `Cotisation DIVA - Gain de ${slot.beneficiaryName}`,
-    });
-  } catch (err) {
-    console.error("[admin/payouts/direct] Fapshi payout error:", err);
-    if (err instanceof FapshiPayoutError) {
-      return NextResponse.json({ error: err.message }, { status: 502 });
+  let fapshiResult: { transId: string };
+  if (channel === "FAPSHI") {
+    try {
+      fapshiResult = await sendPayout({
+        amount: Math.round(netPayout),
+        phone: normalized,
+        medium,
+        name: payoutAccountName,
+        externalId: `direct-${slot.id}-${dueDate.getTime()}`,
+        message: `Cotisation DIVA - Gain de ${slot.beneficiaryName}`,
+      });
+    } catch (err) {
+      console.error("[admin/payouts/direct] Fapshi payout error:", err);
+      if (err instanceof FapshiPayoutError) {
+        return NextResponse.json({ error: err.message }, { status: 502 });
+      }
+      return NextResponse.json(
+        { error: "Le virement a échoué. Veuillez vérifier le solde ou le numéro." },
+        { status: 502 },
+      );
     }
-    return NextResponse.json(
-      { error: "Le virement a échoué. Veuillez vérifier le solde ou le numéro." },
-      { status: 502 },
-    );
+  } else {
+    // Virement direct / manuel via le numéro de l'admin
+    fapshiResult = {
+      transId: `MANUAL-${slot.id.slice(-6).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`,
+    };
   }
 
   // Persist payout row
@@ -360,6 +368,7 @@ export async function POST(request: Request) {
     targetId: payoutRecord.id,
     tontineSessionId,
     metadata: {
+      channel,
       membershipSlotId,
       netPayout,
       payoutPhone: normalized,

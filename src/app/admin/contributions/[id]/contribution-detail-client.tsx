@@ -134,6 +134,8 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [payoutClaims, setPayoutClaims] = useState<PayoutClaim[]>([]);
   const [reviewingClaimId, setReviewingClaimId] = useState<string | null>(null);
+  const [payoutChannel, setPayoutChannel] = useState<"FAPSHI" | "DIRECT">("DIRECT");
+  const [directPayoutChannel, setDirectPayoutChannel] = useState<"FAPSHI" | "DIRECT">("DIRECT");
   const [payoutResult, setPayoutResult] = useState<string | null>(null);
   const [payoutError, setPayoutError] = useState<string | null>(null);
   const [payoutPreview, setPayoutPreview] = useState<{
@@ -756,7 +758,10 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
       const res = await fetch("/api/admin/payouts/release", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ payoutClaimId: reviewingClaimId }),
+        body: JSON.stringify({
+          payoutClaimId: reviewingClaimId,
+          channel: payoutChannel,
+        }),
       });
       const body = await res.json();
       if (!res.ok) {
@@ -765,12 +770,16 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
         return;
       }
       const refMsg = body.transId ? ` (Réf: ${body.transId})` : "";
+      const channelLabel =
+        payoutChannel === "DIRECT"
+          ? (lang === "fr" ? " [Virement direct validé]" : " [Direct payout validated]")
+          : " [Fapshi]";
       setPayoutResult(
         `${t("payoutResultLine", {
           pot: formatXAF(body.pot),
           deducted: formatXAF(body.deducted),
           net: formatXAF(body.netPayout),
-        })}${refMsg}`,
+        })}${refMsg}${channelLabel}`,
       );
       setPayoutPreview(null);
       setReviewingClaimId(null);
@@ -824,6 +833,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
           payoutAccountName: directPayoutName.trim(),
           payoutPhone: directPayoutPhone.trim(),
           customAmount: directPayoutAmount ? Number(directPayoutAmount) : undefined,
+          channel: directPayoutChannel,
         }),
       });
       const data = await res.json().catch(() => null);
@@ -2565,6 +2575,48 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                 />
               </div>
 
+              <div className="flex flex-col gap-1.5">
+                <label className="block font-label-sm text-label-sm text-on-surface font-semibold">
+                  {lang === "fr" ? "Canal d'envoi des fonds :" : "Disbursement channel:"}
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDirectPayoutChannel("DIRECT")}
+                    className={`p-2.5 rounded-lg border text-left flex items-center justify-between transition-all ${
+                      directPayoutChannel === "DIRECT"
+                        ? "border-emerald-600 bg-emerald-50 text-emerald-950 font-semibold ring-1 ring-emerald-500"
+                        : "border-slate-200 bg-surface text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[18px] text-emerald-700">phone_android</span>
+                      <span className="text-xs">{lang === "fr" ? "Virement via mon numéro" : "Direct via my phone"}</span>
+                    </div>
+                    {directPayoutChannel === "DIRECT" && (
+                      <span className="material-symbols-outlined text-emerald-700 text-[16px]">check</span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDirectPayoutChannel("FAPSHI")}
+                    className={`p-2.5 rounded-lg border text-left flex items-center justify-between transition-all ${
+                      directPayoutChannel === "FAPSHI"
+                        ? "border-emerald-600 bg-emerald-50 text-emerald-950 font-semibold ring-1 ring-emerald-500"
+                        : "border-slate-200 bg-surface text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[18px] text-emerald-700">bolt</span>
+                      <span className="text-xs">{lang === "fr" ? "Compte Fapshi (Auto)" : "Fapshi Account (Auto)"}</span>
+                    </div>
+                    {directPayoutChannel === "FAPSHI" && (
+                      <span className="material-symbols-outlined text-emerald-700 text-[16px]">check</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+
               {directPayoutError && (
                 <div className="p-3 bg-error-container text-on-error-container rounded-lg text-sm font-medium flex items-center gap-2">
                   <span className="material-symbols-outlined text-error text-[18px]">error</span>
@@ -2582,12 +2634,21 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
               <button
                 type="submit"
                 disabled={directPayoutLoading || !directPayoutSlotId || !directPayoutPhone || !directPayoutName}
-                className="w-full sm:w-auto self-start bg-primary text-on-primary font-label-md text-label-md px-6 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 transition-opacity"
+                className={`w-full sm:w-auto self-start font-label-md text-label-md px-6 py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 transition-opacity ${
+                  directPayoutChannel === "DIRECT"
+                    ? "bg-emerald-700 text-white hover:bg-emerald-800"
+                    : "bg-primary text-on-primary hover:opacity-90"
+                }`}
               >
                 {directPayoutLoading ? (
                   <>
-                    <LoadingSpinner className="w-4 h-4 text-on-primary" />
+                    <LoadingSpinner className="w-4 h-4 text-white" />
                     <span>{t("sendingPayout")}</span>
+                  </>
+                ) : directPayoutChannel === "DIRECT" ? (
+                  <>
+                    <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                    <span>{lang === "fr" ? "Valider le virement direct" : "Validate direct payout"}</span>
                   </>
                 ) : (
                   <>
@@ -2825,23 +2886,131 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                           <span className="font-label-sm text-label-sm text-on-surface-variant">{t("amountToSendLabel")}</span>
                           <span className="font-numeric-data text-lg font-bold text-primary">{formatXAF(payoutPreview.netPayout)}</span>
                         </div>
-                        <p className="font-label-sm text-xs text-slate-600 bg-amber-50 border border-amber-200 rounded p-2">
-                          {lang === "fr"
-                            ? "Le compte administrateur sera débité et les fonds transférés directement au nom et au numéro ci-dessus."
-                            : "The admin account will be debited and funds transferred directly to the name and number above."}
-                        </p>
+
+                        {/* Choix du mode de versement : Fapshi vs Direct personnel */}
+                        <div className="flex flex-col gap-2 pt-2 border-t border-slate-200">
+                          <span className="text-xs font-bold text-slate-800">
+                            {lang === "fr" ? "Mode de versement des fonds :" : "Disbursement method:"}
+                          </span>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setPayoutChannel("DIRECT")}
+                              className={`p-3 rounded-xl border text-left flex flex-col gap-1 transition-all ${
+                                payoutChannel === "DIRECT"
+                                  ? "border-emerald-600 bg-emerald-50/90 ring-2 ring-emerald-500/30"
+                                  : "border-slate-200 bg-slate-50/60 hover:bg-slate-100"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="material-symbols-outlined text-[20px] text-emerald-700">phone_android</span>
+                                  <span className="text-xs font-bold text-slate-900">
+                                    {lang === "fr" ? "Virement via mon numéro" : "Direct via my number"}
+                                  </span>
+                                </div>
+                                {payoutChannel === "DIRECT" && (
+                                  <span className="material-symbols-outlined text-emerald-700 text-[18px]">check_circle</span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-600 leading-snug">
+                                {lang === "fr"
+                                  ? "Vous envoyez vous-même les fonds depuis votre téléphone (MTN/Orange). Valide la réception."
+                                  : "You disburse from your own mobile. Confirms funds received."}
+                              </p>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setPayoutChannel("FAPSHI")}
+                              className={`p-3 rounded-xl border text-left flex flex-col gap-1 transition-all ${
+                                payoutChannel === "FAPSHI"
+                                  ? "border-emerald-600 bg-emerald-50/90 ring-2 ring-emerald-500/30"
+                                  : "border-slate-200 bg-slate-50/60 hover:bg-slate-100"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="material-symbols-outlined text-[20px] text-emerald-700">bolt</span>
+                                  <span className="text-xs font-bold text-slate-900">
+                                    {lang === "fr" ? "Compte Fapshi (Automatique)" : "Fapshi Account (Auto)"}
+                                  </span>
+                                </div>
+                                {payoutChannel === "FAPSHI" && (
+                                  <span className="material-symbols-outlined text-emerald-700 text-[18px]">check_circle</span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-600 leading-snug">
+                                {lang === "fr"
+                                  ? "Débit automatique de votre solde Fapshi vers le numéro du membre."
+                                  : "Automatic transfer from your Fapshi balance to the beneficiary."}
+                              </p>
+                            </button>
+                          </div>
+                        </div>
+
+                        {payoutChannel === "DIRECT" ? (
+                          <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 flex items-start gap-2">
+                            <span className="material-symbols-outlined text-[18px] text-emerald-700 flex-shrink-0 mt-0.5">verified</span>
+                            <div className="leading-relaxed">
+                              {lang === "fr" ? (
+                                <>
+                                  <strong>Virement hors Fapshi :</strong> Effectuez le transfert de{" "}
+                                  <span className="font-bold underline">{formatXAF(payoutPreview.netPayout)}</span> depuis votre téléphone
+                                  vers le <strong>{payoutPreview.payoutPhone}</strong> ({payoutPreview.payoutAccountName}). En validant ci-dessous,
+                                  vous confirmez que la personne a bien reçu ses fonds. Aucun compte Fapshi ne sera débité.
+                                </>
+                              ) : (
+                                <>
+                                  <strong>Direct transfer outside Fapshi:</strong> Send{" "}
+                                  <span className="font-bold underline">{formatXAF(payoutPreview.netPayout)}</span> from your phone to{" "}
+                                  <strong>{payoutPreview.payoutPhone}</strong> ({payoutPreview.payoutAccountName}). Validate below that funds were received.
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-950 flex items-start gap-2">
+                            <span className="material-symbols-outlined text-[18px] text-blue-700 flex-shrink-0 mt-0.5">account_balance_wallet</span>
+                            <div className="leading-relaxed">
+                              {lang === "fr" ? (
+                                <>
+                                  <strong>Débit Fapshi :</strong> Le compte Fapshi Diva sera débité de{" "}
+                                  <span className="font-bold">{formatXAF(payoutPreview.netPayout)}</span> et transféré automatiquement vers le numéro{" "}
+                                  <strong>{payoutPreview.payoutPhone}</strong>.
+                                </>
+                              ) : (
+                                <>
+                                  <strong>Fapshi debit:</strong> The admin Fapshi balance will be debited{" "}
+                                  <span className="font-bold">{formatXAF(payoutPreview.netPayout)}</span> and sent automatically to{" "}
+                                  <strong>{payoutPreview.payoutPhone}</strong>.
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
                         <div className="flex flex-col gap-2 mt-1">
                           <button
                             onClick={confirmReleasePayout}
                             disabled={releasing}
-                            className="w-full bg-primary text-on-primary font-label-md text-label-md py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 shadow-xs"
+                            className={`w-full font-label-md text-label-md py-3 rounded-xl hover:opacity-95 disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm font-semibold transition-colors ${
+                              payoutChannel === "DIRECT"
+                                ? "bg-emerald-700 hover:bg-emerald-800 text-white"
+                                : "bg-primary hover:bg-primary/90 text-on-primary"
+                            }`}
                           >
                             {releasing ? (
                               <span>{t("recordingEllipsis")}</span>
+                            ) : payoutChannel === "DIRECT" ? (
+                              <>
+                                <span className="material-symbols-outlined text-[20px]">check_circle</span>
+                                <span>{lang === "fr" ? "Valider que la personne a reçu les fonds" : "Confirm funds received"}</span>
+                              </>
                             ) : (
                               <>
-                                <span className="material-symbols-outlined text-[18px]">payments</span>
-                                <span>{t("confirmAndSend")}</span>
+                                <span className="material-symbols-outlined text-[20px]">bolt</span>
+                                <span>{lang === "fr" ? "Transférer via Fapshi" : "Disburse via Fapshi"}</span>
                               </>
                             )}
                           </button>

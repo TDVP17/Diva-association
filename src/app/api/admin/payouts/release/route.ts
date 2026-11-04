@@ -15,7 +15,10 @@ import { TONTINE_TYPE_LABELS } from "@/lib/tontine-labels";
 import { logAudit } from "@/lib/audit";
 import { formatXAF } from "@/lib/format-currency";
 
-const bodySchema = z.object({ payoutClaimId: z.string().min(1) });
+const bodySchema = z.object({
+  payoutClaimId: z.string().min(1),
+  channel: z.enum(["FAPSHI", "DIRECT"]).default("FAPSHI"),
+});
 
 export async function POST(request: Request) {
   const admin = await requireAdmin();
@@ -25,7 +28,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
-  const { payoutClaimId } = parsed.data;
+  const { payoutClaimId, channel } = parsed.data;
 
   const claim = await prisma.payout.findUnique({
     where: { id: payoutClaimId },
@@ -88,21 +91,28 @@ export async function POST(request: Request) {
   const medium = provider ? fapshiMediumFor(provider) : undefined;
   const payoutName = (claim.payoutAccountName || slot.beneficiaryName).trim();
 
-  let fapshiResult;
-  try {
-    fapshiResult = await sendPayout({
-      amount: Math.round(netPayout),
-      phone: normalizedPhone,
-      medium,
-      name: payoutName,
-      externalId: `${claim.tontineSessionId}:${slot.id}:${claim.dueDate.toISOString()}`,
-      message: `Cotisation DIVA - Gain de ${slot.beneficiaryName}`,
-    });
-  } catch (err) {
-    if (err instanceof FapshiPayoutError) {
-      return NextResponse.json({ error: err.message }, { status: 502 });
+  let fapshiResult: { transId: string };
+  if (channel === "FAPSHI") {
+    try {
+      fapshiResult = await sendPayout({
+        amount: Math.round(netPayout),
+        phone: normalizedPhone,
+        medium,
+        name: payoutName,
+        externalId: `payout-${claim.id}`,
+        message: `Cotisation DIVA - Gain de ${slot.beneficiaryName}`,
+      });
+    } catch (err) {
+      if (err instanceof FapshiPayoutError) {
+        return NextResponse.json({ error: err.message }, { status: 502 });
+      }
+      return NextResponse.json({ error: "Payout could not be sent. Please try again." }, { status: 502 });
     }
-    return NextResponse.json({ error: "Payout could not be sent. Please try again." }, { status: 502 });
+  } else {
+    // Virement direct via le numéro de l'admin (hors Fapshi)
+    fapshiResult = {
+      transId: `MANUAL-${claim.id.slice(-8).toUpperCase()}`,
+    };
   }
 
   await prisma.$transaction([
@@ -287,6 +297,7 @@ export async function POST(request: Request) {
     targetId: payoutClaimId,
     tontineSessionId: claim.tontineSessionId,
     metadata: {
+      channel,
       netPayout,
       deducted,
       membershipSlotId: slot.id,
@@ -304,5 +315,6 @@ export async function POST(request: Request) {
     netPayout,
     dueDate: claim.dueDate.toISOString(),
     transId: fapshiResult.transId,
+    channel,
   });
 }
