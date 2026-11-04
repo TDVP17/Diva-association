@@ -46,6 +46,7 @@ vi.mock("@/lib/prisma", () => {
     },
     payout: {
       create: (...a: unknown[]) => mockCreatePayout(...a),
+      upsert: (...a: unknown[]) => mockCreatePayout(...a),
     },
     tontineSession: {
       findUnique: (...a: unknown[]) => mockFindUniqueSession(...a),
@@ -102,7 +103,7 @@ describe("Draw and Payout Rules", () => {
       expect(data.error).toContain("lucky ball");
     });
 
-    it("rejects with 409 if less than half of members have contributed for this cycle", async () => {
+    it("rejects with 409 if not all members have contributed for this cycle", async () => {
       mockAuth.mockResolvedValue({ user: { id: "user-1" } });
       mockFindUniqueMembershipSlot.mockResolvedValue({
         id: "slot-1",
@@ -110,18 +111,18 @@ describe("Draw and Payout Rules", () => {
         membership: {
           userId: "user-1",
           tontineSessionId: "session-1",
-          tontineSession: { type: "MONTHLY_28" },
+          tontineSession: { type: "MONTHLY_28", startDate: new Date("2026-10-28"), payouts: [] },
         },
       });
       mockGetDesignatedSlot.mockResolvedValue({ id: "slot-1" });
 
-      // 4 total slots in session -> half threshold is 2
+      // 4 total slots in session
       mockFindManyMembership.mockResolvedValue([
         { slots: [{ id: "slot-1" }, { id: "slot-2" }] },
         { slots: [{ id: "slot-3" }, { id: "slot-4" }] },
       ]);
-      // Only 1 contribution paid so far (< 2)
-      mockCountContribution.mockResolvedValue(1);
+      // Only 2 contributions paid so far (< 4)
+      mockCountContribution.mockResolvedValue(2);
 
       const req = new Request("http://localhost/api/payments/payout-claims", {
         method: "POST",
@@ -136,10 +137,10 @@ describe("Draw and Payout Rules", () => {
       const res = await postPayoutClaim(req);
       expect(res.status).toBe(409);
       const data = await res.json();
-      expect(data.error).toContain("half of the members have contributed");
+      expect(data.error).toContain("Les coordonnées de paiement ne peuvent être transmises");
     });
 
-    it("accepts and creates payout claim if ball is drawn AND at least half have contributed", async () => {
+    it("accepts and creates payout claim if ball is drawn AND all members have contributed", async () => {
       mockAuth.mockResolvedValue({ user: { id: "user-1" } });
       mockFindUniqueMembershipSlot.mockResolvedValue({
         id: "slot-1",
@@ -147,18 +148,18 @@ describe("Draw and Payout Rules", () => {
         membership: {
           userId: "user-1",
           tontineSessionId: "session-1",
-          tontineSession: { type: "MONTHLY_28" },
+          tontineSession: { type: "MONTHLY_28", startDate: new Date("2026-10-28"), payouts: [] },
         },
       });
       mockGetDesignatedSlot.mockResolvedValue({ id: "slot-1" });
 
-      // 4 total slots -> half threshold is 2
+      // 4 total slots
       mockFindManyMembership.mockResolvedValue([
         { slots: [{ id: "slot-1" }, { id: "slot-2" }] },
         { slots: [{ id: "slot-3" }, { id: "slot-4" }] },
       ]);
-      // 2 contributions paid (>= 2)
-      mockCountContribution.mockResolvedValue(2);
+      // 4 contributions paid (>= 4)
+      mockCountContribution.mockResolvedValue(4);
       mockCreatePayout.mockResolvedValue({ id: "payout-1" });
 
       const req = new Request("http://localhost/api/payments/payout-claims", {
