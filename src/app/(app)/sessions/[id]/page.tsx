@@ -823,14 +823,8 @@ export default async function SessionDetailPage({
         }))}
         myUnpaidSlotIds={mySlots
           .filter((s) => {
-            const slotContributions = contributions.filter((c) => c.membershipSlotId === s.id);
-            const nextUnpaid = getSlotNextUnpaidDueDate({
-              type: tontineSession.type,
-              startDate: tontineSession.startDate,
-              maxPosition: totalSlotsCount,
-              paidDueDates: slotContributions.filter((c) => c.status === "PAID").map((c) => c.dueDate),
-            });
-            return !nextUnpaid.isAllPaid;
+            const statusSlot = memberStatusSlots.find((m) => m.id === s.id);
+            return !statusSlot?.paid;
           })
           .map((s) => s.id)}
         slotTotal={perSlotTotal}

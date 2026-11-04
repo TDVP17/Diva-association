@@ -62,7 +62,8 @@ export function NetworkFallbackProofStep({
   // reflects how many names the member has to contribute for.
   const [selectedSlotIds, setSelectedSlotIds] = useState<string[]>(() => {
     if (defaultSelectedSlotIds && defaultSelectedSlotIds.length > 0) {
-      return defaultSelectedSlotIds;
+      const valid = defaultSelectedSlotIds.filter((id) => availableSlots.some((s) => s.id === id));
+      if (valid.length > 0) return valid;
     }
     return availableSlots.map((s) => s.id);
   });

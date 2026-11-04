@@ -85,7 +85,7 @@ export function CotisationMembersList({
 
   const hasUnpaid = myUnpaidSlotIds.length > 0;
   const myUnpaidFallbackSlots = members
-    .filter((m) => myUnpaidSlotIds.includes(m.id))
+    .filter((m) => myUnpaidSlotIds.includes(m.id) && !m.paid)
     .map((m) => ({
       id: m.id,
       beneficiaryName: m.beneficiaryName,

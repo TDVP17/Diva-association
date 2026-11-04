@@ -558,6 +558,7 @@ export function PaymentConfirmDialog({
                 failCount={failCount}
                 payerPhone={rawNum}
                 availableSlots={slotsForFallback}
+                defaultSelectedSlotIds={membershipSlotId ? [membershipSlotId] : undefined}
                 transId={transId}
                 onProofSubmitted={() => {
                   if (onProofSubmitted) {
