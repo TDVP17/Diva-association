@@ -34,6 +34,13 @@ export async function GET(request: Request) {
 
     // Group by userId so a member with multiple slots gets 1 reminder
     const processedUsers = new Set<string>();
+    const sessionRecipients: {
+      userId: string;
+      message: string;
+      messageKey: string;
+      messageVars: Record<string, string>;
+      actionUrl: string;
+    }[] = [];
 
     for (const slot of unpaid) {
       if (processedUsers.has(slot.userId)) continue;
@@ -56,25 +63,26 @@ export async function GET(request: Request) {
       const firstName = rawName.split(/\s+/)[0] || rawName;
       const message = reminderEveMessage(lang, firstName, tontineSession.type, amount, sessionTitle);
 
+      sessionRecipients.push({
+        userId: slot.userId,
+        message,
+        messageKey: "waReminderEve",
+        messageVars: {
+          name: firstName,
+          amount: formatXAF(amount),
+          cotisation: sessionTitle,
+        },
+        actionUrl: `/sessions/${tontineSession.id}`,
+      });
+    }
+
+    if (sessionRecipients.length > 0) {
       await scheduleInAppNotifications({
         tontineSessionId: tontineSession.id,
         type: "CONTRIBUTION_REMINDER",
-        recipients: [
-          {
-            userId: slot.userId,
-            message,
-            messageKey: "waReminderEve",
-            messageVars: {
-              name: firstName,
-              amount: formatXAF(amount),
-              cotisation: sessionTitle,
-            },
-            actionUrl: `/sessions/${tontineSession.id}`,
-          },
-        ],
+        recipients: sessionRecipients,
       });
-
-      sent++;
+      sent += sessionRecipients.length;
     }
   }
 
