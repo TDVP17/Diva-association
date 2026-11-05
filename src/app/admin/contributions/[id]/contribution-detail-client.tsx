@@ -254,6 +254,89 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   const [relaunchError, setRelaunchError] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
 
+  // Slot Transfer State
+  const [transferModalSlot, setTransferModalSlot] = useState<AdminSlot | null>(null);
+  const [transferSelectedSlotIds, setTransferSelectedSlotIds] = useState<string[]>([]);
+  const [transferTargetEmail, setTransferTargetEmail] = useState("");
+  const [transferCustomNames, setTransferCustomNames] = useState<Record<string, string>>({});
+  const [transferSearchingUser, setTransferSearchingUser] = useState(false);
+  const [transferUserResults, setTransferUserResults] = useState<{ id: string; name: string; email: string; avatar?: string | null }[]>([]);
+  const [transferSelectedUser, setTransferSelectedUser] = useState<{ id: string; name: string; email: string } | null>(null);
+  const [transferSubmitting, setTransferSubmitting] = useState(false);
+  const [transferError, setTransferError] = useState<string | null>(null);
+  const [transferSuccess, setTransferSuccess] = useState<string | null>(null);
+
+  function openTransferModal(slot: AdminSlot) {
+    setTransferModalSlot(slot);
+    setTransferSelectedSlotIds([slot.id]);
+    setTransferTargetEmail("");
+    setTransferSelectedUser(null);
+    setTransferUserResults([]);
+    setTransferError(null);
+    setTransferSuccess(null);
+    setTransferCustomNames({ [slot.id]: slot.beneficiaryName });
+  }
+
+  useEffect(() => {
+    if (!transferTargetEmail.trim() || transferSelectedUser) {
+      setTransferUserResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setTransferSearchingUser(true);
+      try {
+        const res = await fetch(`/api/admin/users/search?q=${encodeURIComponent(transferTargetEmail.trim())}`);
+        const data = await res.json();
+        setTransferUserResults(data.users || []);
+      } catch (e) {
+        console.error("Transfer user search failed:", e);
+      } finally {
+        setTransferSearchingUser(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [transferTargetEmail, transferSelectedUser]);
+
+  async function handleConfirmTransfer() {
+    if (!transferTargetEmail.trim()) {
+      setTransferError(lang === "fr" ? "Veuillez entrer l'email du nouveau compte." : "Please enter the target user email.");
+      return;
+    }
+    if (transferSelectedSlotIds.length === 0) {
+      setTransferError(lang === "fr" ? "Veuillez sélectionner au moins une part." : "Please select at least one slot.");
+      return;
+    }
+    setTransferSubmitting(true);
+    setTransferError(null);
+    try {
+      const res = await fetch(`/api/admin/sessions/${tontineSessionId}/transfer-slots`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slotIds: transferSelectedSlotIds,
+          targetEmail: transferTargetEmail.trim(),
+          newBeneficiaryNames: transferCustomNames,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setTransferError(data.error || (lang === "fr" ? "Échec du transfert." : "Transfer failed."));
+      } else {
+        setTransferSuccess(data.message || (lang === "fr" ? "Transfert effectué avec succès !" : "Transfer completed successfully!"));
+        await refreshSession();
+        setTimeout(() => {
+          setTransferModalSlot(null);
+          setTransferSuccess(null);
+        }, 1800);
+      }
+    } catch (err) {
+      console.error("Transfer error:", err);
+      setTransferError(lang === "fr" ? "Erreur réseau. Veuillez réessayer." : "Network error. Please try again.");
+    } finally {
+      setTransferSubmitting(false);
+    }
+  }
+
   function buildInitialAssignedSlots(slots: AdminSlot[]): (AdminSlot | null)[] {
     const hasOfficial = slots.some((s) => s.officialPosition !== null);
     if (hasOfficial) {
@@ -2016,6 +2099,15 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                     <MemberArchivesToggle userId={s.userId} lang={lang} />
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openTransferModal(s)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 font-label-sm text-xs font-semibold transition-colors shadow-2xs"
+                      title={lang === "fr" ? `Transférer la part ${s.beneficiaryName} à un autre compte (ex: cousine)` : `Transfer slot ${s.beneficiaryName} to another user`}
+                    >
+                      <span className="material-symbols-outlined text-[15px]">swap_horiz</span>
+                      <span>{lang === "fr" ? "Transférer" : "Transfer"}</span>
+                    </button>
                     <Link
                       href={`/admin/support?with=${encodeURIComponent(s.userId)}&name=${encodeURIComponent(s.name)}`}
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-primary/30 text-primary hover:bg-primary/10 font-label-sm text-xs font-semibold transition-colors"
@@ -3353,6 +3445,242 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
               >
                 <span className="material-symbols-outlined text-[18px]">restart_alt</span>
                 {relaunching ? t("relaunching") : t("confirmRelaunch")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Slot Modal */}
+      {transferModalSlot && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-surface rounded-2xl p-6 shadow-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto border border-outline-variant/40 flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between border-b border-outline-variant/20 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center flex-shrink-0">
+                  <span className="material-symbols-outlined text-[24px]">swap_horiz</span>
+                </div>
+                <div>
+                  <h3 className="font-title-md text-title-md text-on-surface font-bold">
+                    {lang === "fr" ? "Transférer une ou plusieurs parts" : "Transfer Cotisation Slots"}
+                  </h3>
+                  <p className="font-label-sm text-xs text-on-surface-variant">
+                    {lang === "fr" ? `Propriétaire actuel : ${transferModalSlot.name}` : `Current owner: ${transferModalSlot.name}`}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTransferModalSlot(null)}
+                className="p-1 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            {/* Select Slots to Transfer */}
+            <div>
+              <label className="font-label-md text-sm font-semibold text-on-surface block mb-2">
+                {lang === "fr" ? "1. Sélectionner les parts à transférer :" : "1. Select slots to transfer:"}
+              </label>
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {session?.slots
+                  .filter((s) => s.userId === transferModalSlot.userId)
+                  .map((slot) => {
+                    const isSelected = transferSelectedSlotIds.includes(slot.id);
+                    return (
+                      <div
+                        key={slot.id}
+                        className={`p-3 rounded-xl border transition-all ${
+                          isSelected
+                            ? "border-indigo-400 bg-indigo-50/40 shadow-xs"
+                            : "border-outline-variant/30 bg-surface-container-lowest hover:bg-surface-container-low"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <label className="flex items-center gap-2 cursor-pointer select-none min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setTransferSelectedSlotIds((prev) => [...prev, slot.id]);
+                                  setTransferCustomNames((prev) => ({
+                                    ...prev,
+                                    [slot.id]: prev[slot.id] || slot.beneficiaryName,
+                                  }));
+                                } else {
+                                  setTransferSelectedSlotIds((prev) => prev.filter((id) => id !== slot.id));
+                                }
+                              }}
+                              className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                            />
+                            <span className="font-label-md text-sm font-bold text-on-surface truncate">
+                              {slot.beneficiaryName}
+                            </span>
+                          </label>
+                          <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 flex-shrink-0">
+                            {slot.officialPosition !== null
+                              ? `Position #${slot.officialPosition}`
+                              : slot.ballDrawn !== null
+                              ? `Boule #${slot.ballDrawn}`
+                              : (lang === "fr" ? "En attente tirage" : "Awaiting draw")}
+                          </span>
+                        </div>
+
+                        {isSelected && (
+                          <div className="mt-2 pl-6">
+                            <label className="text-xs text-on-surface-variant block mb-1">
+                              {lang === "fr" ? "Renommer la part (optionnel) :" : "Rename slot (optional):"}
+                            </label>
+                            <input
+                              type="text"
+                              value={transferCustomNames[slot.id] ?? slot.beneficiaryName}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setTransferCustomNames((prev) => ({ ...prev, [slot.id]: val }));
+                              }}
+                              placeholder={slot.beneficiaryName}
+                              className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-outline-variant bg-surface text-on-surface focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+
+            {/* Recipient User Email */}
+            <div>
+              <label className="font-label-md text-sm font-semibold text-on-surface block mb-1">
+                {lang === "fr" ? "2. Email du compte destinataire (ex: cousine) :" : "2. Target account email (e.g. cousin):"}
+              </label>
+              <p className="text-xs text-on-surface-variant mb-2">
+                {lang === "fr"
+                  ? "La destinataire doit déjà avoir créé son compte sur l'application avec cette adresse email."
+                  : "The recipient must already have created their account on the app with this email address."}
+              </p>
+
+              <div className="relative">
+                <input
+                  type="email"
+                  value={transferTargetEmail}
+                  onChange={(e) => {
+                    setTransferTargetEmail(e.target.value);
+                    setTransferSelectedUser(null);
+                  }}
+                  placeholder="ex: cousine@gmail.com"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-outline-variant bg-surface text-on-surface text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                {transferSearchingUser && (
+                  <div className="absolute right-3 top-3">
+                    <span className="material-symbols-outlined text-[18px] animate-spin text-primary">progress_activity</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Autocomplete suggestions */}
+              {transferUserResults.length > 0 && !transferSelectedUser && (
+                <div className="mt-1 border border-outline-variant/40 rounded-xl bg-surface shadow-lg overflow-hidden divide-y divide-outline-variant/20 max-h-40 overflow-y-auto">
+                  {transferUserResults.map((u) => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => {
+                        setTransferTargetEmail(u.email);
+                        setTransferSelectedUser(u);
+                        setTransferUserResults([]);
+                      }}
+                      className="w-full text-left p-2.5 hover:bg-indigo-50 flex items-center justify-between transition-colors"
+                    >
+                      <div>
+                        <p className="font-label-md text-xs font-bold text-on-surface">{u.name}</p>
+                        <p className="text-xs text-on-surface-variant">{u.email}</p>
+                      </div>
+                      <span className="material-symbols-outlined text-[16px] text-indigo-600">check_circle</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Selected User Confirmation Pill */}
+              {transferSelectedUser && (
+                <div className="mt-2 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-emerald-600 text-[18px]">verified_user</span>
+                    <div>
+                      <p className="text-xs font-bold text-emerald-900">{transferSelectedUser.name}</p>
+                      <p className="text-[11px] text-emerald-700">{transferSelectedUser.email}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTransferSelectedUser(null);
+                      setTransferTargetEmail("");
+                    }}
+                    className="text-xs text-emerald-800 hover:underline"
+                  >
+                    {lang === "fr" ? "Modifier" : "Change"}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Explanatory Safety Box */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-700 space-y-1">
+              <p className="font-semibold text-slate-900 flex items-center gap-1">
+                <span className="material-symbols-outlined text-[15px] text-emerald-600">verified</span>
+                {lang === "fr" ? "Garanties d'intégrité de la tontine :" : "Integrity guarantees:"}
+              </p>
+              <p>• {lang === "fr" ? "Les numéros tirés et les boules restent 100% identiques." : "Drawn numbers and balls remain unchanged."}</p>
+              <p>• {lang === "fr" ? "Les paiements passés sont intégralement conservés." : "Past payments are fully preserved."}</p>
+              <p>• {lang === "fr" ? `Ces parts disparaîtront du compte de ${transferModalSlot.name} et apparaîtront dans le compte de la destinataire.` : `Slots will disappear from ${transferModalSlot.name} and appear in recipient's dashboard.`}</p>
+            </div>
+
+            {transferError && (
+              <div className="p-3 rounded-xl bg-error/10 border border-error/30 text-error text-xs flex items-center gap-2">
+                <span className="material-symbols-outlined text-[16px]">error</span>
+                <span>{transferError}</span>
+              </div>
+            )}
+
+            {transferSuccess && (
+              <div className="p-3 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs flex items-center gap-2">
+                <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                <span>{transferSuccess}</span>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setTransferModalSlot(null)}
+                disabled={transferSubmitting}
+                className="flex-1 py-2.5 rounded-xl border border-outline-variant text-on-surface font-label-md text-sm hover:bg-surface transition-all"
+              >
+                {t("cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmTransfer}
+                disabled={transferSubmitting || transferSelectedSlotIds.length === 0 || !transferTargetEmail.trim()}
+                className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white font-label-md text-sm hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50 shadow-sm flex items-center justify-center gap-2"
+              >
+                {transferSubmitting ? (
+                  <>
+                    <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
+                    <span>{lang === "fr" ? "Transfert en cours..." : "Transferring..."}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[18px]">swap_horiz</span>
+                    <span>{lang === "fr" ? "Confirmer le transfert" : "Confirm Transfer"}</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
