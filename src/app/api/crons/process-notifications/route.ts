@@ -29,9 +29,15 @@ export async function processDueNotifications() {
   let broadcastEmailSentThisRun = false;
 
   for (const n of due) {
-    // Anti-spam safeguard: if multiple broadcast emails are due, process at most 1 per cron run
-    // to strictly enforce the 3-minute spacing between outgoing broadcast emails.
-    if (n.channel === "EMAIL" && n.type === "ADMIN_BROADCAST") {
+    // Anti-spam safeguard: if multiple broadcast/group emails are due, process at most 1 per cron run
+    // to strictly enforce the 3-minute spacing between outgoing notification emails.
+    const isBroadcastOrGroup =
+      n.type === "ADMIN_BROADCAST" ||
+      n.type === "DRAW_LAUNCHED" ||
+      n.type === "CONTRIBUTION_REMINDER" ||
+      n.type === "TURN_REMINDER_TOMORROW";
+
+    if (n.channel === "EMAIL" && isBroadcastOrGroup) {
       if (broadcastEmailSentThisRun) {
         continue;
       }
@@ -67,7 +73,7 @@ export async function processDueNotifications() {
           recipientName: n.user.name ?? undefined,
         });
         await sendEmail(n.user.email, subject, emailHtml);
-        if (n.type === "ADMIN_BROADCAST") {
+        if (isBroadcastOrGroup) {
           broadcastEmailSentThisRun = true;
         }
       } else if (n.channel === "WHATSAPP") {

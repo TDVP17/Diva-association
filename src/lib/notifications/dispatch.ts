@@ -204,9 +204,16 @@ async function deliverInstantNotifications(params: {
           }
 
           // Deliver instant Email notification via Resend with official DIVA logo and direct CTA button
-          // For ADMIN_BROADCAST (global alerts), DO NOT blast all emails at once here!
-          // They are queued with 3 minutes of spacing between each recipient so they never go to spam.
-          if (user?.email && params.type !== "ADMIN_BROADCAST") {
+          // For broadcast or multi-recipient events (ADMIN_BROADCAST, DRAW_LAUNCHED, or >1 recipients),
+          // DO NOT blast emails simultaneously here!
+          // They are queued with 3 minutes of spacing (STAGGER_MS) between each recipient so email providers (Gmail, Yahoo)
+          // never flag them as bulk spam, and members never receive duplicate emails.
+          const isBroadcastOrGroup =
+            params.type === "ADMIN_BROADCAST" ||
+            params.type === "DRAW_LAUNCHED" ||
+            params.recipients.length > 1;
+
+          if (user?.email && !isBroadcastOrGroup) {
             try {
               const emailHtml = renderBrandedEmailHtml({
                 title,
