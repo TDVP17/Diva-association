@@ -550,6 +550,8 @@ export const translations = {
       "Your request was not approved by the association. You cannot join this contribution at this time.",
     memberRejectedReasonSuffix: " Reason: {reason}",
     drawStartedMessage: "The draw has started — come pick your number!",
+    drawCompletedReadyToContribute:
+      "The lucky draw is complete and all positions have been assigned! You can now make your contribution for {cotisation}.",
     swapApprovedRequesterMessage: "Your position exchange request was approved.",
     swapRejectedRequesterMessage: "Your position exchange request was rejected.",
     swapApprovedTargetMessage: "A position exchange you accepted was approved.",
@@ -1794,6 +1796,8 @@ export const translations = {
       "Votre demande n'a pas été approuvée par l'association. Vous ne pouvez pas rejoindre cette cotisation pour le moment.",
     memberRejectedReasonSuffix: " Raison : {reason}",
     drawStartedMessage: "Le tirage au sort a commencé — venez choisir votre numéro !",
+    drawCompletedReadyToContribute:
+      "Le tirage au sort est terminé et toutes les places de l'ordre de passage sont attribuées ! Vous pouvez dès à présent effectuer votre cotisation pour {cotisation}.",
     swapApprovedRequesterMessage: "Votre demande d'échange de position a été approuvée.",
     swapRejectedRequesterMessage: "Votre demande d'échange de position a été rejetée.",
     swapApprovedTargetMessage: "Un échange de position que vous avez accepté a été approuvé.",

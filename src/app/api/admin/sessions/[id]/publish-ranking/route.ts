@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
+import { notifyDrawCompletedIfAllDrawn } from "@/lib/notifications/draw-complete";
 
 const bodySchema = z.object({
   order: z.array(z.string().min(1)).min(1),
@@ -54,6 +55,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       ? [prisma.tontineSession.update({ where: { id }, data: { status: "ACTIVE" } })]
       : []),
   ]);
+
+  if (!isSaveOnly) {
+    void notifyDrawCompletedIfAllDrawn(id).catch((err) =>
+      console.error("[publish-ranking] notifyDrawCompleted error:", err),
+    );
+  }
 
   return NextResponse.json({ ok: true, saved: isSaveOnly });
 }

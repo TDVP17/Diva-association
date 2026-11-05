@@ -2070,24 +2070,48 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
           </section>
 
           <section>
-            <h3 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-stack-gap-md">
-              <span className="material-symbols-outlined">group</span>
-              {t("membersLabel")} ({session.slots.filter((s) => s.paidThisCycle).length}/{session.slots.length})
-            </h3>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-stack-gap-md">
+              <h3 className="font-title-md text-title-md text-primary flex items-center gap-2">
+                <span className="material-symbols-outlined">group</span>
+                {t("membersLabel")} ({session.slots.filter((s) => s.paidThisCycle).length}/{session.slots.length})
+              </h3>
+              {session.slots.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => openTransferModal(session.slots[0])}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-600 text-white font-label-md text-xs font-bold hover:bg-indigo-700 shadow-xs transition-all active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-[18px]">swap_horiz</span>
+                  <span>{lang === "fr" ? "Transférer des parts (ex: cousine)" : "Transfer slots (e.g. cousin)"}</span>
+                </button>
+              )}
+            </div>
             <div className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-outline-variant/30 overflow-hidden">
               {session.slots.map((s, i) => (
-                <div key={s.id} className={`flex items-center justify-between p-3 ${i < session.slots.length - 1 ? "border-b border-outline-variant/30" : ""}`}>
-                  <div className="min-w-0 flex-1 pr-2">
-                    <Link
-                      href={`/admin/support?with=${encodeURIComponent(s.userId)}&name=${encodeURIComponent(s.name)}`}
-                      className="font-label-md text-label-md text-on-surface hover:text-primary hover:underline font-semibold flex items-center gap-1.5 truncate group"
-                      title={lang === "fr" ? `Écrire à ${s.name}` : `Message ${s.name}`}
-                    >
-                      <span className="truncate">{s.beneficiaryName}</span>
-                      <span className="material-symbols-outlined text-[16px] text-primary opacity-60 group-hover:opacity-100 flex-shrink-0">
-                        chat
-                      </span>
-                    </Link>
+                <div
+                  key={s.id}
+                  className={`p-3.5 flex flex-col md:flex-row md:items-center md:justify-between gap-3 ${
+                    i < session.slots.length - 1 ? "border-b border-outline-variant/30" : ""
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                      <Link
+                        href={`/admin/support?with=${encodeURIComponent(s.userId)}&name=${encodeURIComponent(s.name)}`}
+                        className="font-label-md text-label-md text-on-surface hover:text-primary hover:underline font-bold flex items-center gap-1.5 truncate group"
+                        title={lang === "fr" ? `Écrire à ${s.name}` : `Message ${s.name}`}
+                      >
+                        <span className="truncate">{s.beneficiaryName}</span>
+                        <span className="material-symbols-outlined text-[16px] text-primary opacity-60 group-hover:opacity-100 flex-shrink-0">
+                          chat
+                        </span>
+                      </Link>
+                      {s.officialPosition && (
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary">
+                          #{s.officialPosition}
+                        </span>
+                      )}
+                    </div>
                     <Link
                       href={`/admin/support?with=${encodeURIComponent(s.userId)}&name=${encodeURIComponent(s.name)}`}
                       className="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors block truncate"
@@ -2098,19 +2122,19 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                     </Link>
                     <MemberArchivesToggle userId={s.userId} lang={lang} />
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-2 flex-wrap pt-2 md:pt-0 border-t md:border-t-0 border-outline-variant/15">
                     <button
                       type="button"
                       onClick={() => openTransferModal(s)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 font-label-sm text-xs font-semibold transition-colors shadow-2xs"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 active:scale-95 font-label-sm text-xs font-bold transition-all shadow-2xs"
                       title={lang === "fr" ? `Transférer la part ${s.beneficiaryName} à un autre compte (ex: cousine)` : `Transfer slot ${s.beneficiaryName} to another user`}
                     >
-                      <span className="material-symbols-outlined text-[15px]">swap_horiz</span>
+                      <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
                       <span>{lang === "fr" ? "Transférer" : "Transfer"}</span>
                     </button>
                     <Link
                       href={`/admin/support?with=${encodeURIComponent(s.userId)}&name=${encodeURIComponent(s.name)}`}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-primary/30 text-primary hover:bg-primary/10 font-label-sm text-xs font-semibold transition-colors"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-primary/30 text-primary hover:bg-primary/10 font-label-sm text-xs font-semibold transition-colors"
                       title={lang === "fr" ? `Envoyer un message à ${s.name}` : `Send message to ${s.name}`}
                     >
                       <span className="material-symbols-outlined text-[15px]">chat</span>
@@ -2138,27 +2162,27 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                           console.error("Ban error:", e);
                         }
                       }}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-error/30 text-error bg-error/5 hover:bg-error/15 font-label-sm text-xs transition-colors"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-error/30 text-error bg-error/5 hover:bg-error/15 font-label-sm text-xs transition-colors"
                       title={lang === "fr" ? `Bannir ${s.name}` : `Ban ${s.name}`}
                     >
                       <span className="material-symbols-outlined text-[14px]">block</span>
                       <span>{lang === "fr" ? "Bannir" : "Ban"}</span>
                     </button>
                     {s.paidThisCycle ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-md font-label-sm text-label-sm flex-shrink-0 bg-[#d1fae5] text-[#065f46]">
+                      <span className="inline-flex items-center px-2.5 py-1.5 rounded-lg font-label-sm text-xs font-bold bg-[#d1fae5] text-[#065f46]">
                         {t("paidStatus")}
                       </span>
                     ) : s.hasPendingProof ? (
                       <button
                         type="button"
                         onClick={() => setActiveTab("payments")}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-label-sm text-xs font-bold flex-shrink-0 bg-amber-100 text-amber-950 border border-amber-300 hover:bg-amber-200 transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-label-sm text-xs font-bold bg-amber-100 text-amber-950 border border-amber-300 hover:bg-amber-200 transition-colors cursor-pointer"
                       >
                         <span className="material-symbols-outlined text-[14px]">add_photo_alternate</span>
                         <span>{lang === "fr" ? "Preuve à cocher" : "Proof to check"}</span>
                       </button>
                     ) : (
-                      <span className="inline-flex items-center px-2 py-1 rounded-md font-label-sm text-label-sm flex-shrink-0 bg-secondary-fixed text-on-secondary-fixed-variant">
+                      <span className="inline-flex items-center px-2.5 py-1.5 rounded-lg font-label-sm text-xs font-bold bg-secondary-fixed text-on-secondary-fixed-variant">
                         {t("unpaidStatus")}
                       </span>
                     )}
@@ -3479,10 +3503,38 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
               </button>
             </div>
 
+            {/* Source Account Selector */}
+            <div>
+              <label className="font-label-md text-sm font-semibold text-on-surface block mb-1.5">
+                {lang === "fr" ? "1. Compte d'origine (détient actuellement les parts) :" : "1. Source account (current holder):"}
+              </label>
+              <select
+                value={transferModalSlot.userId}
+                onChange={(e) => {
+                  const targetSlot = session?.slots.find((s) => s.userId === e.target.value);
+                  if (targetSlot) {
+                    setTransferModalSlot(targetSlot);
+                    setTransferSelectedSlotIds([targetSlot.id]);
+                    setTransferCustomNames({ [targetSlot.id]: targetSlot.beneficiaryName });
+                  }
+                }}
+                className="w-full px-3 py-2.5 rounded-xl border border-outline-variant/40 bg-surface text-on-surface font-body-sm text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                {Array.from(new Map((session?.slots ?? []).map((s) => [s.userId, s])).values()).map((s) => {
+                  const count = session?.slots.filter((item) => item.userId === s.userId).length || 0;
+                  return (
+                    <option key={s.userId} value={s.userId}>
+                      {s.name} ({count} {lang === "fr" ? (count > 1 ? "parts" : "part") : (count > 1 ? "slots" : "slot")})
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
             {/* Select Slots to Transfer */}
             <div>
               <label className="font-label-md text-sm font-semibold text-on-surface block mb-2">
-                {lang === "fr" ? "1. Sélectionner les parts à transférer :" : "1. Select slots to transfer:"}
+                {lang === "fr" ? "2. Sélectionner les parts à transférer :" : "2. Select slots to transfer:"}
               </label>
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                 {session?.slots
@@ -3555,7 +3607,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
             {/* Recipient User Email */}
             <div>
               <label className="font-label-md text-sm font-semibold text-on-surface block mb-1">
-                {lang === "fr" ? "2. Email du compte destinataire (ex: cousine) :" : "2. Target account email (e.g. cousin):"}
+                {lang === "fr" ? "3. Email du compte destinataire (ex: cousine) :" : "3. Target account email (e.g. cousin):"}
               </label>
               <p className="text-xs text-on-surface-variant mb-2">
                 {lang === "fr"

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { notifyDrawCompletedIfAllDrawn } from "@/lib/notifications/draw-complete";
 
 type DrawResult =
   | {
@@ -98,6 +99,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
+
+    // If all approved slots now have balls drawn and official positions, notify all members
+    void notifyDrawCompletedIfAllDrawn(tontineSessionId).catch((err) =>
+      console.error("[draw] notifyDrawCompleted error:", err),
+    );
+
     return NextResponse.json({
       drawn: result.drawn,
       remainingUndrawnCount: result.remainingUndrawnCount,
