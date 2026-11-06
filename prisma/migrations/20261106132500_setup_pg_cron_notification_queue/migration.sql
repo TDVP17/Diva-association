@@ -41,9 +41,10 @@ BEGIN
 END;
 $$;
 
--- Planifier le dispatch des notifications toutes les minutes
+-- Planifier le dispatch des notifications toutes les 5 minutes (économie de quotas Supabase Free Tier)
 SELECT cron.schedule(
   'notification-email-queue',
-  '* * * * *',
+  '*/5 * * * *',
   'SELECT private.invoke_send_email(''process-queue'');'
 );
+
