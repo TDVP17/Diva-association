@@ -18,18 +18,16 @@ export default async function PublicPayPage({
 }) {
   const { code } = await searchParams;
   const session = await auth();
-  if (!session?.user) {
-    const callback = code ? `/pay?code=${encodeURIComponent(code)}` : `/pay`;
-    redirect(`/login?callbackUrl=${encodeURIComponent(callback)}`);
-  }
 
   const lang = await getLang();
   const t = getTranslator(lang);
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-container-padding bg-background">
-      <SupabaseSessionBootstrap expectedEmail={session.user.email ?? undefined} />
-      <div className="w-full max-w-sm">
+      {session?.user?.email && (
+        <SupabaseSessionBootstrap expectedEmail={session.user.email} />
+      )}
+      <div className="w-full max-w-sm sm:max-w-md">
         <div className="flex justify-end mb-2">
           <LanguageToggle currentLang={lang} />
         </div>
@@ -40,6 +38,7 @@ export default async function PublicPayPage({
         <MemberCodePayFlow
           lang={lang}
           initialCode={code}
+          currentUser={session?.user ? { id: session.user.id, name: session.user.name, email: session.user.email } : null}
         />
       </div>
     </main>

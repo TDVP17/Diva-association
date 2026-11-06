@@ -15,7 +15,10 @@ export default async function ContributeForRelativePage() {
       <h1 className="font-title-md text-title-md text-primary mb-stack-gap-md">
         {t("contributeForRelativeNav")}
       </h1>
-      <MemberCodePayFlow lang={lang} />
+      <MemberCodePayFlow
+        lang={lang}
+        currentUser={session?.user ? { id: session.user.id, name: session.user.name, email: session.user.email } : null}
+      />
       <ShareAppSection lang={lang} variant="card" />
     </main>
   );

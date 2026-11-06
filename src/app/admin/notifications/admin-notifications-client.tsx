@@ -44,8 +44,9 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
 
   // Broadcast Alert modal state
   const [showAlertModal, setShowAlertModal] = useState(false);
-  const [alertTarget, setAlertTarget] = useState<"ALL" | "GROUP">("ALL");
+  const [alertTarget, setAlertTarget] = useState<"ALL" | "GROUP" | "ORPHAN">("ALL");
   const [noPhoneCount, setNoPhoneCount] = useState(0);
+  const [orphanCount, setOrphanCount] = useState(0);
   const [alertGroupId, setAlertGroupId] = useState("");
   const [alertTitle, setAlertTitle] = useState("");
   const [alertMessage, setAlertMessage] = useState("");
@@ -74,6 +75,9 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
           setContributions(b.contributions ?? []);
           if (typeof b.noPhoneCount === "number") {
             setNoPhoneCount(b.noPhoneCount);
+          }
+          if (typeof b.orphanCount === "number") {
+            setOrphanCount(b.orphanCount);
           }
           if (b.contributions?.length > 0 && !alertGroupId) {
             setAlertGroupId(b.contributions[0].id);
@@ -147,6 +151,34 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
           <p className="text-on-surface-variant font-body-lg mt-1">{t("notificationCenterSubtitle")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {orphanCount > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setAlertFeedback(null);
+                setAlertTarget("ORPHAN");
+                setAlertTitle(
+                  lang === "fr"
+                    ? "Bienvenue sur DIVA Asso ! 🎉"
+                    : "Welcome to DIVA Asso! 🎉",
+                );
+                setAlertMessage(
+                  lang === "fr"
+                    ? "Vous êtes inscrit sur DIVA Asso mais vous n'avez pas encore rejoint de cotisation. Venez découvrir les sessions ouvertes et démarrez votre épargne en toute sécurité !"
+                    : "You are registered on DIVA Asso but have not joined any cotisation yet. Explore the open sessions and start saving securely!",
+                );
+                setShowAlertModal(true);
+              }}
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 border border-amber-500/30 font-label-md text-label-md transition-all shadow-xs"
+            >
+              <span className="material-symbols-outlined text-[20px] text-amber-700">person_add</span>
+              <span>
+                {lang === "fr"
+                  ? `Relancer les inscrits sans cotisation (${orphanCount})`
+                  : `Remind members with 0 cotisations (${orphanCount})`}
+              </span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -219,7 +251,7 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
                 <label className="block font-label-md text-label-md text-on-surface mb-2 font-semibold">
                   {t("adminAlertTargetLabel")}
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => setAlertTarget("ALL")}
@@ -250,7 +282,36 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
                     <span className="text-sm">{t("adminAlertTargetGroup")}</span>
                   </button>
 
-
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAlertTarget("ORPHAN");
+                      setAlertTitle(
+                        lang === "fr"
+                          ? "Bienvenue sur DIVA Asso ! 🎉"
+                          : "Welcome to DIVA Asso! 🎉",
+                      );
+                      setAlertMessage(
+                        lang === "fr"
+                          ? "Vous êtes inscrit sur DIVA Asso mais vous n'avez pas encore rejoint de cotisation. Venez découvrir les sessions ouvertes et démarrez votre épargne en toute sécurité !"
+                          : "You are registered on DIVA Asso but have not joined any cotisation yet. Explore the open sessions and start saving securely!",
+                      );
+                    }}
+                    className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition-all ${
+                      alertTarget === "ORPHAN"
+                        ? "border-amber-600 bg-amber-50 text-amber-900 font-semibold shadow-sm"
+                        : "border-outline-variant text-on-surface hover:bg-surface"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[20px] text-amber-600">
+                      {alertTarget === "ORPHAN" ? "radio_button_checked" : "radio_button_unchecked"}
+                    </span>
+                    <span className="text-sm">
+                      {lang === "fr"
+                        ? `Sans cotisation (${orphanCount})`
+                        : `No cotisation (${orphanCount})`}
+                    </span>
+                  </button>
                 </div>
               </div>
 

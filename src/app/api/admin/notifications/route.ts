@@ -12,7 +12,7 @@ const TONTINE_LABELS: Record<string, string> = {
 };
 
 const broadcastSchema = z.object({
-  target: z.enum(["ALL", "GROUP", "NO_PHONE"]),
+  target: z.enum(["ALL", "GROUP", "NO_PHONE", "ORPHAN"]),
   tontineSessionId: z.string().optional(),
   title: z.string().trim().min(1, "Title is required").max(200),
   message: z.string().trim().min(1, "Message is required").max(5000),
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
     ...(memberQuery ? { user: { name: { contains: memberQuery, mode: "insensitive" as const } } } : {}),
   };
 
-  const [notifications, sessions, noPhoneCount] = await Promise.all([
+  const [notifications, sessions, noPhoneCount, orphanCount] = await Promise.all([
     prisma.notification.findMany({
       where,
       include: { user: { select: { name: true } }, tontineSession: { select: { id: true, title: true, type: true } } },
@@ -46,10 +46,21 @@ export async function GET(request: Request) {
     }),
     prisma.tontineSession.findMany({ select: { id: true, title: true, type: true }, orderBy: { startDate: "desc" } }),
     prisma.user.count({ where: { isBanned: false, OR: [{ phone: null }, { phone: "" }] } }),
+    prisma.user.count({
+      where: {
+        isBanned: false,
+        memberships: {
+          none: {
+            status: "APPROVED",
+          },
+        },
+      },
+    }),
   ]);
 
   return NextResponse.json({
     noPhoneCount,
+    orphanCount,
     notifications: notifications.map((n) => ({
       id: n.id,
       userName: n.user.name,
@@ -91,6 +102,19 @@ export async function POST(request: Request) {
       select: { id: true },
     });
     userIds = users.map((u) => u.id);
+  } else if (target === "ORPHAN") {
+    const users = await prisma.user.findMany({
+      where: {
+        isBanned: false,
+        memberships: {
+          none: {
+            status: "APPROVED",
+          },
+        },
+      },
+      select: { id: true },
+    });
+    userIds = users.map((u) => u.id);
   } else if (target === "NO_PHONE") {
     const users = await prisma.user.findMany({
       where: {
@@ -129,7 +153,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, count: 0, message: "No recipients found" });
   }
 
-  const actionUrl = target === "NO_PHONE" ? "/profile" : (tontineSessionId ? `/sessions/${tontineSessionId}` : "/notifications");
+  const actionUrl = target === "NO_PHONE" ? "/profile" : target === "ORPHAN" ? "/sessions" : (tontineSessionId ? `/sessions/${tontineSessionId}` : "/notifications");
   const formattedMessage = `${title}\n\n${message}`;
 
   let count = 0;

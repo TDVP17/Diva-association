@@ -32,3 +32,4 @@ export function EmergencyLockedScreen({ lang }: { lang: Lang }) {
     </div>
   );
 }
+

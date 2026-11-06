@@ -129,6 +129,51 @@ export async function scheduleNotifications(params: {
 }
 
 /**
+ * Strict daily email limiter (0 FCFA wasted, 0 spam):
+ * Enforces a maximum of `maxPerDay` (default: 2) emails per 24 hours per member for:
+ * - PAYMENT_FAILED (max 2/day)
+ * - CONTRIBUTION_REMINDER (max 2/day)
+ * - FINE_REMINDER (max 2/day)
+ * If the user has already received 2 emails of this type within the last 24h,
+ * email dispatch is skipped. The in-app notification remains visible in the app.
+ */
+export async function filterRecipientsUnderDailyEmailLimit(
+  recipients: NotificationRecipient[],
+  type: NotificationEventType,
+  maxPerDay: number = 2,
+): Promise<NotificationRecipient[]> {
+  const rateLimitedTypes: NotificationEventType[] = [
+    "PAYMENT_FAILED",
+    "CONTRIBUTION_REMINDER",
+    "FINE_REMINDER",
+  ];
+  if (!rateLimitedTypes.includes(type) || recipients.length === 0) {
+    return recipients;
+  }
+
+  const userIds = recipients.map((r) => r.userId);
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  const recentEmails = await prisma.notification.findMany({
+    where: {
+      userId: { in: userIds },
+      type,
+      channel: "EMAIL",
+      status: { in: ["SENT", "PROCESSING", "SCHEDULED"] },
+      createdAt: { gte: oneDayAgo },
+    },
+    select: { userId: true },
+  });
+
+  const countMap = new Map<string, number>();
+  for (const n of recentEmails) {
+    countMap.set(n.userId, (countMap.get(n.userId) || 0) + 1);
+  }
+
+  return recipients.filter((r) => (countMap.get(r.userId) || 0) < maxPerDay);
+}
+
+/**
  * Delivers immediate background notifications to user's phone via Web Push,
  * WhatsApp (Evolution API), and Email (Resend) so members receive alerts even
  * when the app is closed or in the background. Never blocks the calling request handler.
@@ -203,7 +248,7 @@ async function deliverInstantNotifications(params: {
             console.error("[push] instant delivery failed:", pushErr);
           }
 
-          // Deliver instant Email notification via Resend with official DIVA logo and direct CTA button
+          // Deliver instant Email notification via Resend with official DIVA logo and direct CTA button.
           // For broadcast or multi-recipient events (ADMIN_BROADCAST, DRAW_LAUNCHED, CONTRIBUTION_REMINDER, FINE_REMINDER, or >1 recipients),
           // DO NOT blast emails simultaneously here!
           // They are queued with 3 minutes of spacing (STAGGER_MS) between each recipient so email providers (Gmail, Yahoo)
@@ -215,7 +260,11 @@ async function deliverInstantNotifications(params: {
             params.type === "FINE_REMINDER" ||
             params.recipients.length > 1;
 
-          if (user?.email && !isBroadcastOrGroup) {
+          // NEVER send companion transactional email here for PAYMENT_SUCCESS:
+          // The official payment receipt email with downloadable PDF is already sent by settleContribution / settleBulkPayment.
+          const isPaymentSuccess = params.type === "PAYMENT_SUCCESS";
+
+          if (user?.email && !isBroadcastOrGroup && !isPaymentSuccess) {
             try {
               const emailHtml = renderBrandedEmailHtml({
                 title,
@@ -227,6 +276,17 @@ async function deliverInstantNotifications(params: {
                 recipientName: user.name,
               });
               await sendEmailSafe(user.email, title, emailHtml);
+
+              // Mark the scheduled EMAIL row as SENT immediately so the background queue never re-sends a duplicate!
+              await prisma.notification.updateMany({
+                where: {
+                  userId: r.userId,
+                  channel: "EMAIL",
+                  type: params.type,
+                  status: "SCHEDULED",
+                },
+                data: { status: "SENT", sentAt: new Date() },
+              });
             } catch (emailErr) {
               console.error("[email] instant delivery failed:", emailErr);
             }
@@ -272,22 +332,49 @@ export async function scheduleInAppNotifications(params: {
     data: { status: "SENT", sentAt: new Date() },
   });
 
+  // Companion Web Push
   await scheduleNotifications({ ...params, channel: "PUSH" });
-  await scheduleNotifications({ ...params, channel: "EMAIL" });
+
+  // Companion Email:
+  // - Skip completely for PAYMENT_SUCCESS (official receipt PDF email already sent).
+  // - For all other types, strictly enforce max 2 emails / 24h per member for failures and reminders.
+  if (params.type !== "PAYMENT_SUCCESS") {
+    const eligibleEmailRecipients = await filterRecipientsUnderDailyEmailLimit(
+      params.recipients,
+      params.type,
+      2,
+    );
+    if (eligibleEmailRecipients.length > 0) {
+      await scheduleNotifications({
+        ...params,
+        channel: "EMAIL",
+        recipients: eligibleEmailRecipients,
+      });
+    }
+  }
 
   // Trigger instant delivery (Push & transactional email) in background
   void deliverInstantNotifications(params);
 
-  // Trigger immediate dispatch of the first due notification via Supabase Edge Function (0 CPU Vercel)
-  // while subsequent recipients will be dispatched by Supabase pg_cron every 5 minutes.
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const cronSecret = process.env.CRON_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (supabaseUrl && cronSecret) {
-    void fetch(`${supabaseUrl}/functions/v1/send-email?action=process-queue`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${cronSecret}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "process-queue" }),
-    }).catch(() => {});
+  // Trigger immediate dispatch via Supabase Edge Function (0 CPU Vercel)
+  // ONLY if this was a broadcast/group with queued recipients!
+  const isBroadcastOrGroup =
+    params.type === "ADMIN_BROADCAST" ||
+    params.type === "DRAW_LAUNCHED" ||
+    params.type === "CONTRIBUTION_REMINDER" ||
+    params.type === "FINE_REMINDER" ||
+    params.recipients.length > 1;
+
+  if (isBroadcastOrGroup) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const cronSecret = process.env.CRON_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (supabaseUrl && cronSecret) {
+      void fetch(`${supabaseUrl}/functions/v1/send-email?action=process-queue`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${cronSecret}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "process-queue" }),
+      }).catch(() => {});
+    }
   }
 
   return count;

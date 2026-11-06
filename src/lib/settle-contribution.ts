@@ -25,7 +25,7 @@ type ContributionWithSlot = Contribution & {
  */
 export async function settleContribution(
   contribution: ContributionWithSlot,
-  options: { paidAt: Date; origin: string },
+  options: { paidAt: Date; origin: string; skipEmail?: boolean; skipNotification?: boolean },
 ): Promise<void> {
   const { membership } = contribution.membershipSlot;
   const { user, tontineSession } = membership;
@@ -74,33 +74,37 @@ export async function settleContribution(
 
 
 
-  await sendEmailSafe(
-    user.email,
-    translate(recipientLang, "paymentReceivedEmailSubject", { session: sessionLabel }),
-    paymentSuccessEmailHtml(recipientLang, {
-      recipientName: user.name,
-      beneficiaryName: contribution.membershipSlot.beneficiaryName,
-      paidByName,
-      sessionLabel,
-      amount: totalPaid,
-      transRef: contribution.fapshiTxRef ?? contribution.id,
-      receiptUrl,
-    }),
-  );
+  if (!options.skipEmail) {
+    await sendEmailSafe(
+      user.email,
+      translate(recipientLang, "paymentReceivedEmailSubject", { session: sessionLabel }),
+      paymentSuccessEmailHtml(recipientLang, {
+        recipientName: user.name,
+        beneficiaryName: contribution.membershipSlot.beneficiaryName,
+        paidByName,
+        sessionLabel,
+        amount: totalPaid,
+        transRef: contribution.fapshiTxRef ?? contribution.id,
+        receiptUrl,
+      }),
+    );
+  }
 
-  await scheduleInAppNotifications({
-    tontineSessionId: membership.tontineSessionId,
-    type: "PAYMENT_SUCCESS",
-    recipients: [
-      {
-        userId: user.id,
-        message: `Your payment of ${formatXAF(totalPaid)} for ${sessionLabel} was received. Thank you!`,
-        messageKey: "paymentSuccessNotifMessage",
-        messageVars: { amount: formatXAF(totalPaid), session: sessionLabel },
-        actionUrl: `/sessions/${membership.tontineSessionId}`,
-      },
-    ],
-  });
+  if (!options.skipNotification) {
+    await scheduleInAppNotifications({
+      tontineSessionId: membership.tontineSessionId,
+      type: "PAYMENT_SUCCESS",
+      recipients: [
+        {
+          userId: user.id,
+          message: `Your payment of ${formatXAF(totalPaid)} for ${sessionLabel} was received. Thank you!`,
+          messageKey: "paymentSuccessNotifMessage",
+          messageVars: { amount: formatXAF(totalPaid), session: sessionLabel },
+          actionUrl: `/sessions/${membership.tontineSessionId}`,
+        },
+      ],
+    });
+  }
 
   // Group celebration notification: Notify other approved members in the cotisation
   // that a member has contributed (e.g. "Awa • Tontine du Quartier : « J'ai cotisé, merci la team ! »")
@@ -194,46 +198,49 @@ export async function settleContribution(
     const payerLang: Lang = contribution.paidByUser.preferredLang === "en" ? "en" : "fr";
     const beneficiaryLabel = `${user.name} (${contribution.membershipSlot.beneficiaryName})`;
 
-    // In-app & push notification to the relative's phone
-    await scheduleInAppNotifications({
-      tontineSessionId: membership.tontineSessionId,
-      type: "PAYMENT_SUCCESS",
-      recipients: [
-        {
-          userId: contribution.paidByUser.id,
-          message:
-            payerLang === "en"
-              ? `Your contribution of ${formatXAF(totalPaid)} for ${beneficiaryLabel} in ${sessionLabel} was successful! Receipt is available.`
-              : `Votre cotisation de ${formatXAF(totalPaid)} pour ${beneficiaryLabel} dans ${sessionLabel} a été validée avec succès ! Votre reçu est disponible.`,
-          messageKey: "relativePaymentSuccessNotif",
-          messageVars: {
-            amount: formatXAF(totalPaid),
-            beneficiary: beneficiaryLabel,
-            session: sessionLabel,
+    if (!options.skipNotification) {
+      // In-app & push notification to the relative's phone
+      await scheduleInAppNotifications({
+        tontineSessionId: membership.tontineSessionId,
+        type: "PAYMENT_SUCCESS",
+        recipients: [
+          {
+            userId: contribution.paidByUser.id,
+            message:
+              payerLang === "en"
+                ? `Your contribution of ${formatXAF(totalPaid)} for ${beneficiaryLabel} in ${sessionLabel} was successful! Receipt is available.`
+                : `Votre cotisation de ${formatXAF(totalPaid)} pour ${beneficiaryLabel} dans ${sessionLabel} a été validée avec succès ! Votre reçu est disponible.`,
+            messageKey: "relativePaymentSuccessNotif",
+            messageVars: {
+              amount: formatXAF(totalPaid),
+              beneficiary: beneficiaryLabel,
+              session: sessionLabel,
+            },
+            actionUrl: "/history",
           },
-          actionUrl: "/history",
-        },
-      ],
-    });
+        ],
+      });
+    }
 
-    await sendEmailSafe(
-      contribution.paidByUser.email,
-      translate(payerLang, "paymentSentEmailSubject", { session: sessionLabel }),
-      paymentSuccessEmailHtml(payerLang, {
-        recipientName: contribution.paidByUser.name,
-        beneficiaryName: contribution.membershipSlot.beneficiaryName,
-        paidByName: contribution.paidByUser.name,
-        sessionLabel,
-        amount: totalPaid,
-        transRef: contribution.fapshiTxRef ?? contribution.id,
-        receiptUrl,
-      }),
-    );
-
+    if (!options.skipEmail) {
+      await sendEmailSafe(
+        contribution.paidByUser.email,
+        translate(payerLang, "paymentSentEmailSubject", { session: sessionLabel }),
+        paymentSuccessEmailHtml(payerLang, {
+          recipientName: contribution.paidByUser.name,
+          beneficiaryName: contribution.membershipSlot.beneficiaryName,
+          paidByName: contribution.paidByUser.name,
+          sessionLabel,
+          amount: totalPaid,
+          transRef: contribution.fapshiTxRef ?? contribution.id,
+          receiptUrl,
+        }),
+      );
+    }
   }
 }
 
-function paymentSuccessEmailHtml(
+export function paymentSuccessEmailHtml(
   lang: Lang,
   data: {
     recipientName: string;

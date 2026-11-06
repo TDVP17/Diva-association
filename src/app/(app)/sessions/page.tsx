@@ -332,60 +332,60 @@ export default async function SessionsPage() {
                   <h3 className="font-label-md text-label-md text-on-surface font-semibold group-hover:text-primary transition-colors">
                     {c.title}
                   </h3>
-                    {c.description && (
-                      <DescriptionPill
-                        description={c.description}
-                        label={t("seeDescription")}
+                  {c.description && (
+                    <DescriptionPill
+                      description={c.description}
+                      label={t("seeDescription")}
+                    />
+                  )}
+                  <p className="font-label-sm text-label-sm text-on-surface-variant">
+                    {t("startsOn")}{" "}
+                    {c.startDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </p>
+                  <p className="font-label-sm text-label-sm text-primary mt-0.5">
+                    {t("validatedMembersCount", { count: String(c.membersCount) })}
+                  </p>
+                  <p className="font-label-sm text-label-sm text-on-surface-variant mt-1 flex items-center gap-1 flex-wrap">
+                    <span className="font-numeric-data text-on-surface font-semibold">{formatXAF(c.amount)}</span>
+                    <span>{t("plusFeeSuffix", { fee: formatXAF(c.fee) })}</span>
+                  </p>
+                  {(() => {
+                    const pot = Math.round(c.totalSlots * (c.amount + 0.25 * (c.fee ?? 0)));
+                    return (
+                      <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold">
+                        <span className="material-symbols-outlined text-[14px] text-emerald-600">emoji_events</span>
+                        <span>{t("totalPotToEat")} : {formatXAF(pot)}</span>
+                      </div>
+                    );
+                  })()}
+                  <p className="font-label-sm text-label-sm text-red-600 font-semibold mt-1.5 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[16px]">block</span>
+                    {t("newMemberNotAllowed")}
+                  </p>
+                  {(() => {
+                    const fallback = getTontineConfig(c.type);
+                    const fAmount = c.fineAmountPerPeriod ?? fallback?.fineAmountPerPeriod ?? 500;
+                    const fInterval = c.fineIntervalHours ?? fallback?.fineIntervalHours ?? 24;
+                    const lTime = c.limitTime || "18:30";
+                    return (
+                      <FineRulePill
+                        fineAmount={fAmount}
+                        fineIntervalHours={fInterval}
+                        limitTime={lTime}
+                        lang={lang}
                       />
-                    )}
-                    <p className="font-label-sm text-label-sm text-on-surface-variant">
-                      {t("startsOn")}{" "}
-                      {c.startDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </p>
-                    <p className="font-label-sm text-label-sm text-primary mt-0.5">
-                      {t("validatedMembersCount", { count: String(c.membersCount) })}
-                    </p>
-                    <p className="font-label-sm text-label-sm text-on-surface-variant mt-1 flex items-center gap-1 flex-wrap">
-                      <span className="font-numeric-data text-on-surface font-semibold">{formatXAF(c.amount)}</span>
-                      <span>{t("plusFeeSuffix", { fee: formatXAF(c.fee) })}</span>
-                    </p>
-                    {(() => {
-                      const pot = Math.round(c.totalSlots * (c.amount + 0.25 * (c.fee ?? 0)));
-                      return (
-                        <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold">
-                          <span className="material-symbols-outlined text-[14px] text-emerald-600">emoji_events</span>
-                          <span>{t("totalPotToEat")} : {formatXAF(pot)}</span>
-                        </div>
-                      );
-                    })()}
-                    <p className="font-label-sm text-label-sm text-red-600 font-semibold mt-1.5 flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[16px]">block</span>
-                      {t("newMemberNotAllowed")}
-                    </p>
-                    {(() => {
-                      const fallback = getTontineConfig(c.type);
-                      const fAmount = c.fineAmountPerPeriod ?? fallback?.fineAmountPerPeriod ?? 500;
-                      const fInterval = c.fineIntervalHours ?? fallback?.fineIntervalHours ?? 24;
-                      const lTime = c.limitTime || "18:30";
-                      return (
-                        <FineRulePill
-                          fineAmount={fAmount}
-                          fineIntervalHours={fInterval}
-                          limitTime={lTime}
-                          lang={lang}
-                        />
-                      );
-                    })()}
-                  </div>
-                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                    <span className={`font-label-sm text-label-sm px-2.5 py-1 rounded font-bold tracking-wide uppercase shadow-sm ${c.isActive ? "bg-emerald-600 text-white" : "bg-red-600 text-white"}`}>
-                      {c.isActive ? t("tagActiveStatus") : (c.isFull ? t("tagFullStatus") : t("tagActiveStatus"))}
-                    </span>
-                  </div>
+                    );
+                  })()}
+                </div>
+                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                  <span className={`font-label-sm text-label-sm px-2.5 py-1 rounded font-bold tracking-wide uppercase shadow-sm ${c.isActive ? "bg-emerald-600 text-white" : "bg-red-600 text-white"}`}>
+                    {c.isActive ? t("tagActiveStatus") : (c.isFull ? t("tagFullStatus") : t("tagActiveStatus"))}
+                  </span>
+                </div>
               </Link>
             ))}
           </div>

@@ -386,3 +386,4 @@ export function SecurityDashboardClient({ lang }: { lang: Lang }) {
     </div>
   );
 }
+

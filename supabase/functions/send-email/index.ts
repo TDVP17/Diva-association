@@ -257,6 +257,38 @@ Deno.serve(async (req: Request) => {
     for (const notif of (dueNotifications || [])) {
       await supabaseAdmin.from("notifications").update({ status: "PROCESSING" }).eq("id", notif.id);
 
+      // Guard: PAYMENT_SUCCESS emails are already sent as official PDF receipts via settleContribution.
+      // Skip queue re-delivery to prevent duplicates.
+      if (notif.type === "PAYMENT_SUCCESS") {
+        await supabaseAdmin.from("notifications").update({
+          status: "SENT",
+          sentAt: new Date().toISOString(),
+        }).eq("id", notif.id);
+        continue;
+      }
+
+      // Guard: Strict daily rate limit of 2 emails per 24 hours for failures and reminders
+      const rateLimitedTypes = ["PAYMENT_FAILED", "CONTRIBUTION_REMINDER", "FINE_REMINDER"];
+      if (rateLimitedTypes.includes(notif.type)) {
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const { count: dailySentCount } = await supabaseAdmin
+          .from("notifications")
+          .select("id", { count: "exact", head: true })
+          .eq("userId", notif.userId)
+          .eq("channel", "EMAIL")
+          .eq("type", notif.type)
+          .eq("status", "SENT")
+          .gte("createdAt", oneDayAgo);
+
+        if ((dailySentCount || 0) >= 2) {
+          await supabaseAdmin.from("notifications").update({
+            status: "FAILED",
+            errorMessage: "Daily email limit of 2 reached for this notification type",
+          }).eq("id", notif.id);
+          continue;
+        }
+      }
+
       const user = notif.user;
       if (!user?.email) {
         await supabaseAdmin.from("notifications").update({
