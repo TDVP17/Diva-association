@@ -1,3 +1,7 @@
+import dotenv from "dotenv";
+dotenv.config({ path: ".env.local" });
+dotenv.config({ path: ".env" });
+
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, Prisma } from "@/generated/prisma/client";
 
@@ -16,7 +20,8 @@ const globalForPrisma = globalThis as unknown as {
 // withTransientRetry.
 const adapter = new PrismaPg(
   {
-    connectionString: process.env.DATABASE_URL,
+    connectionString: process.env.DIRECT_URL || process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
     max: 3,
     idleTimeoutMillis: 3_000,
     connectionTimeoutMillis: 10_000,

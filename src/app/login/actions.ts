@@ -15,7 +15,12 @@ import { validateEmailAddress } from "@/lib/email-validator";
 import { createSignupToken, verifySignupToken } from "@/lib/signup-token";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { getLang } from "@/lib/i18n/get-lang";
-import { detectSqlInjection, logSecurityEvent } from "@/lib/security";
+import {
+  detectSqlInjection,
+  logSecurityEvent,
+  checkIpIsBlocked,
+  recordFailedLoginAttempt,
+} from "@/lib/security";
 
 export interface AuthFormState {
   error?: string;
@@ -90,26 +95,41 @@ export async function signInAction(
     };
   }
 
+  // Extraction des métadonnées du client pour la sécurité et la détection anti-brute-force
+  let clientIp = "127.0.0.1";
+  let clientUserAgent = "unknown";
+  let clientCountry = "Cameroun (par défaut)";
+  try {
+    const h = await headers();
+    const forwardedFor = h.get("x-forwarded-for");
+    const realIp = h.get("x-real-ip");
+    clientIp = forwardedFor ? forwardedFor.split(",")[0].trim() : (realIp || "127.0.0.1");
+    clientUserAgent = h.get("user-agent") || "unknown";
+    clientCountry = h.get("x-vercel-ip-country") || h.get("cf-ipcountry") || "Cameroun (par défaut)";
+  } catch {
+    // Hors contexte HTTP direct
+  }
+
+  // 0. Vérification Anti-Brute-Force : blocage IP 30 minutes après 5 échecs consécutifs
+  const ipBlockCheck = await checkIpIsBlocked(clientIp);
+  if (ipBlockCheck.isBlocked) {
+    return {
+      error:
+        lang === "fr"
+          ? "Trop de tentatives, réessayez plus tard."
+          : "Too many attempts, please try again later.",
+    };
+  }
+
   // 1. Détection proactive des attaques par injection SQL sur le formulaire de login
   if (detectSqlInjection(rawIdentifier) || detectSqlInjection(password)) {
     try {
-      let ip = "127.0.0.1";
-      let userAgent = "unknown";
-      try {
-        const h = await headers();
-        const forwardedFor = h.get("x-forwarded-for");
-        const realIp = h.get("x-real-ip");
-        ip = forwardedFor ? forwardedFor.split(",")[0].trim() : (realIp || "127.0.0.1");
-        userAgent = h.get("user-agent") || "unknown";
-      } catch {
-        // En dehors du scope de requête Next.js (ex: tests automatisés)
-      }
       await logSecurityEvent({
         type: "injection_attempt",
         emailEssaye: rawIdentifier.slice(0, 150),
-        ip,
-        userAgent,
-        details: { target: "login_credentials", payload: rawIdentifier },
+        ip: clientIp,
+        userAgent: clientUserAgent,
+        details: { target: "login_credentials", payload: rawIdentifier, country: clientCountry },
       });
     } catch (e) {
       console.error("[SECURITY] Logging injection attempt failed:", e);
@@ -138,11 +158,27 @@ export async function signInAction(
 
     if (!rawIdentifier.includes("@")) {
       if (!user) {
+        // Enregistre l'échec et vérifie si le seuil est dépassé
+        const failureResult = await recordFailedLoginAttempt({
+          emailEssaye: rawIdentifier,
+          ip: clientIp,
+          userAgent: clientUserAgent,
+          country: clientCountry,
+          isAdminTarget: false,
+        });
+        if (failureResult.blocked) {
+          return {
+            error:
+              lang === "fr"
+                ? "Trop de tentatives, réessayez plus tard."
+                : "Too many attempts, please try again later.",
+          };
+        }
         return {
           error:
             lang === "fr"
-              ? "Email, numéro de téléphone ou mot de passe incorrect."
-              : "Incorrect email, phone number, or password.",
+              ? "Email ou mot de passe incorrect."
+              : "Incorrect email or password.",
         };
       }
       emailToUse = user.email;
@@ -158,11 +194,29 @@ export async function signInAction(
     });
 
     if (error || !data?.session?.access_token || !data?.session?.refresh_token || !data.user) {
+      const isAdminTarget = isAdminRole(userRole) || emailToUse.includes("admin") || emailToUse === "divaasso17@gmail.com";
+      const failureResult = await recordFailedLoginAttempt({
+        emailEssaye: emailToUse,
+        ip: clientIp,
+        userAgent: clientUserAgent,
+        country: clientCountry,
+        isAdminTarget,
+      });
+
+      if (failureResult.blocked) {
+        return {
+          error:
+            lang === "fr"
+              ? "Trop de tentatives, réessayez plus tard."
+              : "Too many attempts, please try again later.",
+        };
+      }
+
       return {
         error:
           lang === "fr"
-            ? "Email, numéro de téléphone ou mot de passe incorrect."
-            : "Incorrect email, phone number, or password.",
+            ? "Email ou mot de passe incorrect."
+            : "Incorrect email or password.",
       };
     }
 

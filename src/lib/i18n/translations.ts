@@ -374,6 +374,7 @@ export const translations = {
     // Admin
     adminBrand: "DIVA Asso.",
     adminNavDashboard: "Dashboard",
+    adminNavSecurity: "Security & Lockdown",
     adminNavNotifications: "Notifications",
     adminNavSupport: "Support",
     adminNavAnalytics: "Analytics",
@@ -1621,6 +1622,7 @@ export const translations = {
     // Admin
     adminBrand: "DIVA Asso.",
     adminNavDashboard: "Tableau de bord",
+    adminNavSecurity: "Sécurité & Panique",
     adminNavNotifications: "Notifications",
     adminNavSupport: "Support",
     adminNavAnalytics: "Analytique",

@@ -14,8 +14,10 @@ import { OfflineDraftSync } from "@/components/offline-draft-sync";
 import { WhatsAppPhonePrompt, WhatsAppPhoneBanner } from "@/components/whatsapp-phone-prompt";
 import { InactivityAutoLogout } from "@/components/inactivity-auto-logout";
 import { AppLockGate } from "@/components/app-lock-gate";
+import { EmergencyLockedScreen } from "@/components/emergency-locked-screen";
 import { SupabaseSessionBootstrap } from "@/components/supabase-session-bootstrap";
 import { isAdminRole } from "@/lib/constants";
+import { isAppLocked } from "@/lib/security";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -27,6 +29,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // equivalent to reach for chat/profile.
   if (isAdminRole(session.user.role)) redirect("/admin");
   const lang = await getLang();
+
+  // 0. Vérification du Bouton Panique (Verrouillage total de l'application)
+  const locked = await isAppLocked();
+  if (locked) {
+    return <EmergencyLockedScreen lang={lang} />;
+  }
 
   // session.user.image is Auth.js's own OAuth-profile-picture field, set
   // once at login and never updated — the avatar-upload feature writes to

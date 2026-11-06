@@ -2086,59 +2086,83 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                 </button>
               )}
             </div>
-            <div className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-outline-variant/30 overflow-hidden">
-              {session.slots.map((s, i) => (
+            <div className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20">
+              {session.slots.map((s) => (
                 <div
                   key={s.id}
-                  className={`p-3.5 flex flex-col md:flex-row md:items-center md:justify-between gap-3 ${
-                    i < session.slots.length - 1 ? "border-b border-outline-variant/30" : ""
-                  }`}
+                  className="p-3.5 sm:p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 bg-white hover:bg-slate-50/50 transition-colors"
                 >
-                  <div className="w-full md:flex-1 min-w-0 space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
+                  <div className="w-full md:flex-1 min-w-0 space-y-1.5">
+                    <div className="flex items-center justify-between md:justify-start gap-2 flex-wrap">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                          {(s.beneficiaryName || s.name || "M").charAt(0).toUpperCase()}
+                        </div>
+                        <Link
+                          href={`/admin/support?with=${encodeURIComponent(s.userId)}&name=${encodeURIComponent(s.name || s.beneficiaryName || "")}`}
+                          className="text-sm sm:text-base font-bold text-slate-900 hover:text-primary hover:underline flex items-center gap-1.5 group min-w-0"
+                          title={lang === "fr" ? `Écrire à ${s.name}` : `Message ${s.name}`}
+                        >
+                          <span className="truncate">{s.beneficiaryName || s.name || (lang === "fr" ? "Membre Diva" : "Diva Member")}</span>
+                          <span className="material-symbols-outlined text-[16px] text-primary opacity-70 group-hover:opacity-100 flex-shrink-0">
+                            chat
+                          </span>
+                        </Link>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {s.officialPosition && (
+                          <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary">
+                            #{s.officialPosition}
+                          </span>
+                        )}
+                        {s.paidThisCycle ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full font-label-sm text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            {t("paidStatus")}
+                          </span>
+                        ) : s.hasPendingProof ? (
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("payments")}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-label-sm text-[11px] font-bold bg-amber-100 text-amber-950 border border-amber-300 hover:bg-amber-200 transition-colors cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[13px]">add_photo_alternate</span>
+                            <span>{lang === "fr" ? "Preuve" : "Proof"}</span>
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full font-label-sm text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-200">
+                            {t("unpaidStatus")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-slate-600 pl-10 flex items-center gap-2 flex-wrap">
                       <Link
-                        href={`/admin/support?with=${encodeURIComponent(s.userId)}&name=${encodeURIComponent(s.name)}`}
-                        className="text-sm sm:text-base font-bold text-on-surface hover:text-primary hover:underline flex items-center gap-1.5 min-w-0 group"
+                        href={`/admin/support?with=${encodeURIComponent(s.userId)}&name=${encodeURIComponent(s.name || "")}`}
+                        className="hover:text-primary transition-colors text-slate-600"
                         title={lang === "fr" ? `Écrire à ${s.name}` : `Message ${s.name}`}
                       >
-                        <span className="truncate">{s.beneficiaryName || s.name}</span>
-                        <span className="material-symbols-outlined text-[16px] text-primary opacity-70 group-hover:opacity-100 flex-shrink-0">
-                          chat
-                        </span>
+                        <span className="font-medium text-slate-700">{s.name}</span>
+                        {s.memberCode && <span className="text-slate-500"> · {s.memberCode}</span>}
                       </Link>
-                      {s.officialPosition && (
-                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary flex-shrink-0">
-                          #{s.officialPosition}
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-on-surface-variant font-medium">
-                      <Link
-                        href={`/admin/support?with=${encodeURIComponent(s.userId)}&name=${encodeURIComponent(s.name)}`}
-                        className="hover:text-primary transition-colors block truncate"
-                        title={lang === "fr" ? `Écrire à ${s.name}` : `Message ${s.name}`}
-                      >
-                        {s.name}
-                        {s.memberCode && ` · ${s.memberCode}`}
-                      </Link>
-                    </div>
-                    <div className="pt-0.5">
                       <MemberArchivesToggle userId={s.userId} lang={lang} />
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap pt-2.5 md:pt-0 border-t md:border-t-0 border-outline-variant/20 w-full md:w-auto">
+
+                  <div className="flex items-center gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-outline-variant/20 w-full md:w-auto">
                     <button
                       type="button"
                       onClick={() => openTransferModal(s)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 active:scale-95 font-label-sm text-xs font-bold transition-all shadow-2xs"
+                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-300 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 active:scale-95 font-label-sm text-xs font-bold transition-all shadow-2xs"
                       title={lang === "fr" ? `Transférer la part ${s.beneficiaryName} à un autre compte (ex: cousine)` : `Transfer slot ${s.beneficiaryName} to another user`}
                     >
                       <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
                       <span>{lang === "fr" ? "Transférer" : "Transfer"}</span>
                     </button>
                     <Link
-                      href={`/admin/support?with=${encodeURIComponent(s.userId)}&name=${encodeURIComponent(s.name)}`}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-primary/30 text-primary hover:bg-primary/10 font-label-sm text-xs font-semibold transition-colors"
+                      href={`/admin/support?with=${encodeURIComponent(s.userId)}&name=${encodeURIComponent(s.name || "")}`}
+                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg border border-primary/30 text-primary hover:bg-primary/10 font-label-sm text-xs font-semibold transition-colors"
                       title={lang === "fr" ? `Envoyer un message à ${s.name}` : `Send message to ${s.name}`}
                     >
                       <span className="material-symbols-outlined text-[15px]">chat</span>
@@ -2166,30 +2190,12 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                           console.error("Ban error:", e);
                         }
                       }}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-error/30 text-error bg-error/5 hover:bg-error/15 font-label-sm text-xs transition-colors"
+                      className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg border border-error/30 text-error bg-error/5 hover:bg-error/15 font-label-sm text-xs transition-colors"
                       title={lang === "fr" ? `Bannir ${s.name}` : `Ban ${s.name}`}
                     >
                       <span className="material-symbols-outlined text-[14px]">block</span>
                       <span>{lang === "fr" ? "Bannir" : "Ban"}</span>
                     </button>
-                    {s.paidThisCycle ? (
-                      <span className="inline-flex items-center px-2.5 py-1.5 rounded-lg font-label-sm text-xs font-bold bg-[#d1fae5] text-[#065f46]">
-                        {t("paidStatus")}
-                      </span>
-                    ) : s.hasPendingProof ? (
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab("payments")}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-label-sm text-xs font-bold bg-amber-100 text-amber-950 border border-amber-300 hover:bg-amber-200 transition-colors cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-[14px]">add_photo_alternate</span>
-                        <span>{lang === "fr" ? "Preuve à cocher" : "Proof to check"}</span>
-                      </button>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-1.5 rounded-lg font-label-sm text-xs font-bold bg-secondary-fixed text-on-secondary-fixed-variant">
-                        {t("unpaidStatus")}
-                      </span>
-                    )}
                   </div>
                 </div>
               ))}

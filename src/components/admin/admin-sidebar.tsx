@@ -12,6 +12,7 @@ const BASE_ITEMS = [
   { href: "/admin/notifications", label: "adminNavNotifications", icon: "notifications" },
   { href: "/admin/support", label: "adminNavSupport", icon: "support_agent" },
   { href: "/admin/payment-issues", label: "paymentIssuesCard", icon: "shield_person" },
+  { href: "/admin/security", label: "adminNavSecurity", icon: "shield" },
   { href: "/admin/audit-logs", label: "auditLogsNavTitle", icon: "history_edu" },
   { href: "/admin/marketing", label: "adminNavMarketing", icon: "campaign" },
 ] as const;

@@ -4,6 +4,7 @@ import { initiateDirectPayment, initiateHostedPayment, normalizeCameroonPhone, F
 import { assertPriorCyclePaidOut } from "@/lib/round-robin-lock";
 import { computeProviderFee } from "@/lib/payment-fees";
 import { detectMobileMoneyProvider, fapshiMediumFor } from "@/lib/mobile-money-provider";
+import { isAppLocked } from "@/lib/security";
 import type { PaymentProvider, TontineType } from "@/generated/prisma/enums";
 
 export type InitiateSlotPaymentResult =
@@ -192,6 +193,14 @@ export async function initiateSlotPayment(
   phone: string,
   options?: { paidByUserId?: string; useCheckout?: boolean; redirectUrl?: string; dueDate?: Date | string },
 ): Promise<InitiateSlotPaymentResult> {
+  if (await isAppLocked()) {
+    return {
+      ok: false,
+      status: 423,
+      error: "L'application est temporairement verrouillée par l'administrateur. Aucun paiement n'est accepté pour le moment.",
+    };
+  }
+
   const normalizedPhone = normalizeCameroonPhone(phone);
   if (!normalizedPhone) {
     return { ok: false, status: 400, error: "Please enter a valid Mobile Money / Orange Money number" };

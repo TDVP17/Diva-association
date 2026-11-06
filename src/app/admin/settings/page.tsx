@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -63,6 +64,31 @@ export default async function AdminSettingsPage() {
 
       <section className="mb-stack-gap-lg">
         <InlinePasswordField lang={lang} />
+      </section>
+
+      <section className="mb-stack-gap-lg bg-red-50 border-2 border-red-300 rounded-xl p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="material-symbols-outlined text-red-600 text-[26px]">lock</span>
+            <div>
+              <h2 className="font-title-md text-sm font-bold text-red-950">
+                {lang === "fr" ? "Sécurité & Bouton Panique" : "Security & Panic Button"}
+              </h2>
+              <p className="text-xs text-red-800">
+                {lang === "fr"
+                  ? "Verrouillage total de l'application & audit des attaques"
+                  : "Total app lockdown & security attack audit"}
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/admin/security"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-bold transition-all shadow-xs flex-shrink-0"
+          >
+            <span>{lang === "fr" ? "Gérer" : "Manage"}</span>
+            <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+          </Link>
+        </div>
       </section>
 
       <section className="mb-stack-gap-lg bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">

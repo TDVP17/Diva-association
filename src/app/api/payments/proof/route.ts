@@ -7,7 +7,7 @@ import { getContributionTotal } from "@/lib/tontine-engine";
 import { resolveDueDateForSlot } from "@/lib/initiate-slot-payment";
 import { normalizeCameroonPhone } from "@/lib/fapshi";
 import { sendPushToUser } from "@/lib/push/send";
-import { detectSqlInjection, extractClientInfo, logSecurityEvent } from "@/lib/security";
+import { detectSqlInjection, extractClientInfo, logSecurityEvent, isAppLocked } from "@/lib/security";
 import { isAdminRole } from "@/lib/constants";
 
 const slotIdSchema = z.string().trim().min(5).max(50);
@@ -128,6 +128,13 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       }
+    }
+
+    if (await isAppLocked()) {
+      return NextResponse.json(
+        { error: "L'application est temporairement verrouillée par l'administrateur. Aucun paiement ne peut être effectué pour le moment." },
+        { status: 423 },
+      );
     }
 
     const slots = await prisma.membershipSlot.findMany({

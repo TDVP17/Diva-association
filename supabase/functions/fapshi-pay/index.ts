@@ -2536,6 +2536,23 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "Unauthorized" }, 401);
     }
 
+    // Vérification du Bouton Panique (verrouillage d'urgence de la plateforme)
+    const { data: appSetting } = await supabase
+      .from("app_settings")
+      .select("is_locked")
+      .eq("id", "singleton")
+      .maybeSingle();
+
+    if (appSetting?.is_locked) {
+      return jsonResponse(
+        {
+          error:
+            "L'application est temporairement verrouillée par l'administrateur. Aucun paiement ne peut être effectué pour le moment.",
+        },
+        423,
+      );
+    }
+
     switch (action) {
       // 5. Paiement individuel (membre propriétaire de sa part)
       case "initiate": {
