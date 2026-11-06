@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { processDueNotifications } from "@/app/api/crons/process-notifications/route";
 
 export async function GET() {
-  // Opportunistic background pump: dispatches any staggered notification whose 3-minute due time has arrived
-  void processDueNotifications().catch(() => {});
-
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

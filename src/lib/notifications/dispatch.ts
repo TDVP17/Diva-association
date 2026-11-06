@@ -278,11 +278,17 @@ export async function scheduleInAppNotifications(params: {
   // Trigger instant delivery (Push & transactional email) in background
   void deliverInstantNotifications(params);
 
-  // Trigger immediate dispatch of the first due notification (recipient 0, scheduled for now)
-  // while subsequent recipients will be dispatched by the cron every 3 minutes.
-  import("@/app/api/crons/process-notifications/route")
-    .then((mod) => mod.processDueNotifications())
-    .catch((err) => console.error("[notifications] initial queue process error:", err));
+  // Trigger immediate dispatch of the first due notification via Supabase Edge Function (0 CPU Vercel)
+  // while subsequent recipients will be dispatched by Supabase pg_cron every 5 minutes.
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const cronSecret = process.env.CRON_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (supabaseUrl && cronSecret) {
+    void fetch(`${supabaseUrl}/functions/v1/send-email?action=process-queue`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${cronSecret}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "process-queue" }),
+    }).catch(() => {});
+  }
 
   return count;
 }
