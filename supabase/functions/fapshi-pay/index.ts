@@ -765,6 +765,18 @@ async function initiateSlotPaymentCore(
     params.requireSelfOwnership &&
     slot.membership.userId !== params.paidByUserId
   ) {
+    await supabase.from("security_logs").insert({
+      id: createId(),
+      type: "unauthorized_payment_attempt",
+      ip: null,
+      userAgent: null,
+      details: {
+        userId: params.paidByUserId,
+        targetSlotId: slot.id,
+        targetOwnerId: slot.membership.userId,
+      },
+      createdAt: new Date().toISOString(),
+    });
     return jsonResponse({ error: "You don't own this slot" }, 403);
   }
   if (
@@ -1014,6 +1026,18 @@ async function validateBulkSlots(
         };
       }
     } else if (slot.membership.userId !== userId) {
+      await supabase.from("security_logs").insert({
+        id: createId(),
+        type: "unauthorized_bulk_payment_attempt",
+        ip: null,
+        userAgent: null,
+        details: {
+          userId,
+          targetSlotId: slot.id,
+          targetOwnerId: slot.membership.userId,
+        },
+        createdAt: new Date().toISOString(),
+      });
       return {
         ok: false,
         status: 403,

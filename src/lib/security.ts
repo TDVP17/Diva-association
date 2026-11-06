@@ -31,7 +31,14 @@ export function extractClientInfo(request: Request): { ip: string; userAgent: st
   return { ip, userAgent };
 }
 
-export type SecurityEventType = "login_failed" | "admin_attempt" | "injection_attempt";
+export type SecurityEventType =
+  | "login_failed"
+  | "admin_attempt"
+  | "injection_attempt"
+  | "unauthorized_session_access"
+  | "unauthorized_api_access"
+  | "unauthorized_payment_attempt"
+  | "unauthorized_bulk_payment_attempt";
 
 export async function logSecurityEvent({
   type,

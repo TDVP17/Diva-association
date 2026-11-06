@@ -16,11 +16,18 @@ const TONTINE_LABELS: Record<string, string> = {
   QUARTERLY_25: "Every 3 Months (25th)",
 };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ error?: string }>;
+}) {
   const session = await auth();
   if (!session?.user) redirect("/login");
   const userId = session.user.id;
-  const t = getTranslator(await getLang());
+  const lang = await getLang();
+  const t = getTranslator(lang);
+  const resolvedParams = searchParams ? await searchParams : {};
+  const isAccessDenied = resolvedParams.error === "access_denied";
 
   const [memberships, unpaidFines] = await Promise.all([
     prisma.membership.findMany({
@@ -57,6 +64,19 @@ export default async function DashboardPage() {
 
   return (
     <main className="px-container-padding py-stack-gap-lg flex flex-col gap-stack-gap-lg max-w-3xl lg:max-w-5xl mx-auto w-full">
+      {isAccessDenied && (
+        <div className="bg-red-50 border-2 border-red-500/40 rounded-2xl p-4 flex items-center gap-3 text-red-900 shadow-sm animate-in fade-in duration-200">
+          <span className="material-symbols-outlined text-red-600 text-2xl flex-shrink-0">gpp_bad</span>
+          <div>
+            <h4 className="font-title-sm text-title-sm font-bold">{lang === "fr" ? "Accès refusé" : "Access Denied"}</h4>
+            <p className="font-body-sm text-body-sm text-red-800">
+              {lang === "fr"
+                ? "Vous ne faites pas partie de cette cotisation. L'accès est strictement réservé aux membres inscrits."
+                : "You are not a member of this cotisation. Access is strictly reserved for registered participants."}
+            </p>
+          </div>
+        </div>
+      )}
       <section>
         <h2 className="sticky top-16 z-30 bg-background py-2 -mx-container-padding px-container-padding font-title-md text-title-md text-primary mb-stack-gap-md shadow-[0px_4px_20px_rgba(30,41,59,0.05)]">
           {t("yourTontines")}

@@ -36,6 +36,8 @@ import { getDesignatedSlot, assertPriorCyclePaidOut } from "@/lib/round-robin-lo
 import { sessionStatusKey } from "@/lib/session-status-label";
 import { assertJoinable, sumRegisteredSlots } from "@/lib/session-joinability";
 import { checkUserFinesForJoining } from "@/lib/unsettled-fines-gate";
+import { isAdminRole } from "@/lib/constants";
+import { logSecurityEvent } from "@/lib/security";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -115,104 +117,36 @@ export default async function SessionDetailPage({
 
   const myMembership = tontineSession.memberships.find((m) => m.userId === userId);
   const sessionLabel = tontineSession.title || TONTINE_LABELS[tontineSession.type];
+  const userIsAdmin = isAdminRole(session.user.role);
 
   if (!myMembership || myMembership.status === "REJECTED") {
-    const joinCheck = assertJoinable(
-      {
-        ...tontineSession,
-        maxSlots: tontineSession.maxSlots ? Number(tontineSession.maxSlots) : null,
-      },
-      sumRegisteredSlots(tontineSession.memberships),
-    );
-    const finesCheck = await checkUserFinesForJoining(userId, id);
-
-    if (!joinCheck.ok) {
-      const regSlots = sumRegisteredSlots(tontineSession.memberships);
-      const isFull = tontineSession.maxSlots !== null && regSlots >= Number(tontineSession.maxSlots);
-      return (
-        <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-5xl mx-auto w-full">
-          <section className="bg-surface rounded-xl p-6 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant flex flex-col items-center text-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
-              <span className="material-symbols-outlined text-3xl">block</span>
-            </div>
-            <div>
-              <div className="inline-block px-2.5 py-1 mb-2 rounded bg-red-600 text-white font-bold text-xs uppercase tracking-wide">
-                {isFull ? t("tagFullStatus") : t("tagActiveStatus")}
-              </div>
-              <h1 className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">
-                {sessionLabel}
-              </h1>
-              {tontineSession.description && (
-                <details className="mt-2 max-w-md mx-auto w-full">
-                  <summary className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80 font-medium text-xs hover:bg-emerald-100 transition-colors shadow-2xs list-none [&::-webkit-details-marker]:hidden mx-auto">
-                    <span className="text-[13px]">✨</span>
-                    <span>{t("seeDescription")}</span>
-                  </summary>
-                  <p className="font-body-md text-body-md text-on-surface-variant mt-2 whitespace-pre-line bg-surface-container-low/70 p-3 rounded-lg border border-surface-variant">
-                    {tontineSession.description}
-                  </p>
-                </details>
-              )}
-              <p className="font-body-md text-body-md text-red-600 font-semibold mt-1 flex items-center justify-center gap-1">
-                <span className="material-symbols-outlined text-[18px]">block</span>
-                {t("newMemberNotAllowed")}
-              </p>
-              <p className="font-body-md text-body-md text-on-surface-variant mt-2 max-w-md mx-auto">
-                {t("sessionClosedToNewMembers")}
-              </p>
-            </div>
-
-            <div className="w-full max-w-md bg-surface-container-low rounded-xl p-4 border border-surface-variant text-left grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <p className="text-on-surface-variant text-xs">{t("startsOn")}</p>
-                <p className="font-semibold text-on-surface">
-                  {tontineSession.startDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </p>
-              </div>
-              <div>
-                <p className="text-on-surface-variant text-xs">{t("contributionLabel")}</p>
-                <p className="font-semibold text-on-surface">{formatXAF(Number(tontineSession.amount))}</p>
-              </div>
-              <div>
-                <p className="text-on-surface-variant text-xs">{t("feeLabel")}</p>
-                <p className="font-semibold text-on-surface">{formatXAF(Number(tontineSession.fee))}</p>
-              </div>
-              <div>
-                <p className="text-on-surface-variant text-xs">{t("validatedMembersCount", { count: "" }).replace("{count}", "").trim()}</p>
-                <p className="font-semibold text-on-surface">
-                  {(() => {
-                    const approvedCount = tontineSession.memberships.filter((m) => m.status === "APPROVED").length;
-                    return approvedCount > 0 ? approvedCount : (tontineSession.validatedMembersCount ?? 0);
-                  })()}
-                  {tontineSession.maxSlots ? ` / ${tontineSession.maxSlots}` : ""}
-                </p>
-              </div>
-            </div>
-
-            <Link
-              href="/sessions"
-              className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white font-label-md text-label-md hover:bg-primary/90 transition-colors"
-            >
-              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-              {t("viewOpenCotisations")}
-            </Link>
-          </section>
-          <div className="mt-stack-gap-lg">
-            <FinesInfoAccordion
-              lang={lang}
-              fineAmount={fineAmount}
-              fineIntervalHours={fineIntervalHours}
-              limitTime={limitTime}
-            />
-          </div>
-        </main>
+    if (!userIsAdmin) {
+      const joinCheck = assertJoinable(
+        {
+          ...tontineSession,
+          maxSlots: tontineSession.maxSlots ? Number(tontineSession.maxSlots) : null,
+        },
+        sumRegisteredSlots(tontineSession.memberships),
       );
+
+      // Si la session n'est pas un DRAFT ouvert aux adhésions (ex: session en cours, active, ou complète d'un autre membre),
+      // interdire formellement l'accès et rediriger vers /dashboard avec message d'accès refusé.
+      if (tontineSession.status !== "DRAFT" || !joinCheck.ok) {
+        await logSecurityEvent({
+          type: "unauthorized_session_access",
+          emailEssaye: session.user.email ?? null,
+          details: {
+            userId,
+            targetSessionId: id,
+            targetSessionStatus: tontineSession.status,
+            targetSessionTitle: tontineSession.title,
+          },
+        });
+        redirect("/dashboard?error=access_denied");
+      }
     }
 
+    const finesCheck = await checkUserFinesForJoining(userId, id);
     const latestVerification = await prisma.kycVerification.findFirst({
       where: { userId, tontineSessionId: id },
       orderBy: { createdAt: "desc" },

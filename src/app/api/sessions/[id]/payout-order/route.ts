@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getCycleDateForRound } from "@/lib/tontine-engine";
+import { isAdminRole } from "@/lib/constants";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -23,6 +24,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     where: { tontineSessionId, userId: session.user.id, status: "APPROVED" },
     include: { slots: true },
   });
+
+  if (!userMembership && !isAdminRole(session.user.role)) {
+    return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
+  }
+
   const userHasUndrawnSlots = userMembership?.slots.some((s) => s.ballDrawn === null) ?? false;
   if (userHasUndrawnSlots) {
     return NextResponse.json({ rows: [], userMustDrawFirst: true });

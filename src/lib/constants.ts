@@ -12,6 +12,8 @@ export const PROTECTED_PATH_PREFIXES = [
   "/help",
   "/contribute-for-relative",
   "/reglement-general",
+  "/pay",
+  "/global-payment",
 ] as const;
 
 export const ADMIN_PATH_PREFIX = "/admin";

@@ -8,6 +8,7 @@ import { resolveDueDateForSlot } from "@/lib/initiate-slot-payment";
 import { normalizeCameroonPhone } from "@/lib/fapshi";
 import { sendPushToUser } from "@/lib/push/send";
 import { detectSqlInjection, extractClientInfo, logSecurityEvent } from "@/lib/security";
+import { isAdminRole } from "@/lib/constants";
 
 const slotIdSchema = z.string().trim().min(5).max(50);
 
@@ -143,6 +144,37 @@ export async function POST(request: Request) {
 
     if (slots.length !== slotIds.length) {
       return NextResponse.json({ error: "Nom(s) introuvable(s)." }, { status: 404 });
+    }
+
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Veuillez vous connecter pour envoyer une preuve de paiement." },
+        { status: 401 },
+      );
+    }
+
+    // Vérification stricte d'appartenance : un membre ne peut soumettre une preuve que pour ses propres parts
+    const isOwner = slots.every((s) => s.membership.userId === session.user.id);
+    if (!isOwner && !isAdminRole(session.user.role)) {
+      const { ip, userAgent } = extractClientInfo(request);
+      await logSecurityEvent({
+        type: "unauthorized_payment_attempt",
+        emailEssaye: session.user.email ?? null,
+        ip,
+        userAgent,
+        details: {
+          action: "payment_proof_foreign_slot",
+          userId: session.user.id,
+          slotIds,
+          foreignOwners: slots
+            .filter((s) => s.membership.userId !== session.user.id)
+            .map((s) => s.membership.userId),
+        },
+      });
+      return NextResponse.json(
+        { error: "Accès refusé : vous ne pouvez pas cotiser pour un autre membre." },
+        { status: 403 },
+      );
     }
 
     for (const s of slots) {
