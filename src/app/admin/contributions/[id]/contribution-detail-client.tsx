@@ -2094,35 +2094,39 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                     i < session.slots.length - 1 ? "border-b border-outline-variant/30" : ""
                   }`}
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                  <div className="w-full md:flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Link
                         href={`/admin/support?with=${encodeURIComponent(s.userId)}&name=${encodeURIComponent(s.name)}`}
-                        className="font-label-md text-label-md text-on-surface hover:text-primary hover:underline font-bold flex items-center gap-1.5 truncate group"
+                        className="text-sm sm:text-base font-bold text-on-surface hover:text-primary hover:underline flex items-center gap-1.5 min-w-0 group"
                         title={lang === "fr" ? `Écrire à ${s.name}` : `Message ${s.name}`}
                       >
-                        <span className="truncate">{s.beneficiaryName}</span>
-                        <span className="material-symbols-outlined text-[16px] text-primary opacity-60 group-hover:opacity-100 flex-shrink-0">
+                        <span className="truncate">{s.beneficiaryName || s.name}</span>
+                        <span className="material-symbols-outlined text-[16px] text-primary opacity-70 group-hover:opacity-100 flex-shrink-0">
                           chat
                         </span>
                       </Link>
                       {s.officialPosition && (
-                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary">
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/10 text-primary flex-shrink-0">
                           #{s.officialPosition}
                         </span>
                       )}
                     </div>
-                    <Link
-                      href={`/admin/support?with=${encodeURIComponent(s.userId)}&name=${encodeURIComponent(s.name)}`}
-                      className="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors block truncate"
-                      title={lang === "fr" ? `Écrire à ${s.name}` : `Message ${s.name}`}
-                    >
-                      {s.name}
-                      {s.memberCode && ` · ${s.memberCode}`}
-                    </Link>
-                    <MemberArchivesToggle userId={s.userId} lang={lang} />
+                    <div className="text-xs text-on-surface-variant font-medium">
+                      <Link
+                        href={`/admin/support?with=${encodeURIComponent(s.userId)}&name=${encodeURIComponent(s.name)}`}
+                        className="hover:text-primary transition-colors block truncate"
+                        title={lang === "fr" ? `Écrire à ${s.name}` : `Message ${s.name}`}
+                      >
+                        {s.name}
+                        {s.memberCode && ` · ${s.memberCode}`}
+                      </Link>
+                    </div>
+                    <div className="pt-0.5">
+                      <MemberArchivesToggle userId={s.userId} lang={lang} />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap pt-2 md:pt-0 border-t md:border-t-0 border-outline-variant/15">
+                  <div className="flex items-center gap-2 flex-wrap pt-2.5 md:pt-0 border-t md:border-t-0 border-outline-variant/20 w-full md:w-auto">
                     <button
                       type="button"
                       onClick={() => openTransferModal(s)}

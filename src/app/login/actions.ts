@@ -1,6 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getSupabaseAuthClient, getSupabaseAdminClient } from "@/lib/supabase-auth";
 import { clearServerAuthCookies, setServerSupabaseCookies } from "@/lib/supabase/auth-cookies";
@@ -13,6 +15,7 @@ import { validateEmailAddress } from "@/lib/email-validator";
 import { createSignupToken, verifySignupToken } from "@/lib/signup-token";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { getLang } from "@/lib/i18n/get-lang";
+import { detectSqlInjection, logSecurityEvent } from "@/lib/security";
 
 export interface AuthFormState {
   error?: string;
@@ -84,6 +87,38 @@ export async function signInAction(
         lang === "fr"
           ? "L'e-mail ou le numéro de téléphone et le mot de passe sont requis."
           : "Email or phone number and password are required.",
+    };
+  }
+
+  // 1. Détection proactive des attaques par injection SQL sur le formulaire de login
+  if (detectSqlInjection(rawIdentifier) || detectSqlInjection(password)) {
+    try {
+      let ip = "127.0.0.1";
+      let userAgent = "unknown";
+      try {
+        const h = await headers();
+        const forwardedFor = h.get("x-forwarded-for");
+        const realIp = h.get("x-real-ip");
+        ip = forwardedFor ? forwardedFor.split(",")[0].trim() : (realIp || "127.0.0.1");
+        userAgent = h.get("user-agent") || "unknown";
+      } catch {
+        // En dehors du scope de requête Next.js (ex: tests automatisés)
+      }
+      await logSecurityEvent({
+        type: "injection_attempt",
+        emailEssaye: rawIdentifier.slice(0, 150),
+        ip,
+        userAgent,
+        details: { target: "login_credentials", payload: rawIdentifier },
+      });
+    } catch (e) {
+      console.error("[SECURITY] Logging injection attempt failed:", e);
+    }
+    return {
+      error:
+        lang === "fr"
+          ? "Email ou mot de passe incorrect."
+          : "Incorrect email or password.",
     };
   }
 

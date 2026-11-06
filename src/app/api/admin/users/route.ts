@@ -1,15 +1,43 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
+import { detectSqlInjection, extractClientInfo, logSecurityEvent } from "@/lib/security";
 
 import { TONTINE_TYPE_LABELS } from "@/lib/tontine-labels";
+
+const querySchema = z.object({
+  q: z.string().trim().max(100).optional(),
+});
 
 /** Every registered account, searchable by name/email/phone/member code — the admin's global user directory. */
 export async function GET(request: Request) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const q = new URL(request.url).searchParams.get("q")?.trim();
+  const rawQ = new URL(request.url).searchParams.get("q")?.trim() ?? "";
+  const { ip, userAgent } = extractClientInfo(request);
+
+  if (rawQ && detectSqlInjection(rawQ)) {
+    await logSecurityEvent({
+      type: "injection_attempt",
+      emailEssaye: admin.user.email,
+      ip,
+      userAgent,
+      details: { target: "admin_users_list", payload: rawQ },
+    });
+    return NextResponse.json(
+      { error: "Tentative d'injection SQL détectée et bloquée." },
+      { status: 400 },
+    );
+  }
+
+  const parsed = querySchema.safeParse({ q: rawQ || undefined });
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Paramètre de recherche invalide." }, { status: 400 });
+  }
+
+  const q = parsed.data.q;
 
   const where = q
     ? {

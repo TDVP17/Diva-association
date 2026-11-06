@@ -15,9 +15,13 @@ export { LANG_COOKIE };
  * database, so switching language on one device isn't forgotten on another.
  */
 export async function getLang(): Promise<Lang> {
-  const store = await cookies();
-  const cookieValue = store.get(LANG_COOKIE)?.value;
-  if (cookieValue === "fr" || cookieValue === "en") return cookieValue;
+  try {
+    const store = await cookies();
+    const cookieValue = store.get(LANG_COOKIE)?.value;
+    if (cookieValue === "fr" || cookieValue === "en") return cookieValue;
+  } catch {
+    // Called outside request scope (e.g. tests or scripts)
+  }
 
   try {
     const session = await auth();

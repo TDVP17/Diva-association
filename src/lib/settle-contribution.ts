@@ -114,21 +114,7 @@ export async function settleContribution(
       })
     : [];
 
-  if (otherMemberships.length > 0) {
-    const payerDisplayName =
-      paidByName || contribution.membershipSlot.beneficiaryName || user.name || "Un membre";
-    await scheduleInAppNotifications({
-      tontineSessionId: membership.tontineSessionId,
-      type: "PAYMENT_SUCCESS",
-      recipients: otherMemberships.map((m) => ({
-        userId: m.userId,
-        message: `${payerDisplayName} • ${sessionLabel} : « J'ai cotisé, merci la team ! »`,
-        messageKey: "memberPaidGroupCelebration",
-        messageVars: { member: payerDisplayName, session: sessionLabel },
-        actionUrl: `/sessions/${membership.tontineSessionId}`,
-      })),
-    });
-  }
+  // (Note: notification de groupe aux autres membres supprimee a la demande de l'utilisateur - seul le payeur est notifie)
 
   // When ALL members have contributed for this cycle, if the designated beneficiary
   // has already drawn their lucky ball, alert them to submit their payout details.

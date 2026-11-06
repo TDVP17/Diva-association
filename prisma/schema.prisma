@@ -992,3 +992,32 @@ model FallbackPaymentConfig {
 
   @@map("fallback_payment_configs")
 }
+
+/// Logs of security-critical events (failed logins, brute-force attempts,
+/// SQL injection probes, unauthorized admin access attempts).
+model SecurityLog {
+  id          String   @id @default(cuid())
+  type        String   // "login_failed" | "admin_attempt" | "injection_attempt"
+  emailEssaye String?  @map("email_essaye")
+  ip          String?  @map("ip")
+  userAgent   String?  @map("user_agent")
+  details     Json?    @map("details")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([type, createdAt])
+  @@index([ip, createdAt])
+  @@index([emailEssaye, createdAt])
+  @@map("security_logs")
+}
+
+/// Global system settings, including the emergency lockdown toggle ("Bouton Panique").
+model AppSetting {
+  id         String    @id @default("singleton")
+  isLocked   Boolean   @default(false) @map("is_locked")
+  lockedAt   DateTime? @map("locked_at")
+  lockedBy   String?   @map("locked_by")
+  lockReason String?   @map("lock_reason")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}

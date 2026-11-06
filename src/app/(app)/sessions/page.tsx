@@ -272,15 +272,6 @@ export default async function SessionsPage() {
                     const approvedMemberships = s.memberships.filter((m) => m.status === "APPROVED");
                     const approvedDbCount = approvedMemberships.length;
                     const membersCount = approvedDbCount > 0 ? approvedDbCount : (s.validatedMembersCount ?? 0);
-                    // Count exact registered slots (names)
-                    const approvedSlotsCount = approvedMemberships.reduce(
-                      (sum, m) => sum + (m.slots && m.slots.length > 0 ? m.slots.length : (m.slotCount ? Number(m.slotCount) : 1)),
-                      0,
-                    );
-                    const totalSlots = approvedSlotsCount > 0
-                      ? approvedSlotsCount
-                      : (s.maxSlots ? Number(s.maxSlots) : (s.validatedMembersCount || 1));
-                    const pot = Math.round(totalSlots * Number(s.amount));
                     return (
                       <>
                         {membersCount > 0 && (
@@ -294,17 +285,6 @@ export default async function SessionsPage() {
                           <span className="font-numeric-data text-on-surface font-semibold">{formatXAF(Number(s.amount))}</span>
                           <span>{t("plusFeeSuffix", { fee: formatXAF(Number(s.fee)) })}</span>
                         </p>
-                        {approvedSlotsCount > 0 ? (
-                          <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold">
-                            <span className="material-symbols-outlined text-[14px] text-emerald-600">emoji_events</span>
-                            <span>{t("totalPotToEat")} : {formatXAF(pot)}</span>
-                          </div>
-                        ) : (
-                          <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 border border-slate-200 text-slate-600 text-[11px] font-medium">
-                            <span className="material-symbols-outlined text-[15px] text-primary">info</span>
-                            <span>{lang === "fr" ? "Le montant total dépend du nombre de membres (visible après validation)" : "Total pot depends on member count (visible once validated)"}</span>
-                          </div>
-                        )}
                         {(() => {
                           const fallback = getTontineConfig(s.type);
                           const fAmount = s.fineAmountPerPeriod

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { saveFile } from "@/lib/storage";
@@ -6,6 +7,9 @@ import { getContributionTotal } from "@/lib/tontine-engine";
 import { resolveDueDateForSlot } from "@/lib/initiate-slot-payment";
 import { normalizeCameroonPhone } from "@/lib/fapshi";
 import { sendPushToUser } from "@/lib/push/send";
+import { detectSqlInjection, extractClientInfo, logSecurityEvent } from "@/lib/security";
+
+const slotIdSchema = z.string().trim().min(5).max(50);
 
 const MAX_IMAGES = 6;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -61,6 +65,33 @@ export async function POST(request: Request) {
     const dueDateStr = formData.get("dueDate") as string | null;
     const rawPhone = (formData.get("phone") as string | null)?.trim() || null;
     const files = extractProofFiles(formData);
+
+    const hasInjection =
+      slotIds.some((id) => detectSqlInjection(id)) ||
+      (dueDateStr ? detectSqlInjection(dueDateStr) : false) ||
+      (rawPhone ? detectSqlInjection(rawPhone) : false);
+
+    if (hasInjection) {
+      const { ip, userAgent } = extractClientInfo(request);
+      await logSecurityEvent({
+        type: "injection_attempt",
+        emailEssaye: session?.user?.email ?? null,
+        ip,
+        userAgent,
+        details: { target: "payment_proof", slotIds, dueDateStr, rawPhone },
+      });
+      return NextResponse.json(
+        { error: "Tentative d'injection SQL détectée et bloquée." },
+        { status: 400 },
+      );
+    }
+
+    // Validation stricte des IDs avec Zod
+    for (const id of slotIds) {
+      if (!slotIdSchema.safeParse(id).success) {
+        return NextResponse.json({ error: "Identifiant de part invalide." }, { status: 400 });
+      }
+    }
 
     if (slotIds.length === 0 || files.length === 0) {
       return NextResponse.json(

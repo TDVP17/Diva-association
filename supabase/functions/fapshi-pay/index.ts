@@ -1794,21 +1794,7 @@ async function finalizeContributionSettlement(
     .eq("status", "APPROVED")
     .neq("userId", owner.id);
 
-  if (otherMemberships && otherMemberships.length > 0) {
-    const payerDisplayName =
-      paidByName || typed.membershipSlot.beneficiaryName || owner.name;
-    await insertInAppNotifications(supabase, {
-      tontineSessionId: sessionId,
-      type: "PAYMENT_SUCCESS",
-      recipients: otherMemberships.map((m: { userId: string }) => ({
-        userId: m.userId,
-        message: `${payerDisplayName} • ${sessionLabel} : « J'ai cotisé, merci la team ! »`,
-        messageKey: "memberPaidGroupCelebration",
-        messageVars: { member: payerDisplayName, session: sessionLabel },
-        actionUrl: `/sessions/${sessionId}`,
-      })),
-    });
-  }
+  // (Note: notification de groupe aux autres membres supprimee a la demande de l'utilisateur - seul le payeur recoit son recu)
 
   // 3. Notification au proche payeur s'il est distinct du titulaire
   if (typed.paidByUserId && typed.paidByUserId !== owner.id) {
