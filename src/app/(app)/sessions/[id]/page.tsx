@@ -26,7 +26,6 @@ import { PayoutOrderAccordion } from "./payout-order-accordion";
 import { MemberStatusAccordion } from "./member-status-accordion";
 import { PayoutTurnPanel } from "./payout-turn-panel";
 import { PaymentSuccessBanner } from "./payment-success-banner";
-import { PaymentToastBanner } from "./payment-toast-banner";
 import { CotisationHeroCard } from "./cotisation-hero-card";
 import { TonTourBanner } from "./ton-tour-banner";
 import { CotisationMembersList } from "./cotisation-members-list";
@@ -435,13 +434,16 @@ export default async function SessionDetailPage({
   ).length;
 
   const perSlotAmount = Number(tontineSession.amount);
+  const perSlotFee = Number(tontineSession.fee ?? 0);
   const slotCountForPot =
     totalRegisteredSlots > 0
       ? totalRegisteredSlots
       : tontineSession.maxSlots
         ? Number(tontineSession.maxSlots)
         : (allSlotsFlat.length || 1);
-  const totalPotAmount = Math.round(slotCountForPot * perSlotAmount);
+  // Le montant à bouffer (pot) = montant à cotiser + 25% des frais (ex: 2 500 FCFA + 25% de 100 FCFA = 2 525 FCFA par part)
+  const perSlotPotToEat = perSlotAmount + (0.25 * perSlotFee);
+  const totalPotAmount = Math.round(slotCountForPot * perSlotPotToEat);
 
   const mySlots = [...myMembership.slots].sort((a, b) =>
     a.beneficiaryName.localeCompare(b.beneficiaryName, "fr", { sensitivity: "base" }),
@@ -549,17 +551,6 @@ export default async function SessionDetailPage({
     paidContribution = await loadPaidContribution(paymentId, userId);
   }
 
-  // Find the most recent payer to display in the floating celebration toast banner
-  const paidContributionsList = contributions
-    .filter((c) => c.status === "PAID")
-    .sort((a, b) => (b.paidAt?.getTime() ?? 0) - (a.paidAt?.getTime() ?? 0));
-  const recentPayerName =
-    paidContributionsList.length > 0
-      ? paidContributionsList[0].paidByUser?.name ||
-        allSlotsFlat.find((s) => s.id === paidContributionsList[0].membershipSlotId)?.beneficiaryName ||
-        null
-      : null;
-
   // Check if every slot in the group has drawn its lucky ball AND has an assigned position
   const hasAllBallsDrawn =
     allSlotsFlat.length > 0 && allSlotsFlat.every((s) => s.ballDrawn !== null);
@@ -593,13 +584,6 @@ export default async function SessionDetailPage({
 
   return (
     <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-5xl mx-auto w-full pb-32">
-      {/* Toast Notification flottant (en haut de l'écran) */}
-      <PaymentToastBanner
-        sessionLabel={sessionLabel}
-        payerName={recentPayerName}
-        lang={lang}
-      />
-
       {/* Bannière Cotisation terminée */}
       {isSessionFinished && (
         <div className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-teal-950 text-white rounded-2xl p-5 shadow-lg border border-emerald-500/30 mb-5 flex items-start gap-4">

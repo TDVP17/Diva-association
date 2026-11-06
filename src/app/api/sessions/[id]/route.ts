@@ -63,3 +63,4 @@ export async function GET(
 
   return NextResponse.json({ session: tontineSession });
 }
+

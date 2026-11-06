@@ -320,7 +320,7 @@ export function CreateSessionForm({ lang }: { lang: Lang }) {
           const numAmount = Number(amount) || 0;
           const numFee = Number(fee) || 0;
           const count = status === "ACTIVE" ? Number(validatedMembersCount) || 0 : 0;
-          const pot = count > 0 ? Math.round(count * numAmount) : 0;
+          const pot = count > 0 ? Math.round(count * (numAmount + 0.25 * numFee)) : 0;
           return (
             <div className="mt-1 pt-3 border-t border-surface-variant flex flex-col gap-1.5 text-xs">
               <div className="flex justify-between items-center text-on-surface-variant">
