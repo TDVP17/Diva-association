@@ -314,7 +314,11 @@ async function handleFailedOrExpired(transId: string, verified: PaymentStatusRes
         where: { id: { in: failedContributions.map((c) => c.id) } },
         data: { status: "FAILED", failureReason },
       });
-      const amount = Number(bulkPayment.amount);
+      const netTotal = failedContributions.reduce(
+        (sum, c) => sum + Number(c.amountPaid || 0) + Number(c.finePaid || 0),
+        0,
+      );
+      const amount = netTotal > 0 ? netTotal : Number(bulkPayment.amount);
       await scheduleInAppNotifications({
         type: "PAYMENT_FAILED",
         recipients: [
@@ -341,7 +345,7 @@ async function handleFailedOrExpired(transId: string, verified: PaymentStatusRes
     });
     const { membership } = contribution.membershipSlot;
     const sessionLabel = membership.tontineSession.title || TONTINE_LABELS[membership.tontineSession.type] || membership.tontineSession.type;
-    const amount = Number(contribution.amountPaid) + Number(contribution.feePaid) + Number(contribution.finePaid);
+    const amount = Number(contribution.amountPaid) + Number(contribution.finePaid);
     await scheduleInAppNotifications({
       tontineSessionId: membership.tontineSessionId,
       type: "PAYMENT_FAILED",

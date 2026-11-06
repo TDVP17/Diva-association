@@ -114,7 +114,7 @@ export default async function HistoryPage() {
       const pureAmount = Number(c.amountPaid);
       const feeAmount = Number(c.feePaid);
       const fineAmount = Number(c.finePaid);
-      const totalAmount = pureAmount + feeAmount + fineAmount;
+      const totalAmount = pureAmount + fineAmount;
       const effectiveDate = c.paidAt ?? c.dueDate;
 
       rows.push({
@@ -171,7 +171,7 @@ export default async function HistoryPage() {
     const pureAmount = Number(c.amountPaid);
     const feeAmount = Number(c.feePaid);
     const fineAmount = Number(c.finePaid);
-    const totalAmount = pureAmount + feeAmount + fineAmount;
+    const totalAmount = pureAmount + fineAmount;
     const memberName = c.membershipSlot.membership.user.name;
 
     rows.push({
@@ -439,13 +439,13 @@ export default async function HistoryPage() {
                     </div>
                   )}
 
-                  {/* Décomposition du montant cotisé */}
-                  {(r.pureAmount !== undefined && r.feeAmount !== undefined) && (
+                  {/* Montant cotisé */}
+                  {r.pureAmount !== undefined && (
                     <div className="flex items-center gap-1.5 sm:col-span-2">
                       <span className="material-symbols-outlined text-[16px] text-primary">account_balance_wallet</span>
                       <span>
                         <strong className="text-on-surface">{t("amountCotised")} :</strong>{" "}
-                        {t("pureContributionAmount")} : {formatXAF(r.pureAmount)} + {t("feeAmountLabel")} : {formatXAF(r.feeAmount)}
+                        {formatXAF(r.pureAmount)}
                         {r.fineAmount ? ` + ${t("fineDetailLabel")} : ${formatXAF(r.fineAmount)}` : ""}
                       </span>
                     </div>

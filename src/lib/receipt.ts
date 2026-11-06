@@ -16,7 +16,7 @@ export interface ReceiptData {
   paymentMethod?: string;
   tontineType: TontineType;
   amount: number;
-  fee: number;
+  fee?: number;
   fine: number;
   /// Total payment-gateway processing fee (e.g. Fapshi's combined 3.3%) —
   /// the total only, never the internal gateway/president split.
@@ -99,11 +99,10 @@ export async function generateReceiptPdf(data: ReceiptData): Promise<Buffer> {
   y -= 30;
 
   row("Contribution", formatXAF(data.amount));
-  row("Fee", formatXAF(data.fee));
   if (data.fine > 0) row("Late fine", formatXAF(data.fine));
   y -= 10;
-  const exactTotal = data.amount + data.fee + (data.fine || 0);
-  row("Total Deducted", formatXAF(exactTotal), { emphasize: true });
+  const exactTotal = data.amount + (data.fine || 0);
+  row("Total", formatXAF(exactTotal), { emphasize: true });
 
   y -= 30;
   page.drawText("Thank you for your contribution to the community fund.", {
