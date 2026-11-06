@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { clearBrowserSupabaseCookies, getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 // 365 days in milliseconds (1 full year of inactivity)
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -31,7 +32,9 @@ export function InactivityAutoLogout() {
           if (elapsed > ONE_YEAR_MS) {
             // More than 1 year without connecting -> auto-disconnect
             localStorage.removeItem(STORAGE_KEY);
-            // Trigger server signout and redirect to login with expiration notice
+            clearBrowserSupabaseCookies();
+            void getSupabaseBrowserClient()?.auth.signOut().catch(() => {});
+            // Redirect to login with expiration notice
             window.location.href = "/login?expired=1";
             return;
           }

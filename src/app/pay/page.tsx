@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { LanguageToggle } from "@/components/language-toggle";
 import { MemberCodePayFlow } from "@/components/member-code-pay-flow";
+import { SupabaseSessionBootstrap } from "@/components/supabase-session-bootstrap";
 
 /**
  * Entry point for relatives/friends contributing on a member's behalf.
@@ -27,6 +28,7 @@ export default async function PublicPayPage({
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-container-padding bg-background">
+      <SupabaseSessionBootstrap expectedEmail={session.user.email ?? undefined} />
       <div className="w-full max-w-sm">
         <div className="flex justify-end mb-2">
           <LanguageToggle currentLang={lang} />

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { ShareAppSection } from "@/components/share-app-section";
+import { clearBrowserSupabaseCookies, getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export interface TopRightMenuItem {
   href: string;
@@ -80,6 +81,8 @@ export function TopRightMenu({
           <form
             action={async () => {
               setOpen(false);
+              await getSupabaseBrowserClient()?.auth.signOut().catch(() => {});
+              clearBrowserSupabaseCookies();
               await onLogout();
             }}
             className="border-t border-outline-variant"

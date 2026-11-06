@@ -1,9 +1,9 @@
 "use server";
 
-import { AuthError } from "next-auth";
-import { signIn } from "@/auth";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSupabaseAuthClient, getSupabaseAdminClient } from "@/lib/supabase-auth";
+import { clearServerAuthCookies, setServerSupabaseCookies } from "@/lib/supabase/auth-cookies";
 import { isAdminRole } from "@/lib/constants";
 import { ensureMemberCode } from "@/lib/member-code";
 import { createOtpChallenge, verifyOtp, generateOtp } from "@/lib/otp";
@@ -17,17 +17,16 @@ import { getLang } from "@/lib/i18n/get-lang";
 export interface AuthFormState {
   error?: string;
   success?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  redirectTo?: string;
 }
 
-/** Next.js's redirect control-flow signal — must always propagate, never be swallowed as an error. */
-function isRedirectSignal(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "digest" in err &&
-    typeof (err as { digest?: unknown }).digest === "string" &&
-    (err as { digest: string }).digest.startsWith("NEXT_REDIRECT")
-  );
+function sanitizeCallbackUrl(raw: string | undefined): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) {
+    return "/dashboard";
+  }
+  return raw;
 }
 
 export async function findUserByContact(identifier: string) {
@@ -36,7 +35,16 @@ export async function findUserByContact(identifier: string) {
   if (clean.includes("@")) {
     return prisma.user.findUnique({
       where: { email: clean.toLowerCase() },
-      select: { id: true, name: true, email: true, phone: true, role: true, preferredLang: true, isBanned: true },
+      select: {
+        id: true,
+        authUserId: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        preferredLang: true,
+        isBanned: true,
+      },
     });
   }
   const digits = clean.replace(/\D/g, "");
@@ -49,7 +57,16 @@ export async function findUserByContact(identifier: string) {
         ...(!digits.startsWith("237") && digits.length === 9 ? [{ phone: `237${digits}` }] : []),
       ],
     },
-    select: { id: true, name: true, email: true, phone: true, role: true, preferredLang: true, isBanned: true },
+    select: {
+      id: true,
+      authUserId: true,
+      name: true,
+      email: true,
+      phone: true,
+      role: true,
+      preferredLang: true,
+      isBanned: true,
+    },
   });
 }
 
@@ -72,7 +89,7 @@ export async function signInAction(
 
   try {
     let emailToUse = rawIdentifier;
-    let userRole = null;
+    let userRole: string | null = null;
 
     const user = await findUserByContact(rawIdentifier);
     if (user?.isBanned) {
@@ -100,15 +117,12 @@ export async function signInAction(
       emailToUse = rawIdentifier.toLowerCase();
     }
 
-    let redirectTo = callbackUrl;
-    if (callbackUrl === "/dashboard") {
-      if (isAdminRole(userRole)) redirectTo = "/admin";
-    }
-    await signIn("email-password", { email: emailToUse, password, redirectTo });
-    return {};
-  } catch (err) {
-    if (isRedirectSignal(err)) throw err; // successful sign-in — let the redirect happen
-    if (err instanceof AuthError) {
+    const { data, error } = await getSupabaseAuthClient().auth.signInWithPassword({
+      email: emailToUse,
+      password,
+    });
+
+    if (error || !data?.session?.access_token || !data?.session?.refresh_token || !data.user) {
       return {
         error:
           lang === "fr"
@@ -116,6 +130,40 @@ export async function signInAction(
             : "Incorrect email, phone number, or password.",
       };
     }
+
+    if (user && !user.authUserId) {
+      await prisma.user
+        .update({ where: { id: user.id }, data: { authUserId: data.user.id } })
+        .catch(() => {});
+    } else if (!user) {
+      const dbUser = await prisma.user.findUnique({
+        where: { email: emailToUse },
+        select: { id: true, role: true, isBanned: true },
+      });
+      if (dbUser?.isBanned) {
+        return {
+          error:
+            lang === "fr"
+              ? "Ce compte a été banni. Vous ne pouvez plus vous connecter à l'application."
+              : "This account has been banned.",
+        };
+      }
+      userRole = dbUser?.role ?? "MEMBER";
+    }
+
+    await clearServerAuthCookies();
+    await setServerSupabaseCookies(data.session.access_token, data.session.refresh_token);
+
+    const safeCallback = sanitizeCallbackUrl(callbackUrl);
+    const redirectTo =
+      safeCallback === "/dashboard" && isAdminRole(userRole) ? "/admin" : safeCallback;
+
+    return {
+      accessToken: data.session.access_token,
+      refreshToken: data.session.refresh_token,
+      redirectTo,
+    };
+  } catch (err) {
     console.error("[signInAction] unexpected error:", err);
     return {
       error:
@@ -240,28 +288,44 @@ export async function confirmPasswordResetAction(
 
   try {
     const supabaseAdmin = getSupabaseAdminClient();
-    const { data: list, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-    if (listError) {
-      console.error("[confirmPasswordResetAction] listUsers failed:", listError.message);
-      return {
-        error:
-          lang === "fr"
-            ? "Impossible de réinitialiser le mot de passe actuellement."
-            : "Could not reset password. Please try again.",
-      };
+    let targetAuthId = user.authUserId;
+
+    if (!targetAuthId) {
+      const { data: list, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+        page: 1,
+        perPage: 1000,
+      });
+      if (listError) {
+        console.error("[confirmPasswordResetAction] listUsers failed:", listError.message);
+        return {
+          error:
+            lang === "fr"
+              ? "Impossible de réinitialiser le mot de passe actuellement."
+              : "Could not reset password. Please try again.",
+        };
+      }
+      const found = list.users.find(
+        (u) => u.email?.toLowerCase() === user.email.toLowerCase(),
+      );
+      if (found) {
+        targetAuthId = found.id;
+        await prisma.user
+          .update({ where: { id: user.id }, data: { authUserId: found.id } })
+          .catch(() => {});
+      }
     }
 
-    const authUser = list.users.find((u) => u.email === user.email);
-    if (authUser) {
-      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
+    if (targetAuthId) {
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(targetAuthId, {
         password: newPassword,
+        email_confirm: true,
       });
       if (updateError) {
         console.error("[confirmPasswordResetAction] updateUserById failed:", updateError.message);
         return { error: updateError.message };
       }
     } else {
-      const { error: createError } = await supabaseAdmin.auth.admin.createUser({
+      const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email: user.email,
         password: newPassword,
         email_confirm: true,
@@ -270,6 +334,11 @@ export async function confirmPasswordResetAction(
       if (createError) {
         console.error("[confirmPasswordResetAction] createUser failed:", createError.message);
         return { error: createError.message };
+      }
+      if (created?.user?.id) {
+        await prisma.user
+          .update({ where: { id: user.id }, data: { authUserId: created.user.id } })
+          .catch(() => {});
       }
     }
 
@@ -431,7 +500,13 @@ export async function confirmSignUpAction(
   enteredCode: string,
   callbackUrl: string = "/dashboard",
   lang: Lang = "fr",
-): Promise<{ error?: string; success?: boolean }> {
+): Promise<{
+  error?: string;
+  success?: boolean;
+  accessToken?: string;
+  refreshToken?: string;
+  redirectTo?: string;
+}> {
   const data = verifySignupToken(signupToken);
   if (!data) {
     return {
@@ -463,22 +538,23 @@ export async function confirmSignUpAction(
   const { email, password, fullName } = data;
 
   try {
-    const { data: supaData, error: supaError } = await getSupabaseAuthClient().auth.signUp({
+    const supabaseAdmin = getSupabaseAdminClient();
+    const { data: createdAuth, error: createErr } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      email_confirm: true,
+      user_metadata: { full_name: fullName },
     });
 
-    const isAlreadyRegistered =
-      Boolean(
-        supaError &&
-          (supaError.message?.toLowerCase().includes("already registered") ||
-            supaError.message?.toLowerCase().includes("already exists") ||
-            supaError.message?.toLowerCase().includes("user already") ||
-            (supaError as { code?: string })?.code === "user_already_exists" ||
-            supaError.message?.toLowerCase().includes("already been registered")),
-      ) ||
-      Boolean(supaData?.user?.identities && supaData.user.identities.length === 0);
+    const isAlreadyRegistered = Boolean(
+      createErr &&
+        (createErr.message?.toLowerCase().includes("already registered") ||
+          createErr.message?.toLowerCase().includes("already exists") ||
+          createErr.message?.toLowerCase().includes("user already") ||
+          (createErr as { code?: string })?.code === "user_already_exists" ||
+          (createErr as { code?: string })?.code === "email_exists" ||
+          createErr.message?.toLowerCase().includes("already been registered")),
+    );
 
     if (isAlreadyRegistered) {
       return {
@@ -489,34 +565,31 @@ export async function confirmSignUpAction(
       };
     }
 
-    if (supaError && !supaData?.user) {
-      console.error("[confirmSignUpAction] supabase error:", supaError);
+    if (createErr && !createdAuth?.user) {
+      console.error("[confirmSignUpAction] supabase createUser error:", createErr);
       return {
         error:
           lang === "fr"
-            ? `Erreur lors de la création du compte : ${supaError.message}`
-            : supaError.message,
+            ? `Erreur lors de la création du compte : ${createErr.message}`
+            : createErr.message,
       };
     }
 
-    // Auto-confirm in Supabase Admin because we proved email ownership
-    try {
-      const supabaseAdmin = getSupabaseAdminClient();
-      const { data: list } = await supabaseAdmin.auth.admin.listUsers();
-      const authUser = list?.users?.find((u) => u.email === email);
-      if (authUser) {
-        await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
-          email_confirm: true,
-        });
-      }
-    } catch (err) {
-      console.error("[confirmSignUpAction] email_confirm update error:", err);
-    }
+    const authUserId = createdAuth?.user?.id ?? null;
 
     const user = await prisma.user.upsert({
       where: { email },
-      update: { name: fullName, emailVerified: new Date() },
-      create: { email, name: fullName, emailVerified: new Date() },
+      update: {
+        name: fullName,
+        emailVerified: new Date(),
+        ...(authUserId ? { authUserId } : {}),
+      },
+      create: {
+        email,
+        name: fullName,
+        emailVerified: new Date(),
+        ...(authUserId ? { authUserId } : {}),
+      },
     });
     const memberCode = await ensureMemberCode(user.id);
 
@@ -529,18 +602,36 @@ export async function confirmSignUpAction(
       lang,
     });
 
-    let redirectTo = callbackUrl;
-    if (callbackUrl === "/dashboard" && isAdminRole(user.role)) {
-      redirectTo = "/admin";
+    const safeCallback = sanitizeCallbackUrl(callbackUrl);
+    const redirectTo =
+      safeCallback === "/dashboard" && isAdminRole(user.role) ? "/admin" : safeCallback;
+
+    const { data: signInData, error: signInErr } =
+      await getSupabaseAuthClient().auth.signInWithPassword({
+        email,
+        password,
+      });
+
+    if (
+      !signInErr &&
+      signInData?.session?.access_token &&
+      signInData?.session?.refresh_token
+    ) {
+      await clearServerAuthCookies();
+      await setServerSupabaseCookies(
+        signInData.session.access_token,
+        signInData.session.refresh_token,
+      );
+      return {
+        success: true,
+        accessToken: signInData.session.access_token,
+        refreshToken: signInData.session.refresh_token,
+        redirectTo,
+      };
     }
 
-    await signIn("email-password", { email, password, redirectTo });
-    return { success: true };
+    return { success: true, redirectTo: "/login" };
   } catch (err) {
-    if (isRedirectSignal(err)) throw err;
-    if (err instanceof AuthError) {
-      return { success: true };
-    }
     console.error("[confirmSignUpAction] unexpected error:", err);
     return {
       error:
@@ -556,6 +647,7 @@ export async function signUpAction(
   _prevState: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
+  void callbackUrl;
   const lang = await getLang();
   const fullName = String(formData.get("fullName") ?? "").trim();
   const rawEmail = String(formData.get("email") ?? "").trim();
@@ -573,22 +665,165 @@ export async function signUpAction(
   };
 }
 
-export async function getGoogleSignInUrl(
+/**
+ * Finalizes a Supabase OAuth login (Google) after `/auth/callback` obtains a
+ * browser session: verifies the JWT, enforces ban checks, ensures `memberCode`
+ * + welcome notifications for brand-new accounts, sets SSR cookies, and
+ * computes the role-appropriate destination URL.
+ */
+export async function finalizeSupabaseOAuthAction(
+  accessToken: string,
+  refreshToken: string,
   callbackUrl: string = "/dashboard",
-): Promise<{ url?: string; error?: string }> {
+): Promise<{ error?: string; redirectTo: string }> {
+  const lang = await getLang();
   try {
-    await signIn("google", { redirectTo: callbackUrl });
-    return { error: "No redirect occurred" };
-  } catch (err) {
-    if (isRedirectSignal(err)) {
-      const digest = (err as { digest?: string }).digest ?? "";
-      const parts = digest.split(";");
-      if (parts.length >= 3 && parts[2]?.startsWith("http")) {
-        return { url: parts[2] };
+    if (!accessToken || !refreshToken) {
+      return { error: "Default", redirectTo: "/login?error=Default" };
+    }
+
+    const { data, error } = await getSupabaseAuthClient().auth.getUser(accessToken);
+    const rawSupaEmail = data?.user?.email?.trim();
+    if (error || !data?.user || !rawSupaEmail) {
+      return { error: "Default", redirectTo: "/login?error=Default" };
+    }
+
+    const supaUser = data.user;
+    const email = rawSupaEmail.toLowerCase();
+    const meta = (supaUser.user_metadata ?? {}) as Record<string, unknown>;
+    const displayName =
+      (typeof meta.full_name === "string" && meta.full_name.trim()) ||
+      (typeof meta.name === "string" && meta.name.trim()) ||
+      email.split("@")[0] ||
+      "Membre";
+    const googlePicture =
+      (typeof meta.avatar_url === "string" && meta.avatar_url.trim()) ||
+      (typeof meta.picture === "string" && meta.picture.trim()) ||
+      null;
+
+    let dbUser = await prisma.user.findFirst({
+      where: {
+        OR: [{ authUserId: supaUser.id }, { email: { equals: email, mode: "insensitive" } }],
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        image: true,
+        role: true,
+        isBanned: true,
+        authUserId: true,
+        emailVerified: true,
+        createdAt: true,
+      },
+    });
+
+    if (!dbUser) {
+      dbUser = await prisma.user.create({
+        data: {
+          authUserId: supaUser.id,
+          email,
+          name: displayName,
+          image: googlePicture,
+          emailVerified: new Date(),
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          image: true,
+          role: true,
+          isBanned: true,
+          authUserId: true,
+          emailVerified: true,
+          createdAt: true,
+        },
+      });
+    } else if (!dbUser.isBanned) {
+      const updates: { authUserId?: string; emailVerified?: Date; image?: string } = {};
+      if (!dbUser.authUserId) updates.authUserId = supaUser.id;
+      if (!dbUser.emailVerified) updates.emailVerified = new Date();
+      if (!dbUser.image && googlePicture) updates.image = googlePicture;
+      if (Object.keys(updates).length > 0) {
+        await prisma.user.update({ where: { id: dbUser.id }, data: updates }).catch(() => {});
       }
     }
-    console.error("[getGoogleSignInUrl] unexpected error:", err);
-    return { error: "Failed to generate Google sign-in URL" };
+
+    if (dbUser.isBanned) {
+      await clearServerAuthCookies();
+      return { error: "AccountBanned", redirectTo: "/login?error=AccountBanned" };
+    }
+
+    const memberCode = await ensureMemberCode(dbUser.id);
+
+    // Send welcome notifications once if this account was just created via Google OAuth
+    const isFreshAccount = Date.now() - dbUser.createdAt.getTime() < 120_000;
+    if (isFreshAccount) {
+      const existingNotifCount = await prisma.notification.count({
+        where: { userId: dbUser.id },
+      });
+      if (existingNotifCount === 0) {
+        void sendWelcomeAndAdminNotifications({
+          userId: dbUser.id,
+          name: dbUser.name,
+          email: dbUser.email,
+          memberCode,
+          lang,
+        });
+      }
+    }
+
+    await clearServerAuthCookies();
+    await setServerSupabaseCookies(accessToken, refreshToken);
+
+    const safeCallback = sanitizeCallbackUrl(callbackUrl);
+    const redirectTo =
+      safeCallback === "/dashboard" && isAdminRole(dbUser.role) ? "/admin" : safeCallback;
+
+    return { redirectTo };
+  } catch (err) {
+    console.error("[finalizeSupabaseOAuthAction] unexpected error:", err);
+    return { error: "Default", redirectTo: "/login?error=Default" };
   }
 }
 
+/**
+ * Local development quick-login helper (disabled in production).
+ */
+export async function devSignInSupabaseAction(email: string, callbackUrl: string = "/dashboard") {
+  if (process.env.NODE_ENV === "production") return;
+
+  const user = await prisma.user.findUnique({
+    where: { email: email.toLowerCase() },
+    select: { email: true, role: true, isBanned: true },
+  });
+  if (!user || user.isBanned) {
+    redirect("/login?error=AccountBanned");
+  }
+
+  const admin = getSupabaseAdminClient();
+  const { data: linkData } = await admin.auth.admin.generateLink({
+    type: "magiclink",
+    email: user.email,
+  });
+  const tokenHash = linkData?.properties?.hashed_token;
+  if (!tokenHash) {
+    redirect("/login?error=Default");
+  }
+
+  const { data: verified } = await getSupabaseAuthClient().auth.verifyOtp({
+    token_hash: tokenHash,
+    type: "magiclink",
+  });
+  if (!verified?.session?.access_token || !verified?.session?.refresh_token) {
+    redirect("/login?error=Default");
+  }
+
+  await clearServerAuthCookies();
+  await setServerSupabaseCookies(verified.session.access_token, verified.session.refresh_token);
+
+  const safeCallback = sanitizeCallbackUrl(callbackUrl);
+  const redirectTo =
+    safeCallback === "/dashboard" && isAdminRole(user.role) ? "/admin" : safeCallback;
+  redirect(redirectTo);
+}

@@ -6,7 +6,11 @@ import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 import { formatXAF } from "@/lib/format-currency";
 import { detectMobileMoneyProvider } from "@/lib/mobile-money-provider";
 import { playSuccessChimeSound } from "@/lib/sound-effects";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import {
+  getFapshiEdgeUrl,
+  getSupabaseAccessToken,
+  getSupabaseBrowserClient,
+} from "@/lib/supabase/client";
 import {
   NetworkFallbackProofStep,
   type FallbackPayableSlot,
@@ -72,18 +76,30 @@ export function BulkPaymentDialog({
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/payments/bulk/quote", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ membershipSlotIds, isRelative }),
-    })
-      .then(async (res) => {
+    void (async () => {
+      try {
+        const token = await getSupabaseAccessToken();
+        if (!token) {
+          throw new Error(
+            lang === "fr"
+              ? "Votre session a expiré. Veuillez vous reconnecter."
+              : "Your session expired. Please sign in again.",
+          );
+        }
+        const res = await fetch(getFapshiEdgeUrl("bulk-quote"), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ membershipSlotIds, isRelative }),
+        });
         const body = await parseJsonOrThrow<Quote>(res, t("couldNotCalculateTotal"));
         if (!cancelled) setQuote(body);
-      })
-      .catch((err) => {
+      } catch (err) {
         if (!cancelled) setQuoteError(friendlyErrorMessage(err, t("couldNotCalculateTotal")));
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -142,7 +158,7 @@ export function BulkPaymentDialog({
     checkingRef.current = true;
     setCheckingStatus(true);
     try {
-      const res = await fetch(`/api/payments/fapshi/status?transId=${encodeURIComponent(id)}`);
+      const res = await fetch(`${getFapshiEdgeUrl("status")}?transId=${encodeURIComponent(id)}`);
       if (!res.ok) return false;
       const body = (await res.json()) as { status: string; failureReason?: string | null };
       return resolveTerminalStatus(body.status, body.failureReason ?? null);
@@ -245,9 +261,20 @@ export function BulkPaymentDialog({
     setSubmitting(true);
     setPayError(null);
     try {
-      const res = await fetch("/api/payments/bulk/initiate", {
+      const token = await getSupabaseAccessToken();
+      if (!token) {
+        throw new Error(
+          lang === "fr"
+            ? "Votre session a expiré. Veuillez vous reconnecter."
+            : "Your session expired. Please sign in again.",
+        );
+      }
+      const res = await fetch(getFapshiEdgeUrl("bulk"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           membershipSlotIds,
           phone: normalized,

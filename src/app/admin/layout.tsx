@@ -11,6 +11,7 @@ import { InstallPromptModal } from "@/components/install-prompt-modal";
 import { PushPermissionPrompt } from "@/components/push-permission-prompt";
 import { NotificationBadgeSync } from "@/components/notification-badge-sync";
 import { InactivityAutoLogout } from "@/components/inactivity-auto-logout";
+import { SupabaseSessionBootstrap } from "@/components/supabase-session-bootstrap";
 import { isAdminRole } from "@/lib/constants";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -65,6 +66,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <InstallPromptModal lang={lang} />
       <PushPermissionPrompt lang={lang} />
       <NotificationBadgeSync userId={session.user.id} />
+      <SupabaseSessionBootstrap expectedEmail={session.user.email ?? undefined} />
       <InactivityAutoLogout />
     </div>
   );

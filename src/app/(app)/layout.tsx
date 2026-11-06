@@ -14,6 +14,7 @@ import { OfflineDraftSync } from "@/components/offline-draft-sync";
 import { WhatsAppPhonePrompt, WhatsAppPhoneBanner } from "@/components/whatsapp-phone-prompt";
 import { InactivityAutoLogout } from "@/components/inactivity-auto-logout";
 import { AppLockGate } from "@/components/app-lock-gate";
+import { SupabaseSessionBootstrap } from "@/components/supabase-session-bootstrap";
 import { isAdminRole } from "@/lib/constants";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -94,6 +95,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <OfflineDraftSync lang={lang} />
       <NotificationBadgeSync userId={session.user.id} />
       <WhatsAppPhonePrompt lang={lang} hasPhone={!!dbUser?.phone} userEmail={userEmail} />
+      <SupabaseSessionBootstrap expectedEmail={userEmail || undefined} />
       <InactivityAutoLogout />
       <AppLockGate lang={lang} />
     </div>

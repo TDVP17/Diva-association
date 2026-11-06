@@ -116,23 +116,42 @@ export async function updateEmailAction(
 
   try {
     const supabaseAdmin = getSupabaseAdminClient();
-    const { data: list, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-    if (listError) {
-      console.error("[updateEmailAction] could not list Supabase users:", listError.message);
-      return { error: "Could not update your email. Please try again." };
-    }
-    const authUser = list.users.find((u) => u.email === session.user.email);
-    if (!authUser) {
-      return { error: "Could not update your email. Please try again." };
+    const dbSelf = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { authUserId: true },
+    });
+    let targetAuthId = dbSelf?.authUserId ?? null;
+    if (!targetAuthId) {
+      const { data: list, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+        page: 1,
+        perPage: 1000,
+      });
+      if (listError) {
+        console.error("[updateEmailAction] could not list Supabase users:", listError.message);
+        return { error: "Could not update your email. Please try again." };
+      }
+      const authUser = list.users.find(
+        (u) => u.email?.toLowerCase() === session.user.email?.toLowerCase(),
+      );
+      if (!authUser) {
+        return { error: "Could not update your email. Please try again." };
+      }
+      targetAuthId = authUser.id;
     }
 
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(authUser.id, { email });
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(targetAuthId, {
+      email,
+      email_confirm: true,
+    });
     if (updateError) {
       console.error("[updateEmailAction] email update failed:", updateError.message);
       return { error: "Could not update your email. Please try again." };
     }
 
-    await prisma.user.update({ where: { id: session.user.id }, data: { email } });
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: { email, authUserId: targetAuthId },
+    });
     return { success: "Email updated." };
   } catch (err) {
     console.error("[updateEmailAction] unexpected error:", err);
@@ -181,17 +200,30 @@ export async function changePasswordAction(
     }
 
     const supabaseAdmin = getSupabaseAdminClient();
-    const { data: list, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-    if (listError) {
-      console.error("[changePasswordAction] could not list Supabase users:", listError.message);
-      return { error: "Could not update your password. Please try again." };
-    }
-    const authUser = list.users.find((u) => u.email === session.user.email);
-    if (!authUser) {
-      return { error: "Could not update your password. Please try again." };
+    const dbSelf = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { authUserId: true },
+    });
+    let targetAuthId = dbSelf?.authUserId ?? null;
+    if (!targetAuthId) {
+      const { data: list, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+        page: 1,
+        perPage: 1000,
+      });
+      if (listError) {
+        console.error("[changePasswordAction] could not list Supabase users:", listError.message);
+        return { error: "Could not update your password. Please try again." };
+      }
+      const authUser = list.users.find(
+        (u) => u.email?.toLowerCase() === session.user.email?.toLowerCase(),
+      );
+      if (!authUser) {
+        return { error: "Could not update your password. Please try again." };
+      }
+      targetAuthId = authUser.id;
     }
 
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(targetAuthId, {
       password: newPassword,
     });
     if (updateError) {

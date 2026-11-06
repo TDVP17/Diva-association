@@ -1,10 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import {
   signInAction,
-  signUpAction,
   requestPasswordResetAction,
   confirmPasswordResetAction,
   requestSignUpCodeAction,
@@ -12,6 +11,7 @@ import {
   confirmSignUpAction,
   type AuthFormState,
 } from "./actions";
+import { getSupabaseBrowserClient, writeBrowserSupabaseCookies } from "@/lib/supabase/client";
 import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 
 const initialState: AuthFormState = {};
@@ -105,10 +105,34 @@ export function CredentialsForm({
     signInAction.bind(null, callbackUrl),
     initialState,
   );
-  const [signUpState, signUpFormAction] = useActionState(
-    signUpAction.bind(null, callbackUrl),
-    initialState,
-  );
+
+  useEffect(() => {
+    if (!signInState.accessToken || !signInState.refreshToken) return;
+    let active = true;
+    const accessToken = signInState.accessToken;
+    const refreshToken = signInState.refreshToken;
+    const targetUrl = signInState.redirectTo || callbackUrl || "/dashboard";
+
+    void (async () => {
+      writeBrowserSupabaseCookies({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+      const supabase = getSupabaseBrowserClient();
+      if (supabase) {
+        await supabase.auth
+          .setSession({ access_token: accessToken, refresh_token: refreshToken })
+          .catch(() => {});
+      }
+      if (active) {
+        window.location.replace(targetUrl);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [signInState.accessToken, signInState.refreshToken, signInState.redirectTo, callbackUrl]);
 
   // Sign-up 2-step verification state
   const [signupStep, setSignupStep] = useState<1 | 2>(1);
@@ -177,6 +201,25 @@ export function CredentialsForm({
       const res = await confirmSignUpAction(signupToken, signupCode.trim(), callbackUrl, lang);
       if (res.error) {
         setSignupError(res.error);
+      } else if (res.accessToken && res.refreshToken) {
+        writeBrowserSupabaseCookies({
+          access_token: res.accessToken,
+          refresh_token: res.refreshToken,
+        });
+        const supabase = getSupabaseBrowserClient();
+        if (supabase) {
+          await supabase.auth
+            .setSession({
+              access_token: res.accessToken,
+              refresh_token: res.refreshToken,
+            })
+            .catch(() => {});
+        }
+        window.location.replace(res.redirectTo || callbackUrl || "/dashboard");
+        return;
+      } else if (res.redirectTo) {
+        window.location.replace(res.redirectTo);
+        return;
       }
     } catch (err) {
       if (

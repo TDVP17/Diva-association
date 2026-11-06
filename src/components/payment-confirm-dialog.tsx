@@ -6,7 +6,11 @@ import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 import { formatXAF } from "@/lib/format-currency";
 import { detectMobileMoneyProvider } from "@/lib/mobile-money-provider";
 import { playSuccessChimeSound } from "@/lib/sound-effects";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import {
+  getFapshiEdgeUrl,
+  getSupabaseAccessToken,
+  getSupabaseBrowserClient,
+} from "@/lib/supabase/client";
 import {
   NetworkFallbackProofStep,
   type FallbackPayableSlot,
@@ -141,24 +145,42 @@ export function PaymentConfirmDialog({
 
   useEffect(() => {
     let cancelled = false;
-    const request = fineId
-      ? fetch(`/api/fines/${fineId}/quote`)
-      : fetch("/api/payments/quote", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            membershipSlotId,
-            ...(dueDate ? { dueDate } : {}),
-          }),
-        });
-    request
-      .then(async (res) => {
+    void (async () => {
+      try {
+        let res: Response;
+        if (fineId) {
+          const token = await getSupabaseAccessToken();
+          if (!token) {
+            throw new Error(
+              lang === "fr"
+                ? "Votre session a expiré. Veuillez vous reconnecter."
+                : "Your session expired. Please sign in again.",
+            );
+          }
+          res = await fetch(getFapshiEdgeUrl("fine-quote"), {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ fineId }),
+          });
+        } else {
+          res = await fetch(getFapshiEdgeUrl("quote"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              membershipSlotId,
+              ...(dueDate ? { dueDate } : {}),
+            }),
+          });
+        }
         const body = await parseJsonOrThrow<Quote>(res, t("couldNotCalculateTotal"));
         if (!cancelled) setQuote(body);
-      })
-      .catch((err) => {
+      } catch (err) {
         if (!cancelled) setQuoteError(friendlyErrorMessage(err, t("couldNotCalculateTotal")));
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -217,7 +239,7 @@ export function PaymentConfirmDialog({
     checkingRef.current = true;
     setCheckingStatus(true);
     try {
-      const res = await fetch(`/api/payments/fapshi/status?transId=${encodeURIComponent(id)}`);
+      const res = await fetch(`${getFapshiEdgeUrl("status")}?transId=${encodeURIComponent(id)}`);
       if (!res.ok) return false;
       const body = (await res.json()) as { status: string; failureReason?: string | null };
       return resolveTerminalStatus(body.status, body.failureReason ?? null);
@@ -333,9 +355,26 @@ export function PaymentConfirmDialog({
     setSubmitting(true);
     setPayError(null);
     try {
-      const res = await fetch(payEndpoint, {
+      const token = await getSupabaseAccessToken();
+      if (!token) {
+        throw new Error(
+          lang === "fr"
+            ? "Votre session a expiré. Veuillez vous reconnecter."
+            : "Your session expired. Please sign in again.",
+        );
+      }
+      const edgeTarget = fineId
+        ? getFapshiEdgeUrl("fine")
+        : payEndpoint.includes("relative") || payEndpoint.includes("pay-slot")
+          ? getFapshiEdgeUrl("relative")
+          : getFapshiEdgeUrl("initiate");
+
+      const res = await fetch(edgeTarget, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           ...(membershipSlotId ? { membershipSlotId } : {}),
           ...(fineId ? { fineId } : {}),
