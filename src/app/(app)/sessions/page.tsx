@@ -64,7 +64,15 @@ export default async function SessionsPage() {
       status: { not: "CLOSED" },
       id: { notIn: excludedSessionIds },
     },
-    include: { memberships: { select: { status: true, slotCount: true } } },
+    include: {
+      memberships: {
+        select: {
+          status: true,
+          slotCount: true,
+          slots: { select: { id: true } },
+        },
+      },
+    },
     orderBy: { startDate: "asc" },
   });
   const browsable = candidates.filter(
@@ -85,14 +93,24 @@ export default async function SessionsPage() {
   const activeCotisationsList = nonJoinable.map((s) => {
     const regSlots = sumRegisteredSlots(s.memberships);
     const isFull = s.maxSlots !== null && regSlots >= Number(s.maxSlots);
-    const approvedDbCount = s.memberships.filter((m) => m.status === "APPROVED").length;
+    const approvedMemberships = s.memberships.filter((m) => m.status === "APPROVED");
+    const approvedDbCount = approvedMemberships.length;
     const membersCount = approvedDbCount > 0 ? approvedDbCount : (s.validatedMembersCount ?? 0);
+    // Count exact number of parts/names (slots), accounting for members with multiple names
+    const approvedSlotsCount = approvedMemberships.reduce(
+      (sum, m) => sum + (m.slots && m.slots.length > 0 ? m.slots.length : (m.slotCount ? Number(m.slotCount) : 1)),
+      0,
+    );
+    const totalSlots = approvedSlotsCount > 0
+      ? approvedSlotsCount
+      : (s.maxSlots ? Number(s.maxSlots) : (s.validatedMembersCount || 1));
     return {
       id: s.id,
       title: s.title || TONTINE_LABELS[s.type] || s.type,
       description: s.description,
       startDate: s.startDate,
       membersCount,
+      totalSlots,
       amount: Number(s.amount),
       fee: Number(s.fee),
       isFull,
@@ -251,10 +269,18 @@ export default async function SessionsPage() {
                     {t("startsOn")} {s.startDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short", year: "numeric" })}
                   </p>
                   {(() => {
-                    const approvedDbCount = s.memberships.filter((m) => m.status === "APPROVED").length;
+                    const approvedMemberships = s.memberships.filter((m) => m.status === "APPROVED");
+                    const approvedDbCount = approvedMemberships.length;
                     const membersCount = approvedDbCount > 0 ? approvedDbCount : (s.validatedMembersCount ?? 0);
-                    const count = membersCount || (s.maxSlots ? Number(s.maxSlots) : 1);
-                    const pot = Math.round(count * Number(s.amount) + count * Number(s.fee) * 0.25);
+                    // Count exact registered slots (names)
+                    const approvedSlotsCount = approvedMemberships.reduce(
+                      (sum, m) => sum + (m.slots && m.slots.length > 0 ? m.slots.length : (m.slotCount ? Number(m.slotCount) : 1)),
+                      0,
+                    );
+                    const totalSlots = approvedSlotsCount > 0
+                      ? approvedSlotsCount
+                      : (s.maxSlots ? Number(s.maxSlots) : (s.validatedMembersCount || 1));
+                    const pot = Math.round(totalSlots * Number(s.amount));
                     return (
                       <>
                         {membersCount > 0 && (
@@ -268,10 +294,17 @@ export default async function SessionsPage() {
                           <span className="font-numeric-data text-on-surface font-semibold">{formatXAF(Number(s.amount))}</span>
                           <span>{t("plusFeeSuffix", { fee: formatXAF(Number(s.fee)) })}</span>
                         </p>
-                        <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 border border-slate-200 text-slate-600 text-[11px] font-medium">
-                          <span className="material-symbols-outlined text-[15px] text-primary">info</span>
-                          <span>{lang === "fr" ? "Le montant total dépend du nombre de membres (visible après validation)" : "Total pot depends on member count (visible once validated)"}</span>
-                        </div>
+                        {approvedSlotsCount > 0 ? (
+                          <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold">
+                            <span className="material-symbols-outlined text-[14px] text-emerald-600">emoji_events</span>
+                            <span>{t("totalPotToEat")} : {formatXAF(pot)}</span>
+                          </div>
+                        ) : (
+                          <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 border border-slate-200 text-slate-600 text-[11px] font-medium">
+                            <span className="material-symbols-outlined text-[15px] text-primary">info</span>
+                            <span>{lang === "fr" ? "Le montant total dépend du nombre de membres (visible après validation)" : "Total pot depends on member count (visible once validated)"}</span>
+                          </div>
+                        )}
                         {(() => {
                           const fallback = getTontineConfig(s.type);
                           const fAmount = s.fineAmountPerPeriod
@@ -341,8 +374,7 @@ export default async function SessionsPage() {
                       <span>{t("plusFeeSuffix", { fee: formatXAF(c.fee) })}</span>
                     </p>
                     {(() => {
-                      const count = c.membersCount || 1;
-                      const pot = Math.round(count * c.amount + count * c.fee * 0.25);
+                      const pot = Math.round(c.totalSlots * c.amount);
                       return (
                         <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold">
                           <span className="material-symbols-outlined text-[14px] text-emerald-600">emoji_events</span>

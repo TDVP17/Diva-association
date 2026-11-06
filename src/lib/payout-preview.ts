@@ -84,9 +84,8 @@ export async function computePayoutPreview(
 
   // Cagnotte brute : cotisations déjà payées + cotisations du bénéficiaire intégrées
   const grossPotAmount = paidAmount + unpaidContribAmount;
-  const grossFees = paidFees + unpaidContribFee;
-  // Le montant à bouffer comprend la somme des cotisations + 25% des frais (75% restent à l'admin)
-  const pot = Math.round(grossPotAmount + (grossFees * 0.25));
+  // Le montant à bouffer comprend la somme exacte des cotisations (les frais d'administration restent à l'association)
+  const pot = Math.round(grossPotAmount);
 
   // Déductions : cotisations propres non payées à déduire
   const deductedContributions = unpaidContribAmount + unpaidContribFee;

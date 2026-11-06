@@ -501,14 +501,13 @@ export default async function SessionDetailPage({
   ).length;
 
   const perSlotAmount = Number(tontineSession.amount);
-  const perSlotFee = Number(tontineSession.fee);
   const slotCountForPot =
     totalRegisteredSlots > 0
       ? totalRegisteredSlots
       : tontineSession.maxSlots
         ? Number(tontineSession.maxSlots)
         : (allSlotsFlat.length || 1);
-  const totalPotAmount = Math.round(slotCountForPot * perSlotAmount + slotCountForPot * perSlotFee * 0.25);
+  const totalPotAmount = Math.round(slotCountForPot * perSlotAmount);
 
   const mySlots = [...myMembership.slots].sort((a, b) =>
     a.beneficiaryName.localeCompare(b.beneficiaryName, "fr", { sensitivity: "base" }),

@@ -3,6 +3,8 @@ import { auth } from "@/auth";
 import { readStoredFile } from "@/lib/storage";
 import { mimeTypeFor } from "@/lib/mime";
 import { isAdminRole } from "@/lib/constants";
+import { prisma } from "@/lib/prisma";
+import { generateReceiptPdf } from "@/lib/receipt";
 
 export async function GET(
   _request: Request,
@@ -31,6 +33,51 @@ export async function GET(
   }
 
   const key = segments.join("/");
+
+  // Always generate official contribution receipts live without gateway payment fees
+  if (category === "receipts" && rest[0]?.endsWith(".pdf")) {
+    const contributionId = rest[0].replace(/\.pdf$/, "");
+    try {
+      const contrib = await prisma.contribution.findUnique({
+        where: { id: contributionId },
+        include: {
+          membershipSlot: {
+            include: {
+              membership: {
+                include: { user: true, tontineSession: true },
+              },
+            },
+          },
+          paidByUser: true,
+        },
+      });
+      if (contrib) {
+        const u = contrib.membershipSlot.membership.user;
+        const s = contrib.membershipSlot.membership.tontineSession;
+        const pdfBytes = await generateReceiptPdf({
+          memberName: `${u.name} — ${contrib.membershipSlot.beneficiaryName}`,
+          paidByName: contrib.paidByUser?.name,
+          paymentMethod: contrib.recordedByAdminId ? "Recorded by admin" : "Mobile Money / Orange Money",
+          tontineType: s.type,
+          amount: Number(contrib.amountPaid),
+          fee: Number(contrib.feePaid),
+          fine: Number(contrib.finePaid),
+          total: Number(contrib.amountPaid) + Number(contrib.feePaid) + Number(contrib.finePaid),
+          transRef: contrib.fapshiTxRef ?? contrib.id,
+          paidAt: contrib.paidAt ?? contrib.createdAt,
+        });
+        return new NextResponse(new Uint8Array(pdfBytes), {
+          headers: {
+            "Content-Type": "application/pdf",
+            "Cache-Control": "private, max-age=0, no-store",
+          },
+        });
+      }
+    } catch {
+      // Fallback to reading file from storage
+    }
+  }
+
   try {
     const data = await readStoredFile(key);
     return new NextResponse(new Uint8Array(data), {

@@ -266,46 +266,48 @@ const POSTER_CONFIGS = [
     num: "6",
     filename: "6-samedi-diva-asso.jpg",
     day: "SAMEDI",
-    headline1: "BON SAMEDI,",
-    headline2: "SOYEZ PRÊTS DEMAIN.",
-    pitch: "Demain dimanche, la tontine s'ouvre ! Approvisionnez votre compte Mobile Money dès aujourd'hui pour cotiser l'esprit tranquille.",
-    usp1: "Rappels automatiques WhatsApp & SMS sans stress",
-    usp2: "Zéro amende de retard, zéro pénalité",
+    headline1: "PLUSIEURS TONTINES,",
+    headline2: "CHOISISSEZ VOS CYCLES.",
+    pitch: "Hebdo, mensuelle ou cycle du 28 : participez à plusieurs tontines en parallèle et cotisez selon votre propre calendrier d'épargne.",
+    usp1: "Multi-cotisations actives sur une seule application",
+    usp2: "Suivi des tours et dates de collecte en temps réel",
     deviceType: "mobile",
-    screenNav: "Veille de Session · Alertes Actives",
-    screenTitle: "Vérification de votre compte",
+    screenNav: "Multi-Tontines · Flexibilité Totale",
+    screenTitle: "Vos Cotisations en Cours",
     screenContent: `
-      <div style="background:#ffffff; border-radius:16px; padding:14px; border:2px solid #f59e0b; box-shadow:0 6px 18px rgba(245,158,11,0.15); margin-bottom:12px;">
-        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-          <span style="font-size:22px;">🔔</span>
-          <div>
-            <div style="font-size:13px; font-weight:800; color:#0f172a;">Rappel Officiel DIVA Asso</div>
-            <div style="font-size:10px; color:#64748b;">Ouverture demain dès 08h00</div>
-          </div>
+      <div style="background:#ffffff; border-radius:16px; padding:12px; border:2px solid #6366f1; box-shadow:0 6px 18px rgba(99,102,241,0.15); margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <span style="font-size:10px; font-weight:800; color:#4f46e5; text-transform:uppercase; background:#eef2ff; padding:3px 8px; border-radius:6px;">Tontine Mensuelle</span>
+          <span style="font-size:9px; font-weight:700; color:#15803d; background:#dcfce7; padding:2px 6px; border-radius:4px;">À JOUR ✓</span>
         </div>
-        <div style="font-size:11px; color:#334155; line-height:1.4;">
-          La session <strong>Hebdo Sunday</strong> s'ouvre demain matin. Vérifiez votre solde Orange Money ou MTN MoMo dès ce soir pour un versement fluide sans retard !
+        <div style="font-size:15px; font-weight:900; color:#0f172a;">Cycle 28 du mois</div>
+        <div style="font-size:12px; font-weight:700; color:#4338ca; margin-top:2px;">20 000 FCFA / part · 11 membres</div>
+        <div style="font-size:10px; color:#64748b; margin-top:4px;">Gain du tour : <strong>220 000 FCFA</strong> · Collecte chaque 28</div>
+      </div>
+
+      <div style="background:#ffffff; border-radius:16px; padding:12px; border:2px solid #059669; box-shadow:0 6px 18px rgba(5,150,105,0.12); margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <span style="font-size:10px; font-weight:800; color:#059669; text-transform:uppercase; background:#ecfdf5; padding:3px 8px; border-radius:6px;">Tontine Hebdomadaire</span>
+          <span style="font-size:9px; font-weight:700; color:#15803d; background:#dcfce7; padding:2px 6px; border-radius:4px;">À JOUR ✓</span>
+        </div>
+        <div style="font-size:15px; font-weight:900; color:#0f172a;">Chaque dimanche</div>
+        <div style="font-size:12px; font-weight:700; color:#047857; margin-top:2px;">2 500 FCFA / part · Multi-noms</div>
+        <div style="font-size:10px; color:#64748b; margin-top:4px;">Gain net garanti · Reçu officiel instantané</div>
+      </div>
+
+      <div class="slots-list" style="margin-bottom:10px;">
+        <div class="slot-item">
+          <div><span class="slot-title">Jours de collecte flexibles</span> <div class="slot-sub">Dimanche, jeudi, 25, 28 du mois...</div></div>
+          <span class="badge-paid">AU CHOIX ✓</span>
+        </div>
+        <div class="slot-item">
+          <div><span class="slot-title">Gestion de plusieurs noms</span> <div class="slot-sub">1 seul débit groupé Orange / MTN</div></div>
+          <span class="badge-paid">SIMPLIFIÉ ✓</span>
         </div>
       </div>
 
-      <div class="grid-title">Guide Sérénité du Dimanche</div>
-      <div class="slots-list" style="margin-bottom:12px;">
-        <div class="slot-item">
-          <div><span class="slot-title">Compte Mobile Money rechargé</span> <div class="slot-sub">Montant de votre part disponible</div></div>
-          <span class="badge-paid">PRÊT ✓</span>
-        </div>
-        <div class="slot-item">
-          <div><span class="slot-title">Heure limite de versement</span> <div class="slot-sub">Avant 18h30 pour zéro amende</div></div>
-          <span style="color:#0284c7; font-weight:800; font-size:9px;">18H30 MAX</span>
-        </div>
-        <div class="slot-item">
-          <div><span class="slot-title">Reçu certifié automatique</span> <div class="slot-sub">Généré dès validation du paiement</div></div>
-          <span class="badge-paid">GARANTI ✓</span>
-        </div>
-      </div>
-
-      <div style="background:#f0fdf4; border:1.5px solid #86efac; border-radius:12px; padding:10px; text-align:center;">
-        <span style="font-size:12px; font-weight:800; color:#15803d;">✓ Mon Statut : Prêt pour la cotisation</span>
+      <div style="background:#f0fdf4; border:1.5px solid #86efac; border-radius:12px; padding:9px; text-align:center;">
+        <span style="font-size:11px; font-weight:800; color:#15803d;">✓ Épargnez à votre rythme sur divaasso.com</span>
       </div>
     `
   },
@@ -313,42 +315,42 @@ const POSTER_CONFIGS = [
     num: "7",
     filename: "7-dimanche-diva-asso.jpg",
     day: "DIMANCHE",
-    headline1: "DIMANCHE GAGNANT,",
-    headline2: "LA CAGNOTTE EST LÀ !",
-    pitch: "C'est le grand jour ! 100% des membres ont cotisé, les fonds sont sécurisés et reversés directement sur le compte Mobile Money du bénéficiaire.",
-    usp1: "Reversement 100% intégral le jour même",
-    usp2: "Aucune attente, transfert Orange & MTN direct",
+    headline1: "GAGNANT DU TOUR,",
+    headline2: "FONDS REVERSÉS DIRECTEMENT.",
+    pitch: "À chaque tour validé, 100% de la cagnotte est reversée directement sur votre compte Mobile Money. Zéro intermédiaire, transparence totale.",
+    usp1: "Reversement intégral immédiat Orange & MTN",
+    usp2: "Montant net exact calculé sans mauvaise surprise",
     deviceType: "mobile",
-    screenNav: "Session Hebdomadaire · Succès Total",
-    screenTitle: "100% des cotisations collectées",
+    screenNav: "Gain de Session · Versement Automatique",
+    screenTitle: "Tour Validé & Cagnotte Reversée",
     screenContent: `
       <div class="pot-banner" style="background: linear-gradient(135deg, #15803d 0%, #064e3b 100%);">
         <div class="pot-banner-top">
-          <span class="pot-tag" style="color:#fef08a;">100% COTISATIONS COLLECTÉES</span>
-          <span class="pot-badge" style="border-color:#fef08a; color:#fef08a; background:rgba(254,240,138,0.2);">SUCCÈS TOTAL</span>
+          <span class="pot-tag" style="color:#fef08a;">TOUR DE TONTINE VALIDÉ</span>
+          <span class="pot-badge" style="border-color:#fef08a; color:#fef08a; background:rgba(254,240,138,0.2);">VERSÉ ✓</span>
         </div>
-        <div class="pot-amount">2 500 000 <small>FCFA</small></div>
+        <div class="pot-amount">CAGNOTTE REVERSÉE</div>
         <div class="pot-meta">
-          <span>30/30 membres à jour</span>
-          <span style="color:#fef08a; font-weight:800;">Fonds débloqués 🏆</span>
+          <span>Montant net versé au bénéficiaire</span>
+          <span style="color:#fef08a; font-weight:800;">100% Garanti 🏆</span>
         </div>
       </div>
 
       <div style="background:#ffffff; border-radius:16px; padding:14px; border:2px solid #22c55e; margin-bottom:12px; text-align:center;">
         <div style="font-size:24px; margin-bottom:4px;">🏆</div>
-        <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Bénéficiaire de la cagnotte du jour</div>
+        <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Bénéficiaire du tour</div>
         <div style="font-size:17px; font-weight:900; color:#0f172a; margin-top:2px;">Kouam Arnaud</div>
-        <div style="font-size:12px; font-weight:800; color:#15803d; margin-top:4px;">Reversé sur Orange Money (699 •• •• 12) ✓</div>
+        <div style="font-size:12px; font-weight:800; color:#15803d; margin-top:4px;">Reversé sur Mobile Money (699 •• •• 12) ✓</div>
       </div>
 
       <div class="slots-list" style="margin-bottom:10px;">
         <div class="slot-item">
-          <div><span class="slot-title">Statut de la session</span> <div class="slot-sub">Tous les reçus transmis</div></div>
-          <span class="badge-paid">CLÔTURÉE ✓</span>
+          <div><span class="slot-title">Reçu officiel de versement</span> <div class="slot-sub">Téléchargeable en PDF certifié</div></div>
+          <span class="badge-paid">VALIDÉ ✓</span>
         </div>
         <div class="slot-item">
-          <div><span class="slot-title">Prochain tour de tontine</span> <div class="slot-sub">Dimanche prochain dès 08h00</div></div>
-          <span style="color:#0284c7; font-weight:800; font-size:9px;">TOUR SUIVANT</span>
+          <div><span class="slot-title">Toutes tontines & fréquences</span> <div class="slot-sub">Hebdo, mensuelle, cycle 28...</div></div>
+          <span style="color:#0284c7; font-weight:800; font-size:9px;">MULTI-CYCLES</span>
         </div>
       </div>
 

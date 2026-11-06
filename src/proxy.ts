@@ -21,6 +21,12 @@ export default auth((req) => {
     return NextResponse.redirect(new URL(target, nextUrl));
   }
 
+  // Marketing posters are strictly reserved for administrators
+  if (path.startsWith("/posters") && (!session?.user || !isAdminRole(session.user.role))) {
+    const target = session?.user ? "/dashboard" : "/login";
+    return NextResponse.redirect(new URL(target, nextUrl));
+  }
+
   if (!matchesPrefix(path, PROTECTED_PATH_PREFIXES)) {
     return NextResponse.next();
   }
