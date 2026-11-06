@@ -4,6 +4,9 @@ import { LegalPageShell, LegalSection } from "@/components/landing/legal-page-sh
 
 const LAST_UPDATED = "2026-09-01";
 
+export const dynamic = "force-static";
+export const revalidate = 86400;
+
 export const metadata: Metadata = { title: "Terms of Service" };
 
 export default async function TermsOfServicePage() {

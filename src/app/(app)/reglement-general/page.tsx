@@ -3,6 +3,8 @@ import { auth } from "@/auth";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { getAssociationRules } from "@/lib/association-rules";
 
+export const revalidate = 3600;
+
 export default async function GeneralRulesPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");

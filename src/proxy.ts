@@ -58,8 +58,8 @@ export default function proxy(req: NextRequest) {
   const isAuthenticated = hasSupabaseSession || hasLegacyCookie;
   const role = claims?.app_metadata?.role ?? null;
 
-  // Redirect already-signed-in Supabase users away from /login directly to their home area
-  if (hasSupabaseSession && claims?.sub && path === "/login") {
+  // Redirect already-signed-in Supabase users away from /login or / directly to their home area
+  if (hasSupabaseSession && claims?.sub && (path === "/login" || path === "/")) {
     const nowSec = Math.floor(Date.now() / 1000);
     if (!claims.exp || claims.exp > nowSec) {
       const target = isAdminRole(role) ? "/admin" : "/dashboard";
