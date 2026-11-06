@@ -414,3 +414,4 @@ export function renderAdvanceReminderMessage(
   }
   return `Salut, ${name} 👋 Rappel DIVA Asso : votre cotisation de ${formatXAF(amount)} pour « ${sessionTitle} » arrive dans ${daysBefore} jour(s). Vous pouvez cotiser dès maintenant en toute sérénité dans l'application !`;
 }
+

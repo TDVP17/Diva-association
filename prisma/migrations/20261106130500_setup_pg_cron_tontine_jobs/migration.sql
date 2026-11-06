@@ -56,3 +56,4 @@ SELECT cron.schedule('tontine-reminder-urgent', '0 16 * * *', $$SELECT private.i
 SELECT cron.schedule('tontine-food-turn', '30 17 * * *', $$SELECT private.invoke_tontine_cron('food-turn')$$);
 SELECT cron.schedule('tontine-check-penalties', '31 17 * * *', $$SELECT private.invoke_tontine_cron('check-penalties')$$);
 SELECT cron.schedule('tontine-refund-queue', '0 6 * * *', $$SELECT private.invoke_tontine_cron('process-refund-queue')$$);
+
