@@ -60,3 +60,4 @@ export async function logSecurityEvent({
     console.error("[SECURITY] Failed to write security log:", err);
   }
 }
+

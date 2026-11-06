@@ -47,16 +47,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const slotContributions = allSlotIds.length
     ? await prisma.contribution.findMany({
-        where: { membershipSlotId: { in: allSlotIds } },
-        select: {
-          id: true,
-          membershipSlotId: true,
-          dueDate: true,
-          status: true,
-          proofImageUrl: true,
-          proofImageUrls: true,
-        },
-      })
+      where: { membershipSlotId: { in: allSlotIds } },
+      select: {
+        id: true,
+        membershipSlotId: true,
+        dueDate: true,
+        status: true,
+        proofImageUrl: true,
+        proofImageUrls: true,
+      },
+    })
     : [];
 
   const sessionDueDateKey = sessionDueDate.toISOString().slice(0, 10);

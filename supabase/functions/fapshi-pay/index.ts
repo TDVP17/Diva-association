@@ -1755,6 +1755,7 @@ async function finalizeContributionSettlement(
 
   const totalPaid =
     Number(typed.amountPaid) +
+    Number(typed.feePaid) +
     Number(typed.finePaid);
 
   let paidByName: string | undefined;
@@ -2176,7 +2177,7 @@ async function handleFailedOrExpired(
 
     const { data: failedContribs } = await supabase
       .from("contributions")
-      .select("id, amountPaid, finePaid")
+      .select("id, amountPaid, feePaid, finePaid")
       .eq("bulkPaymentId", bulk.id)
       .not("status", "in", '("PAID","FAILED")');
 
@@ -2189,11 +2190,12 @@ async function handleFailedOrExpired(
           failedContribs.map((c: { id: string }) => c.id),
         );
 
-      const netAmount = (failedContribs as { amountPaid?: number | string; finePaid?: number | string }[]).reduce(
-        (sum, c) => sum + Number(c.amountPaid || 0) + Number(c.finePaid || 0),
+      const netAmount = (failedContribs as { amountPaid?: number | string; feePaid?: number | string; finePaid?: number | string }[]).reduce(
+        (sum, c) => sum + Number(c.amountPaid || 0) + Number(c.feePaid || 0) + Number(c.finePaid || 0),
         0,
       );
-      const amountLabel = formatXAF(netAmount > 0 ? netAmount : Number(bulk.amount));
+      // Montant net de cotisation uniquement (sans les 3,1% de Fapshi)
+      const amountLabel = formatXAF(netAmount > 0 ? netAmount : Math.round(Number(bulk.amount) / 1.031));
       await insertInAppNotifications(supabase, {
         type: "PAYMENT_FAILED",
         recipients: [
@@ -2263,7 +2265,7 @@ async function handleFailedOrExpired(
         TONTINE_TYPE_LABELS[m.tontineSession.type] ||
         m.tontineSession.type;
       const amountLabel = formatXAF(
-        Number(typed.amountPaid) + Number(typed.finePaid),
+        Number(typed.amountPaid) + Number(typed.feePaid) + Number(typed.finePaid),
       );
 
       await insertInAppNotifications(supabase, {

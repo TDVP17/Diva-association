@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { LegalPageShell, LegalSection } from "@/components/landing/legal-page-shell";
 
-const LAST_UPDATED = "2026-09-01";
+const LAST_UPDATED = "2026-11-06";
 
 export const dynamic = "force-static";
 export const revalidate = 86400;

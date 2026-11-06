@@ -99,9 +99,10 @@ export async function generateReceiptPdf(data: ReceiptData): Promise<Buffer> {
   y -= 30;
 
   row("Contribution", formatXAF(data.amount));
+  if (data.fee && data.fee > 0) row("Frais de cotisation", formatXAF(data.fee));
   if (data.fine > 0) row("Late fine", formatXAF(data.fine));
   y -= 10;
-  const exactTotal = data.amount + (data.fine || 0);
+  const exactTotal = data.amount + (data.fee || 0) + (data.fine || 0);
   row("Total", formatXAF(exactTotal), { emphasize: true });
 
   y -= 30;

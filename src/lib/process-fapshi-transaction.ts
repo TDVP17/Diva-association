@@ -315,10 +315,11 @@ async function handleFailedOrExpired(transId: string, verified: PaymentStatusRes
         data: { status: "FAILED", failureReason },
       });
       const netTotal = failedContributions.reduce(
-        (sum, c) => sum + Number(c.amountPaid || 0) + Number(c.finePaid || 0),
+        (sum, c) => sum + Number(c.amountPaid || 0) + Number(c.feePaid || 0) + Number(c.finePaid || 0),
         0,
       );
-      const amount = netTotal > 0 ? netTotal : Number(bulkPayment.amount);
+      // Montant net de cotisation uniquement (sans les 3,1% de Fapshi)
+      const amount = netTotal > 0 ? netTotal : Math.round(Number(bulkPayment.amount) / 1.031);
       await scheduleInAppNotifications({
         type: "PAYMENT_FAILED",
         recipients: [
@@ -345,7 +346,7 @@ async function handleFailedOrExpired(transId: string, verified: PaymentStatusRes
     });
     const { membership } = contribution.membershipSlot;
     const sessionLabel = membership.tontineSession.title || TONTINE_LABELS[membership.tontineSession.type] || membership.tontineSession.type;
-    const amount = Number(contribution.amountPaid) + Number(contribution.finePaid);
+    const amount = Number(contribution.amountPaid) + Number(contribution.feePaid) + Number(contribution.finePaid);
     await scheduleInAppNotifications({
       tontineSessionId: membership.tontineSessionId,
       type: "PAYMENT_FAILED",

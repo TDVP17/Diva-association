@@ -60,8 +60,9 @@ export async function GET(
           paymentMethod: contrib.recordedByAdminId ? "Recorded by admin" : "Mobile Money / Orange Money",
           tontineType: s.type,
           amount: Number(contrib.amountPaid),
+          fee: Number(contrib.feePaid),
           fine: Number(contrib.finePaid),
-          total: Number(contrib.amountPaid) + Number(contrib.finePaid),
+          total: Number(contrib.amountPaid) + Number(contrib.feePaid) + Number(contrib.finePaid),
           transRef: contrib.fapshiTxRef ?? contrib.id,
           paidAt: contrib.paidAt ?? contrib.createdAt,
         });

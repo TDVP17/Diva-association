@@ -114,7 +114,7 @@ export default async function HistoryPage() {
       const pureAmount = Number(c.amountPaid);
       const feeAmount = Number(c.feePaid);
       const fineAmount = Number(c.finePaid);
-      const totalAmount = pureAmount + fineAmount;
+      const totalAmount = pureAmount + feeAmount + fineAmount;
       const effectiveDate = c.paidAt ?? c.dueDate;
 
       rows.push({
@@ -171,7 +171,7 @@ export default async function HistoryPage() {
     const pureAmount = Number(c.amountPaid);
     const feeAmount = Number(c.feePaid);
     const fineAmount = Number(c.finePaid);
-    const totalAmount = pureAmount + fineAmount;
+    const totalAmount = pureAmount + feeAmount + fineAmount;
     const memberName = c.membershipSlot.membership.user.name;
 
     rows.push({
@@ -446,6 +446,7 @@ export default async function HistoryPage() {
                       <span>
                         <strong className="text-on-surface">{t("amountCotised")} :</strong>{" "}
                         {formatXAF(r.pureAmount)}
+                        {r.feeAmount ? ` + ${t("feeLabel")} : ${formatXAF(r.feeAmount)}` : ""}
                         {r.fineAmount ? ` + ${t("fineDetailLabel")} : ${formatXAF(r.fineAmount)}` : ""}
                       </span>
                     </div>

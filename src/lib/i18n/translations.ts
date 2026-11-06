@@ -1042,54 +1042,55 @@ export const translations = {
     privacyPolicyTitle: "Privacy Policy",
     privacyPolicyLastUpdated: "Last updated: {date}",
     privacyPolicyIntro:
-      "This Privacy Policy explains what information DIVA Asso collects, why we collect it, and how it is used and protected when you use our platform to manage tontine (cotisation) savings groups.",
-    privacyPolicySectionDataTitle: "Information We Collect",
+      "This Privacy Policy describes how DIVA Asso collects, protects, and handles personal and financial record information. DIVA Asso provides digital management and transparency tools for rotating savings and credit associations (tontines). Protecting members' funds and confidentiality is our highest operational priority.",
+    privacyPolicySectionDataTitle: "Information We Collect & Store",
     privacyPolicySectionDataBody:
-      "Account information (name, email, phone number, preferred language); identity verification documents (Cameroonian national ID card, a selfie photo, and the result of an automated face-match/liveness check) required to join a cotisation; location information (city, neighborhood, and GPS coordinates) if you choose to share it; payment information related to your Mobile Money/Orange Money contributions (phone number and transaction status — we never see or store your Mobile Money PIN); and messages you send through the in-app chat.",
+      "To ensure absolute financial security and mutual trust, we collect:\n\n• Identity & KYC Verification: Cameroonian National Identity Card (CNI), passport or residency permit, and a verified selfie photo required before joining any tontine group.\n• Account Information: Full legal name, verified mobile phone number, email address, preferred language, and group membership code.\n• Payment & Transaction Records: Mobile Money / Orange Money transaction identifiers, amounts contributed, association fees, late penalties, and digital receipt references. (DIVA Asso never requests, sees, or stores your secret Mobile Money PIN).\n• Audit & Security Logs: Authenticated IP address, device user-agent, and timestamped actions to protect against unauthorized access and account takeovers.",
     privacyPolicySectionUseTitle: "How We Use Your Information",
     privacyPolicySectionUseBody:
-      "We use your information to verify your identity before you can join a cotisation, to process and track your contributions and payouts, to send you reminders and notifications about your cotisations (by WhatsApp, email, or in-app), to prevent fraud and duplicate payments, and to let your group's administrator manage membership and resolve disputes.",
-    privacyPolicySectionSharingTitle: "Who We Share It With",
+      "Your information is strictly used for tontine management:\n\n• Verifying member identity (KYC) to eliminate fraud and fake profiles.\n• Enforcing payout turn order and generating tamper-proof electronic receipts.\n• Sending real-time transaction confirmations, payment reminders, and administrative alerts via secure email, Web Push, and in-app notices.\n• Preventing duplicate debits, unauthorized access, and breach of mutual commitment.",
+    privacyPolicySectionSharingTitle: "Data Processors & Zero Commercial Sharing",
     privacyPolicySectionSharingBody:
-      "We share the minimum necessary data with the service providers that power the platform: Didit (identity document and face verification), secure payment gateway (Mobile Money/Orange Money payment processing), Evolution API (WhatsApp notifications), Resend (email notifications), and Supabase (secure data storage and authentication). We do not sell your personal information to anyone.",
-    privacyPolicySectionSecurityTitle: "Data Security",
+      "We strictly do NOT sell, rent, or monetize your personal data. Data is shared exclusively with certified technical infrastructure partners under strict confidentiality:\n\n• Supabase: Encrypted database hosting and private, access-controlled storage for KYC identity documents.\n• Fapshi: Certified, PCI-compliant payment gateway processing Mobile Money (MTN) and Orange Money transactions.\n• Resend: Enterprise transactional email delivery for payment receipts and critical security alerts.\n• Browser Web Push: Direct device notifications without third-party ad brokers.\n\nWe do not use any foreign third-party identity brokers or uncertified messaging proxies.",
+    privacyPolicySectionSecurityTitle: "Security & Encryption Standards",
     privacyPolicySectionSecurityBody:
-      "Your data is encrypted in transit (HTTPS) and access to it is restricted to authorized administrators of your own cotisation group. Identity documents and payment records are stored in access-controlled storage, not publicly accessible.",
-    privacyPolicySectionRightsTitle: "Your Rights",
+      "All network traffic is strictly encrypted using TLS 1.3/HTTPS. KYC identity documents are isolated in private, encrypted cloud storage protected by PostgreSQL Row-Level Security (RLS). Access to sensitive member information is strictly restricted to authenticated administrators of your specific cotisation group and logged in an immutable audit trail.",
+    privacyPolicySectionRightsTitle: "Your Rights & Data Portability",
     privacyPolicySectionRightsBody:
-      "You can access or update most of your account information from your Profile page at any time. To request a copy of your data, a correction, or deletion of your account, contact your association's administrator or reach out using the contact details below.",
-    privacyPolicySectionContactTitle: "Contact Us",
+      "You have the right to inspect your transaction history, download all official contribution receipts, and request correction of inaccurate profile data. However, in accordance with mutual financial commitment rules, transaction ledgers and KYC records of active cycles must be retained until the complete conclusion and financial audit of the cycle.",
+    privacyPolicySectionContactTitle: "Data Protection & Support",
     privacyPolicySectionContactBody:
-      "If you have questions about this Privacy Policy or how your data is handled, please contact your association's administrator through the in-app Support chat.",
+      "For questions regarding your personal data or security rights, you can contact the association administration through the in-app Support chat or write to support@divaasso.com.",
 
     // Terms of Service
     termsOfServiceTitle: "Terms of Service",
     termsOfServiceLastUpdated: "Last updated: {date}",
     termsOfServiceIntro:
-      "These Terms of Service govern your use of the DIVA Asso platform. By creating an account, you agree to these terms.",
-    termsSectionServiceTitle: "About the Service",
+      "These Terms of Service constitute a legally binding agreement between you and DIVA Asso. By creating an account or participating in a cotisation group, you accept these terms in full.",
+    termsSectionServiceTitle: "Nature of the Platform & Legal Framework",
     termsSectionServiceBody:
-      "DIVA Asso is software that helps traditional tontine (cotisation) savings groups organize contributions, track payout order, and communicate. DIVA Asso is not a bank, a licensed financial institution, or a payment processor — Mobile Money and Orange Money payments are processed by our third-party payment partner, and DIVA Asso is not liable for outages or delays caused by that provider or by mobile network operators.",
-    termsSectionEligibilityTitle: "Eligibility & Verification",
+      "DIVA Asso operates as a digital accounting, transparency, and management platform for traditional solidarity tontines governed by Cameroonian Law No. 90/053 of December 19, 1990 on freedom of association.\n\nDIVA Asso is a technological intermediary providing unalterable record-keeping, cycle scheduling, and automated calculation tools. DIVA Asso is not a bank, microfinance institution, or deposit collector. Contributions are processed through certified mobile payment aggregators and disbursed directly to members' registered mobile accounts according to the agreed payout schedule.",
+    termsSectionEligibilityTitle: "Member Eligibility & Mandatory Verification (KYC)",
     termsSectionEligibilityBody:
-      "To join a cotisation, you must complete identity verification (KYC) with a valid Cameroonian national ID card and a matching selfie. An administrator may reject or remove a member who fails verification, provides false information, or violates a group's own rules (Règlement Général).",
-    termsSectionResponsibilitiesTitle: "Member Responsibilities",
+      "Because tontines rely on collective money and mutual trust, participation in any cotisation is conditional upon passing strict identity verification (KYC), including the submission of a valid National Identity Card (CNI) and matching photograph. Group administrators reserve the right to deny or revoke access to any applicant who provides falsified documents or fails security checks.",
+    termsSectionResponsibilitiesTitle: "Irrevocable Financial Commitment & Anti-Default Rules",
     termsSectionResponsibilitiesBody:
-      "You are responsible for making your contributions on time, for keeping your account information accurate, and for the confidentiality of your login credentials and Mobile Money PIN (which DIVA Asso never asks for and never stores). Late contributions may incur a fine as configured by your group's administrator.",
-    termsSectionPaymentsTitle: "Payments & Fees",
+      "Joining a cotisation constitutes a firm, definitive, and irrevocable commitment to pay every scheduled contribution until the completion of the full cycle.\n\nSTRICT ANTI-DEFAULT RULE: Any member who has received their payout pot ('bouffe') is legally, contractually, and morally prohibited from withdrawing, delaying, or failing to make subsequent payments until every other member has received their rightful payout. Refusing or failing to contribute after receiving the pot constitutes an intentional breach of trust and fraud punishable under Articles 318 and 322 of the Cameroonian Penal Code (Abus de confiance et escroquerie).\n\nIn the event of default or abandonment, the association leadership will initiate immediate civil recovery and criminal proceedings, using the member's verified identity documents, cryptographic transaction receipts, and timestamped audit logs as evidence.",
+    termsSectionPaymentsTitle: "Contributions, Association Fees & Official Receipts",
     termsSectionPaymentsBody:
-      "Contributions are collected via Mobile Money/Orange Money through our payment partner, which charges a processing fee shown to you before you confirm any payment. Payouts follow the order configured for your cotisation (random draw or admin-assigned) and are recorded once confirmed.",
-    termsSectionTerminationTitle: "Suspension & Termination",
+      "Each cotisation session specifies the periodic contribution amount, the schedule, any applicable late penalties, and the transparent association management fee established by the leadership.\n\nPayments are executed via Mobile Money or Orange Money. For every confirmed payment, an immutable electronic receipt is generated with a unique transaction reference, detailing the contribution, association fee, and exact timestamp. Receipts are permanently accessible in the member's portal.",
+    termsSectionTerminationTitle: "Sanctions, Fines & Exclusion",
     termsSectionTerminationBody:
-      "An administrator may suspend or remove a member for non-payment, fraud, or violation of a group's rules. You may close your account at any time by contacting your administrator.",
-    termsSectionLiabilityTitle: "Limitation of Liability",
+      "Late payments incur late penalty fines defined in the group's Internal Regulations. Persistent non-payment or fraudulent behavior results in immediate account suspension, forfeiture of priority positions, and escalation to legal enforcement.",
+    termsSectionLiabilityTitle: "Limitation of Liability & System Availability",
     termsSectionLiabilityBody:
-      "DIVA Asso provides record-keeping and coordination tools for tontines organized and run by their own members and administrators. We are not a party to, and are not liable for, the tontine agreement between members. To the fullest extent permitted by law, DIVA Asso is not liable for indirect or consequential damages arising from use of the platform.",
-    termsSectionChangesTitle: "Changes to These Terms",
+      "DIVA Asso provides robust infrastructure and automated bookkeeping with 99.9% target availability. DIVA Asso is not liable for telecom network failures, mobile money operator downtimes (MTN/Orange), or local power outages. Members must ensure their mobile accounts have sufficient funds prior to deadlines.",
+    termsSectionChangesTitle: "Amendments to Terms",
     termsSectionChangesBody:
-      "We may update these terms from time to time. Continued use of the platform after a change constitutes acceptance of the updated terms.",
-    termsSectionContactTitle: "Contact Us",
-    termsSectionContactBody: "Questions about these terms can be directed to your association's administrator through the in-app Support chat.",
+      "Any material changes to these terms will be communicated via in-app notification and email. Continued use of the platform after notification constitutes acceptance of the modified terms.",
+    termsSectionContactTitle: "Legal & Administrative Inquiries",
+    termsSectionContactBody:
+      "For legal inquiries, dispute resolution, or administrative requests, contact your association administrators via the in-app Support chat or email legal@divaasso.com.",
 
     // Admin Broadcast Alerts
     adminAlertNav: "Alerts & Announcements",
@@ -2291,54 +2292,55 @@ export const translations = {
     privacyPolicyTitle: "Politique de confidentialité",
     privacyPolicyLastUpdated: "Dernière mise à jour : {date}",
     privacyPolicyIntro:
-      "Cette politique de confidentialité explique quelles informations DIVA Asso collecte, pourquoi nous les collectons, et comment elles sont utilisées et protégées lorsque vous utilisez notre plateforme pour gérer des groupes d'épargne tontine (cotisation).",
-    privacyPolicySectionDataTitle: "Informations que nous collectons",
+      "La présente Politique de confidentialité détaille les engagements de DIVA Asso. concernant la collecte, la protection et le traitement de vos données personnelles et financières. DIVA Asso. fournit une solution numérique sécurisée de gestion et de transparence pour les groupes de tontine et de cotisation solidaire. La protection absolue des fonds des membres et de leur vie privée constitue le pilier fondamental de notre plateforme.",
+    privacyPolicySectionDataTitle: "Données collectées et stockées",
     privacyPolicySectionDataBody:
-      "Informations de compte (nom, email, numéro de téléphone, langue préférée) ; documents de vérification d'identité (carte nationale d'identité camerounaise, une photo selfie, et le résultat d'une vérification automatique de correspondance faciale/détection de vivacité) requis pour rejoindre une cotisation ; informations de localisation (ville, quartier et coordonnées GPS) si vous choisissez de les partager ; informations de paiement liées à vos cotisations Mobile Money/Orange Money (numéro de téléphone et statut de transaction — nous ne voyons ni ne stockons jamais votre code secret Mobile Money) ; et les messages que vous envoyez via le chat intégré.",
-    privacyPolicySectionUseTitle: "Comment nous utilisons vos informations",
+      "Afin de garantir une sécurité financière totale et prévenir toute tentative d'usurpation ou d'escroquerie, nous collectons strictement :\n\n• Vérification d'identité & KYC : Carte Nationale d'Identité camerounaise (CNI), récépissé officiel ou passeport, accompagné d'une photo selfie de conformité, obligatoires avant toute adhésion à une session de cotisation.\n• Informations de profil : Nom complet officiel, numéro de téléphone mobile vérifié, adresse e-mail, langue de communication et code membre unique.\n• Données de paiement et transactions : Référence unique des transactions Mobile Money (MTN) et Orange Money, montants cotisés, frais associatifs, pénalités de retard et reçus électroniques horodatés. (DIVA Asso ne demande, ne voit et ne conserve JAMAIS votre code secret Mobile Money).\n• Sécurité et audit : Adresse IP authentifiée, signature du terminal (User-Agent) et horodatage de chaque action sensible pour bloquer toute tentative d'intrusion.",
+    privacyPolicySectionUseTitle: "Finalités du traitement de vos données",
     privacyPolicySectionUseBody:
-      "Nous utilisons vos informations pour vérifier votre identité avant que vous puissiez rejoindre une cotisation, pour traiter et suivre vos cotisations et versements, pour vous envoyer des rappels et notifications concernant vos cotisations (par WhatsApp, email ou dans l'application), pour prévenir la fraude et les paiements en double, et pour permettre à l'administrateur de votre groupe de gérer les adhésions et résoudre les litiges.",
-    privacyPolicySectionSharingTitle: "Avec qui nous les partageons",
+      "Vos informations sont utilisées exclusivement dans le cadre de la bonne tenue de la tontine :\n\n• Authentification et validation KYC des membres pour protéger la communauté contre les faux profils et la défaillance.\n• Suivi en temps réel de l'état des cotisations, planification automatisée de l'ordre de bouffe et génération de reçus officiels infalsifiables.\n• Envoi instantané des confirmations de paiement, alertes de tour et rappels d'échéance par e-mail sécurisé, notifications Web Push et notifications intégrées dans l'application.\n• Prévention des paiements en double, détection des anomalies et résolution transparente des litiges comptables.",
+    privacyPolicySectionSharingTitle: "Sous-traitants techniques & Absence totale de revente",
     privacyPolicySectionSharingBody:
-      "Nous partageons le minimum de données nécessaire avec les prestataires qui font fonctionner la plateforme : Didit (vérification de documents d'identité et du visage), passerelle de paiement sécurisée (traitement des paiements Mobile Money/Orange Money), Evolution API (notifications WhatsApp), Resend (notifications par email) et Supabase (stockage sécurisé des données et authentification). Nous ne vendons vos informations personnelles à personne.",
-    privacyPolicySectionSecurityTitle: "Sécurité des données",
+      "DIVA Asso ne commercialise, ne loue et ne vend AUCUNE donnée personnelle à des tiers. Les données sont partagées uniquement avec les infrastructures techniques indispensables au fonctionnement du service :\n\n• Supabase : Hébergement de base de données chiffrée et stockage privé ultra-sécurisé avec politiques strictes RLS (Row-Level Security) pour les pièces d'identité.\n• Fapshi : Passerelle de paiement agréée et certifiée PCI-DSS pour le traitement sécurisé des flux Mobile Money (MTN) et Orange Money.\n• Resend : Service d'infrastructure e-mail pour l'expédition immédiate des reçus de caisse et des alertes de sécurité critiques.\n• Web Push du navigateur : Notifications directes sur votre appareil, sans intermédiaire publicitaire.\n\nNous n'utilisons aucun courtier de données étranger ni service de messagerie non sécurisé.",
+    privacyPolicySectionSecurityTitle: "Chiffrement et protection des documents d'identité",
     privacyPolicySectionSecurityBody:
-      "Vos données sont chiffrées en transit (HTTPS) et l'accès y est limité aux administrateurs autorisés de votre propre groupe de cotisation. Les documents d'identité et les enregistrements de paiement sont stockés dans un espace à accès contrôlé, non accessible publiquement.",
-    privacyPolicySectionRightsTitle: "Vos droits",
+      "Toutes les communications transitent via un chiffrement SSL/TLS de niveau bancaire (HTTPS). Les pièces d'identité (CNI) et photographies des membres sont conservées dans un espace de stockage cloud privé et chiffré, inaccessible au public, et protégé par des règles d'accès strictes limitées aux administrateurs légitimes de votre groupe. Chaque accès est consigné dans un journal d'audit immuable.",
+    privacyPolicySectionRightsTitle: "Vos droits et conservation des registres",
     privacyPolicySectionRightsBody:
-      "Vous pouvez consulter ou modifier la plupart des informations de votre compte depuis votre page Profil à tout moment. Pour demander une copie de vos données, une correction ou la suppression de votre compte, contactez l'administrateur de votre association ou utilisez les coordonnées ci-dessous.",
-    privacyPolicySectionContactTitle: "Nous contacter",
+      "Vous bénéficiez d'un droit d'accès permanent à votre historique financier et au téléchargement de tous vos reçus de cotisation. En raison de la nature solidaire et de la responsabilité collective inhérente aux tontines, les pièces justificatives d'identité et les registres comptables liés à un cycle de cotisation actif doivent être conservés jusqu'à la clôture intégrale et l'audit final du cycle.",
+    privacyPolicySectionContactTitle: "Délégué à la protection des données & Support",
     privacyPolicySectionContactBody:
-      "Pour toute question concernant cette politique de confidentialité ou la gestion de vos données, veuillez contacter l'administrateur de votre association via le chat d'assistance de l'application.",
+      "Pour toute question relative à la protection de vos données ou pour exercer vos droits, vous pouvez contacter directement l'administration de l'association via le chat d'assistance intégré dans l'application ou par e-mail à support@divaasso.com.",
 
     // Terms of Service
     termsOfServiceTitle: "Conditions d'utilisation",
     termsOfServiceLastUpdated: "Dernière mise à jour : {date}",
     termsOfServiceIntro:
-      "Ces conditions d'utilisation régissent votre usage de la plateforme DIVA Asso. En créant un compte, vous acceptez ces conditions.",
-    termsSectionServiceTitle: "À propos du service",
+      "Les présentes Conditions d'utilisation régissent l'accès et l'usage de la plateforme DIVA Asso. En créant un compte ou en rejoignant un groupe de cotisation, vous acceptez expressément et sans réserve ces conditions.",
+    termsSectionServiceTitle: "Nature de la plateforme & Cadre légal",
     termsSectionServiceBody:
-      "DIVA Asso. est un logiciel qui aide les groupes d'épargne tontine (cotisation) traditionnels à organiser les cotisations, suivre l'ordre de bouffe et communiquer. DIVA Asso. n'est pas une banque, un établissement financier agréé ou un prestataire de services de paiement — les paiements Mobile Money et Orange Money sont traités par notre partenaire de paiement tiers, et DIVA Asso. n'est pas responsable des interruptions ou retards causés par ce prestataire ou par les opérateurs de réseaux mobiles.",
-    termsSectionEligibilityTitle: "Éligibilité et vérification",
+      "DIVA Asso est une solution logicielle d'organisation, de transparence comptable et de gestion des tontines traditionnelles, s'inscrivant dans le cadre de la Loi n° 90/053 du 19 décembre 1990 relative à la liberté d'association au Cameroun.\n\nDIVA Asso intervient exclusivement en tant qu'intermédiaire technologique facilitant le suivi des cotisations, l'immuabilité des registres et l'équité des tours de rôle. DIVA Asso n'est ni un établissement bancaire, ni un organisme de microfinance, ni un collecteur de fonds : les cotisations transitent par des agrégateurs de paiement mobile certifiés et sont reversées directement aux bénéficiaires désignés selon l'ordre du cycle.",
+    termsSectionEligibilityTitle: "Éligibilité & Vérification obligatoire d'identité (KYC)",
     termsSectionEligibilityBody:
-      "Pour rejoindre une cotisation, vous devez compléter une vérification d'identité (KYC) avec une carte nationale d'identité camerounaise valide et un selfie correspondant. Un administrateur peut rejeter ou retirer un membre qui échoue à la vérification, fournit de fausses informations, ou viole le règlement propre à un groupe (Règlement Général).",
-    termsSectionResponsibilitiesTitle: "Responsabilités des membres",
+      "La tontine reposant sur la confiance mutuelle et la garantie des fonds de chacun, l'adhésion à une session de cotisation exige impérativement une vérification d'identité réussie (CNI camerounaise en cours de validité, passeport ou titre de séjour, assorti d'une photo selfie de conformité). L'administration de l'association se réserve le droit d'exclure tout utilisateur ayant fourni de fausses déclarations ou des documents non conformes.",
+    termsSectionResponsibilitiesTitle: "Engagement financier irrévocable & Sanction anti-défaillance",
     termsSectionResponsibilitiesBody:
-      "Vous êtes responsable du paiement de vos cotisations à temps, de l'exactitude des informations de votre compte, et de la confidentialité de vos identifiants de connexion et de votre code secret Mobile Money (que DIVA Asso ne demande ni ne stocke jamais). Les cotisations en retard peuvent entraîner une amende telle que configurée par l'administrateur de votre groupe.",
-    termsSectionPaymentsTitle: "Paiements et frais",
+      "L'adhésion à une cotisation constitue un engagement ferme, définitif et irrévocable de verser la totalité de ses cotisations jusqu'au terme complet du cycle tontinier.\n\nRÈGLE STRICTE ANTI-DÉFAILLANCE : Tout membre ayant déjà bénéficié de son tour de bouffe (gain de la cagnotte) a l'obligation légale, contractuelle et morale absolue de continuer à verser l'intégralité de ses cotisations périodiques jusqu'au dernier tour de table. Tout abandon, refus ou cessation de paiement après avoir perçu le gain constitue un abus de confiance manifeste et une escroquerie qualifiée au sens des articles 318 et 322 du Code pénal camerounais.\n\nEn cas de défaillance non régularisée, l'administration de l'association engagera sans délai des poursuites civiles de recouvrement forcé ainsi qu'une plainte pénale, en s'appuyant sur l'identité certifiée du membre (CNI, selfie), les reçus électroniques horodatés et les journaux de traçabilité de la plateforme.",
+    termsSectionPaymentsTitle: "Cotisations, Frais associatifs & Reçus officiels",
     termsSectionPaymentsBody:
-      "Les cotisations sont collectées via Mobile Money/Orange Money par l'intermédiaire de notre partenaire de paiement, qui applique des frais de traitement affichés avant que vous ne confirmiez tout paiement. Les versements suivent l'ordre configuré pour votre cotisation (tirage au sort ou attribution par l'admin) et sont enregistrés une fois confirmés.",
-    termsSectionTerminationTitle: "Suspension et résiliation",
+      "Chaque session de cotisation définit clairement le montant de la part périodique, les pénalités de retard applicables et les frais de fonctionnement associatif arrêtés par le bureau.\n\nLes paiements s'effectuent par Mobile Money (MTN) ou Orange Money. Pour tout paiement validé, la plateforme délivre immédiatement un reçu de paiement électronique infalsifiable portant un numéro de transaction unique, le détail de la cotisation, les frais associatifs et l'horodatage officiel. Ce reçu fait foi entre les membres et l'association.",
+    termsSectionTerminationTitle: "Retards, Pénalités et Exclusion",
     termsSectionTerminationBody:
-      "Un administrateur peut suspendre ou retirer un membre en cas de non-paiement, de fraude ou de violation du règlement d'un groupe. Vous pouvez fermer votre compte à tout moment en contactant votre administrateur.",
-    termsSectionLiabilityTitle: "Limitation de responsabilité",
+      "Tout retard de paiement au-delà de l'échéance fixée entraîne automatiquement l'application des pénalités prévues par le Règlement Général. Le non-respect réitéré des échéances peut entraîner la suspension immédiate du membre, la perte des positions prioritaires et le transfert de sa place conformément aux règles communautaires.",
+    termsSectionLiabilityTitle: "Disponibilité du service & Responsabilité technique",
     termsSectionLiabilityBody:
-      "DIVA Asso fournit des outils de tenue de registres et de coordination pour des tontines organisées et gérées par leurs propres membres et administrateurs. Nous ne sommes pas partie à l'accord de tontine entre membres et n'en sommes pas responsables. Dans toute la mesure permise par la loi, DIVA Asso n'est pas responsable des dommages indirects ou consécutifs résultant de l'utilisation de la plateforme.",
-    termsSectionChangesTitle: "Modifications de ces conditions",
+      "DIVA Asso met en œuvre une infrastructure haute disponibilité pour assurer l'accessibilité permanente des registres et le traitement des transactions. DIVA Asso ne saurait toutefois être tenue responsable des pannes émanant des réseaux de télécommunication, des indisponibilités temporaires des opérateurs Mobile Money (MTN / Orange) ou de cas de force majeure. Il incombe à chaque membre de veiller au solde de son compte mobile avant l'heure limite.",
+    termsSectionChangesTitle: "Mise à jour des conditions",
     termsSectionChangesBody:
-      "Nous pouvons mettre à jour ces conditions de temps à autre. La poursuite de l'utilisation de la plateforme après une modification vaut acceptation des conditions mises à jour.",
-    termsSectionContactTitle: "Nous contacter",
-    termsSectionContactBody: "Pour toute question concernant ces conditions, veuillez contacter l'administrateur de votre association via le chat d'assistance de l'application.",
+      "Toute évolution substantielle des présentes conditions fera l'objet d'une notification préalable dans l'application. La participation continue aux cotisations vaut acceptation pleine et entière des conditions révisées.",
+    termsSectionContactTitle: "Assistance & Réclamations",
+    termsSectionContactBody:
+      "Pour toute réclamation, demande administrative ou litige, les membres peuvent s'adresser au bureau de l'association via le support intégré dans l'application ou par e-mail à contact@divaasso.com.",
 
     // Admin Broadcast Alerts
     adminAlertNav: "Alertes et Annonces",

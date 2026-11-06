@@ -286,7 +286,7 @@ export async function POST(request: Request) {
               title: "Nouvelle preuve de paiement reçue",
               body: `${namesLabel} (${group.memberName}) — ${group.sessionTitle}`,
               url: actionUrl,
-            }).catch(() => {}),
+            }).catch(() => { }),
           ),
         );
       }

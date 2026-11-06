@@ -38,8 +38,9 @@ export async function settleContribution(
     paymentMethod: contribution.recordedByAdminId ? "Recorded by admin" : "Mobile Money / Orange Money",
     tontineType: tontineSession.type,
     amount: Number(contribution.amountPaid),
+    fee: Number(contribution.feePaid),
     fine: Number(contribution.finePaid),
-    total: Number(contribution.amountPaid) + Number(contribution.finePaid),
+    total: Number(contribution.amountPaid) + Number(contribution.feePaid) + Number(contribution.finePaid),
     transRef: contribution.fapshiTxRef ?? contribution.id,
     paidAt: options.paidAt,
   });

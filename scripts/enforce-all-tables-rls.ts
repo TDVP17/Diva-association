@@ -52,3 +52,4 @@ main().catch((err) => {
   console.error("Error enforcing RLS:", err);
   process.exit(1);
 });
+
