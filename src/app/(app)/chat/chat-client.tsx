@@ -8,6 +8,7 @@ import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 import { formatMessageDate } from "@/lib/format-message-date";
 import { LoadingSpinner } from "@/components/loading-spinner";
 import { queueChatMessage, requestBackgroundSync } from "@/lib/offline/db";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 interface Contact {
   id: string;
@@ -63,6 +64,8 @@ export function ChatClient({
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendInfo, setSendInfo] = useState<string | null>(null);
   const feedEndRef = useRef<HTMLDivElement>(null);
+  const activeIdRef = useRef<string | null>(null);
+  activeIdRef.current = active?.id ?? null;
 
   // Deep link from elsewhere in the admin area (e.g. "Message" on a pending
   // membership request) — opens a conversation with that member even if
@@ -136,11 +139,66 @@ export function ChatClient({
         refreshContacts(); // opening a thread marks it read server-side — sync the badge
       })
       .catch(() => setFeed([]));
-
-    const interval = setInterval(() => loadFeed(active.id), 4000);
-    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, loadFeed]);
+  }, [active]);
+
+  // Étape 1 (STOP CPU): remplace l'ancien polling setInterval(4000ms) par Supabase Realtime
+  useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        if (activeIdRef.current) void loadFeed(activeIdRef.current);
+        if (isAdmin) refreshContacts();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    if (!supabase) {
+      return () => {
+        document.removeEventListener("visibilitychange", handleVisibility);
+      };
+    }
+
+    const channel = supabase
+      .channel("chat")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chat_messages",
+        },
+        (payload) => {
+          const msg = payload.new as {
+            id?: string;
+            senderId?: string;
+            receiverId?: string;
+          };
+          const involvesMe =
+            isAdmin ||
+            msg.senderId === currentUserId ||
+            msg.receiverId === currentUserId;
+          if (!involvesMe) return;
+
+          const currentActiveId = activeIdRef.current;
+          if (
+            currentActiveId &&
+            (msg.senderId === currentActiveId || msg.receiverId === currentActiveId)
+          ) {
+            void loadFeed(currentActiveId);
+          }
+          if (isAdmin) {
+            refreshContacts();
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      void supabase.removeChannel(channel);
+    };
+  }, [currentUserId, isAdmin, loadFeed, refreshContacts]);
 
   useEffect(() => {
     feedEndRef.current?.scrollIntoView({ behavior: "smooth" });

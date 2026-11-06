@@ -2,16 +2,15 @@
 
 import { useEffect } from "react";
 import { updateAppBadge } from "@/lib/notification-badge";
-
-const POLL_MS = 60 * 1000;
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 /**
  * Mounted once in each app shell (member + admin) — keeps the installed
  * PWA's home-screen icon badge in sync with the unread-notification count.
- * Purely a side effect (no rendered UI, no React state), so it's safe to
- * run this fetch/update cycle directly inside the effect.
+ * Étape 1 (STOP CPU): le polling setInterval(60000ms) a été remplacé par
+ * une écoute Supabase Realtime sur la table `notifications`.
  */
-export function NotificationBadgeSync() {
+export function NotificationBadgeSync({ userId }: { userId?: string }) {
   useEffect(() => {
     let cancelled = false;
 
@@ -22,20 +21,46 @@ export function NotificationBadgeSync() {
           if (!cancelled && body) updateAppBadge(body.count);
         })
         .catch(() => {
-          // Best-effort only — a failed poll just tries again next cycle.
+          // Best-effort only.
         });
     }
 
+    function handleVisibility() {
+      if (document.visibilityState === "visible") {
+        sync();
+      }
+    }
+
     sync();
-    const interval = setInterval(sync, POLL_MS);
-    document.addEventListener("visibilitychange", sync);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    const supabase = getSupabaseBrowserClient();
+    const channel = supabase
+      ? supabase
+        .channel(userId ? `notifications:${userId}` : "notifications")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "notifications",
+            ...(userId ? { filter: `userId=eq.${userId}` } : {}),
+          },
+          () => {
+            sync();
+          },
+        )
+        .subscribe()
+      : null;
 
     return () => {
       cancelled = true;
-      clearInterval(interval);
-      document.removeEventListener("visibilitychange", sync);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      if (supabase && channel) {
+        void supabase.removeChannel(channel);
+      }
     };
-  }, []);
+  }, [userId]);
 
   return null;
 }

@@ -6,6 +6,7 @@ import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 import { formatXAF } from "@/lib/format-currency";
 import { detectMobileMoneyProvider } from "@/lib/mobile-money-provider";
 import { playSuccessChimeSound } from "@/lib/sound-effects";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   NetworkFallbackProofStep,
   type FallbackPayableSlot,
@@ -32,11 +33,6 @@ interface SavedMethod {
 function providerLabelKey(provider: MobileMoneyProvider): TranslationKey {
   return provider === "ORANGE" ? "orangeMoneyLabel" : "mtnMobileMoneyLabel";
 }
-
-// Fapshi rate-limits payment-status checks to 6/min per transaction — this
-// interval keeps the poller comfortably under that even accounting for
-// timer drift.
-const POLL_INTERVAL_MS = 12_000;
 
 type Step = "form" | "waiting" | "success" | "failed";
 
@@ -97,7 +93,10 @@ export function PaymentConfirmDialog({
   const [failedReason, setFailedReason] = useState<string | null>(null);
   const [failCount, setFailCount] = useState(0);
   const [showWaitingHint, setShowWaitingHint] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [checkingStatus, setCheckingStatus] = useState(false);
+  const channelCleanupRef = useRef<(() => void) | null>(null);
+  const settledOrDoneRef = useRef(false);
+  const checkingRef = useRef(false);
   const hintRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -166,10 +165,10 @@ export function PaymentConfirmDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [membershipSlotId, fineId, dueDate]);
 
-  function stopPolling() {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
+  function stopWatching() {
+    if (channelCleanupRef.current) {
+      channelCleanupRef.current();
+      channelCleanupRef.current = null;
     }
     if (hintRef.current) {
       clearTimeout(hintRef.current);
@@ -183,41 +182,132 @@ export function PaymentConfirmDialog({
 
   useEffect(() => {
     return () => {
-      stopPolling();
+      stopWatching();
     };
   }, []);
 
-  function startPolling(id: string) {
-    stopPolling();
-    hintRef.current = setTimeout(() => setShowWaitingHint(true), 45_000);
-    // Hard timeout after 70 seconds to prevent indefinite loading
-    timeoutRef.current = setTimeout(() => {
-      stopPolling();
-      setFailedReason(t("ussdTimeoutReason"));
+  function resolveTerminalStatus(status: string, reason?: string | null): boolean {
+    if (settledOrDoneRef.current) return true;
+    if (
+      status === "SUCCESSFUL" ||
+      status === "COMPLETED" ||
+      status === "DUPLICATE_PAID" ||
+      status === "PAID"
+    ) {
+      settledOrDoneRef.current = true;
+      stopWatching();
+      playSuccessChimeSound();
+      setStep("success");
+      setTimeout(() => onSettled(), 1500);
+      return true;
+    }
+    if (status === "FAILED" || status === "EXPIRED") {
+      settledOrDoneRef.current = true;
+      stopWatching();
+      setFailedReason(reason ?? null);
       setFailCount((c) => c + 1);
       setStep("failed");
+      return true;
+    }
+    return false;
+  }
+
+  async function checkStatusOnce(id: string): Promise<boolean> {
+    if (settledOrDoneRef.current || checkingRef.current) return false;
+    checkingRef.current = true;
+    setCheckingStatus(true);
+    try {
+      const res = await fetch(`/api/payments/fapshi/status?transId=${encodeURIComponent(id)}`);
+      if (!res.ok) return false;
+      const body = (await res.json()) as { status: string; failureReason?: string | null };
+      return resolveTerminalStatus(body.status, body.failureReason ?? null);
+    } catch {
+      return false;
+    } finally {
+      checkingRef.current = false;
+      setCheckingStatus(false);
+    }
+  }
+
+  // Étape 1 (STOP CPU): remplace l'ancien polling setInterval par Supabase Realtime
+  function watchPaymentStatus(id: string) {
+    stopWatching();
+    settledOrDoneRef.current = false;
+    hintRef.current = setTimeout(() => setShowWaitingHint(true), 45_000);
+    // Hard timeout after 70 seconds — vérifie une seule fois auprès de Fapshi avant d'expirer
+    timeoutRef.current = setTimeout(async () => {
+      const resolved = await checkStatusOnce(id);
+      if (!resolved && !settledOrDoneRef.current) {
+        settledOrDoneRef.current = true;
+        stopWatching();
+        setFailedReason(t("ussdTimeoutReason"));
+        setFailCount((c) => c + 1);
+        setStep("failed");
+      }
     }, 70_000);
 
-    pollRef.current = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/payments/fapshi/status?transId=${encodeURIComponent(id)}`);
-        if (!res.ok) return;
-        const body = (await res.json()) as { status: string; failureReason?: string | null };
-        if (body.status === "SUCCESSFUL" || body.status === "COMPLETED") {
-          stopPolling();
-          playSuccessChimeSound();
-          setStep("success");
-          setTimeout(() => onSettled(), 1500);
-        } else if (body.status === "FAILED" || body.status === "EXPIRED") {
-          stopPolling();
-          setFailedReason(body.failureReason ?? null);
-          setFailCount((c) => c + 1);
-          setStep("failed");
-        }
-      } catch {
-        // Transient network hiccup — the next tick will retry.
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && !settledOrDoneRef.current) {
+        void checkStatusOnce(id);
       }
-    }, POLL_INTERVAL_MS);
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    const supabase = getSupabaseBrowserClient();
+    const targetTable = fineId ? "fines" : "contributions";
+    const channel = supabase
+      ? supabase
+          .channel(`payment-status:${id}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: targetTable,
+              filter: `fapshiTxRef=eq.${id}`,
+            },
+            (payload) => {
+              const row = payload.new as { status?: string; failureReason?: string | null };
+              if (row.status === "PAID" || row.status === "DEDUCTED") {
+                resolveTerminalStatus("PAID");
+              } else if (row.status === "FAILED") {
+                resolveTerminalStatus("FAILED", row.failureReason ?? null);
+              }
+            },
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "payment_attempts",
+              filter: `transId=eq.${id}`,
+            },
+            async (payload) => {
+              const row = payload.new as { status?: string };
+              if (
+                row.status === "SUCCESSFUL" ||
+                row.status === "COMPLETED" ||
+                row.status === "DUPLICATE_PAID"
+              ) {
+                resolveTerminalStatus("SUCCESSFUL");
+              } else if (row.status === "FAILED" || row.status === "EXPIRED") {
+                const resolved = await checkStatusOnce(id);
+                if (!resolved) {
+                  resolveTerminalStatus(row.status, null);
+                }
+              }
+            },
+          )
+          .subscribe()
+      : null;
+
+    channelCleanupRef.current = () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      if (supabase && channel) {
+        void supabase.removeChannel(channel);
+      }
+    };
   }
 
   async function handleConfirm() {
@@ -257,7 +347,7 @@ export function PaymentConfirmDialog({
       setTransId(body.transId);
       setUsedPhone(normalized);
       setStep("waiting");
-      startPolling(body.transId);
+      watchPaymentStatus(body.transId);
       // Best-effort, fire-and-forget — saving the number for next time is a
       // convenience, never something that should block or fail the payment
       // that's already in flight.
@@ -277,7 +367,7 @@ export function PaymentConfirmDialog({
   }
 
   function retry() {
-    stopPolling();
+    stopWatching();
     setStep("form");
     setPayError(null);
     setFailedReason(null);
@@ -508,9 +598,25 @@ export function PaymentConfirmDialog({
                 {t("stillWaitingForConfirmation")}
               </p>
             )}
+            {transId && (
+              <button
+                type="button"
+                onClick={() => void checkStatusOnce(transId)}
+                disabled={checkingStatus}
+                className="mt-1 px-4 py-2 rounded-lg bg-primary/10 text-primary font-label-md text-label-md hover:bg-primary/15 transition-colors disabled:opacity-60"
+              >
+                {checkingStatus
+                  ? lang === "fr"
+                    ? "Vérification..."
+                    : "Checking..."
+                  : lang === "fr"
+                    ? "J'ai validé sur mon téléphone — Vérifier"
+                    : "I approved on my phone — Check status"}
+              </button>
+            )}
             <button
               onClick={onClose}
-              className="mt-2 px-4 py-2 rounded-lg border border-outline-variant text-on-surface-variant font-label-md text-label-md hover:bg-surface-container-low"
+              className="mt-1 px-4 py-2 rounded-lg border border-outline-variant text-on-surface-variant font-label-md text-label-md hover:bg-surface-container-low"
             >
               {t("cancelAction")}
             </button>

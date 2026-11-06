@@ -221,7 +221,7 @@ export default async function SessionDetailPage({
     if (latestVerification?.status === "PENDING") {
       return (
         <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-5xl mx-auto w-full">
-          <VerificationPollingRefresh />
+          <VerificationPollingRefresh verificationId={latestVerification.id} />
           <section className="bg-surface rounded-xl p-6 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant text-center flex flex-col items-center gap-2">
             <span className="material-symbols-outlined text-primary text-4xl">hourglass_top</span>
             <h1 className="font-title-md text-title-md text-primary">{t("verificationInProgress")}</h1>

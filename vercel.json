@@ -1,36 +1,3 @@
 {
-  "crons": [
-    {
-      "path": "/api/crons/turn-reminder",
-      "schedule": "0 7 * * *"
-    },
-    {
-      "path": "/api/crons/reminder-eve",
-      "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/api/crons/reminder-noon",
-      "schedule": "0 11 * * *"
-    },
-    {
-      "path": "/api/crons/reminder-urgent",
-      "schedule": "0 16 * * *"
-    },
-    {
-      "path": "/api/crons/check-penalties",
-      "schedule": "31 17 * * *"
-    },
-    {
-      "path": "/api/crons/food-turn",
-      "schedule": "30 17 * * *"
-    },
-    {
-      "path": "/api/crons/archive-transactions",
-      "schedule": "0 5 * * *"
-    },
-    {
-      "path": "/api/crons/process-refund-queue",
-      "schedule": "0 6 * * *"
-    }
-  ]
+  "crons": []
 }

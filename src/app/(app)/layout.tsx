@@ -92,7 +92,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <InstallPromptModal lang={lang} />
       <PushPermissionPrompt lang={lang} />
       <OfflineDraftSync lang={lang} />
-      <NotificationBadgeSync />
+      <NotificationBadgeSync userId={session.user.id} />
       <WhatsAppPhonePrompt lang={lang} hasPhone={!!dbUser?.phone} userEmail={userEmail} />
       <InactivityAutoLogout />
       <AppLockGate lang={lang} />

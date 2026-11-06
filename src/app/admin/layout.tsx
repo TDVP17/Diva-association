@@ -64,7 +64,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <AdminBottomNav lang={lang} isPresident={isPresident} counts={counts} />
       <InstallPromptModal lang={lang} />
       <PushPermissionPrompt lang={lang} />
-      <NotificationBadgeSync />
+      <NotificationBadgeSync userId={session.user.id} />
       <InactivityAutoLogout />
     </div>
   );
