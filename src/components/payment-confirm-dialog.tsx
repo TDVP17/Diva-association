@@ -40,20 +40,23 @@ function providerLabelKey(provider: MobileMoneyProvider): TranslationKey {
 
 type Step = "form" | "waiting" | "success" | "failed";
 
+/** Action of the `fapshi-pay` Supabase Edge Function used to initiate the USSD push. */
+export type FapshiPayAction = "initiate" | "relative" | "fine";
+
 /**
  * Full USSD-push payment flow, shown before anything is charged: quote
  * breakdown, the Mobile Money/Orange Money number the prompt goes to, and
  * the payment's purpose — then, once confirmed, a live "waiting for you to
  * approve on your phone" screen that polls for the result. Reused by every
- * payment surface (self, relative, public, fines) via `payEndpoint` +
- * whichever of membershipSlotId/fineId applies.
+ * payment surface (self, relative, fines) via `payAction` (an action of the
+ * `fapshi-pay` Supabase Edge Function) + whichever of membershipSlotId/fineId applies.
  */
 export function PaymentConfirmDialog({
   lang,
   membershipSlotId,
   fineId,
   dueDate,
-  payEndpoint,
+  payAction = "initiate",
   description,
   beneficiaryName,
   fallbackAvailableSlots,
@@ -68,8 +71,8 @@ export function PaymentConfirmDialog({
   membershipSlotId?: string;
   fineId?: string;
   dueDate?: string | null;
-  /** Endpoint to POST { membershipSlotId | fineId, phone } to. */
-  payEndpoint: string;
+  /** `fapshi-pay` Edge Function action (defaults to "initiate"; forced to "fine" when fineId is set). */
+  payAction?: FapshiPayAction;
   /** Shown as the payment's purpose, e.g. "Cotisation : Dimanche — 15 sept. 2026". */
   description: string;
   /** Optional display name of the slot being paid (used in fallback summary when single-slot). */
@@ -363,11 +366,7 @@ export function PaymentConfirmDialog({
             : "Your session expired. Please sign in again.",
         );
       }
-      const edgeTarget = fineId
-        ? getFapshiEdgeUrl("fine")
-        : payEndpoint.includes("relative") || payEndpoint.includes("pay-slot")
-          ? getFapshiEdgeUrl("relative")
-          : getFapshiEdgeUrl("initiate");
+      const edgeTarget = getFapshiEdgeUrl(fineId ? "fine" : payAction);
 
       const res = await fetch(edgeTarget, {
         method: "POST",

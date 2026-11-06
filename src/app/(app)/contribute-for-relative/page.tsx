@@ -15,7 +15,7 @@ export default async function ContributeForRelativePage() {
       <h1 className="font-title-md text-title-md text-primary mb-stack-gap-md">
         {t("contributeForRelativeNav")}
       </h1>
-      <MemberCodePayFlow lang={lang} payEndpoint="/api/payments/relative/initiate" />
+      <MemberCodePayFlow lang={lang} />
       <ShareAppSection lang={lang} variant="card" />
     </main>
   );

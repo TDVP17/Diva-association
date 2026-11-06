@@ -14,10 +14,10 @@ import {
 } from "@/lib/supabase/auth-cookies";
 
 // ---------------------------------------------------------------------------
-// Legacy NextAuth fallback — kept strictly read-only during Sub-Step (b) so
-// members who already had an active NextAuth cookie before this deploy are NOT
-// disconnected; `<SupabaseSessionBootstrap />` silently upgrades them to a
-// native Supabase Auth Bearer session on their very next page open.
+// Legacy NextAuth fallback — strictly read-only (no `/api/auth/*` route is
+// exposed anymore). Only decodes a pre-migration NextAuth JWT cookie so those
+// members are NOT disconnected; `<SupabaseSessionBootstrap />` silently
+// upgrades them to a native Supabase Auth Bearer session on their next visit.
 // ---------------------------------------------------------------------------
 const legacyNextAuth = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -64,12 +64,6 @@ const legacyNextAuth = NextAuth({
     },
   },
 });
-
-export const {
-  handlers,
-  signIn,
-  unstable_update: updateSession,
-} = legacyNextAuth;
 
 function isNextControlFlowError(err: unknown): boolean {
   if (typeof err !== "object" || err === null || !("digest" in err)) return false;

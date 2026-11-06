@@ -35,8 +35,8 @@ type Step = "form" | "waiting" | "success" | "failed";
 /**
  * Multi-slot sibling of PaymentConfirmDialog: same form/waiting/success/
  * failed flow, but quotes and initiates a single Fapshi USSD prompt across
- * every selected membershipSlotId at once via the /api/payments/bulk/*
- * endpoints instead of one slot at a time.
+ * every selected membershipSlotId at once via the `bulk-quote` / `bulk`
+ * actions of the `fapshi-pay` Supabase Edge Function instead of one slot at a time.
  */
 export function BulkPaymentDialog({
   lang,

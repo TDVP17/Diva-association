@@ -113,7 +113,7 @@ export function PayButton({
           lang={lang}
           membershipSlotId={membershipSlotId}
           beneficiaryName={beneficiaryName}
-          payEndpoint="/api/payments/fapshi/initiate"
+          payAction="initiate"
           description={description}
           defaultPhone={defaultPhone}
           onSettled={() => {

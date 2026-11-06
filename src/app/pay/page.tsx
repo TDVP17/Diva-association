@@ -39,7 +39,6 @@ export default async function PublicPayPage({
         </div>
         <MemberCodePayFlow
           lang={lang}
-          payEndpoint="/api/payments/relative/initiate"
           initialCode={code}
         />
       </div>

@@ -33,7 +33,7 @@ export function FinePayButton({
         <PaymentConfirmDialog
           lang={lang}
           fineId={fineId}
-          payEndpoint={`/api/fines/${fineId}/pay`}
+          payAction="fine"
           description={description}
           defaultPhone={defaultPhone}
           onSettled={() => router.refresh()}

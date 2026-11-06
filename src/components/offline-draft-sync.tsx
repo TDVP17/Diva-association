@@ -132,7 +132,7 @@ export function OfflineDraftSync({ lang }: { lang: Lang }) {
           lang={lang}
           membershipSlotId={reviewing.membershipSlotId}
           beneficiaryName={reviewing.beneficiaryName}
-          payEndpoint="/api/payments/fapshi/initiate"
+          payAction="initiate"
           description={reviewing.description}
           defaultPhone={reviewing.phone}
           onSettled={handleSettled}

@@ -27,9 +27,9 @@ interface FundableSlot {
 /**
  * Enter a member's personal code → see every active cotisation cycle they
  * still owe → pay one via Fapshi. Shared by the authenticated "Contribute
- * for a Relative" page (payEndpoint records paidByUserId) and the public,
- * no-account /pay entry point (payEndpoint is anonymous) — same flow,
- * different endpoint depending on whether the payer is signed in.
+ * for a Relative" page and the /pay entry point (shared link) — both call
+ * the `relative` action of the `fapshi-pay` Supabase Edge Function, which
+ * records the signed-in payer as paidByUserId.
  *
  * When an `initialCode` is provided (e.g. from a shared link), the flow
  * auto-searches on mount so the payer sees the member's unpaid cotisations
@@ -37,11 +37,9 @@ interface FundableSlot {
  */
 export function MemberCodePayFlow({
   lang,
-  payEndpoint,
   initialCode,
 }: {
   lang: Lang;
-  payEndpoint: string;
   initialCode?: string;
 }) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
@@ -421,7 +419,7 @@ export function MemberCodePayFlow({
             beneficiaryName: `${s.beneficiaryName} (${s.tontineSessionTitle})`,
             baseTotal: s.amount,
           }))}
-          payEndpoint={payEndpoint}
+          payAction="relative"
           description={`${t("paymentDescriptionPrefix")}: ${confirmSlot.tontineSessionTitle}`}
           onSettled={async () => {
             const confirmedSlot = confirmSlot;

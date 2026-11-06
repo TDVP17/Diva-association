@@ -309,7 +309,7 @@ export function CotisationMembersList({
             beneficiaryName={activeSlot?.beneficiaryName}
             fallbackAvailableSlots={myUnpaidFallbackSlots}
             dueDate={activeSlot?.targetDueDate ?? null}
-            payEndpoint="/api/payments/fapshi/initiate"
+            payAction="initiate"
             description={modalDescription}
             defaultPhone={defaultPhone}
             onSettled={() => {
