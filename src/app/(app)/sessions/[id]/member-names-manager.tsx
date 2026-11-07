@@ -5,23 +5,52 @@ import { useRouter } from "next/navigation";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage, ApiError } from "@/lib/api-error";
 
+export interface MemberSlotEntry {
+  id: string;
+  beneficiaryName: string;
+  officialPosition?: number | null;
+}
+
+interface EditableSlotItem {
+  id: string | null;
+  name: string;
+  officialPosition?: number | null;
+}
+
 interface MemberNamesManagerProps {
   tontineSessionId: string;
   lang: Lang;
   currentNames: string[];
+  currentSlots?: MemberSlotEntry[];
   sessionStatus: "DRAFT" | "ACTIVE" | "DRAWING" | "CLOSED";
   maxSlots?: number | null;
   startDate?: string | Date | null;
   isFinished?: boolean;
 }
 
+function buildEditableItems(
+  currentNames: string[],
+  currentSlots?: MemberSlotEntry[],
+): EditableSlotItem[] {
+  if (currentSlots && currentSlots.length > 0) {
+    return currentSlots.map((s) => ({
+      id: s.id,
+      name: s.beneficiaryName,
+      officialPosition: s.officialPosition ?? null,
+    }));
+  }
+  if (currentNames && currentNames.length > 0) {
+    return currentNames.map((name) => ({ id: null, name, officialPosition: null }));
+  }
+  return [{ id: null, name: "", officialPosition: null }];
+}
+
 export function MemberNamesManager({
   tontineSessionId,
   lang,
   currentNames,
+  currentSlots,
   sessionStatus,
-  maxSlots,
-  startDate,
   isFinished = false,
 }: MemberNamesManagerProps) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
@@ -29,8 +58,8 @@ export function MemberNamesManager({
 
   // Comes closed by default as instructed
   const [isOpen, setIsOpen] = useState(false);
-  const [names, setNames] = useState<string[]>(
-    currentNames && currentNames.length > 0 ? currentNames : [""],
+  const [items, setItems] = useState<EditableSlotItem[]>(() =>
+    buildEditableItems(currentNames, currentSlots),
   );
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -39,37 +68,37 @@ export function MemberNamesManager({
   const [leaving, setLeaving] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
 
-  // Sync names when currentNames updates
+  // Sync items when server props update
   useEffect(() => {
-    if (currentNames && currentNames.length > 0) {
-      setNames(currentNames);
-    }
-  }, [currentNames]);
+    setItems(buildEditableItems(currentNames, currentSlots));
+  }, [currentNames, currentSlots]);
 
-  // Adding, deleting names, and leaving are possible when the cotisation is in DRAFT (avant le tirage) OR when this cycle is finished
-  const canEditNames = sessionStatus === "DRAFT" || isFinished;
+  // Adding/removing names & leaving are only allowed in DRAFT or when the cycle is finished.
+  // Renaming existing names is ALSO allowed when the cotisation is ongoing (DRAWING / ACTIVE).
+  const canAddOrRemoveNames = sessionStatus === "DRAFT" || isFinished;
+  const canRenameNames = sessionStatus !== "CLOSED" || isFinished;
+  const isRenameOnly = canRenameNames && !canAddOrRemoveNames;
   const canLeave = sessionStatus === "DRAFT" || isFinished;
-  // A single member can register up to 15 names
   const slotLimit = 15;
 
-  function handleAddName() {
-    handleAddMultiple(1);
-  }
-
   function handleAddMultiple(count: number) {
-    if (!canEditNames) return;
-    const remaining = slotLimit - names.length;
+    if (!canAddOrRemoveNames) return;
+    const remaining = slotLimit - items.length;
     const toAdd = Math.min(count, remaining);
     if (toAdd <= 0) return;
-    const emptySlots = Array(toAdd).fill("");
-    setNames([...names, ...emptySlots]);
+    const emptySlots: EditableSlotItem[] = Array.from({ length: toAdd }, () => ({
+      id: null,
+      name: "",
+      officialPosition: null,
+    }));
+    setItems([...items, ...emptySlots]);
     setSaveError(null);
     setSuccessMessage(null);
   }
 
   async function handleRemoveName(indexToRemove: number) {
-    if (!canEditNames || saving) return;
-    if (names.length <= 1) {
+    if (!canAddOrRemoveNames || saving) return;
+    if (items.length <= 1) {
       setSaveError(
         lang === "fr"
           ? "Vous devez avoir au moins un nom. Pour vous retirer complètement, utilisez le bouton « Quitter la cotisation » ci-dessous."
@@ -78,30 +107,32 @@ export function MemberNamesManager({
       return;
     }
 
-    const nameToRemove = names[indexToRemove]?.trim() || `#${indexToRemove + 1}`;
+    const nameToRemove = items[indexToRemove]?.name.trim() || `#${indexToRemove + 1}`;
     const confirmMessage =
       lang === "fr"
         ? `Êtes-vous sûr de vouloir supprimer le nom « ${nameToRemove} » de cette cotisation ?`
-        : `Are you sure you want to remove the name "${nameToRemove}" from this cotisation?`;
+        : `Êtes-vous sûr ? Are you sure you want to remove "${nameToRemove}" from this cotisation?`;
 
     if (!window.confirm(confirmMessage)) {
       return;
     }
 
-    const updated = names.filter((_, idx) => idx !== indexToRemove);
-    setNames(updated);
+    const updated = items.filter((_, idx) => idx !== indexToRemove);
+    setItems(updated);
     setSaveError(null);
     setSuccessMessage(null);
     setSaving(true);
 
     try {
-      const trimmed = updated.map((n) => n.trim());
+      const trimmed = updated.map((it) => it.name.trim());
+      const slotIds = updated.map((it) => it.id);
       const res = await fetch(`/api/sessions/${tontineSessionId}/slots`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           slotCount: trimmed.length,
           beneficiaryNames: trimmed,
+          slotIds,
         }),
       });
 
@@ -120,20 +151,24 @@ export function MemberNamesManager({
   }
 
   function handleNameChange(index: number, val: string) {
-    setNames(names.map((n, i) => (i === index ? val : n)));
+    setItems(items.map((it, i) => (i === index ? { ...it, name: val } : it)));
     setSaveError(null);
     setSuccessMessage(null);
   }
 
   async function handleSaveNames(e: React.FormEvent) {
     e.preventDefault();
-    if (!canEditNames) return;
+    if (!canRenameNames) return;
 
-    if (names.some((n) => !n.trim())) {
+    if (items.some((it) => !it.name.trim())) {
       setSaveError(
         lang === "fr"
-          ? "Veuillez renseigner un nom pour chaque case ou supprimer les cases vides avec l'icône corbeille rouge."
-          : "Please fill in all names or remove empty fields with the red trash icon before saving.",
+          ? canAddOrRemoveNames
+            ? "Veuillez renseigner un nom pour chaque case ou supprimer les cases vides avec l'icône corbeille rouge."
+            : "Veuillez renseigner un nom valide dans chaque case."
+          : canAddOrRemoveNames
+            ? "Please fill in all names or remove empty fields with the red trash icon before saving."
+            : "Please enter a valid name for each slot.",
       );
       return;
     }
@@ -143,19 +178,29 @@ export function MemberNamesManager({
     setSuccessMessage(null);
 
     try {
-      const trimmed = names.map((n) => n.trim());
+      const trimmed = items.map((it) => it.name.trim());
+      const slotIds = items.map((it) => it.id);
       const res = await fetch(`/api/sessions/${tontineSessionId}/slots`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           slotCount: trimmed.length,
           beneficiaryNames: trimmed,
+          slotIds,
         }),
       });
 
-      const data = await parseJsonOrThrow<{ ok?: boolean; beneficiaryNames?: string[] }>(res, t("couldNotSaveSlots"));
-      if (data?.beneficiaryNames && data.beneficiaryNames.length > 0) {
-        setNames(data.beneficiaryNames);
+      const data = await parseJsonOrThrow<{ ok?: boolean; beneficiaryNames?: string[] }>(
+        res,
+        t("couldNotSaveSlots"),
+      );
+      if (data?.beneficiaryNames && data.beneficiaryNames.length === items.length) {
+        setItems(
+          items.map((it, idx) => ({
+            ...it,
+            name: data.beneficiaryNames![idx],
+          })),
+        );
       }
       setSuccessMessage(
         lang === "fr"
@@ -228,14 +273,14 @@ export function MemberNamesManager({
                   ? "Cliquez pour refermer"
                   : "Click to close"
                 : lang === "fr"
-                ? `${names.length} nom${names.length > 1 ? "s" : ""} enregistré${names.length > 1 ? "s" : ""} · Cliquez pour voir ou modifier`
-                : `${names.length} registered name${names.length > 1 ? "s" : ""} · Click to view`}
+                  ? `${items.length} nom${items.length > 1 ? "s" : ""} enregistré${items.length > 1 ? "s" : ""} · Cliquez pour voir ou modifier`
+                  : `${items.length} registered name${items.length > 1 ? "s" : ""} · Click to view or edit`}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 text-on-surface-variant">
           <span className="font-label-sm text-xs hidden sm:inline">
-            {isOpen ? (lang === "fr" ? "Fermer" : "Close") : (lang === "fr" ? "Ouvrir" : "Open")}
+            {isOpen ? (lang === "fr" ? "Fermer" : "Close") : (lang === "fr" ? "Modifier" : "Edit")}
           </span>
           <span
             className={`material-symbols-outlined text-2xl transition-transform duration-200 ${
@@ -250,33 +295,58 @@ export function MemberNamesManager({
       {/* Accordion Body */}
       {isOpen && (
         <div className="p-5 pt-3 border-t border-surface-variant animate-in fade-in duration-200 flex flex-col gap-4">
-          {canEditNames ? (
-            /* Editable when cotisation hasn't started yet */
+          {canRenameNames ? (
             <form onSubmit={handleSaveNames} className="flex flex-col gap-3.5">
-              <p className="text-xs text-on-surface-variant leading-relaxed">
-                {lang === "fr"
-                  ? isFinished
-                    ? "Ce cycle de cotisation est terminé. Vous pouvez dès maintenant ajuster vos noms (ajouter jusqu'à 15 noms ou retirer) ou quitter avant le prochain cycle :"
-                    : "La cotisation n'a pas encore commencé. Vous pouvez ajouter jusqu'à 15 noms ou supprimer ceux que vous ne souhaitez plus conserver :"
-                  : isFinished
-                    ? "This cycle has finished. You can now adjust your names (up to 15 names) or leave before the next cycle starts:"
-                    : "The cotisation has not started yet. You can register up to 15 names or remove existing ones:"}
-              </p>
+              {isRenameOnly ? (
+                <div className="p-3 rounded-lg bg-emerald-50/90 border border-emerald-200 text-xs text-emerald-950 flex items-start gap-2">
+                  <span className="material-symbols-outlined text-base text-emerald-700 mt-0.5">
+                    edit_note
+                  </span>
+                  <span className="leading-relaxed">
+                    {lang === "fr"
+                      ? "Vous pouvez modifier l'écriture de vos noms ci-dessous (vos places de bouffe et vos cotisations payées restent conservées). L'ajout ou le retrait de parts en cours de cotisation se fait uniquement par l'administrateur."
+                      : "You can rename your registered names below (your payout positions and paid contributions are preserved). Adding or removing slots during an active cotisation is handled by the administrator."}
+                  </span>
+                </div>
+              ) : (
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  {lang === "fr"
+                    ? isFinished
+                      ? "Ce cycle de cotisation est terminé. Vous pouvez dès maintenant ajuster vos noms (ajouter jusqu'à 15 noms ou retirer) ou quitter avant le prochain cycle :"
+                      : "La cotisation n'a pas encore commencé. Vous pouvez modifier vos noms, en ajouter jusqu'à 15 ou supprimer ceux que vous ne souhaitez plus conserver :"
+                    : isFinished
+                      ? "This cycle has finished. You can now adjust your names (up to 15 names) or leave before the next cycle starts:"
+                      : "The cotisation has not started yet. You can rename, register up to 15 names, or remove existing ones:"}
+                </p>
+              )}
 
               <div className="space-y-2.5">
-                {names.map((name, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <span className="w-6 text-xs font-bold text-on-surface-variant text-center flex-shrink-0">
-                      #{i + 1}
-                    </span>
+                {items.map((item, i) => (
+                  <div key={item.id ?? `new-${i}`} className="flex items-center gap-2">
+                    {item.officialPosition ? (
+                      <span
+                        title={
+                          lang === "fr"
+                            ? `Place #${item.officialPosition} dans l'ordre de bouffe`
+                            : `Place #${item.officialPosition} in payout order`
+                        }
+                        className="px-2 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-bold text-center flex-shrink-0"
+                      >
+                        #{item.officialPosition}
+                      </span>
+                    ) : (
+                      <span className="w-6 text-xs font-bold text-on-surface-variant text-center flex-shrink-0">
+                        #{i + 1}
+                      </span>
+                    )}
                     <input
                       type="text"
-                      value={name}
+                      value={item.name}
                       onChange={(e) => handleNameChange(i, e.target.value)}
                       placeholder={`${lang === "fr" ? "Nom complet" : "Full name"} #${i + 1}`}
                       className="flex-1 border border-outline-variant rounded-lg px-3 py-2 font-label-md text-sm bg-white focus:outline-hidden focus:border-primary"
                     />
-                    {names.length > 1 && (
+                    {canAddOrRemoveNames && items.length > 1 && (
                       <button
                         type="button"
                         onClick={() => handleRemoveName(i)}
@@ -291,31 +361,33 @@ export function MemberNamesManager({
                 ))}
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 pt-1">
-                {names.length < slotLimit && (
-                  <button
-                    type="button"
-                    onClick={() => handleAddMultiple(1)}
-                    className="text-xs font-bold text-primary hover:text-primary/80 flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 cursor-pointer transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">add_circle</span>
-                    <span>{lang === "fr" ? "+1 nom" : "+1 name"}</span>
-                  </button>
-                )}
-                {names.length + 5 <= slotLimit && (
-                  <button
-                    type="button"
-                    onClick={() => handleAddMultiple(5)}
-                    className="text-xs font-bold text-emerald-800 hover:text-emerald-900 flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 cursor-pointer transition-colors shadow-2xs"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">group_add</span>
-                    <span>{lang === "fr" ? "+5 noms d'un coup" : "+5 names at once"}</span>
-                  </button>
-                )}
-                <span className="text-xs font-semibold text-on-surface-variant ml-auto">
-                  {names.length} / {slotLimit} {lang === "fr" ? "noms" : "names"}
-                </span>
-              </div>
+              {canAddOrRemoveNames && (
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {items.length < slotLimit && (
+                    <button
+                      type="button"
+                      onClick={() => handleAddMultiple(1)}
+                      className="text-xs font-bold text-primary hover:text-primary/80 flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 cursor-pointer transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                      <span>{lang === "fr" ? "+1 nom" : "+1 name"}</span>
+                    </button>
+                  )}
+                  {items.length + 5 <= slotLimit && (
+                    <button
+                      type="button"
+                      onClick={() => handleAddMultiple(5)}
+                      className="text-xs font-bold text-emerald-800 hover:text-emerald-900 flex items-center gap-1.5 py-1.5 px-3 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 cursor-pointer transition-colors shadow-2xs"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">group_add</span>
+                      <span>{lang === "fr" ? "+5 noms d'un coup" : "+5 names at once"}</span>
+                    </button>
+                  )}
+                  <span className="text-xs font-semibold text-on-surface-variant ml-auto">
+                    {items.length} / {slotLimit} {lang === "fr" ? "noms" : "names"}
+                  </span>
+                </div>
+              )}
 
               {saveError && (
                 <p className="font-label-sm text-xs text-error bg-error/5 p-2 rounded-lg border border-error/20">
@@ -339,41 +411,29 @@ export function MemberNamesManager({
                     ? "Enregistrement..."
                     : "Saving..."
                   : lang === "fr"
-                  ? "Enregistrer les modifications"
-                  : "Save Changes"}
+                    ? "Enregistrer les modifications"
+                    : "Save Changes"}
               </button>
             </form>
           ) : (
-            /* Read-only when cotisation has started */
-            <div className="flex flex-col gap-2.5">
-              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-900 flex items-center gap-2">
-                <span className="material-symbols-outlined text-base text-amber-700">lock</span>
-                <span>
-                  {lang === "fr"
-                    ? "La cotisation est déjà en cours ou en tirage. L'ajout et la suppression de noms sont désormais verrouillés."
-                    : "The cotisation is already ongoing or in drawing. Adding or removing names is locked."}
-                </span>
-              </div>
-
-              <div className="space-y-2 mt-1">
-                {names.map((name, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2.5 p-2.5 rounded-lg bg-surface-container-low border border-surface-variant"
-                  >
-                    <span className="w-6 text-xs font-bold text-primary text-center">
-                      #{i + 1}
-                    </span>
-                    <span className="font-label-md text-sm font-semibold text-on-surface">
-                      {name}
-                    </span>
-                  </div>
-                ))}
-              </div>
+            <div className="space-y-2 mt-1">
+              {items.map((item, i) => (
+                <div
+                  key={item.id ?? i}
+                  className="flex items-center gap-2.5 p-2.5 rounded-lg bg-surface-container-low border border-surface-variant"
+                >
+                  <span className="w-6 text-xs font-bold text-primary text-center">
+                    #{item.officialPosition ?? i + 1}
+                  </span>
+                  <span className="font-label-md text-sm font-semibold text-on-surface">
+                    {item.name}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
 
-          {/* Option to leave group (only possible before draw / before cotisation starts) */}
+          {/* Option to leave group (only possible before draw / before cotisation starts or after cycle finishes) */}
           {canLeave ? (
             <div className="mt-2 pt-4 border-t border-surface-variant flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
@@ -386,8 +446,8 @@ export function MemberNamesManager({
                       ? "Retirez votre participation pour ne plus être reconduit pour le prochain cycle."
                       : "Retirez votre participation de ce groupe avant le début de la cotisation."
                     : isFinished
-                    ? "Leave this group before the next cycle begins."
-                    : "Remove your participation from this contribution before it starts."}
+                      ? "Leave this group before the next cycle begins."
+                      : "Remove your participation from this contribution before it starts."}
                 </p>
               </div>
               <button
@@ -403,17 +463,15 @@ export function MemberNamesManager({
                       ? "Départ en cours..."
                       : "Leaving..."
                     : lang === "fr"
-                    ? "Quitter la cotisation"
-                    : "Leave Cotisation"}
+                      ? "Quitter la cotisation"
+                      : "Leave Cotisation"}
                 </span>
               </button>
             </div>
           ) : (
             <div className="mt-2 pt-4 border-t border-surface-variant flex items-center gap-2 text-xs text-on-surface-variant bg-surface-container-low p-2.5 rounded-lg">
               <span className="material-symbols-outlined text-[18px] text-outline">lock</span>
-              <span>
-                {t("cannotLeaveCotisationStarted")}
-              </span>
+              <span>{t("cannotLeaveCotisationStarted")}</span>
             </div>
           )}
 

@@ -8,6 +8,7 @@ import { isSessionCycleFinished } from "@/lib/tontine-engine";
 const bodySchema = z.object({
   slotCount: z.coerce.number().int().min(1).max(15),
   beneficiaryNames: z.array(z.string().trim().min(1).max(100)).min(1).max(15),
+  slotIds: z.array(z.string().nullable().optional()).optional(),
 });
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -22,11 +23,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   const { id: tontineSessionId } = await params;
-  const { slotCount, beneficiaryNames } = parsed.data;
+  const { slotCount, beneficiaryNames, slotIds } = parsed.data;
 
   if (beneficiaryNames.length !== slotCount) {
     return NextResponse.json(
       { error: `Please provide exactly ${slotCount} name(s)` },
+      { status: 400 },
+    );
+  }
+  if (slotIds !== undefined && slotIds.length !== slotCount) {
+    return NextResponse.json(
+      { error: "Invalid slotIds length" },
       { status: 400 },
     );
   }
@@ -63,17 +70,48 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Your membership isn't approved yet" }, { status: 403 });
     }
 
-    const isInitialLateSelection =
-      membership.slotCount === null && tontineSession.status !== "CLOSED";
-
-    if (tontineSession.status !== "DRAFT" && !isFinished && !isInitialLateSelection) {
+    if (tontineSession.status === "CLOSED" && !isFinished) {
       return NextResponse.json(
-        { error: "Cannot modify slots while cotisation cycle is actively running" },
+        { error: "Cette cotisation est clôturée." },
         { status: 409 },
       );
     }
 
-    if (tontineSession.maxSlots !== null) {
+    const isInitialLateSelection =
+      membership.slotCount === null && tontineSession.status !== "CLOSED";
+    const isFullEditAllowed =
+      tontineSession.status === "DRAFT" || isFinished || isInitialLateSelection;
+
+    if (!isFullEditAllowed) {
+      // Rename-only mode when cotisation is ongoing (DRAWING / ACTIVE):
+      // the member can rename their existing names, while only the admin can add/remove slots.
+      const currentMemberSlotsCount = await prisma.membershipSlot.count({
+        where: { membershipId: membership.id },
+      });
+      if (slotCount !== currentMemberSlotsCount) {
+        return NextResponse.json(
+          {
+            error:
+              "La cotisation a déjà commencé : seul l'administrateur peut ajouter ou retirer des noms. Vous pouvez uniquement renommer vos noms existants.",
+          },
+          { status: 409 },
+        );
+      }
+      if (
+        slotIds &&
+        slotIds.some((sid) => typeof sid !== "string" || !sid.trim())
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Seul l'administrateur peut ajouter de nouveaux noms en cours de cotisation.",
+          },
+          { status: 409 },
+        );
+      }
+    }
+
+    if (isFullEditAllowed && tontineSession.maxSlots !== null) {
       // Ensure a single member is always permitted to register up to 15 slots in the session
       const maxAllowed = Math.max(Number(tontineSession.maxSlots), 15);
       const otherSlotsTotal = tontineSession.memberships
@@ -112,29 +150,86 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         orderBy: { createdAt: "asc" },
       });
 
-      // Update existing slots with the new beneficiary names in place
-      const slotsToUpdate = existingUserSlots.slice(0, finalNames.length);
-      for (let i = 0; i < slotsToUpdate.length; i++) {
-        await tx.membershipSlot.update({
-          where: { id: slotsToUpdate[i].id },
-          data: { beneficiaryName: finalNames[i] },
-        });
+      const existingById = new Map(existingUserSlots.map((s) => [s.id, s]));
+      const hasValidExplicitIds =
+        Array.isArray(slotIds) &&
+        slotIds.every((sid) => sid === null || sid === undefined || existingById.has(sid)) &&
+        new Set(slotIds.filter((sid): sid is string => Boolean(sid))).size ===
+          slotIds.filter((sid): sid is string => Boolean(sid)).length;
+
+      if (!isFullEditAllowed) {
+        // Rename-only mode: strictly update existing slots in place without creating or deleting any slot
+        if (existingUserSlots.length !== finalNames.length) {
+          throw new Error("SLOT_COUNT_MISMATCH");
+        }
+        if (hasValidExplicitIds && slotIds && slotIds.every((sid): sid is string => Boolean(sid))) {
+          for (let i = 0; i < finalNames.length; i++) {
+            await tx.membershipSlot.update({
+              where: { id: slotIds[i] },
+              data: { beneficiaryName: finalNames[i] },
+            });
+          }
+        } else {
+          for (let i = 0; i < existingUserSlots.length; i++) {
+            await tx.membershipSlot.update({
+              where: { id: existingUserSlots[i].id },
+              data: { beneficiaryName: finalNames[i] },
+            });
+          }
+        }
+        return;
       }
 
-      // If slotCount was increased, create additional slots at the end
-      if (finalNames.length > existingUserSlots.length) {
-        const newNames = finalNames.slice(existingUserSlots.length);
+      let newNames: string[] = [];
+      let excessSlots: typeof existingUserSlots = [];
 
+      if (hasValidExplicitIds && slotIds) {
+        const keptSlotIds = new Set<string>();
+        for (let i = 0; i < finalNames.length; i++) {
+          const sid = slotIds[i];
+          if (sid) {
+            keptSlotIds.add(sid);
+            await tx.membershipSlot.update({
+              where: { id: sid },
+              data: { beneficiaryName: finalNames[i] },
+            });
+          } else {
+            newNames.push(finalNames[i]);
+          }
+        }
+        excessSlots = existingUserSlots.filter((s) => !keptSlotIds.has(s.id));
+      } else {
+        // Fallback positional update when slotIds are omitted
+        const slotsToUpdate = existingUserSlots.slice(0, finalNames.length);
+        for (let i = 0; i < slotsToUpdate.length; i++) {
+          await tx.membershipSlot.update({
+            where: { id: slotsToUpdate[i].id },
+            data: { beneficiaryName: finalNames[i] },
+          });
+        }
+        if (finalNames.length > existingUserSlots.length) {
+          newNames = finalNames.slice(existingUserSlots.length);
+        }
+        if (existingUserSlots.length > finalNames.length) {
+          excessSlots = existingUserSlots.slice(finalNames.length);
+        }
+      }
+
+      // If new slots were added, create them at the end
+      if (newNames.length > 0) {
         const currentApprovedSlots = await tx.membershipSlot.findMany({
           where: { membership: { tontineSessionId, status: "APPROVED" }, NOT: { membershipId: membership.id } },
           select: { officialPosition: true },
         });
+        const keptExistingSlots = existingUserSlots.filter(
+          (s) => !excessSlots.some((ex) => ex.id === s.id),
+        );
         const allKnownPositions = [
           ...currentApprovedSlots.map((s) => s.officialPosition ?? 0),
-          ...existingUserSlots.map((s) => s.officialPosition ?? 0),
+          ...keptExistingSlots.map((s) => s.officialPosition ?? 0),
         ];
         const maxOfficialPos = Math.max(0, ...allKnownPositions);
-        const totalPriorApprovedCount = currentApprovedSlots.length + existingUserSlots.length;
+        const totalPriorApprovedCount = currentApprovedSlots.length + keptExistingSlots.length;
         const isStartedRunning = tontineSession.status !== "DRAFT" && !isFinished;
 
         const nextPos = isStartedRunning
@@ -168,9 +263,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         }
       }
 
-      // If slotCount was decreased, handle excess slots safely
-      if (existingUserSlots.length > finalNames.length) {
-        const excessSlots = existingUserSlots.slice(finalNames.length);
+      // If slots were removed, handle excess slots safely
+      if (excessSlots.length > 0) {
         const excessSlotIds = excessSlots.map((s) => s.id);
 
         if (!isFinished) {

@@ -772,6 +772,11 @@ export default async function SessionDetailPage({
           tontineSessionId={id}
           lang={lang}
           currentNames={mySlots.map((s) => s.beneficiaryName)}
+          currentSlots={mySlots.map((s) => ({
+            id: s.id,
+            beneficiaryName: s.beneficiaryName,
+            officialPosition: s.officialPosition,
+          }))}
           sessionStatus={tontineSession.status}
           maxSlots={tontineSession.maxSlots ? Math.max(Number(tontineSession.maxSlots), 15) : null}
           startDate={tontineSession.startDate}
