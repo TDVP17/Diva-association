@@ -50,8 +50,30 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
   const [alertGroupId, setAlertGroupId] = useState("");
   const [alertTitle, setAlertTitle] = useState("");
   const [alertMessage, setAlertMessage] = useState("");
+  const [intervalMinutes, setIntervalMinutes] = useState(3);
   const [sendingAlert, setSendingAlert] = useState(false);
   const [alertFeedback, setAlertFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Auto-open modal if URL specifies ?target=ORPHAN
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get("target") === "ORPHAN") {
+        setAlertTarget("ORPHAN");
+        setAlertTitle(
+          lang === "fr"
+            ? "Bienvenue sur DIVA Asso ! 🎉 Rejoignez une cotisation"
+            : "Welcome to DIVA Asso! 🎉 Join a cotisation",
+        );
+        setAlertMessage(
+          lang === "fr"
+            ? "Bonjour ! Vous êtes inscrit sur DIVA Asso mais vous n'avez pas encore rejoint de cotisation. Venez découvrir les sessions ouvertes et démarrez votre épargne solidaire en toute sécurité sur divaasso.com !"
+            : "Hello! You are registered on DIVA Asso but have not joined any cotisation yet. Explore the open sessions and start saving securely on divaasso.com!",
+        );
+        setShowAlertModal(true);
+      }
+    }
+  }, [lang]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -114,6 +136,7 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
           tontineSessionId: alertGroupId || undefined,
           title: alertTitle.trim(),
           message: alertMessage.trim(),
+          intervalMinutes,
         }),
       });
 
@@ -371,6 +394,25 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
                   <button
                     type="button"
                     onClick={() => {
+                      setAlertTarget("ORPHAN");
+                      setAlertTitle(
+                        lang === "fr"
+                          ? "Bienvenue sur DIVA Asso ! 🎉 Rejoignez une cotisation"
+                          : "Welcome to DIVA Asso! 🎉 Join a cotisation",
+                      );
+                      setAlertMessage(
+                        lang === "fr"
+                          ? "Bonjour ! Vous êtes inscrit sur DIVA Asso mais vous n'avez pas encore rejoint de cotisation. Venez découvrir les sessions ouvertes et démarrez votre épargne solidaire en toute sécurité sur divaasso.com !"
+                          : "Hello! You are registered on DIVA Asso but have not joined any cotisation yet. Explore the open sessions and start saving securely on divaasso.com!",
+                      );
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 transition-colors inline-flex items-center gap-1 font-medium"
+                  >
+                    <span>🎉</span> {lang === "fr" ? "Relance sans cotisation" : "Welcome new registered"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
                       const selectedSession = contributions.find((c) => c.id === alertGroupId)?.label || "";
                       setAlertTitle(
                         lang === "fr"
@@ -457,6 +499,69 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
                   maxLength={5000}
                   className="w-full border border-outline-variant rounded-xl px-3.5 py-2.5 font-label-md text-label-md bg-white text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-y"
                 />
+              </div>
+
+              {/* Cadence d'envoi en minutes (demandé par l'administrateur) */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <label className="font-label-md text-label-md text-on-surface font-semibold flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[18px] text-primary">timer</span>
+                    <span>
+                      {lang === "fr"
+                        ? "Délai entre chaque envoi de rappel (minutes)"
+                        : "Minutes between each reminder send"}
+                    </span>
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min={1}
+                      max={60}
+                      value={intervalMinutes}
+                      onChange={(e) =>
+                        setIntervalMinutes(
+                          Math.max(1, Math.min(60, parseInt(e.target.value) || 1)),
+                        )
+                      }
+                      className="w-18 text-center font-bold border border-outline-variant rounded-lg px-2 py-1 bg-white text-sm text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    />
+                    <span className="text-xs font-semibold text-on-surface-variant">min</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] text-on-surface-variant">
+                    {lang === "fr" ? "Raccourcis rapides :" : "Quick presets:"}
+                  </span>
+                  {[1, 2, 3, 5, 10, 15].map((mins) => (
+                    <button
+                      key={mins}
+                      type="button"
+                      onClick={() => setIntervalMinutes(mins)}
+                      className={`px-2 py-0.5 rounded text-[11px] font-semibold border transition-colors cursor-pointer ${
+                        intervalMinutes === mins
+                          ? "bg-primary text-white border-primary shadow-2xs"
+                          : "bg-white text-slate-700 border-slate-300 hover:bg-slate-100"
+                      }`}
+                    >
+                      {mins} min
+                    </button>
+                  ))}
+                </div>
+
+                <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                  {lang === "fr"
+                    ? `Les notifications et e-mails seront espacés de ${intervalMinutes} minute(s) entre chaque membre pour garantir la délivrabilité et éviter que vos e-mails ne soient bloqués par les filtres anti-spam.`
+                    : `Notifications and emails will be spaced by ${intervalMinutes} minute(s) between each member to guarantee deliverability and avoid spam filters.`}
+                </p>
+
+                {alertTarget === "ORPHAN" && orphanCount > 0 && (
+                  <p className="text-[11px] font-bold text-amber-900 bg-amber-100/70 p-2 rounded-lg border border-amber-300/60">
+                    ⏱️ {lang === "fr"
+                      ? `${orphanCount} inscrit(s) sans cotisation × ${intervalMinutes} min = durée totale de diffusion estimée à ~${orphanCount * intervalMinutes} minutes.`
+                      : `${orphanCount} registered member(s) with no cotisations × ${intervalMinutes} min = estimated total duration ~${orphanCount * intervalMinutes} minutes.`}
+                  </p>
+                )}
               </div>
 
               {/* Notice */}

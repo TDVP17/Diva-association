@@ -16,6 +16,7 @@ const broadcastSchema = z.object({
   tontineSessionId: z.string().optional(),
   title: z.string().trim().min(1, "Title is required").max(200),
   message: z.string().trim().min(1, "Message is required").max(5000),
+  intervalMinutes: z.coerce.number().min(1).max(60).optional(),
 });
 
 const PAGE_SIZE = 50;
@@ -92,7 +93,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid payload" }, { status: 400 });
   }
 
-  const { target, tontineSessionId, title, message } = parsed.data;
+  const { target, tontineSessionId, title, message, intervalMinutes } = parsed.data;
+  const staggerMs =
+    typeof intervalMinutes === "number" && intervalMinutes > 0
+      ? intervalMinutes * 60 * 1000
+      : undefined;
 
   let userIds: string[] = [];
 
@@ -188,6 +193,7 @@ export async function POST(request: Request) {
         message: formattedMessage,
         actionUrl,
       })),
+      staggerMs,
     });
   }
 
@@ -202,6 +208,7 @@ export async function POST(request: Request) {
       target,
       title,
       count,
+      intervalMinutes: intervalMinutes ?? 3,
     },
     request,
   });

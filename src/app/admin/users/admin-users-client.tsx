@@ -191,6 +191,35 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
         </button>
       </div>
 
+      {noneCount > 0 && filterTab === "none" && (
+        <div className="p-4 bg-amber-50 border border-amber-300/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs animate-in fade-in duration-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-800 flex items-center justify-center flex-shrink-0">
+              <span className="material-symbols-outlined text-[24px]">campaign</span>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-amber-950">
+                {lang === "fr"
+                  ? `${noneCount} utilisateur(s) inscrit(s) sans aucune cotisation`
+                  : `${noneCount} registered user(s) with 0 cotisations`}
+              </p>
+              <p className="text-xs text-amber-800/90 mt-0.5">
+                {lang === "fr"
+                  ? "Envoyez-leur un rappel échelonné par minute pour les inciter à rejoindre une session."
+                  : "Send them a staggered reminder per minute to invite them to join a session."}
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/admin/notifications?target=ORPHAN"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-label-md text-xs font-bold transition-all shadow-xs flex-shrink-0 cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[18px]">send</span>
+            <span>{lang === "fr" ? `Relancer ces ${noneCount} membres` : `Remind these ${noneCount} members`}</span>
+          </Link>
+        </div>
+      )}
+
       {!users ? (
         <LoadingSpinner fullPage />
       ) : displayedUsers.length === 0 ? (

@@ -235,6 +235,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   const [locking, setLocking] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [showSettingsAccordion, setShowSettingsAccordion] = useState(false);
 
   const [showRelaunchModal, setShowRelaunchModal] = useState(false);
   const [relaunchFields, setRelaunchFields] = useState<{
@@ -1288,77 +1289,117 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
 
       {activeTab === "overview" && (
         <div className="flex flex-col gap-stack-gap-lg">
-          <div>
-            <h3 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-3">
-              <span className="material-symbols-outlined">settings</span>
-              {t("settingsTab")}
-            </h3>
-            <div className="flex items-center gap-2 flex-wrap">
-              {session.status === "DRAFT" && (
-                <button
-                  onClick={startDrawingPhase}
-                  disabled={startingDraw || !drawUnlocked}
-                  title={drawUnlocked ? undefined : t("drawUnlocksAt", { date: drawUnlocksAtLabel })}
-                  className="px-3 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 disabled:opacity-60"
+          {/* Section Paramètres repliable (fermée par défaut à la demande de l'administrateur) */}
+          <div className="rounded-2xl border border-outline-variant/60 bg-white overflow-hidden shadow-2xs transition-all">
+            <button
+              type="button"
+              onClick={() => setShowSettingsAccordion((prev) => !prev)}
+              className="w-full px-4 py-3.5 sm:px-5 sm:py-4 flex items-center justify-between gap-3 text-left hover:bg-slate-50 transition-colors cursor-pointer"
+              aria-expanded={showSettingsAccordion}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-primary flex items-center justify-center flex-shrink-0">
+                  <span className="material-symbols-outlined text-[20px]">settings</span>
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-title-md text-sm sm:text-base font-bold text-on-surface">
+                      {t("settingsTab")}
+                    </h3>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                      {lang === "fr" ? "Actions cotisation" : "Session actions"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] sm:text-xs text-on-surface-variant mt-0.5 truncate">
+                    {lang === "fr"
+                      ? "Relance, modification, pause, clôture ou suppression"
+                      : "Relaunch, edit, pause, close, or delete"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-primary flex-shrink-0">
+                <span>{showSettingsAccordion ? (lang === "fr" ? "Fermer" : "Close") : (lang === "fr" ? "Ouvrir" : "Open")}</span>
+                <span
+                  className={`material-symbols-outlined text-[20px] transition-transform duration-200 ${
+                    showSettingsAccordion ? "rotate-180" : ""
+                  }`}
                 >
-                  {startingDraw ? t("startingEllipsis") : drawUnlocked ? t("startDrawingPhase") : t("drawUnlocksAt", { date: drawUnlocksAtLabel })}
-                </button>
-              )}
-              {(session.status === "CLOSED" || session.status === "ACTIVE") && (
-                <button
-                  onClick={openRelaunchModal}
-                  className="px-3 py-2 rounded-lg bg-emerald-600 text-white font-label-sm text-label-sm hover:bg-emerald-700 flex items-center gap-1 shadow-sm"
-                >
-                  <span className="material-symbols-outlined text-[16px]">restart_alt</span>
-                  {t("relaunchCotisation")}
-                </button>
-              )}
-              {(session.status === "ACTIVE" || session.status === "DRAWING") && (
-                <button
-                  onClick={closeSession}
-                  disabled={closing}
-                  className="px-3 py-2 rounded-lg border border-amber-600/40 text-amber-700 font-label-sm text-label-sm hover:bg-amber-50 disabled:opacity-60 flex items-center gap-1"
-                >
-                  <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                  {closing ? t("closing") : t("closeCotisation")}
-                </button>
-              )}
-              <button
-                onClick={openEditModal}
-                className="px-3 py-2 rounded-lg border border-outline-variant text-on-surface font-label-sm text-label-sm hover:bg-surface flex items-center gap-1"
-              >
-                <span className="material-symbols-outlined text-[16px]">edit</span>
-                {t("editCotisation")}
-              </button>
-              <button
-                onClick={togglePause}
-                disabled={pausing}
-                className="px-3 py-2 rounded-lg border border-outline-variant text-on-surface font-label-sm text-label-sm hover:bg-surface disabled:opacity-60 flex items-center gap-1"
-              >
-                <span className="material-symbols-outlined text-[16px]">{session.isPaused ? "play_arrow" : "pause"}</span>
-                {session.isPaused ? t("resume") : t("pause")}
-              </button>
-              {!session.lockedAt && (
-                <button
-                  onClick={lockSession}
-                  disabled={locking}
-                  className="px-3 py-2 rounded-lg border border-outline-variant text-on-surface font-label-sm text-label-sm hover:bg-surface disabled:opacity-60 flex items-center gap-1"
-                >
-                  <span className="material-symbols-outlined text-[16px]">lock</span>
-                  {t("lock")}
-                </button>
-              )}
-              <button
-                onClick={deleteSession}
-                disabled={deleting}
-                className="px-3 py-2 rounded-lg border border-error/40 text-error font-label-sm text-label-sm hover:bg-error/5 disabled:opacity-60 flex items-center gap-1"
-              >
-                <span className="material-symbols-outlined text-[16px]">delete</span>
-                {deleting ? t("savingEllipsis") : t("delete")}
-              </button>
-            </div>
+                  expand_more
+                </span>
+              </div>
+            </button>
+
+            {showSettingsAccordion && (
+              <div className="p-4 sm:p-5 pt-2 border-t border-outline-variant/30 bg-slate-50/50 animate-in fade-in duration-200">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {session.status === "DRAFT" && (
+                    <button
+                      onClick={startDrawingPhase}
+                      disabled={startingDraw || !drawUnlocked}
+                      title={drawUnlocked ? undefined : t("drawUnlocksAt", { date: drawUnlocksAtLabel })}
+                      className="px-3 py-2 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 disabled:opacity-60 cursor-pointer shadow-xs"
+                    >
+                      {startingDraw ? t("startingEllipsis") : drawUnlocked ? t("startDrawingPhase") : t("drawUnlocksAt", { date: drawUnlocksAtLabel })}
+                    </button>
+                  )}
+                  {(session.status === "CLOSED" || session.status === "ACTIVE") && (
+                    <button
+                      onClick={openRelaunchModal}
+                      className="px-3 py-2 rounded-lg bg-emerald-600 text-white font-label-sm text-label-sm hover:bg-emerald-700 flex items-center gap-1.5 shadow-xs cursor-pointer font-bold"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">restart_alt</span>
+                      {t("relaunchCotisation")}
+                    </button>
+                  )}
+                  {(session.status === "ACTIVE" || session.status === "DRAWING") && (
+                    <button
+                      onClick={closeSession}
+                      disabled={closing}
+                      className="px-3 py-2 rounded-lg border border-amber-600/50 text-amber-800 bg-amber-50 hover:bg-amber-100 disabled:opacity-60 flex items-center gap-1.5 font-label-sm text-label-sm cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                      {closing ? t("closing") : t("closeCotisation")}
+                    </button>
+                  )}
+                  <button
+                    onClick={openEditModal}
+                    className="px-3 py-2 rounded-lg border border-outline-variant text-on-surface bg-white hover:bg-slate-100 font-label-sm text-label-sm flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">edit</span>
+                    {t("editCotisation")}
+                  </button>
+                  <button
+                    onClick={togglePause}
+                    disabled={pausing}
+                    className="px-3 py-2 rounded-lg border border-outline-variant text-on-surface bg-white hover:bg-slate-100 disabled:opacity-60 flex items-center gap-1.5 font-label-sm text-label-sm cursor-pointer shadow-2xs"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">{session.isPaused ? "play_arrow" : "pause"}</span>
+                    {session.isPaused ? t("resume") : t("pause")}
+                  </button>
+                  {!session.lockedAt && (
+                    <button
+                      onClick={lockSession}
+                      disabled={locking}
+                      className="px-3 py-2 rounded-lg border border-outline-variant text-on-surface bg-white hover:bg-slate-100 disabled:opacity-60 flex items-center gap-1.5 font-label-sm text-label-sm cursor-pointer shadow-2xs"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">lock</span>
+                      {t("lock")}
+                    </button>
+                  )}
+                  <button
+                    onClick={deleteSession}
+                    disabled={deleting}
+                    className="px-3 py-2 rounded-lg border border-error/40 text-error bg-error/5 hover:bg-error/15 disabled:opacity-60 flex items-center gap-1.5 font-label-sm text-label-sm cursor-pointer shadow-2xs"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                    {deleting ? t("savingEllipsis") : t("delete")}
+                  </button>
+                </div>
+                {deleteError && <p className="font-label-sm text-label-sm text-error mt-2">{deleteError}</p>}
+              </div>
+            )}
           </div>
-          {deleteError && <p className="font-label-sm text-label-sm text-error">{deleteError}</p>}
 
           <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4 flex flex-col h-full">
             <div className="flex justify-between items-center mb-3">

@@ -40,6 +40,7 @@ export async function scheduleNotifications(params: {
   channel: NotificationChannel;
   type: NotificationEventType;
   recipients: NotificationRecipient[];
+  staggerMs?: number;
 }): Promise<number> {
   if (params.recipients.length === 0) return 0;
 
@@ -110,6 +111,7 @@ export async function scheduleNotifications(params: {
   });
 
   const now = Date.now();
+  const stepMs = typeof params.staggerMs === "number" && params.staggerMs > 0 ? params.staggerMs : STAGGER_MS;
   await prisma.notification.createMany({
     data: personalizedRecipients.map((r, index) => ({
       tontineSessionId: params.tontineSessionId,
@@ -121,7 +123,7 @@ export async function scheduleNotifications(params: {
       messageVars: r.messageVars,
       actionUrl: r.actionUrl,
       status: "SCHEDULED" as const,
-      scheduledAt: new Date(now + index * STAGGER_MS),
+      scheduledAt: new Date(now + index * stepMs),
     })),
   });
 
@@ -317,6 +319,7 @@ export async function scheduleInAppNotifications(params: {
   tontineSessionId?: string;
   type: NotificationEventType;
   recipients: NotificationRecipient[];
+  staggerMs?: number;
 }): Promise<number> {
   const count = await scheduleNotifications({ ...params, channel: "IN_APP" });
   if (count === 0) return 0;
@@ -332,7 +335,7 @@ export async function scheduleInAppNotifications(params: {
     data: { status: "SENT", sentAt: new Date() },
   });
 
-  // Companion Web Push
+  // Companion Web Push (staggered by stepMs)
   await scheduleNotifications({ ...params, channel: "PUSH" });
 
   // Companion Email:
