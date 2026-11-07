@@ -4,7 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 import { formatXAF } from "@/lib/format-currency";
-import { detectMobileMoneyProvider } from "@/lib/mobile-money-provider";
+import {
+  detectMobileMoneyProvider,
+  getOperatorInfo,
+} from "@/lib/mobile-money-provider";
+import { OperatorBadge } from "@/components/operator-badge";
 import { playSuccessChimeSound } from "@/lib/sound-effects";
 import {
   getFapshiEdgeUrl,
@@ -20,6 +24,9 @@ interface QuoteItem {
   membershipSlotId: string;
   beneficiaryName: string;
   sessionLabel: string;
+  amount?: number;
+  fee?: number;
+  fineAmount?: number;
   baseTotal: number;
 }
 
@@ -257,6 +264,15 @@ export function BulkPaymentDialog({
       setPhoneError(t("invalidMobileMoneyPhone"));
       return;
     }
+    const opInfo = getOperatorInfo(normalized, lang);
+    if (opInfo.status === "unknown") {
+      setPhoneError(
+        lang === "fr"
+          ? "Opérateur inconnu. Veuillez vérifier votre numéro Orange (69x, 655-659) ou MTN (67x, 680-684)."
+          : "Unknown operator. Please verify your Orange or MTN Cameroon number.",
+      );
+      return;
+    }
     setPhoneError(null);
     setSubmitting(true);
     setPayError(null);
@@ -302,6 +318,36 @@ export function BulkPaymentDialog({
     setTransId(null);
   }
 
+  const operatorInfo = getOperatorInfo(phone, lang);
+  const operatorFeeLabel =
+    operatorInfo.provider === "ORANGE"
+      ? lang === "fr"
+        ? "Frais Orange"
+        : "Orange fees"
+      : operatorInfo.provider === "MTN"
+        ? lang === "fr"
+          ? "Frais MTN"
+          : "MTN fees"
+        : lang === "fr"
+          ? "Frais opérateur"
+          : "Operator fees";
+
+  const providerFeeAmount =
+    quote?.providerFeeAmount ??
+    (quote?.baseTotal ? Math.round(quote.baseTotal * 0.031) : 0);
+  const totalCharged =
+    quote?.totalCharged ??
+    (quote?.baseTotal ? quote.baseTotal + providerFeeAmount : 0);
+  const isOperatorInvalid = operatorInfo.status === "unknown";
+
+  const potTotal =
+    quote?.items.reduce(
+      (sum, item) => sum + (item.amount ?? (item.baseTotal - (item.fee ?? 100))),
+      0,
+    ) ?? 0;
+  const feesTotal =
+    quote?.items.reduce((sum, item) => sum + (item.fee ?? 100), 0) ?? 0;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-container-padding"
@@ -324,21 +370,44 @@ export function BulkPaymentDialog({
 
             {quote && (
               <div className="flex flex-col gap-2 mb-4 bg-surface-container-low p-3.5 rounded-xl border border-outline-variant">
-                <div className="flex flex-col gap-1 max-h-36 overflow-y-auto pr-1">
+                <div className="flex flex-col gap-1 max-h-32 overflow-y-auto pr-1">
                   {quote.items.map((item) => (
-                    <div key={item.membershipSlotId} className="flex justify-between items-center gap-2 text-sm">
+                    <div key={item.membershipSlotId} className="flex justify-between items-center gap-2 text-xs">
                       <span className="font-body-md text-body-md text-on-surface-variant truncate">{item.beneficiaryName}</span>
                       <span className="font-label-md text-label-md text-on-surface flex-shrink-0">{formatXAF(item.baseTotal)}</span>
                     </div>
                   ))}
                 </div>
                 <div className="flex justify-between items-center text-sm pt-2 border-t border-outline-variant">
-                  <span className="font-body-md text-body-md text-on-surface-variant">{t("amountToContributeLabel")}</span>
-                  <span className="font-label-md text-label-md text-on-surface">{formatXAF(quote.baseTotal)}</span>
+                  <span className="font-body-md text-body-md text-on-surface-variant">
+                    {lang === "fr"
+                      ? `Cotisation pour le pot (${quote.items.length} ${quote.items.length > 1 ? "noms" : "nom"})`
+                      : `Tontine pot (${quote.items.length} ${quote.items.length > 1 ? "slots" : "slot"})`}
+                  </span>
+                  <span className="font-label-md text-label-md text-on-surface">{formatXAF(potTotal)}</span>
                 </div>
-                <div className="flex justify-between items-center border-t border-outline-variant pt-2 mt-1">
-                  <span className="font-label-md text-label-md text-on-surface font-bold">{t("totalLabel")}</span>
-                  <span className="font-headline-sm text-headline-sm text-primary font-bold">{formatXAF(quote.baseTotal)}</span>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-body-md text-body-md text-on-surface-variant">
+                    {lang === "fr" ? "Frais Diva" : "Diva fees"}
+                  </span>
+                  <span className="font-label-md text-label-md text-on-surface">+{formatXAF(feesTotal)}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-body-md text-body-md text-on-surface-variant flex items-center gap-1.5">
+                    <span>{operatorFeeLabel}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-semibold font-numeric-data">3,1%</span>
+                  </span>
+                  <span className="font-label-md text-label-md text-on-surface font-semibold text-amber-950">
+                    +{formatXAF(providerFeeAmount)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center border-t border-outline-variant pt-2.5 mt-1 bg-primary/5 -mx-3.5 -mb-3.5 p-3.5 rounded-b-xl border-t">
+                  <span className="font-label-md text-sm text-on-surface font-black uppercase tracking-wider">
+                    {lang === "fr" ? "TOTAL À PAYER" : "TOTAL TO PAY"}
+                  </span>
+                  <span className="font-headline-sm text-xl text-primary font-black">
+                    {formatXAF(totalCharged)}
+                  </span>
                 </div>
               </div>
             )}
@@ -358,6 +427,7 @@ export function BulkPaymentDialog({
                   placeholder={t("mobileMoneyPhonePlaceholder")}
                   className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
                 />
+                <OperatorBadge operator={operatorInfo} lang={lang} className="mt-2" />
                 {phoneError && <p className="font-label-sm text-label-sm text-error mt-1">{phoneError}</p>}
               </div>
             )}
@@ -373,10 +443,12 @@ export function BulkPaymentDialog({
               </button>
               <button
                 onClick={() => handleConfirm()}
-                disabled={!quote || submitting || !phone.trim()}
+                disabled={!quote || submitting || !phone.trim() || isOperatorInvalid}
                 className="flex-1 px-3 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-60"
               >
-                {submitting ? t("redirectingToFapshi") : t("confirmAndPay")}
+                {submitting
+                  ? t("redirectingToFapshi")
+                  : `${t("confirmAndPay")} (${formatXAF(totalCharged)})`}
               </button>
             </div>
           </>
@@ -388,7 +460,7 @@ export function BulkPaymentDialog({
             <h2 className="font-headline-sm text-headline-sm text-on-surface">{t("waitingForUssdConfirmationTitle")}</h2>
             {quote && (
               <p className="font-headline-sm text-headline-sm text-primary font-bold">
-                {formatXAF(quote.baseTotal)}
+                {formatXAF(totalCharged)}
               </p>
             )}
             <p className="font-label-sm text-label-sm text-on-surface-variant">{t("ussdSentToPhone", { phone })}</p>

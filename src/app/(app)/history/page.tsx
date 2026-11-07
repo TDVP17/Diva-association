@@ -5,6 +5,7 @@ import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { formatXAF } from "@/lib/format-currency";
 import { TONTINE_TYPE_LABELS } from "@/lib/tontine-labels";
 import { normalizeCameroonPhone } from "@/lib/fapshi";
+import { detectMobileMoneyProvider } from "@/lib/mobile-money-provider";
 
 interface Row {
   kind: "contribution" | "fine" | "relative_contribution" | "duplicate_refund" | "payout";
@@ -18,6 +19,8 @@ interface Row {
   pureAmount?: number;
   feeAmount?: number;
   fineAmount?: number;
+  providerFeeAmount?: number;
+  operatorName?: string | null;
   status: string;
   payerName?: string | null;
   payerPhone?: string | null;
@@ -114,7 +117,20 @@ export default async function HistoryPage() {
       const pureAmount = Number(c.amountPaid);
       const feeAmount = Number(c.feePaid);
       const fineAmount = Number(c.finePaid);
-      const totalAmount = pureAmount + feeAmount + fineAmount;
+      const providerFeeAmount = Number(
+        c.providerFeeAmount ??
+          (c.paymentProvider === "FAPSHI" ? Math.round((pureAmount + feeAmount) * 0.031) : 0),
+      );
+      const detectedOp = c.payerPhone ? detectMobileMoneyProvider(c.payerPhone) : null;
+      const operatorName =
+        detectedOp === "ORANGE"
+          ? "Orange"
+          : detectedOp === "MTN"
+            ? "MTN"
+            : providerFeeAmount > 0
+              ? (lang === "fr" ? "Opérateur" : "Operator")
+              : null;
+      const totalAmount = pureAmount + feeAmount + fineAmount + providerFeeAmount;
       const effectiveDate = c.paidAt ?? c.dueDate;
 
       rows.push({
@@ -130,6 +146,8 @@ export default async function HistoryPage() {
         pureAmount,
         feeAmount,
         fineAmount: fineAmount > 0 ? fineAmount : undefined,
+        providerFeeAmount: providerFeeAmount > 0 ? providerFeeAmount : undefined,
+        operatorName,
         status: c.status,
         payerName: c.paidByUser?.name ?? user?.name ?? null,
         payerPhone: c.payerPhone,
@@ -171,7 +189,20 @@ export default async function HistoryPage() {
     const pureAmount = Number(c.amountPaid);
     const feeAmount = Number(c.feePaid);
     const fineAmount = Number(c.finePaid);
-    const totalAmount = pureAmount + feeAmount + fineAmount;
+    const providerFeeAmount = Number(
+      c.providerFeeAmount ??
+        (c.paymentProvider === "FAPSHI" ? Math.round((pureAmount + feeAmount) * 0.031) : 0),
+    );
+    const detectedOp = c.payerPhone ? detectMobileMoneyProvider(c.payerPhone) : null;
+    const operatorName =
+      detectedOp === "ORANGE"
+        ? "Orange"
+        : detectedOp === "MTN"
+          ? "MTN"
+          : providerFeeAmount > 0
+            ? (lang === "fr" ? "Opérateur" : "Operator")
+            : null;
+    const totalAmount = pureAmount + feeAmount + fineAmount + providerFeeAmount;
     const memberName = c.membershipSlot.membership.user.name;
 
     rows.push({
@@ -185,6 +216,8 @@ export default async function HistoryPage() {
       pureAmount,
       feeAmount,
       fineAmount: fineAmount > 0 ? fineAmount : undefined,
+      providerFeeAmount: providerFeeAmount > 0 ? providerFeeAmount : undefined,
+      operatorName,
       status: c.status,
       payerName: user?.name ?? t("youLabel"),
       payerPhone: c.payerPhone,
@@ -439,16 +472,41 @@ export default async function HistoryPage() {
                     </div>
                   )}
 
-                  {/* Montant cotisé */}
+                  {/* Montant cotisé & Décomposition des frais */}
                   {r.pureAmount !== undefined && (
-                    <div className="flex items-center gap-1.5 sm:col-span-2">
-                      <span className="material-symbols-outlined text-[16px] text-primary">account_balance_wallet</span>
-                      <span>
-                        <strong className="text-on-surface">{t("amountCotised")} :</strong>{" "}
-                        {formatXAF(r.pureAmount)}
-                        {r.feeAmount ? ` + ${t("feeLabel")} : ${formatXAF(r.feeAmount)}` : ""}
-                        {r.fineAmount ? ` + ${t("fineDetailLabel")} : ${formatXAF(r.fineAmount)}` : ""}
-                      </span>
+                    <div className="flex flex-col gap-1 sm:col-span-2 bg-surface-container-highest/40 p-2.5 rounded-lg border border-outline-variant/50">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-on-surface-variant flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[15px] text-primary">savings</span>
+                          {lang === "fr" ? "Cotisation pour le pot" : "Tontine pot"}
+                        </span>
+                        <span className="font-semibold text-on-surface">{formatXAF(r.pureAmount)}</span>
+                      </div>
+                      {r.feeAmount !== undefined && r.feeAmount > 0 && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-on-surface-variant">{lang === "fr" ? "Frais Diva Asso" : "Diva fees"}</span>
+                          <span className="font-semibold text-on-surface">+{formatXAF(r.feeAmount)}</span>
+                        </div>
+                      )}
+                      {r.fineAmount !== undefined && r.fineAmount > 0 && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-on-surface-variant">{t("fineDetailLabel")}</span>
+                          <span className="font-semibold text-error">+{formatXAF(r.fineAmount)}</span>
+                        </div>
+                      )}
+                      {r.providerFeeAmount !== undefined && r.providerFeeAmount > 0 && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-on-surface-variant flex items-center gap-1">
+                            <span>{lang === "fr" ? `Frais ${r.operatorName || "opérateur"}` : `${r.operatorName || "Operator"} fee`}</span>
+                            <span className="text-[10px] px-1 py-0.2 rounded bg-amber-100 text-amber-900 font-medium">3,1%</span>
+                          </span>
+                          <span className="font-semibold text-amber-950">+{formatXAF(r.providerFeeAmount)}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between text-xs border-t border-outline-variant/60 pt-1 mt-0.5">
+                        <strong className="text-on-surface uppercase tracking-wider">{lang === "fr" ? "Total débité" : "Total charged"} :</strong>
+                        <strong className="text-primary font-bold">{formatXAF(r.totalAmount)}</strong>
+                      </div>
                     </div>
                   )}
 

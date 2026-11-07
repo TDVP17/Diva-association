@@ -4,7 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 import { formatXAF } from "@/lib/format-currency";
-import { detectMobileMoneyProvider } from "@/lib/mobile-money-provider";
+import {
+  detectMobileMoneyProvider,
+  getOperatorInfo,
+} from "@/lib/mobile-money-provider";
+import { OperatorBadge } from "@/components/operator-badge";
 import { playSuccessChimeSound } from "@/lib/sound-effects";
 import {
   getFapshiEdgeUrl,
@@ -22,8 +26,8 @@ interface Quote {
   fee?: number;
   fineAmount?: number;
   baseTotal: number;
-  providerFeeAmount: number;
-  totalCharged: number;
+  providerFeeAmount?: number;
+  totalCharged?: number;
 }
 
 interface SavedMethod {
@@ -143,8 +147,30 @@ export function PaymentConfirmDialog({
     };
   }, []);
 
-  const detectedProvider = phone.trim() ? detectMobileMoneyProvider(phone.replace(/\D/g, "").replace(/^237/, "")) : null;
   const usingNewNumber = selectedMethodId === "new" || (savedMethods?.length ?? 0) === 0;
+  const selectedSavedMethod = !usingNewNumber ? savedMethods?.find((m) => m.id === selectedMethodId) : null;
+  const effectivePhone = usingNewNumber ? phone : (selectedSavedMethod?.phone ?? "");
+
+  const operatorInfo = selectedSavedMethod
+    ? {
+        provider: selectedSavedMethod.provider,
+        status: "detected" as const,
+        name: selectedSavedMethod.provider === "ORANGE" ? "Orange Money" : "MTN Mobile Money",
+        shortName: selectedSavedMethod.provider === "ORANGE" ? "Orange" : "MTN",
+      }
+    : getOperatorInfo(phone, lang);
+
+  const detectedProvider = operatorInfo.provider;
+  const isOperatorInvalid = usingNewNumber && operatorInfo.status === "unknown";
+
+  const providerFeeAmount = quote?.providerFeeAmount ?? (quote?.baseTotal ? Math.round(quote.baseTotal * 0.031) : 0);
+  const totalCharged = quote?.totalCharged ?? (quote?.baseTotal ? quote.baseTotal + providerFeeAmount : 0);
+
+  const operatorFeeLabel = operatorInfo.provider === "ORANGE"
+    ? (lang === "fr" ? "Frais Orange" : "Orange fees")
+    : operatorInfo.provider === "MTN"
+    ? (lang === "fr" ? "Frais MTN" : "MTN fees")
+    : (lang === "fr" ? "Frais opérateur" : "Operator fees");
 
   useEffect(() => {
     let cancelled = false;
@@ -353,6 +379,14 @@ export function PaymentConfirmDialog({
         setPhoneError(t("invalidMobileMoneyPhone"));
         return;
       }
+      if (operatorInfo.status === "unknown") {
+        setPhoneError(
+          lang === "fr"
+            ? "Opérateur inconnu. Veuillez entrer un numéro Orange ou MTN valide."
+            : "Unknown operator. Please enter a valid Orange or MTN number."
+        );
+        return;
+      }
     }
     setPhoneError(null);
     setSubmitting(true);
@@ -465,12 +499,21 @@ export function PaymentConfirmDialog({
                     <span className="font-label-md text-label-md text-on-surface">{formatXAF(quote.baseTotal)}</span>
                   </div>
                 )}
-                <div className="flex justify-between items-center border-t border-outline-variant pt-2 mt-1">
-                  <span className="font-label-md text-label-md text-on-surface font-bold">
-                    {t("totalLabel")}
+                <div className="flex justify-between items-center text-sm">
+                  <span className="font-body-md text-body-md text-on-surface-variant flex items-center gap-1.5">
+                    <span>{operatorFeeLabel}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-semibold font-numeric-data">3,1%</span>
                   </span>
-                  <span className="font-headline-sm text-headline-sm text-primary font-bold">
-                    {formatXAF(quote.baseTotal)}
+                  <span className="font-label-md text-label-md text-on-surface font-semibold text-amber-950">
+                    +{formatXAF(providerFeeAmount)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center border-t border-outline-variant pt-2.5 mt-1 bg-primary/5 -mx-3.5 -mb-3.5 p-3.5 rounded-b-xl border-t">
+                  <span className="font-label-md text-sm text-on-surface font-black uppercase tracking-wider">
+                    {lang === "fr" ? "TOTAL À PAYER" : "TOTAL TO PAY"}
+                  </span>
+                  <span className="font-headline-sm text-xl text-primary font-black">
+                    {formatXAF(totalCharged)}
                   </span>
                 </div>
               </div>
@@ -544,17 +587,7 @@ export function PaymentConfirmDialog({
                       placeholder={t("mobileMoneyPhonePlaceholder")}
                       className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
                     />
-                    {detectedProvider && (
-                      <p className="font-label-sm text-label-sm text-on-surface-variant mt-1 flex items-center gap-1">
-                        <span
-                          className={`px-1.5 py-0.5 rounded font-label-sm text-[10px] uppercase tracking-wide ${
-                            detectedProvider === "ORANGE" ? "bg-orange-100 text-orange-700" : "bg-yellow-100 text-yellow-800"
-                          }`}
-                        >
-                          {t(providerLabelKey(detectedProvider))}
-                        </span>
-                      </p>
-                    )}
+                    <OperatorBadge operator={operatorInfo} lang={lang} className="mt-2" />
                     {phoneError && <p className="font-label-sm text-label-sm text-error mt-1">{phoneError}</p>}
                     {canManageSavedMethods && (
                       <label className="flex items-center gap-2 mt-2 cursor-pointer">
@@ -585,10 +618,12 @@ export function PaymentConfirmDialog({
               </button>
               <button
                 onClick={() => handleConfirm()}
-                disabled={!quote || submitting || (usingNewNumber ? !phone.trim() : !selectedMethodId)}
-                className="flex-1 px-3 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-60"
+                disabled={!quote || submitting || (usingNewNumber ? !phone.trim() || isOperatorInvalid : !selectedMethodId)}
+                className="flex-1 px-3 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-60 cursor-pointer"
               >
-                {submitting ? t("redirectingToFapshi") : t("confirmAndPay")}
+                {submitting
+                  ? t("redirectingToFapshi")
+                  : (lang === "fr" ? `Payer ${formatXAF(totalCharged)}` : `Pay ${formatXAF(totalCharged)}`)}
               </button>
             </div>
           </>
@@ -600,7 +635,7 @@ export function PaymentConfirmDialog({
             <h2 className="font-headline-sm text-headline-sm text-on-surface">{t("waitingForUssdConfirmationTitle")}</h2>
             {quote && (
               <p className="font-headline-sm text-headline-sm text-primary font-bold">
-                {formatXAF(quote.baseTotal)}
+                {formatXAF(totalCharged)}
               </p>
             )}
             <p className="font-label-sm text-label-sm text-on-surface-variant">

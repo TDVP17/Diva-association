@@ -6,6 +6,7 @@ import { sendEmailSafe } from "@/lib/email/resend";
 import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { formatXAF } from "@/lib/format-currency";
+import { detectMobileMoneyProvider } from "@/lib/mobile-money-provider";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { TONTINE_TYPE_LABELS } from "@/lib/tontine-labels";
 
@@ -32,15 +33,37 @@ export async function settleContribution(
 
   const paidByName = contribution.paidByUser?.name;
 
+  const baseTotal = Number(contribution.amountPaid) + Number(contribution.feePaid);
+  const providerFee = Number(
+    contribution.providerFeeAmount ??
+      (contribution.paymentProvider === "FAPSHI" ? Math.round(baseTotal * 0.031) : 0),
+  );
+  const detectedOp = contribution.payerPhone ? detectMobileMoneyProvider(contribution.payerPhone) : null;
+  const opName =
+    detectedOp === "ORANGE"
+      ? "Orange Money (3,1%)"
+      : detectedOp === "MTN"
+        ? "MTN MoMo (3,1%)"
+        : providerFee > 0
+          ? "opérateur (3,1%)"
+          : null;
+  const totalPaid =
+    Number(contribution.amountPaid) +
+    Number(contribution.feePaid) +
+    Number(contribution.finePaid) +
+    providerFee;
+
   const receiptBytes = await generateReceiptPdf({
     memberName: `${user.name} — ${contribution.membershipSlot.beneficiaryName}`,
     paidByName,
     paymentMethod: contribution.recordedByAdminId ? "Recorded by admin" : "Mobile Money / Orange Money",
+    operatorName: opName,
     tontineType: tontineSession.type,
     amount: Number(contribution.amountPaid),
     fee: Number(contribution.feePaid),
     fine: Number(contribution.finePaid),
-    total: Number(contribution.amountPaid) + Number(contribution.feePaid) + Number(contribution.finePaid),
+    paymentFee: providerFee > 0 ? providerFee : undefined,
+    total: totalPaid,
     transRef: contribution.fapshiTxRef ?? contribution.id,
     paidAt: options.paidAt,
   });
@@ -66,8 +89,6 @@ export async function settleContribution(
       : []),
   ]);
 
-  const totalPaid =
-    Number(contribution.amountPaid) + Number(contribution.feePaid) + Number(contribution.finePaid);
   const sessionLabel = tontineSession.title || TONTINE_TYPE_LABELS[tontineSession.type];
   const receiptUrl = `${options.origin}/api/files/${receiptKey}`;
   const recipientLang: Lang = user.preferredLang === "en" ? "en" : "fr";

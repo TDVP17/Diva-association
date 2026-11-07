@@ -14,12 +14,12 @@ export interface ReceiptData {
   /// (admin manual entry or a relative/friend paying via their own code).
   paidByName?: string;
   paymentMethod?: string;
+  operatorName?: string | null;
   tontineType: TontineType;
   amount: number;
   fee?: number;
   fine: number;
-  /// Total payment-gateway processing fee (e.g. Fapshi's combined 3.3%) —
-  /// the total only, never the internal gateway/president split.
+  /// Total payment-gateway / operator processing fee (3.1%)
   paymentFee?: number;
   total: number;
   transRef: string;
@@ -98,12 +98,19 @@ export async function generateReceiptPdf(data: ReceiptData): Promise<Buffer> {
   });
   y -= 30;
 
-  row("Contribution", formatXAF(data.amount));
-  if (data.fee && data.fee > 0) row("Frais de cotisation", formatXAF(data.fee));
-  if (data.fine > 0) row("Late fine", formatXAF(data.fine));
+  row("Cotisation pour le pot", formatXAF(data.amount));
+  if (data.fee && data.fee > 0) row("Frais Diva Asso", formatXAF(data.fee));
+  if (data.fine > 0) row("Pénalité de retard", formatXAF(data.fine));
+  if (data.paymentFee && data.paymentFee > 0) {
+    const opLabel = data.operatorName ? `Frais ${data.operatorName}` : "Frais opérateur (3,1%)";
+    row(opLabel, formatXAF(data.paymentFee));
+  }
   y -= 10;
-  const exactTotal = data.amount + (data.fee || 0) + (data.fine || 0);
-  row("Total", formatXAF(exactTotal), { emphasize: true });
+  const exactTotal =
+    data.total > 0
+      ? data.total
+      : data.amount + (data.fee || 0) + (data.fine || 0) + (data.paymentFee || 0);
+  row("TOTAL PAYÉ", formatXAF(exactTotal), { emphasize: true });
 
   y -= 30;
   page.drawText("Thank you for your contribution to the community fund.", {

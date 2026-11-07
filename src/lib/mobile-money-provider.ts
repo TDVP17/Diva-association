@@ -24,6 +24,61 @@ export function detectMobileMoneyProvider(normalizedPhone: string): MobileMoneyP
   return null;
 }
 
+export interface OperatorInfo {
+  provider: MobileMoneyProvider | null;
+  status: "idle" | "detected" | "unknown";
+  name: string;
+  shortName: string;
+  helpMessage?: string;
+}
+
+/**
+ * Analyse et détecte en temps réel l'opérateur (Orange ou MTN) d'un numéro camerounais.
+ * Gère les préfixes à 2 ou 3 chiffres et les formats avec/sans indicatif 237.
+ */
+export function getOperatorInfo(phone: string, lang: "fr" | "en" = "fr"): OperatorInfo {
+  const digits = phone.replace(/\D/g, "");
+  const normalized = digits.startsWith("237") ? digits.slice(3) : digits;
+
+  if (normalized.length < 2) {
+    return { provider: null, status: "idle", name: "", shortName: "" };
+  }
+
+  // Préfixes ambigus où le 3ème chiffre est nécessaire pour trancher
+  if (normalized.length === 2 && (normalized === "65" || normalized === "68")) {
+    return { provider: null, status: "idle", name: "", shortName: "" };
+  }
+
+  const provider = detectMobileMoneyProvider(normalized);
+  if (provider === "ORANGE") {
+    return {
+      provider: "ORANGE",
+      status: "detected",
+      name: "Orange Money",
+      shortName: "Orange",
+    };
+  }
+  if (provider === "MTN") {
+    return {
+      provider: "MTN",
+      status: "detected",
+      name: "MTN Mobile Money",
+      shortName: "MTN",
+    };
+  }
+
+  return {
+    provider: null,
+    status: "unknown",
+    name: lang === "fr" ? "Opérateur inconnu" : "Unknown operator",
+    shortName: lang === "fr" ? "Inconnu" : "Unknown",
+    helpMessage:
+      lang === "fr"
+        ? "Opérateur inconnu — Veuillez vérifier votre numéro (Orange ou MTN uniquement)."
+        : "Unknown operator — Please check your number (Orange or MTN only).",
+  };
+}
+
 /** Fapshi's own `medium` values for its direct-pay/payout APIs — MTN routes through "mobile money", Orange through "orange money". */
 export function fapshiMediumFor(provider: MobileMoneyProvider): "mobile money" | "orange money" {
   return provider === "ORANGE" ? "orange money" : "mobile money";

@@ -5,6 +5,7 @@ import { mimeTypeFor } from "@/lib/mime";
 import { isAdminRole } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 import { generateReceiptPdf } from "@/lib/receipt";
+import { detectMobileMoneyProvider } from "@/lib/mobile-money-provider";
 
 export async function GET(
   _request: Request,
@@ -54,15 +55,37 @@ export async function GET(
       if (contrib) {
         const u = contrib.membershipSlot.membership.user;
         const s = contrib.membershipSlot.membership.tontineSession;
+        const baseTotal = Number(contrib.amountPaid) + Number(contrib.feePaid);
+        const providerFee = Number(
+          contrib.providerFeeAmount ??
+            (contrib.paymentProvider === "FAPSHI" ? Math.round(baseTotal * 0.031) : 0),
+        );
+        const detectedOp = contrib.payerPhone ? detectMobileMoneyProvider(contrib.payerPhone) : null;
+        const opName =
+          detectedOp === "ORANGE"
+            ? "Orange Money (3,1%)"
+            : detectedOp === "MTN"
+              ? "MTN MoMo (3,1%)"
+              : providerFee > 0
+                ? "opérateur (3,1%)"
+                : null;
+        const totalPaid =
+          Number(contrib.amountPaid) +
+          Number(contrib.feePaid) +
+          Number(contrib.finePaid) +
+          providerFee;
+
         const pdfBytes = await generateReceiptPdf({
           memberName: `${u.name} — ${contrib.membershipSlot.beneficiaryName}`,
           paidByName: contrib.paidByUser?.name,
           paymentMethod: contrib.recordedByAdminId ? "Recorded by admin" : "Mobile Money / Orange Money",
+          operatorName: opName,
           tontineType: s.type,
           amount: Number(contrib.amountPaid),
           fee: Number(contrib.feePaid),
           fine: Number(contrib.finePaid),
-          total: Number(contrib.amountPaid) + Number(contrib.feePaid) + Number(contrib.finePaid),
+          paymentFee: providerFee > 0 ? providerFee : undefined,
+          total: totalPaid,
           transRef: contrib.fapshiTxRef ?? contrib.id,
           paidAt: contrib.paidAt ?? contrib.createdAt,
         });
