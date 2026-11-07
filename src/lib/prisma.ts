@@ -9,18 +9,13 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-// DATABASE_URL goes through Supabase's PgBouncer transaction-mode pooler.
-// In testing, connections it hands out sometimes fail on first use with a
-// misleading "Authentication failed" (P1000) error instead of a clean
-// "connection closed" — reproducible even seconds after a prior query on
-// the same pool succeeded, so this isn't purely an idle-timeout question we
-// can tune our way out of; Supabase's side of the pooler isn't fully
-// predictable from here. Kept the pool small/short-lived (below) as a
-// first line of defense, but the actual fix is retrying once — see
-// withTransientRetry.
+// DATABASE_URL goes through Supabase's PgBouncer transaction-mode pooler (port 6543).
+// Must ALWAYS prefer DATABASE_URL over DIRECT_URL at runtime — DIRECT_URL connects to
+// port 5432 (session mode) which is strictly capped at 15 connections and causes
+// (EMAXCONNSESSION) crashes under serverless traffic.
 const adapter = new PrismaPg(
   {
-    connectionString: process.env.DIRECT_URL || process.env.DATABASE_URL,
+    connectionString: process.env.DATABASE_URL || process.env.DIRECT_URL,
     ssl: { rejectUnauthorized: false },
     max: 3,
     idleTimeoutMillis: 3_000,
