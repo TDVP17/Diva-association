@@ -44,14 +44,15 @@ export async function GET(request: Request) {
   // 4. Requête paramétrée Prisma ORM
   const users = await prisma.user.findMany({
     where: {
-      role: "MEMBER",
+      isBanned: false,
       OR: [
         { name: { contains: q, mode: "insensitive" } },
         { email: { contains: q, mode: "insensitive" } },
         { phone: { contains: q } },
+        { memberCode: { contains: q, mode: "insensitive" } },
       ],
     },
-    select: { id: true, name: true, email: true, phone: true, avatar: true },
+    select: { id: true, name: true, email: true, phone: true, avatar: true, memberCode: true },
     take: 10,
   });
 

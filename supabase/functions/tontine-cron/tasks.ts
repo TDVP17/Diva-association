@@ -648,7 +648,7 @@ export async function runCheckPenaltiesTask(
         userId,
         status,
         user:users!inner(id, name, email, preferredLang),
-        slots:membership_slots(id, beneficiaryName)
+        slots:membership_slots(id, beneficiaryName, createdAt)
       )
     `)
     .eq("status", "ACTIVE")
@@ -684,6 +684,9 @@ export async function runCheckPenaltiesTask(
 
       for (const m of approvedMemberships) {
         for (const slot of m.slots || []) {
+          // Ne jamais infliger d'amende rétroactive pour une échéance passée avant l'ajout du nom
+          if (slot.createdAt && new Date(slot.createdAt) > cutoff) continue;
+
           // Vérifier si cotisation déjà payée
           const { data: contrib } = await supabase
             .from("contributions")

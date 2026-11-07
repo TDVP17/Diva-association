@@ -204,12 +204,15 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   const [publishing, setPublishing] = useState(false);
   const [startingDraw, setStartingDraw] = useState(false);
   const [userQuery, setUserQuery] = useState("");
-  const [userResults, setUserResults] = useState<{ id: string; name: string; email: string }[]>([]);
+  const [userResults, setUserResults] = useState<
+    { id: string; name: string; email: string; phone?: string | null; memberCode?: string | null }[]
+  >([]);
   const [selectedUser, setSelectedUser] = useState<{ id: string; name: string } | null>(null);
   const [addSlotCount, setAddSlotCount] = useState(1);
   const [addNames, setAddNames] = useState<string[]>([""]);
   const [addingMember, setAddingMember] = useState(false);
   const [addMemberResult, setAddMemberResult] = useState<string | null>(null);
+  const [addMemberIsError, setAddMemberIsError] = useState(false);
   const [membershipQueue, setMembershipQueue] = useState<MembershipRequest[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [fines, setFines] = useState<FineRow[]>([]);
@@ -450,8 +453,9 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
       body: JSON.stringify({ action, reason: reason || undefined }),
     });
     if (!res.ok) {
+      const errBody = await res.json().catch(() => null);
       setMembershipQueue((q) => [...q, request]);
-      window.alert(t("couldNotUpdateMembership"));
+      window.alert(errBody?.error || t("couldNotUpdateMembership"));
     } else {
       await refreshSession();
     }
@@ -937,6 +941,26 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     }
   }
 
+  function scrollToAddMemberForm(preselectUser?: { id: string; name: string }) {
+    setActiveTab("members");
+    setAddMemberResult(null);
+    setAddMemberIsError(false);
+    if (preselectUser) {
+      setSelectedUser(preselectUser);
+      setUserResults([]);
+      setAddSlotCount(1);
+      setAddNames([preselectUser.name]);
+    }
+    setTimeout(() => {
+      const formEl = document.getElementById("admin-add-member-section");
+      if (formEl) {
+        formEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        formEl.classList.add("ring-4", "ring-emerald-500/40");
+        setTimeout(() => formEl.classList.remove("ring-4", "ring-emerald-500/40"), 2200);
+      }
+    }, 120);
+  }
+
   function handleAddSlotCountChange(next: number) {
     setAddSlotCount(next);
     setAddNames((current) => {
@@ -950,6 +974,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     if (!selectedUser || addNames.some((n) => !n.trim())) return;
     setAddingMember(true);
     setAddMemberResult(null);
+    setAddMemberIsError(false);
     try {
       const res = await fetch("/api/admin/memberships/manual", {
         method: "POST",
@@ -961,13 +986,24 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
           beneficiaryNames: addNames.map((n) => n.trim()),
         }),
       });
-      const body = await res.json();
+      const body = await res.json().catch(() => null);
       if (!res.ok) {
         if (body?.error) console.error("[addMember] server error:", body.error);
-        setAddMemberResult(t("couldNotAddMember"));
+        setAddMemberIsError(true);
+        setAddMemberResult(body?.error || t("couldNotAddMember"));
         return;
       }
-      setAddMemberResult(t("memberAddedSuccessfully"));
+      const addedNames: string[] = Array.isArray(body?.beneficiaryNames) ? body.beneficiaryNames : [];
+      const assignedPositions: number[] = Array.isArray(body?.assignedPositions) ? body.assignedPositions : [];
+      const posSuffix =
+        assignedPositions.length > 0
+          ? lang === "fr"
+            ? ` — classé(s) à la fin : ${assignedPositions.map((p) => `#${p}`).join(", ")}`
+            : ` — ranked at the end: ${assignedPositions.map((p) => `#${p}`).join(", ")}`
+          : "";
+      const namesLabel = addedNames.length > 0 ? ` (${addedNames.join(", ")})` : "";
+      setAddMemberIsError(false);
+      setAddMemberResult(`${t("memberAddedSuccessfully")}${namesLabel}${posSuffix}`);
       setSelectedUser(null);
       setUserQuery("");
       setAddSlotCount(1);
@@ -1454,6 +1490,24 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
               </div>
 
               <div className="flex items-center gap-1.5 flex-wrap self-start sm:self-center">
+                {session.status !== "CLOSED" && (
+                  <button
+                    type="button"
+                    onClick={() => scrollToAddMemberForm()}
+                    className="px-3 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">person_add</span>
+                    <span>
+                      {session.status === "DRAFT"
+                        ? lang === "fr"
+                          ? "Ajouter des noms"
+                          : "Add names"
+                        : lang === "fr"
+                          ? "Ajouter des noms (à la fin)"
+                          : "Add names (at the end)"}
+                    </span>
+                  </button>
+                )}
                 {unassignedSlots.length > 0 && (
                   <button
                     type="button"
@@ -2094,13 +2148,13 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                       >
                         {lang === "fr" ? "Bannir" : "Ban"}
                       </button>
-                      {session.status === "DRAFT" ? (
+                      {session.status !== "CLOSED" ? (
                         <button onClick={() => decideMembership(m, "approve")} className="px-2 py-1 rounded bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90">
                           {t("approve")}
                         </button>
                       ) : (
                         <span className="px-2 py-1 text-xs text-on-surface-variant italic">
-                          {lang === "fr" ? "Tirage déjà lancé" : "Draw started"}
+                          {lang === "fr" ? "Clôturée" : "Closed"}
                         </span>
                       )}
                     </div>
@@ -2116,16 +2170,36 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                 <span className="material-symbols-outlined">group</span>
                 {t("membersLabel")} ({session.slots.filter((s) => s.paidThisCycle).length}/{session.slots.length})
               </h3>
-              {session.slots.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => openTransferModal(session.slots[0])}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-600 text-white font-label-md text-xs font-bold hover:bg-indigo-700 shadow-xs transition-all active:scale-95"
-                >
-                  <span className="material-symbols-outlined text-[18px]">swap_horiz</span>
-                  <span>{lang === "fr" ? "Transférer des parts (ex: cousine)" : "Transfer slots (e.g. cousin)"}</span>
-                </button>
-              )}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                {session.status !== "CLOSED" && (
+                  <button
+                    type="button"
+                    onClick={() => scrollToAddMemberForm()}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-primary text-on-primary font-label-md text-xs font-bold hover:opacity-90 shadow-xs transition-all active:scale-95 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">person_add</span>
+                    <span>
+                      {session.status === "DRAFT"
+                        ? lang === "fr"
+                          ? "Ajouter des noms"
+                          : "Add names"
+                        : lang === "fr"
+                          ? "Ajouter des noms (en fin de liste)"
+                          : "Add names (at the end)"}
+                    </span>
+                  </button>
+                )}
+                {session.slots.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => openTransferModal(session.slots[0])}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-600 text-white font-label-md text-xs font-bold hover:bg-indigo-700 shadow-xs transition-all active:scale-95"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">swap_horiz</span>
+                    <span>{lang === "fr" ? "Transférer des parts (ex: cousine)" : "Transfer slots (e.g. cousin)"}</span>
+                  </button>
+                )}
+              </div>
             </div>
             <div className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20">
               {session.slots.map((s) => (
@@ -2191,7 +2265,22 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-outline-variant/20 w-full md:w-auto">
+                  <div className="flex items-center gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-outline-variant/20 w-full md:w-auto flex-wrap">
+                    {session.status !== "CLOSED" && (
+                      <button
+                        type="button"
+                        onClick={() => scrollToAddMemberForm({ id: s.userId, name: s.name })}
+                        className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg border border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 active:scale-95 font-label-sm text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                        title={
+                          lang === "fr"
+                            ? `Ajouter un autre nom pour ${s.name} (classé à la fin)`
+                            : `Add another name for ${s.name} (ranked at the end)`
+                        }
+                      >
+                        <span className="material-symbols-outlined text-[15px]">person_add</span>
+                        <span>{lang === "fr" ? "+ Nom" : "+ Name"}</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => openTransferModal(s)}
@@ -2243,78 +2332,192 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
             </div>
           </section>
 
-          {session.status === "DRAFT" && (
-            <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4">
-              <h3 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-4">
-                <span className="material-symbols-outlined">person_add</span>
-                {t("addMemberManually")}
-              </h3>
-              {!selectedUser ? (
-                <div className="relative mb-3">
-                  <input
-                    value={userQuery}
-                    onChange={(e) => setUserQuery(e.target.value)}
-                    placeholder={t("searchUserPlaceholder")}
-                    className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
-                  />
-                  {visibleUserResults.length > 0 && (
-                    <div className="absolute z-10 mt-1 w-full bg-white border border-outline-variant rounded-lg shadow-md overflow-hidden">
-                      {visibleUserResults.map((u) => (
-                        <button
-                          key={u.id}
-                          onClick={() => {
-                            setSelectedUser(u);
-                            setUserResults([]);
-                          }}
-                          className="w-full text-left px-3 py-2 hover:bg-surface-container-low"
-                        >
-                          <p className="font-label-md text-label-md text-on-surface">{u.name}</p>
-                          <p className="font-label-sm text-label-sm text-on-surface-variant">{u.email}</p>
-                        </button>
-                      ))}
-                    </div>
+          {session.status !== "CLOSED" && (() => {
+            const maxOfficialPos = session.slots.reduce(
+              (max, sl) => Math.max(max, sl.officialPosition ?? 0),
+              0,
+            );
+            const nextEndPosition = Math.max(maxOfficialPos, session.slots.length) + 1;
+            const existingUserIds = new Set(session.slots.map((sl) => sl.userId));
+            const isStarted = session.status !== "DRAFT";
+
+            return (
+              <section
+                id="admin-add-member-section"
+                className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-outline-variant/40 p-4 transition-all"
+              >
+                <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
+                  <h3 className="font-title-md text-title-md text-primary flex items-center gap-2">
+                    <span className="material-symbols-outlined">person_add</span>
+                    {isStarted
+                      ? lang === "fr"
+                        ? "Ajouter des noms dans la cotisation"
+                        : "Add Names to Cotisation"
+                      : t("addMemberManually")}
+                  </h3>
+                  {isStarted && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-bold">
+                      <span className="material-symbols-outlined text-[15px]">low_priority</span>
+                      {lang === "fr"
+                        ? `Classé à la fin (dès #${nextEndPosition})`
+                        : `Ranked at end (from #${nextEndPosition})`}
+                    </span>
                   )}
                 </div>
-              ) : (
-                <div className="flex flex-col gap-3 mb-3">
-                  <div className="flex items-center justify-between bg-surface-container-lowest rounded-lg px-3 py-2">
-                    <span className="font-label-md text-label-md text-on-surface">{selectedUser.name}</span>
-                    <button onClick={() => setSelectedUser(null)} className="text-outline hover:text-error" aria-label={t("cancel")}>
-                      <span className="material-symbols-outlined text-[18px]">close</span>
+
+                {isStarted && (
+                  <div className="mb-4 p-3 rounded-xl bg-emerald-50/90 border border-emerald-200 text-emerald-950 text-xs sm:text-sm flex items-start gap-2.5">
+                    <span className="material-symbols-outlined text-[18px] text-emerald-700 flex-shrink-0 mt-0.5">
+                      info
+                    </span>
+                    <p className="leading-relaxed">
+                      {lang === "fr"
+                        ? `Cette cotisation a déjà commencé : les noms ajoutés ici prendront automatiquement les dernières places pour bouffer (à partir de la place #${nextEndPosition}), sans modifier l'ordre des membres précédents.`
+                        : `This cotisation has already started: names added here will automatically take the last payout positions at the end (starting at place #${nextEndPosition}), without changing existing positions.`}
+                    </p>
+                  </div>
+                )}
+
+                {!selectedUser ? (
+                  <div className="relative mb-3">
+                    <input
+                      value={userQuery}
+                      onChange={(e) => setUserQuery(e.target.value)}
+                      placeholder={t("searchUserPlaceholder")}
+                      className="w-full border border-outline-variant rounded-lg px-3 py-2.5 font-label-md text-label-md bg-white"
+                    />
+                    {visibleUserResults.length > 0 && (
+                      <div className="absolute z-10 mt-1 w-full bg-white border border-outline-variant rounded-lg shadow-md overflow-hidden max-h-64 overflow-y-auto divide-y divide-outline-variant/20">
+                        {visibleUserResults.map((u) => {
+                          const alreadyInSession = existingUserIds.has(u.id);
+                          return (
+                            <button
+                              key={u.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedUser({ id: u.id, name: u.name });
+                                setUserResults([]);
+                                setAddMemberResult(null);
+                                setAddMemberIsError(false);
+                                if (addNames.length === 1 && !addNames[0].trim()) {
+                                  setAddNames([u.name]);
+                                }
+                              }}
+                              className="w-full text-left px-3 py-2.5 hover:bg-surface-container-low flex items-center justify-between gap-2"
+                            >
+                              <div className="min-w-0">
+                                <p className="font-label-md text-label-md text-on-surface font-semibold truncate">
+                                  {u.name}
+                                  {u.memberCode ? (
+                                    <span className="ml-1.5 text-xs font-normal text-on-surface-variant">
+                                      · {u.memberCode}
+                                    </span>
+                                  ) : null}
+                                </p>
+                                <p className="font-label-sm text-label-sm text-on-surface-variant truncate">
+                                  {u.email}
+                                  {u.phone ? ` · ${u.phone}` : ""}
+                                </p>
+                              </div>
+                              {alreadyInSession && (
+                                <span className="flex-shrink-0 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-bold">
+                                  {lang === "fr" ? "Déjà membre (+ noms)" : "Existing (+ names)"}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3 mb-3">
+                    <div className="flex items-center justify-between bg-surface-container-lowest border border-outline-variant/40 rounded-lg px-3 py-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-label-md text-label-md font-bold text-on-surface truncate">
+                          {selectedUser.name}
+                        </span>
+                        {existingUserIds.has(selectedUser.id) && (
+                          <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-bold">
+                            {lang === "fr" ? "Ajout de nom(s) supplémentaire(s)" : "Adding extra name(s)"}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedUser(null);
+                          setAddSlotCount(1);
+                          setAddNames([""]);
+                        }}
+                        className="text-outline hover:text-error cursor-pointer"
+                        aria-label={t("cancel")}
+                      >
+                        <span className="material-symbols-outlined text-[18px]">close</span>
+                      </button>
+                    </div>
+                    <select
+                      value={addSlotCount}
+                      onChange={(e) => handleAddSlotCountChange(Number(e.target.value))}
+                      className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt} {opt !== 1 ? t("slots") : t("slot")}
+                        </option>
+                      ))}
+                    </select>
+                    {addNames.map((name, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        {isStarted && (
+                          <span className="px-2.5 py-2 rounded-lg bg-primary/10 text-primary font-bold text-xs flex-shrink-0">
+                            #{nextEndPosition + i}
+                          </span>
+                        )}
+                        <input
+                          value={name}
+                          onChange={(e) =>
+                            setAddNames((current) => current.map((n, idx) => (idx === i ? e.target.value : n)))
+                          }
+                          placeholder={`${t("beneficiaryName")} — ${t("slot")} ${i + 1}`}
+                          className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
+                        />
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={addMemberManually}
+                      disabled={addingMember || addNames.some((n) => !n.trim())}
+                      className="w-full bg-primary text-on-primary font-label-md text-label-md font-bold py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                    >
+                      {addingMember
+                        ? t("recordingEllipsis")
+                        : isStarted
+                          ? lang === "fr"
+                            ? addSlotCount > 1
+                              ? `Ajouter ces ${addSlotCount} noms à la fin (#${nextEndPosition} à #${nextEndPosition + addSlotCount - 1})`
+                              : `Ajouter ce nom à la fin (Place #${nextEndPosition})`
+                            : addSlotCount > 1
+                              ? `Add ${addSlotCount} names at the end (#${nextEndPosition}–#${nextEndPosition + addSlotCount - 1})`
+                              : `Add name at the end (Place #${nextEndPosition})`
+                          : t("addMemberManually")}
                     </button>
                   </div>
-                  <select
-                    value={addSlotCount}
-                    onChange={(e) => handleAddSlotCountChange(Number(e.target.value))}
-                    className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md bg-white"
+                )}
+                {addMemberResult && (
+                  <div
+                    className={`mt-2 p-2.5 rounded-lg text-xs sm:text-sm font-medium ${
+                      addMemberIsError
+                        ? "bg-error-container/30 border border-error/30 text-error"
+                        : "bg-emerald-50 border border-emerald-200 text-emerald-900"
+                    }`}
                   >
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt} {opt !== 1 ? t("slots") : t("slot")}
-                      </option>
-                    ))}
-                  </select>
-                  {addNames.map((name, i) => (
-                    <input
-                      key={i}
-                      value={name}
-                      onChange={(e) => setAddNames((current) => current.map((n, idx) => (idx === i ? e.target.value : n)))}
-                      placeholder={`${t("beneficiaryName")} — ${t("slot")} ${i + 1}`}
-                      className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
-                    />
-                  ))}
-                  <button
-                    onClick={addMemberManually}
-                    disabled={addingMember || addNames.some((n) => !n.trim())}
-                    className="w-full bg-primary text-on-primary font-label-md text-label-md py-2.5 rounded-lg hover:opacity-90 disabled:opacity-50"
-                  >
-                    {addingMember ? t("recordingEllipsis") : t("addMemberManually")}
-                  </button>
-                </div>
-              )}
-              {addMemberResult && <p className="font-label-sm text-label-sm text-on-surface-variant">{addMemberResult}</p>}
-            </section>
-          )}
+                    {addMemberResult}
+                  </div>
+                )}
+              </section>
+            );
+          })()}
         </div>
       )}
 

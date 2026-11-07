@@ -21,7 +21,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   const tontineSession = await prisma.tontineSession.findUnique({
     where: { id },
-    include: { memberships: { select: { slots: { select: { id: true } } } } },
+    include: {
+      memberships: {
+        where: { status: "APPROVED" },
+        select: { slots: { select: { id: true } } },
+      },
+    },
   });
   if (!tontineSession) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });

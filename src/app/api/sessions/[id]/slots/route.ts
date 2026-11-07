@@ -56,18 +56,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       officialPositions: allSlots.map((s) => s.officialPosition),
     });
 
-    if (tontineSession.status !== "DRAFT" && !isFinished) {
-      return NextResponse.json(
-        { error: "Cannot modify slots while cotisation cycle is actively running" },
-        { status: 409 },
-      );
-    }
-
     const membership = await prisma.membership.findUnique({
       where: { userId_tontineSessionId: { userId: session.user.id, tontineSessionId } },
     });
     if (!membership || membership.status !== "APPROVED") {
       return NextResponse.json({ error: "Your membership isn't approved yet" }, { status: 403 });
+    }
+
+    const isInitialLateSelection =
+      membership.slotCount === null && tontineSession.status !== "CLOSED";
+
+    if (tontineSession.status !== "DRAFT" && !isFinished && !isInitialLateSelection) {
+      return NextResponse.json(
+        { error: "Cannot modify slots while cotisation cycle is actively running" },
+        { status: 409 },
+      );
     }
 
     if (tontineSession.maxSlots !== null) {
@@ -122,21 +125,47 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       if (finalNames.length > existingUserSlots.length) {
         const newNames = finalNames.slice(existingUserSlots.length);
 
-        // Find the current highest officialPosition in this session so new slots appear at the end
-        const maxPosSlot = await tx.membershipSlot.findFirst({
-          where: { membership: { tontineSessionId }, officialPosition: { not: null } },
-          orderBy: { officialPosition: "desc" },
+        const currentApprovedSlots = await tx.membershipSlot.findMany({
+          where: { membership: { tontineSessionId, status: "APPROVED" }, NOT: { membershipId: membership.id } },
           select: { officialPosition: true },
         });
-        const nextPos = maxPosSlot?.officialPosition ? maxPosSlot.officialPosition + 1 : null;
+        const allKnownPositions = [
+          ...currentApprovedSlots.map((s) => s.officialPosition ?? 0),
+          ...existingUserSlots.map((s) => s.officialPosition ?? 0),
+        ];
+        const maxOfficialPos = Math.max(0, ...allKnownPositions);
+        const totalPriorApprovedCount = currentApprovedSlots.length + existingUserSlots.length;
+        const isStartedRunning = tontineSession.status !== "DRAFT" && !isFinished;
+
+        const nextPos = isStartedRunning
+          ? Math.max(maxOfficialPos, totalPriorApprovedCount) + 1
+          : maxOfficialPos > 0
+            ? maxOfficialPos + 1
+            : null;
 
         await tx.membershipSlot.createMany({
-          data: newNames.map((beneficiaryName, idx) => ({
-            membershipId: membership.id,
-            beneficiaryName,
-            officialPosition: nextPos !== null ? nextPos + idx : null,
-          })),
+          data: newNames.map((beneficiaryName, idx) => {
+            const pos = nextPos !== null ? nextPos + idx : null;
+            return {
+              membershipId: membership.id,
+              beneficiaryName,
+              officialPosition: pos,
+              ballDrawn: isStartedRunning && pos !== null ? pos : null,
+            };
+          }),
         });
+
+        const newTotalApproved = totalPriorApprovedCount + newNames.length;
+        if (
+          isStartedRunning &&
+          tontineSession.maxSlots !== null &&
+          newTotalApproved > Number(tontineSession.maxSlots)
+        ) {
+          await tx.tontineSession.update({
+            where: { id: tontineSessionId },
+            data: { maxSlots: newTotalApproved },
+          });
+        }
       }
 
       // If slotCount was decreased, handle excess slots safely

@@ -36,28 +36,34 @@ export async function POST(request: Request) {
 
   const tontineSession = await prisma.tontineSession.findUnique({
     where: { id: tontineSessionId },
-    select: { status: true, title: true, type: true },
+    select: { status: true, title: true, type: true, maxSlots: true },
   });
   if (!tontineSession) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    return NextResponse.json({ error: "Cotisation introuvable." }, { status: 404 });
   }
-  if (tontineSession.status !== "DRAFT") {
+  if (tontineSession.status === "CLOSED") {
     return NextResponse.json(
-      { error: "Impossible d'ajouter un membre : le tirage au sort a déjà été lancé ou la cotisation est en cours." },
+      { error: "Impossible d'ajouter des noms : cette cotisation est clôturée." },
       { status: 409 },
     );
   }
 
   const targetUser = await prisma.user.findUnique({ where: { id: userId } });
-  if (!targetUser || targetUser.role !== "MEMBER") {
-    return NextResponse.json({ error: "This user cannot be added as a member" }, { status: 400 });
+  if (!targetUser || targetUser.isBanned) {
+    return NextResponse.json(
+      { error: "Cet utilisateur est introuvable ou a été banni." },
+      { status: 400 },
+    );
   }
 
   const existingMembership = await prisma.membership.findUnique({
     where: { userId_tontineSessionId: { userId, tontineSessionId } },
   });
-  if (existingMembership && existingMembership.status !== "REJECTED") {
-    return NextResponse.json({ error: "This user is already a member of this session" }, { status: 409 });
+  if (existingMembership?.status === "BANNED") {
+    return NextResponse.json(
+      { error: "Impossible d'ajouter ce membre : il a été banni de cette cotisation." },
+      { status: 409 },
+    );
   }
 
   const finesCheck = await checkUserFinesForJoining(userId, tontineSessionId);
@@ -77,31 +83,99 @@ export async function POST(request: Request) {
     beneficiaryNames,
   );
 
+  const isStarted = tontineSession.status !== "DRAFT";
+
   try {
-    const createdMembership = await prisma.$transaction(async (tx) => {
+    const {
+      membership: createdMembership,
+      assignedPositions,
+      isAppend,
+    } = await prisma.$transaction(async (tx) => {
+      const currentApprovedSlots = await tx.membershipSlot.findMany({
+        where: { membership: { tontineSessionId, status: "APPROVED" } },
+        select: { id: true, officialPosition: true },
+      });
+
+      const maxOfficialPos = currentApprovedSlots.reduce(
+        (max, s) => Math.max(max, s.officialPosition ?? 0),
+        0,
+      );
+
+      // Si la cotisation a déjà commencé (DRAWING ou ACTIVE), les nouveaux noms prennent
+      // obligatoirement les dernières places à la fin de l'ordre de bouffe.
+      const startPos = isStarted
+        ? Math.max(maxOfficialPos, currentApprovedSlots.length) + 1
+        : maxOfficialPos > 0
+          ? maxOfficialPos + 1
+          : null;
+
+      const isAlreadyApproved = existingMembership?.status === "APPROVED";
+      let existingMemberSlotsCount = 0;
+
+      if (existingMembership && !isAlreadyApproved) {
+        await tx.membershipSlot.deleteMany({
+          where: { membershipId: existingMembership.id },
+        });
+        await tx.kycVerification.updateMany({
+          where: { membershipId: existingMembership.id },
+          data: { status: "VERIFIED", verifiedAt: new Date() },
+        });
+      } else if (existingMembership && isAlreadyApproved) {
+        existingMemberSlotsCount = await tx.membershipSlot.count({
+          where: { membershipId: existingMembership.id },
+        });
+      }
+
+      const newMemberSlotCount = existingMemberSlotsCount + finalNames.length;
+
       const membership = existingMembership
         ? await tx.membership.update({
             where: { id: existingMembership.id },
-            data: { status: "APPROVED", slotCount },
+            data: {
+              status: "APPROVED",
+              rejectionReason: null,
+              slotCount: newMemberSlotCount,
+            },
           })
         : await tx.membership.create({
-            data: { userId, tontineSessionId, status: "APPROVED", slotCount },
+            data: {
+              userId,
+              tontineSessionId,
+              status: "APPROVED",
+              slotCount: newMemberSlotCount,
+            },
           });
-      const maxPosSlot = await tx.membershipSlot.findFirst({
-        where: { membership: { tontineSessionId }, officialPosition: { not: null } },
-        orderBy: { officialPosition: "desc" },
-        select: { officialPosition: true },
-      });
-      const nextPos = maxPosSlot?.officialPosition ? maxPosSlot.officialPosition + 1 : null;
 
+      const positions: number[] = [];
       await tx.membershipSlot.createMany({
-        data: finalNames.map((beneficiaryName, idx) => ({
-          membershipId: membership.id,
-          beneficiaryName,
-          officialPosition: nextPos !== null ? nextPos + idx : null,
-        })),
+        data: finalNames.map((beneficiaryName, idx) => {
+          const pos = startPos !== null ? startPos + idx : null;
+          if (pos !== null) positions.push(pos);
+          return {
+            membershipId: membership.id,
+            beneficiaryName,
+            officialPosition: pos,
+            ballDrawn: isStarted && pos !== null ? pos : null,
+          };
+        }),
       });
-      return membership;
+
+      const newTotalApprovedSlots = currentApprovedSlots.length + finalNames.length;
+      if (
+        tontineSession.maxSlots !== null &&
+        newTotalApprovedSlots > Number(tontineSession.maxSlots)
+      ) {
+        await tx.tontineSession.update({
+          where: { id: tontineSessionId },
+          data: { maxSlots: newTotalApprovedSlots },
+        });
+      }
+
+      return {
+        membership,
+        assignedPositions: positions,
+        isAppend: isAlreadyApproved && existingMemberSlotsCount > 0,
+      };
     });
 
     await ensureMemberCode(userId);
@@ -113,10 +187,20 @@ export async function POST(request: Request) {
       tontineSession.type;
     const lang = targetUser.preferredLang === "en" ? "en" : "fr";
 
-    const message = translate(lang, "memberApprovedMessage", {
-      name: userFirstName,
-      session: sessionTitle,
-    });
+    const positionsLabel =
+      assignedPositions.length > 0
+        ? assignedPositions.map((p) => `#${p}`).join(", ")
+        : null;
+
+    const message =
+      isStarted && positionsLabel
+        ? lang === "en"
+          ? `Hello ${userFirstName} 👋! Your name(s) (${finalNames.join(", ")}) have been added to ${sessionTitle} at the end of the payout order (${positionsLabel}).`
+          : `Bonjour ${userFirstName} 👋 ! Vos nom(s) (${finalNames.join(", ")}) ont été ajoutés dans la cotisation « ${sessionTitle} » en fin d'ordre de bouffe (place ${positionsLabel}).`
+        : translate(lang, "memberApprovedMessage", {
+            name: userFirstName,
+            session: sessionTitle,
+          });
 
     await scheduleInAppNotifications({
       tontineSessionId,
@@ -125,8 +209,12 @@ export async function POST(request: Request) {
         {
           userId,
           message,
-          messageKey: "memberApprovedMessage",
-          messageVars: { name: userFirstName, session: sessionTitle },
+          ...(isStarted && positionsLabel
+            ? {}
+            : {
+                messageKey: "memberApprovedMessage",
+                messageVars: { name: userFirstName, session: sessionTitle },
+              }),
           actionUrl: `/sessions/${tontineSessionId}`,
         },
       ],
@@ -140,14 +228,27 @@ export async function POST(request: Request) {
       targetId: createdMembership.id,
       tontineSessionId,
       request,
-      payloadAfter: { status: "APPROVED", slotCount, finalNames },
+      payloadAfter: {
+        status: "APPROVED",
+        addedSlotCount: slotCount,
+        totalMemberSlotCount: createdMembership.slotCount,
+        finalNames,
+        assignedPositions,
+      },
       metadata: {
         userId,
         manual: true,
+        addedAfterStart: isStarted,
+        isAppend,
       },
     });
 
-    return NextResponse.json({ ok: true, beneficiaryNames: finalNames });
+    return NextResponse.json({
+      ok: true,
+      beneficiaryNames: finalNames,
+      assignedPositions,
+      isAppend,
+    });
   } catch (err) {
     console.error("[admin/memberships/manual] unexpected error:", err);
     return NextResponse.json({ error: "Could not add this member. Please try again." }, { status: 500 });

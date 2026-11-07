@@ -40,9 +40,9 @@ export async function POST(
     const action = parsed.data.action;
     const isApproved = action === "approve";
 
-    if (isApproved && existing.tontineSession.status !== "DRAFT") {
+    if (isApproved && existing.tontineSession.status === "CLOSED") {
       return NextResponse.json(
-        { error: "Impossible de valider ce membre : le tirage au sort a déjà été lancé ou la cotisation est en cours." },
+        { error: "Impossible de valider ce membre : cette cotisation est clôturée." },
         { status: 409 },
       );
     }
