@@ -99,7 +99,7 @@ export async function generateReceiptPdf(data: ReceiptData): Promise<Buffer> {
   y -= 30;
 
   row("Cotisation pour le pot", formatXAF(data.amount));
-  if (data.fee && data.fee > 0) row("Frais Diva Asso", formatXAF(data.fee));
+  if (data.fee && data.fee > 0) row("Frais", formatXAF(data.fee));
   if (data.fine > 0) row("Pénalité de retard", formatXAF(data.fine));
   if (data.paymentFee && data.paymentFee > 0) {
     const opLabel = data.operatorName ? `Frais ${data.operatorName}` : "Frais opérateur (3,1%)";

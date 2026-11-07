@@ -5,7 +5,7 @@ import { translate, type Lang } from "@/lib/i18n/translations";
 import { PaymentConfirmDialog } from "@/components/payment-confirm-dialog";
 import { BulkPaymentDialog } from "@/app/(app)/global-payment/bulk-payment-dialog";
 import { formatXAF } from "@/lib/format-currency";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { getSupabaseAccessToken, getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 interface FoundMember {
   memberCode: string;
@@ -67,6 +67,10 @@ export function MemberCodePayFlow({
 
   async function fetchSlots(memberCode: string) {
     const membershipsRes = await fetch(`/api/members/${encodeURIComponent(memberCode)}/memberships`);
+    if (membershipsRes.status === 401) {
+      setShowAuthRequiredModal(true);
+      return [];
+    }
     const membershipsBody = await membershipsRes.json();
     const fetchedSlots: FundableSlot[] = membershipsRes.ok ? (membershipsBody.slots ?? []) : [];
     setSlots(fetchedSlots);
@@ -78,10 +82,18 @@ export function MemberCodePayFlow({
   async function findMember(codeToSearch?: string) {
     const trimmed = (codeToSearch ?? code).trim();
     if (!trimmed) return;
+    if (!currentUser) {
+      setShowAuthRequiredModal(true);
+      return;
+    }
     setSearching(true);
     setSearchError(null);
     try {
       const lookupRes = await fetch(`/api/members/lookup-code?code=${encodeURIComponent(trimmed)}`);
+      if (lookupRes.status === 401) {
+        setShowAuthRequiredModal(true);
+        return;
+      }
       const lookupBody = await lookupRes.json();
       if (!lookupRes.ok) {
         if (lookupBody?.error) console.error("[findMember] server error:", lookupBody.error);
@@ -314,8 +326,9 @@ export function MemberCodePayFlow({
             {selectedSlotIds.length > 1 && (
               <button
                 type="button"
-                onClick={() => {
-                  if (!currentUser) {
+                onClick={async () => {
+                  const token = currentUser ? await getSupabaseAccessToken() : null;
+                  if (!currentUser || !token) {
                     setShowAuthRequiredModal(true);
                   } else {
                     setShowBulkDialog(true);
@@ -359,8 +372,9 @@ export function MemberCodePayFlow({
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (!currentUser) {
+                    onClick={async () => {
+                      const token = currentUser ? await getSupabaseAccessToken() : null;
+                      if (!currentUser || !token) {
                         setShowAuthRequiredModal(true);
                       } else {
                         setConfirmSlotId(s.slotId);
@@ -577,11 +591,24 @@ export function MemberCodePayFlow({
                   const target = typeof window !== "undefined"
                     ? `${window.location.pathname}${window.location.search}`
                     : `/pay?code=${member.memberCode}`;
-                  window.location.href = `/login?callbackUrl=${encodeURIComponent(target)}`;
+                  window.location.href = `/login?callbackUrl=${encodeURIComponent(target)}&authRequired=1`;
                 }}
                 className="w-full py-2.5 px-4 rounded-xl bg-primary hover:bg-primary/95 text-on-primary font-semibold text-sm transition-colors cursor-pointer"
               >
                 {lang === "fr" ? "Se connecter par Email" : "Sign in with Email"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const target = typeof window !== "undefined"
+                    ? `${window.location.pathname}${window.location.search}`
+                    : `/pay?code=${member.memberCode}`;
+                  window.location.href = `/login?mode=signup&callbackUrl=${encodeURIComponent(target)}&authRequired=1`;
+                }}
+                className="w-full py-2.5 px-4 rounded-xl border-2 border-primary text-primary hover:bg-primary/5 font-semibold text-sm transition-colors cursor-pointer"
+              >
+                {lang === "fr" ? "Créer un compte (S'inscrire)" : "Create an account (Sign up)"}
               </button>
 
               <button

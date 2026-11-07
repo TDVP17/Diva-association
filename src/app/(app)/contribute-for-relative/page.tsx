@@ -6,7 +6,9 @@ import { ShareAppSection } from "@/components/share-app-section";
 
 export default async function ContributeForRelativePage() {
   const session = await auth();
-  if (!session?.user) redirect("/login");
+  if (!session?.user) {
+    redirect("/login?callbackUrl=%2Fcontribute-for-relative&authRequired=1");
+  }
   const lang = await getLang();
   const t = getTranslator(lang);
 
@@ -17,7 +19,7 @@ export default async function ContributeForRelativePage() {
       </h1>
       <MemberCodePayFlow
         lang={lang}
-        currentUser={session?.user ? { id: session.user.id, name: session.user.name, email: session.user.email } : null}
+        currentUser={{ id: session.user.id, name: session.user.name, email: session.user.email }}
       />
       <ShareAppSection lang={lang} variant="card" />
     </main>

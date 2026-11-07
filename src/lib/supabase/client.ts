@@ -40,6 +40,20 @@ export function clearBrowserSupabaseCookies() {
   document.cookie = `${SB_REFRESH_COOKIE}=; path=/; max-age=0; samesite=lax${secureFlag}`;
 }
 
+function hasBrowserSupabaseCookies(): boolean {
+  return Boolean(
+    readDocumentCookie(SB_ACCESS_COOKIE) || readDocumentCookie(SB_REFRESH_COOKIE),
+  );
+}
+
+function isOAuthCallbackContext(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    window.location.pathname.startsWith("/auth/callback") ||
+    window.location.hash.includes("access_token=")
+  );
+}
+
 /**
  * Browser singleton Supabase client shared across Auth, Realtime listeners
  * (chat, notifications, KYC verification, Mobile Money payment status) and
@@ -69,24 +83,39 @@ export function getSupabaseBrowserClient(): SupabaseClient | null {
   });
 
   client.auth.onAuthStateChange((event, session) => {
-    if (session?.access_token) {
-      writeBrowserSupabaseCookies(session);
-      client.realtime.setAuth(session.access_token);
-    } else if (event === "SIGNED_OUT") {
+    if (event === "SIGNED_OUT") {
       clearBrowserSupabaseCookies();
       client.realtime.setAuth("");
+      return;
+    }
+    if (session?.access_token) {
+      if (event === "INITIAL_SESSION" && !hasBrowserSupabaseCookies() && !isOAuthCallbackContext()) {
+        void client.auth.signOut({ scope: "local" });
+        return;
+      }
+      if (hasBrowserSupabaseCookies() || isOAuthCallbackContext() || event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        writeBrowserSupabaseCookies(session);
+        client.realtime.setAuth(session.access_token);
+      }
     }
   });
 
-  // Hydrate browser session from server-written cookies if localStorage is empty
+  // Hydrate browser session from server-written cookies if localStorage is empty,
+  // or purge stale localStorage if server cookies were cleared on sign-out.
   void client.auth.getSession().then(({ data }) => {
+    const cookieAccess = readDocumentCookie(SB_ACCESS_COOKIE);
+    const cookieRefresh = readDocumentCookie(SB_REFRESH_COOKIE);
+    if (!cookieAccess && !cookieRefresh) {
+      if (!isOAuthCallbackContext() && data.session) {
+        void client.auth.signOut({ scope: "local" });
+      }
+      return;
+    }
     if (data.session?.access_token) {
       writeBrowserSupabaseCookies(data.session);
       client.realtime.setAuth(data.session.access_token);
       return;
     }
-    const cookieAccess = readDocumentCookie(SB_ACCESS_COOKIE);
-    const cookieRefresh = readDocumentCookie(SB_REFRESH_COOKIE);
     if (cookieAccess && cookieRefresh) {
       void client.auth.setSession({
         access_token: cookieAccess,
@@ -110,7 +139,12 @@ export async function ensureBrowserSupabaseSession(expectedEmail?: string): Prom
   const { data } = await supabase.auth.getSession();
   let session = data.session;
 
-  if (!session) {
+  if (!hasBrowserSupabaseCookies() && !isOAuthCallbackContext()) {
+    if (session) {
+      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+      session = null;
+    }
+  } else if (!session) {
     const cookieAccess = readDocumentCookie(SB_ACCESS_COOKIE);
     const cookieRefresh = readDocumentCookie(SB_REFRESH_COOKIE);
     if (cookieAccess && cookieRefresh) {

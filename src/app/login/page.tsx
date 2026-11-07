@@ -8,9 +8,16 @@ const isDev = process.env.NODE_ENV !== "production";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ callbackUrl?: string; error?: string; mode?: string; expired?: string }>;
+  searchParams: Promise<{
+    callbackUrl?: string;
+    error?: string;
+    mode?: string;
+    expired?: string;
+    signedOut?: string;
+    authRequired?: string;
+  }>;
 }) {
-  const { callbackUrl = "/dashboard", error, mode, expired } = await searchParams;
+  const { callbackUrl = "/dashboard", error, mode, expired, signedOut, authRequired } = await searchParams;
   const lang = await getLang();
 
   const seededUsers = isDev
@@ -41,6 +48,8 @@ export default async function LoginPage({
       isDev={isDev}
       oauthError={error}
       sessionExpired={expired === "1"}
+      signedOut={signedOut === "1"}
+      authRequired={authRequired === "1"}
       lang={lang}
       initialMode={mode === "signup" ? "signup" : "signin"}
     />

@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
-// Deliberately no auth() call — a relative/friend without a DIVA account
-// must be able to look a member up by their personal code and contribute
-// on their behalf (see /pay, the public entry point). Returns display-only
-// info, never email/phone/financial data, so the code can be shared
-// without leaking anything beyond what the payer needs to confirm they
-// found the right person.
+// Requires an authenticated session (sign-in or sign-up) before looking up
+// and validating a relative's contribution.
 export async function GET(request: Request) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json(
+      { error: "Veuillez vous connecter ou vous inscrire pour cotiser pour un proche." },
+      { status: 401 },
+    );
+  }
+
   const code = new URL(request.url).searchParams.get("code")?.trim().toUpperCase();
   if (!code) {
     return NextResponse.json({ error: "Missing code" }, { status: 400 });

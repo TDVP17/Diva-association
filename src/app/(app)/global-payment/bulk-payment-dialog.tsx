@@ -388,9 +388,9 @@ export function BulkPaymentDialog({
                 </div>
                 <div className="flex justify-between items-center text-sm">
                   <span className="font-body-md text-body-md text-on-surface-variant">
-                    {lang === "fr" ? "Frais Diva" : "Diva fees"}
+                    {lang === "fr" ? "Frais" : "Fees"}
                   </span>
-                  <span className="font-label-md text-label-md text-on-surface">+{formatXAF(feesTotal)}</span>
+                  <span className="font-label-md text-label-md text-on-surface">{formatXAF(feesTotal)}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
                   <span className="font-body-md text-body-md text-on-surface-variant flex items-center gap-1.5">

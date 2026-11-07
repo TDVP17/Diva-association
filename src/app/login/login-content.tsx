@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { CredentialsForm } from "./credentials-form";
 import { LanguageToggle } from "@/components/language-toggle";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { clearBrowserSupabaseCookies, getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 
 interface DevUser {
@@ -45,6 +45,8 @@ export function LoginContent({
   isDev,
   oauthError,
   sessionExpired,
+  signedOut,
+  authRequired,
   lang,
   initialMode,
 }: {
@@ -53,12 +55,25 @@ export function LoginContent({
   isDev: boolean;
   oauthError?: string;
   sessionExpired?: boolean;
+  signedOut?: boolean;
+  authRequired?: boolean;
   lang: Lang;
   initialMode?: "signin" | "signup";
 }) {
   const t = (key: TranslationKey) => translate(lang, key);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [localOAuthError, setLocalOAuthError] = useState<string | undefined>(oauthError);
+
+  const isRelativePayCallback =
+    callbackUrl.startsWith("/pay") || callbackUrl.startsWith("/contribute-for-relative");
+
+  // Ensure stale browser sessions are completely cleared when arriving from sign-out, expiry, or authRequired
+  useEffect(() => {
+    if (signedOut || sessionExpired || authRequired) {
+      clearBrowserSupabaseCookies();
+      void getSupabaseBrowserClient()?.auth.signOut({ scope: "local" }).catch(() => {});
+    }
+  }, [signedOut, sessionExpired, authRequired]);
 
   // Safety net: if an OAuth hash lands directly on /login, forward it to /auth/callback
   useEffect(() => {
@@ -128,6 +143,22 @@ export function LoginContent({
         </div>
 
         <OAuthErrorBanner error={localOAuthError ?? oauthError} lang={lang} />
+
+        {isRelativePayCallback && (
+          <div
+            role="status"
+            className="relative z-10 mb-stack-gap-md rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 px-4 py-3 text-xs leading-relaxed flex items-start gap-2.5"
+          >
+            <span className="material-symbols-outlined text-[18px] text-emerald-700 shrink-0 mt-0.5">
+              lock
+            </span>
+            <span>
+              {lang === "fr"
+                ? "Connexion ou inscription obligatoire : connectez-vous ou créez un compte gratuit ci-dessous avant de pouvoir valider la cotisation de votre proche et recevoir votre reçu officiel."
+                : "Sign in or sign up required: please sign in or create a free account below before validating your relative's contribution and receiving your official receipt."}
+            </span>
+          </div>
+        )}
 
         {sessionExpired && (
           <div

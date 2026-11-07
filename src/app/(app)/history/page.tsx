@@ -484,8 +484,8 @@ export default async function HistoryPage() {
                       </div>
                       {r.feeAmount !== undefined && r.feeAmount > 0 && (
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-on-surface-variant">{lang === "fr" ? "Frais Diva Asso" : "Diva fees"}</span>
-                          <span className="font-semibold text-on-surface">+{formatXAF(r.feeAmount)}</span>
+                          <span className="text-on-surface-variant">{lang === "fr" ? "Frais" : "Fees"}</span>
+                          <span className="font-semibold text-on-surface">{formatXAF(r.feeAmount)}</span>
                         </div>
                       )}
                       {r.fineAmount !== undefined && r.fineAmount > 0 && (

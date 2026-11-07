@@ -177,6 +177,10 @@ export const auth = cache(async (): Promise<Session | null> => {
 export async function signOut(options?: { redirectTo?: string }) {
   await clearServerAuthCookies();
   if (options?.redirectTo) {
-    redirect(options.redirectTo);
+    let target = options.redirectTo;
+    if (target.startsWith("/login") && !target.includes("signedOut=")) {
+      target += target.includes("?") ? "&signedOut=1" : "?signedOut=1";
+    }
+    redirect(target);
   }
 }

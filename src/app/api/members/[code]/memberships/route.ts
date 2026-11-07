@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getContributionTotal, getNextDueDate } from "@/lib/tontine-engine";
 
@@ -8,14 +9,17 @@ const TONTINE_LABELS: Record<string, string> = {
   MONTHLY_25: "Monthly Tontine (25th)",
 };
 
-// Lists a member's active contribution memberships for the public "pay via
-// personal code" flow (see /pay), once their code has been resolved.
-// Deliberately no auth() call — same reasoning as lookup-code. One entry
-// per MembershipSlot (not per Membership) — satisfies the "different names
-// in different contributions" requirement naturally, since each slot
-// already carries its own beneficiaryName and independent Contribution
-// history.
+// Lists a member's active contribution memberships for the relative payment flow.
+// Strictly requires an authenticated user session.
 export async function GET(_request: Request, { params }: { params: Promise<{ code: string }> }) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json(
+      { error: "Veuillez vous connecter ou vous inscrire pour cotiser pour un proche." },
+      { status: 401 },
+    );
+  }
+
   const { code: rawCode } = await params;
   const code = rawCode.trim().toUpperCase();
 

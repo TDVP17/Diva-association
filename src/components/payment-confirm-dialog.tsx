@@ -176,16 +176,16 @@ export function PaymentConfirmDialog({
     let cancelled = false;
     void (async () => {
       try {
+        const token = await getSupabaseAccessToken();
+        if (!token) {
+          throw new Error(
+            lang === "fr"
+              ? "Veuillez vous connecter ou vous inscrire pour valider cette cotisation."
+              : "Please sign in or sign up to complete this contribution.",
+          );
+        }
         let res: Response;
         if (fineId) {
-          const token = await getSupabaseAccessToken();
-          if (!token) {
-            throw new Error(
-              lang === "fr"
-                ? "Votre session a expiré. Veuillez vous reconnecter."
-                : "Your session expired. Please sign in again.",
-            );
-          }
           res = await fetch(getFapshiEdgeUrl("fine-quote"), {
             method: "POST",
             headers: {
@@ -197,7 +197,10 @@ export function PaymentConfirmDialog({
         } else {
           res = await fetch(getFapshiEdgeUrl("quote"), {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
             body: JSON.stringify({
               membershipSlotId,
               ...(dueDate ? { dueDate } : {}),
@@ -477,14 +480,18 @@ export function PaymentConfirmDialog({
                 </div>
                 {quote.amount !== undefined && (
                   <div className="flex justify-between items-center text-sm">
-                    <span className="font-body-md text-body-md text-on-surface-variant">{t("amountToContributeLabel")}</span>
+                    <span className="font-body-md text-body-md text-on-surface-variant">
+                      {lang === "fr" ? "Cotisation pour le pot" : "Contribution for the pot"}
+                    </span>
                     <span className="font-label-md text-label-md text-on-surface">{formatXAF(quote.amount)}</span>
                   </div>
                 )}
                 {quote.fee !== undefined && quote.fee > 0 && (
                   <div className="flex justify-between items-center text-sm">
-                    <span className="font-body-md text-body-md text-on-surface-variant">{t("feeLabel")}</span>
-                    <span className="font-label-md text-label-md text-on-surface">+{formatXAF(quote.fee)}</span>
+                    <span className="font-body-md text-body-md text-on-surface-variant">
+                      {lang === "fr" ? "Frais" : "Fees"}
+                    </span>
+                    <span className="font-label-md text-label-md text-on-surface">{formatXAF(quote.fee)}</span>
                   </div>
                 )}
                 {quote.fineAmount !== undefined && quote.fineAmount > 0 && (

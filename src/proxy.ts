@@ -54,17 +54,26 @@ export default function proxy(req: NextRequest) {
 
   const claims = sbAccess ? decodeJwtPayload(sbAccess) : null;
   const isBannedClaim = Boolean(claims?.app_metadata?.is_banned);
-  const hasSupabaseSession = Boolean((claims?.sub && !isBannedClaim) || sbRefresh);
+  const nowSec = Math.floor(Date.now() / 1000);
+  const hasValidAccess = Boolean(claims?.sub && !isBannedClaim && (!claims.exp || claims.exp > nowSec));
+  const hasSupabaseSession = Boolean(hasValidAccess || sbRefresh);
   const isAuthenticated = hasSupabaseSession || hasLegacyCookie;
   const role = claims?.app_metadata?.role ?? null;
 
-  // Redirect already-signed-in Supabase users away from /login or / directly to their home area
-  if (hasSupabaseSession && claims?.sub && (path === "/login" || path === "/")) {
-    const nowSec = Math.floor(Date.now() / 1000);
-    if (!claims.exp || claims.exp > nowSec) {
-      const target = isAdminRole(role) ? "/admin" : "/dashboard";
-      return NextResponse.redirect(new URL(target, nextUrl));
+  const bypassLoginAutoRedirect =
+    nextUrl.searchParams.has("signedOut") ||
+    nextUrl.searchParams.has("expired") ||
+    nextUrl.searchParams.has("authRequired") ||
+    nextUrl.searchParams.has("error");
+
+  // Redirect already-signed-in Supabase users away from /login or / directly to their home area (or callbackUrl)
+  if (hasValidAccess && !bypassLoginAutoRedirect && (path === "/login" || path === "/")) {
+    const rawCallback = path === "/login" ? nextUrl.searchParams.get("callbackUrl") : null;
+    if (rawCallback && rawCallback.startsWith("/") && !rawCallback.startsWith("//") && !rawCallback.startsWith("/login")) {
+      return NextResponse.redirect(new URL(rawCallback, nextUrl));
     }
+    const target = isAdminRole(role) ? "/admin" : "/dashboard";
+    return NextResponse.redirect(new URL(target, nextUrl));
   }
 
   // Marketing posters are strictly reserved for administrators
@@ -83,7 +92,11 @@ export default function proxy(req: NextRequest) {
 
   if (!isAuthenticated) {
     const loginUrl = new URL("/login", nextUrl);
-    loginUrl.searchParams.set("callbackUrl", path);
+    const fullTarget = `${path}${nextUrl.search}`;
+    loginUrl.searchParams.set("callbackUrl", fullTarget);
+    if (path.startsWith("/pay") || path.startsWith("/contribute-for-relative")) {
+      loginUrl.searchParams.set("authRequired", "1");
+    }
     return NextResponse.redirect(loginUrl);
   }
 
