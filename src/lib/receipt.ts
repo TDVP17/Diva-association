@@ -110,7 +110,7 @@ export async function generateReceiptPdf(data: ReceiptData): Promise<Buffer> {
     data.total > 0
       ? data.total
       : data.amount + (data.fee || 0) + (data.fine || 0) + (data.paymentFee || 0);
-  row("TOTAL PAYÉ", formatXAF(exactTotal), { emphasize: true });
+  row("TOTAL DÉBITÉ", formatXAF(exactTotal), { emphasize: true });
 
   y -= 30;
   page.drawText("Thank you for your contribution to the community fund.", {

@@ -163,8 +163,8 @@ export function PaymentConfirmDialog({
   const detectedProvider = operatorInfo.provider;
   const isOperatorInvalid = usingNewNumber && operatorInfo.status === "unknown";
 
-  const providerFeeAmount = quote?.providerFeeAmount ?? (quote?.baseTotal ? Math.round(quote.baseTotal * 0.031) : 0);
-  const totalCharged = quote?.totalCharged ?? (quote?.baseTotal ? quote.baseTotal + providerFeeAmount : 0);
+  const providerFeeAmount = quote ? Math.round(quote.baseTotal * 0.031) : 0;
+  const totalCharged = quote ? quote.baseTotal + providerFeeAmount : 0;
 
   const operatorFeeLabel = operatorInfo.provider === "ORANGE"
     ? (lang === "fr" ? "Frais Orange" : "Orange fees")
@@ -517,7 +517,7 @@ export function PaymentConfirmDialog({
                 </div>
                 <div className="flex justify-between items-center border-t border-outline-variant pt-2.5 mt-1 bg-primary/5 -mx-3.5 -mb-3.5 p-3.5 rounded-b-xl border-t">
                   <span className="font-label-md text-sm text-on-surface font-black uppercase tracking-wider">
-                    {lang === "fr" ? "TOTAL À PAYER" : "TOTAL TO PAY"}
+                    {lang === "fr" ? "TOTAL À DÉBITER" : "TOTAL TO DEBIT"}
                   </span>
                   <span className="font-headline-sm text-xl text-primary font-black">
                     {formatXAF(totalCharged)}

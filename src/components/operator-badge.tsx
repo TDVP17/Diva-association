@@ -52,14 +52,9 @@ export function OperatorBadge({
         >
           {isOrange ? "OM" : "MTN"}
         </div>
-        <div className="flex flex-col">
-          <span className="font-bold text-xs leading-tight">
-            {isOrange ? "Orange Money" : "MTN Mobile Money"}
-          </span>
-          <span className="text-[10px] text-on-surface-variant/80 font-normal">
-            {lang === "fr" ? "Opérateur détecté automatiquement" : "Operator auto-detected"}
-          </span>
-        </div>
+        <span className="font-bold text-xs leading-tight">
+          {isOrange ? "Orange Money" : "MTN Mobile Money"}
+        </span>
       </div>
 
       <span
