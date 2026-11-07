@@ -106,20 +106,7 @@ export async function settleContribution(
     });
   }
 
-  // Group celebration notification: Notify other approved members in the cotisation
-  // that a member has contributed (e.g. "Awa • Tontine du Quartier : « J'ai cotisé, merci la team ! »")
-  const otherMemberships = prisma.membership?.findMany
-    ? await prisma.membership.findMany({
-        where: {
-          tontineSessionId: membership.tontineSessionId,
-          status: "APPROVED",
-          userId: { not: user.id },
-        },
-        select: { userId: true },
-      })
-    : [];
-
-  // (Note: notification de groupe aux autres membres supprimee a la demande de l'utilisateur - seul le payeur est notifie)
+  // Seul le payeur est notifié (les autres membres ne reçoivent pas de notification lors d'une cotisation).
 
   // When ALL members have contributed for this cycle, if the designated beneficiary
   // has already drawn their lucky ball, alert them to submit their payout details.
