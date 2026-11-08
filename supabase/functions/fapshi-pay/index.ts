@@ -67,6 +67,240 @@ function formatXAF(amount: number): string {
   return `${formatted} FCFA`;
 }
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function formatSessionSummaryEdge(labels: string[], lang: "fr" | "en"): string {
+  const unique = [...new Set(labels.filter(Boolean))];
+  if (unique.length === 0) return "DIVA Asso";
+  if (unique.length === 1) return unique[0];
+  if (unique.length === 2) return `${unique[0]}, ${unique[1]}`;
+  return lang === "en" ? `${unique.length} tontines` : `${unique.length} cotisations`;
+}
+
+function renderReceiptBrandedEmailHtml(params: {
+  title: string;
+  bodyHtml: string;
+  actionUrl: string;
+  actionLabel: string;
+  lang: "fr" | "en";
+}): string {
+  const baseUrl = getAppBaseUrl();
+  const logoUrl = `${baseUrl}/icons/icon-512.png`;
+  const primaryColor = "#003528";
+  const rawUrl = params.actionUrl.trim() || "/dashboard";
+  let targetUrl = rawUrl;
+
+  if (rawUrl.startsWith("http")) {
+    try {
+      const parsed = new URL(rawUrl);
+      const baseOrigin = new URL(baseUrl).origin;
+      if (parsed.origin === baseOrigin) {
+        targetUrl = `${baseUrl}/open?target=${encodeURIComponent(parsed.pathname + parsed.search)}`;
+      }
+    } catch {
+      targetUrl = rawUrl;
+    }
+  } else {
+    const cleanPath = rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`;
+    targetUrl = `${baseUrl}/open?target=${encodeURIComponent(cleanPath)}`;
+  }
+
+  return `
+    <!DOCTYPE html>
+    <html lang="${params.lang}">
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${escapeHtml(params.title)}</title>
+    </head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px 12px; -webkit-font-smoothing: antialiased;">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);">
+        <tr>
+          <td style="padding: 26px 24px 20px; text-align: center; background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%); border-bottom: 1px solid #f1f5f9;">
+            <a href="${baseUrl}" target="_blank" style="text-decoration: none; display: inline-block;">
+              <img src="${logoUrl}" alt="DIVA Asso" width="60" height="60" style="display: block; margin: 0 auto 10px; border-radius: 14px; border: 1px solid #e2e8f0;" />
+              <span style="display: block; font-size: 20px; font-weight: 800; color: #003528; letter-spacing: -0.5px;">DIVA Asso.</span>
+            </a>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 28px 28px 20px;">
+            <h2 style="color: #0f172a; font-size: 18px; font-weight: 700; margin-top: 0; margin-bottom: 18px; line-height: 1.4;">${escapeHtml(params.title)}</h2>
+            <div style="font-size: 15px; line-height: 1.6; color: #334155;">
+              ${params.bodyHtml}
+            </div>
+            <div style="margin: 28px 0 10px 0; text-align: center;">
+              <a href="${targetUrl}"
+                 style="background-color: ${primaryColor}; color: #ffffff; padding: 13px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block; box-shadow: 0 2px 4px rgba(0,53,40,0.15);">
+                ${escapeHtml(params.actionLabel)}
+              </a>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 20px 24px 28px; background-color: #f8fafc; border-top: 1px solid #f1f5f9; text-align: center;">
+            <p style="font-size: 12px; color: #64748b; margin: 0 0 6px 0;">
+              <strong>DIVA Asso.</strong> — Plateforme sécurisée de gestion des tontines et cotisations
+            </p>
+            <p style="font-size: 11px; color: #94a3b8; margin: 0;">
+              <a href="${baseUrl}" style="color: #003528; text-decoration: underline;">www.divaasso.com</a> • Bertoua, Cameroun
+            </p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `.trim();
+}
+
+function buildPaymentReceiptEmailHtml(
+  lang: "fr" | "en",
+  data: {
+    recipientName: string;
+    items: { beneficiaryName: string; sessionLabel?: string }[];
+    paidByName?: string;
+    sessionLabel: string;
+    amount: number;
+    transRef: string;
+    receiptUrl: string;
+    isPayerCopy?: boolean;
+  },
+): { subject: string; html: string } {
+  const isEn = lang === "en";
+  const subject = data.isPayerCopy
+    ? isEn
+      ? `Payment sent — ${data.sessionLabel}`
+      : `Paiement envoyé — ${data.sessionLabel}`
+    : isEn
+      ? `Payment received — ${data.sessionLabel}`
+      : `Paiement reçu — ${data.sessionLabel}`;
+
+  const greeting = isEn
+    ? `Hello ${escapeHtml(data.recipientName)},`
+    : `Bonjour ${escapeHtml(data.recipientName)},`;
+  const intro = isEn
+    ? "🎉 Your contribution has been received successfully."
+    : "🎉 Votre contribution a été reçue avec succès.";
+
+  const distinctSessions = [...new Set(data.items.map((i) => i.sessionLabel).filter(Boolean))];
+  const showSessionInline = distinctSessions.length > 1;
+  const namesHtml =
+    data.items.length === 1
+      ? escapeHtml(data.items[0].beneficiaryName)
+      : data.items
+          .map(
+            (item) =>
+              `<div style="padding: 2px 0; line-height: 1.4;">${escapeHtml(item.beneficiaryName)}${
+                showSessionInline && item.sessionLabel
+                  ? ` <span style="font-weight: 400; color: #64748b; font-size: 12px;">(${escapeHtml(item.sessionLabel)})</span>`
+                  : ""
+              }</div>`,
+          )
+          .join("");
+
+  const forBase = isEn ? "Contributed for" : "Contribution pour";
+  const forLabel = data.items.length > 1 ? `${forBase} (${data.items.length})` : forBase;
+  const paidByLabel = isEn ? "Paid by" : "Payé par";
+  const contributionLabel = "Contribution";
+  const amountLabel = isEn ? "Amount" : "Montant";
+  const txIdLabel = isEn ? "Transaction ID" : "ID de transaction";
+  const closingLine = isEn
+    ? "Thank you for your contribution to DIVA asso."
+    : "Merci pour votre contribution chez DIVA asso.";
+  const downloadLabel = isEn
+    ? "Download Payment Receipt (PDF)"
+    : "Télécharger le reçu (PDF)";
+
+  const tdLabelStyle = "padding: 6px 12px 6px 0; color: #64748b; white-space: nowrap; vertical-align: top;";
+  const tdValStyle = "padding: 6px 0; font-weight: 600; text-align: right; vertical-align: top;";
+  const paidByRow = data.paidByName
+    ? `<tr><td style="${tdLabelStyle}"><strong>${paidByLabel} :</strong></td><td style="${tdValStyle}">${escapeHtml(data.paidByName)}</td></tr>`
+    : "";
+
+  const bodyHtml = `
+    <p style="margin-top: 0;">${greeting}</p>
+    <p>${intro}</p>
+
+    <table width="100%" style="margin: 18px 0; border-collapse: collapse; font-size: 14px;">
+      <tr>
+        <td style="${tdLabelStyle}"><strong>${forLabel} :</strong></td>
+        <td style="${tdValStyle}">${namesHtml}</td>
+      </tr>
+      ${paidByRow}
+      <tr>
+        <td style="${tdLabelStyle}"><strong>${contributionLabel} :</strong></td>
+        <td style="${tdValStyle}">${escapeHtml(data.sessionLabel)}</td>
+      </tr>
+      <tr>
+        <td style="${tdLabelStyle}"><strong>${amountLabel} :</strong></td>
+        <td style="padding: 6px 0; font-weight: 700; color: #003528; text-align: right; vertical-align: top; font-size: 16px;">${formatXAF(data.amount)}</td>
+      </tr>
+      <tr>
+        <td style="${tdLabelStyle}"><strong>${txIdLabel} :</strong></td>
+        <td style="padding: 6px 0; font-family: monospace; text-align: right; vertical-align: top; font-size: 13px; word-break: break-all;">${escapeHtml(data.transRef)}</td>
+      </tr>
+    </table>
+
+    <p style="margin-bottom: 0;">${closingLine}</p>
+  `;
+
+  return {
+    subject,
+    html: renderReceiptBrandedEmailHtml({
+      title: subject,
+      bodyHtml,
+      actionUrl: data.receiptUrl,
+      actionLabel: downloadLabel,
+      lang,
+    }),
+  };
+}
+
+async function sendReceiptEmailSafeEdge(options: {
+  to: string | null | undefined;
+  subject: string;
+  html: string;
+}): Promise<void> {
+  if (!options.to) return;
+  const apiKey = (Deno.env.get("RESEND_API_KEY") ?? "").trim().replace(/^["']|["']$/g, "");
+  if (!apiKey) {
+    console.warn("[fapshi-pay] RESEND_API_KEY not configured; skipping email receipt");
+    return;
+  }
+  const from =
+    Deno.env.get("RESEND_FROM") ||
+    Deno.env.get("EMAIL_FROM") ||
+    "DIVA Asso <contact@divaasso.com>";
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+      }),
+    });
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => "");
+      console.error("[fapshi-pay] Resend email error:", res.status, errBody);
+    }
+  } catch (err) {
+    console.error("[fapshi-pay] Email dispatch failed:", err);
+  }
+}
+
 type TontineType =
   | "HEBDO_SUNDAY"
   | "EVERY_MONDAY"
@@ -625,9 +859,13 @@ async function insertInAppNotifications(
       createdAt: nowIso,
     });
 
-    // Mise en file PUSH + EMAIL échelonnée (3 min d'écart)
+    // Mise en file PUSH (+ EMAIL sauf PAYMENT_SUCCESS qui envoie déjà le reçu PDF officiel)
     const scheduledAt = new Date(now + idx * 3 * 60 * 1000).toISOString();
-    for (const channel of ["PUSH", "EMAIL"] as const) {
+    const channels =
+      params.type === "PAYMENT_SUCCESS"
+        ? (["PUSH"] as const)
+        : (["PUSH", "EMAIL"] as const);
+    for (const channel of channels) {
       rows.push({
         id: createId(),
         tontineSessionId: params.tontineSessionId ?? null,
@@ -1685,11 +1923,210 @@ async function escalateDuplicateToManualReview(
   }
 }
 
+interface SettledContributionSummary {
+  id: string;
+  dueDate: string;
+  sessionId: string;
+  sessionLabel: string;
+  owner: {
+    id: string;
+    name: string;
+    email: string;
+    preferredLang: string | null;
+  };
+  beneficiaryName: string;
+  totalPaid: number;
+  fapshiTxRef: string | null;
+  paidByUserId: string | null;
+  receiptKey: string;
+}
+
+async function checkAndTriggerMilestone100Percent(
+  supabase: SupabaseClient,
+  sessionId: string,
+  sessionLabel: string,
+  dueDate: string,
+): Promise<void> {
+  // Si 100% des parts approuvées ont cotisé pour ce cycle, alerte PAYOUT_TURN au bénéficiaire désigné
+  try {
+    const { data: allApprovedSlots } = await supabase
+      .from("membership_slots")
+      .select(
+        "id, officialPosition, ballDrawn, memberships!inner(tontineSessionId, status, userId), payouts(id)",
+      )
+      .eq("memberships.tontineSessionId", sessionId)
+      .eq("memberships.status", "APPROVED");
+
+    const approvedList = (allApprovedSlots ?? []) as unknown as {
+      id: string;
+      officialPosition: number | null;
+      ballDrawn: number | null;
+      memberships: { userId: string };
+      payouts?: { id: string }[];
+    }[];
+
+    if (approvedList.length > 0) {
+      const { count: paidCount } = await supabase
+        .from("contributions")
+        .select("id", { count: "exact", head: true })
+        .in(
+          "membershipSlotId",
+          approvedList.map((s) => s.id),
+        )
+        .eq("dueDate", dueDate)
+        .eq("status", "PAID");
+
+      if ((paidCount ?? 0) >= approvedList.length) {
+        const designated = approvedList
+          .filter(
+            (s) =>
+              s.officialPosition !== null &&
+              s.ballDrawn !== null &&
+              (!s.payouts || s.payouts.length === 0),
+          )
+          .sort(
+            (a, b) => (a.officialPosition ?? 0) - (b.officialPosition ?? 0),
+          )[0];
+
+        if (designated) {
+          const sinceIso = new Date(
+            Date.now() - 24 * 60 * 60 * 1000,
+          ).toISOString();
+          const { data: recentAlert } = await supabase
+            .from("notifications")
+            .select("id")
+            .eq("userId", designated.memberships.userId)
+            .eq("tontineSessionId", sessionId)
+            .eq("type", "PAYOUT_TURN")
+            .gte("createdAt", sinceIso)
+            .limit(1);
+
+          if (!recentAlert || recentAlert.length === 0) {
+            await insertInAppNotifications(supabase, {
+              tontineSessionId: sessionId,
+              type: "PAYOUT_TURN",
+              recipients: [
+                {
+                  userId: designated.memberships.userId,
+                  message: `C'est à votre tour de bouffer la cagnotte de ${sessionLabel} ! 🎉 Tous les membres ont cotisé : veuillez fournir votre numéro Mobile/Orange Money pour recevoir votre virement.`,
+                  messageKey: "payoutTurnNotifMessage",
+                  messageVars: { cotisation: sessionLabel },
+                  actionUrl: `/sessions/${sessionId}`,
+                },
+              ],
+            });
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[fapshi-pay] 100% milestone check error:", err);
+  }
+}
+
+async function sendSingleSettlementNotificationsAndEmail(
+  supabase: SupabaseClient,
+  summary: SettledContributionSummary,
+  transRef: string,
+): Promise<void> {
+  const { owner, sessionId, sessionLabel, totalPaid, beneficiaryName, receiptKey } = summary;
+  const ownerLang: "fr" | "en" = owner.preferredLang === "en" ? "en" : "fr";
+  const receiptUrl = `${getAppBaseUrl()}/api/files/${receiptKey}`;
+  const isRelative = Boolean(summary.paidByUserId && summary.paidByUserId !== owner.id);
+
+  let payer: { id: string; name: string; email: string; preferredLang: string | null } | null = null;
+  if (isRelative && summary.paidByUserId) {
+    const { data: payerRow } = await supabase
+      .from("users")
+      .select("id, name, email, preferredLang")
+      .eq("id", summary.paidByUserId)
+      .maybeSingle<{ id: string; name: string; email: string; preferredLang: string | null }>();
+    payer = payerRow ?? null;
+  }
+
+  // 1. Notification in-app au titulaire (montant net sans 3,1%)
+  await insertInAppNotifications(supabase, {
+    tontineSessionId: sessionId,
+    type: "PAYMENT_SUCCESS",
+    recipients: [
+      {
+        userId: owner.id,
+        message:
+          ownerLang === "en"
+            ? `Your payment of ${formatXAF(totalPaid)} for ${sessionLabel} was received. Thank you!`
+            : `Votre cotisation de ${formatXAF(totalPaid)} pour ${sessionLabel} a bien été reçue. Merci !`,
+        messageKey: "paymentSuccessNotifMessage",
+        messageVars: { amount: formatXAF(totalPaid), session: sessionLabel },
+        actionUrl: `/sessions/${sessionId}`,
+      },
+    ],
+  });
+
+  // 2. Email reçu officiel au titulaire (sans frais 3,1%)
+  const ownerEmail = buildPaymentReceiptEmailHtml(ownerLang, {
+    recipientName: owner.name,
+    items: [{ beneficiaryName, sessionLabel }],
+    paidByName: payer?.name,
+    sessionLabel,
+    amount: totalPaid,
+    transRef,
+    receiptUrl,
+  });
+  await sendReceiptEmailSafeEdge({
+    to: owner.email,
+    subject: ownerEmail.subject,
+    html: ownerEmail.html,
+  });
+
+  // 3. Notification + Email au proche payeur s'il est distinct du titulaire
+  if (isRelative && payer) {
+    const payerLang: "fr" | "en" = payer.preferredLang === "en" ? "en" : "fr";
+    const beneficiaryLabel = `${owner.name} (${beneficiaryName})`;
+    await insertInAppNotifications(supabase, {
+      tontineSessionId: sessionId,
+      type: "PAYMENT_SUCCESS",
+      recipients: [
+        {
+          userId: payer.id,
+          message:
+            payerLang === "en"
+              ? `Your contribution of ${formatXAF(totalPaid)} for ${beneficiaryLabel} in ${sessionLabel} was successful! Receipt is available.`
+              : `Votre cotisation de ${formatXAF(totalPaid)} pour ${beneficiaryLabel} dans ${sessionLabel} a été validée avec succès ! Votre reçu est disponible.`,
+          messageKey: "relativePaymentSuccessNotif",
+          messageVars: {
+            amount: formatXAF(totalPaid),
+            beneficiary: beneficiaryLabel,
+            session: sessionLabel,
+          },
+          actionUrl: "/history",
+        },
+      ],
+    });
+
+    const payerEmail = buildPaymentReceiptEmailHtml(payerLang, {
+      recipientName: payer.name,
+      items: [{ beneficiaryName: beneficiaryLabel, sessionLabel }],
+      paidByName: payer.name,
+      sessionLabel,
+      amount: totalPaid,
+      transRef,
+      receiptUrl,
+      isPayerCopy: true,
+    });
+    await sendReceiptEmailSafeEdge({
+      to: payer.email,
+      subject: payerEmail.subject,
+      html: payerEmail.html,
+    });
+  }
+}
+
 async function finalizeContributionSettlement(
   supabase: SupabaseClient,
   contributionId: string,
   paidAt: Date,
-): Promise<void> {
+  options?: { skipNotificationsAndEmail?: boolean },
+): Promise<SettledContributionSummary | null> {
   const { data: contrib } = await supabase
     .from("contributions")
     .select(
@@ -1718,7 +2155,7 @@ async function finalizeContributionSettlement(
     .eq("id", contributionId)
     .maybeSingle();
 
-  if (!contrib) return;
+  if (!contrib) return null;
 
   const typed = contrib as unknown as {
     id: string;
@@ -1777,150 +2214,42 @@ async function finalizeContributionSettlement(
       .eq("status", "UNPAID");
   }
 
+  // Montant net cotisé uniquement (strictement sans les frais opérateur de 3,1%)
   const totalPaid =
     Number(typed.amountPaid) +
     Number(typed.feePaid) +
     Number(typed.finePaid);
 
-  let paidByName: string | undefined;
-  let paidByLang = "fr";
-  if (typed.paidByUserId) {
-    const { data: payer } = await supabase
-      .from("users")
-      .select("id, name, preferredLang")
-      .eq("id", typed.paidByUserId)
-      .maybeSingle<{ id: string; name: string; preferredLang: string | null }>();
-    if (payer) {
-      paidByName = payer.name;
-      paidByLang = payer.preferredLang === "en" ? "en" : "fr";
-    }
+  const summary: SettledContributionSummary = {
+    id: typed.id,
+    dueDate: typed.dueDate,
+    sessionId,
+    sessionLabel,
+    owner,
+    beneficiaryName: typed.membershipSlot.beneficiaryName,
+    totalPaid,
+    fapshiTxRef: typed.fapshiTxRef,
+    paidByUserId: typed.paidByUserId,
+    receiptKey,
+  };
+
+  if (options?.skipNotificationsAndEmail) {
+    return summary;
   }
 
-  // 1. Notification au titulaire de la part
-  await insertInAppNotifications(supabase, {
-    tontineSessionId: sessionId,
-    type: "PAYMENT_SUCCESS",
-    recipients: [
-      {
-        userId: owner.id,
-        message: `Votre cotisation de ${formatXAF(totalPaid)} pour ${sessionLabel} a bien été reçue. Merci !`,
-        messageKey: "paymentSuccessNotifMessage",
-        messageVars: { amount: formatXAF(totalPaid), session: sessionLabel },
-        actionUrl: `/sessions/${sessionId}`,
-      },
-    ],
-  });
+  await sendSingleSettlementNotificationsAndEmail(
+    supabase,
+    summary,
+    typed.fapshiTxRef || typed.id,
+  );
+  await checkAndTriggerMilestone100Percent(
+    supabase,
+    sessionId,
+    sessionLabel,
+    typed.dueDate,
+  );
 
-  // 2. Notification de célébration aux autres membres approuvés de la tontine
-  const { data: otherMemberships } = await supabase
-    .from("memberships")
-    .select("userId")
-    .eq("tontineSessionId", sessionId)
-    .eq("status", "APPROVED")
-    .neq("userId", owner.id);
-
-  // (Note: notification de groupe aux autres membres supprimee a la demande de l'utilisateur - seul le payeur recoit son recu)
-
-  // 3. Notification au proche payeur s'il est distinct du titulaire
-  if (typed.paidByUserId && typed.paidByUserId !== owner.id) {
-    const beneficiaryLabel = `${owner.name} (${typed.membershipSlot.beneficiaryName})`;
-    await insertInAppNotifications(supabase, {
-      tontineSessionId: sessionId,
-      type: "PAYMENT_SUCCESS",
-      recipients: [
-        {
-          userId: typed.paidByUserId,
-          message:
-            paidByLang === "en"
-              ? `Your contribution of ${formatXAF(totalPaid)} for ${beneficiaryLabel} in ${sessionLabel} was successful! Receipt is available.`
-              : `Votre cotisation de ${formatXAF(totalPaid)} pour ${beneficiaryLabel} dans ${sessionLabel} a été validée avec succès ! Votre reçu est disponible.`,
-          messageKey: "relativePaymentSuccessNotif",
-          messageVars: {
-            amount: formatXAF(totalPaid),
-            beneficiary: beneficiaryLabel,
-            session: sessionLabel,
-          },
-          actionUrl: "/history",
-        },
-      ],
-    });
-  }
-
-  // 4. Si 100% des parts approuvées ont cotisé pour ce cycle, alerte PAYOUT_TURN au bénéficiaire désigné
-  try {
-    const { data: allApprovedSlots } = await supabase
-      .from("membership_slots")
-      .select(
-        "id, officialPosition, ballDrawn, memberships!inner(tontineSessionId, status, userId), payouts(id)",
-      )
-      .eq("memberships.tontineSessionId", sessionId)
-      .eq("memberships.status", "APPROVED");
-
-    const approvedList = (allApprovedSlots ?? []) as unknown as {
-      id: string;
-      officialPosition: number | null;
-      ballDrawn: number | null;
-      memberships: { userId: string };
-      payouts?: { id: string }[];
-    }[];
-
-    if (approvedList.length > 0) {
-      const { count: paidCount } = await supabase
-        .from("contributions")
-        .select("id", { count: "exact", head: true })
-        .in(
-          "membershipSlotId",
-          approvedList.map((s) => s.id),
-        )
-        .eq("dueDate", typed.dueDate)
-        .eq("status", "PAID");
-
-      if ((paidCount ?? 0) >= approvedList.length) {
-        const designated = approvedList
-          .filter(
-            (s) =>
-              s.officialPosition !== null &&
-              s.ballDrawn !== null &&
-              (!s.payouts || s.payouts.length === 0),
-          )
-          .sort(
-            (a, b) => (a.officialPosition ?? 0) - (b.officialPosition ?? 0),
-          )[0];
-
-        if (designated) {
-          const sinceIso = new Date(
-            Date.now() - 24 * 60 * 60 * 1000,
-          ).toISOString();
-          const { data: recentAlert } = await supabase
-            .from("notifications")
-            .select("id")
-            .eq("userId", designated.memberships.userId)
-            .eq("tontineSessionId", sessionId)
-            .eq("type", "PAYOUT_TURN")
-            .gte("createdAt", sinceIso)
-            .limit(1);
-
-          if (!recentAlert || recentAlert.length === 0) {
-            await insertInAppNotifications(supabase, {
-              tontineSessionId: sessionId,
-              type: "PAYOUT_TURN",
-              recipients: [
-                {
-                  userId: designated.memberships.userId,
-                  message: `C'est à votre tour de bouffer la cagnotte de ${sessionLabel} ! 🎉 Tous les membres ont cotisé : veuillez fournir votre numéro Mobile/Orange Money pour recevoir votre virement.`,
-                  messageKey: "payoutTurnNotifMessage",
-                  messageVars: { cotisation: sessionLabel },
-                  actionUrl: `/sessions/${sessionId}`,
-                },
-              ],
-            });
-          }
-        }
-      }
-    }
-  } catch (err) {
-    console.error("[fapshi-pay] 100% milestone check error:", err);
-  }
+  return summary;
 }
 
 async function settleOrFlagContribution(
@@ -2135,7 +2464,10 @@ async function settleBulkPayment(
   const { data: contributions } = await supabase
     .from("contributions")
     .select("id, status")
-    .eq("bulkPaymentId", attempt.bulkPaymentId!);
+    .eq("bulkPaymentId", attempt.bulkPaymentId!)
+    .order("createdAt", { ascending: true });
+
+  const settledItems: SettledContributionSummary[] = [];
 
   for (const c of (contributions ?? []) as { id: string; status: string }[]) {
     if (c.status === "PAID") continue;
@@ -2152,7 +2484,208 @@ async function settleBulkPayment(
       .select("id");
 
     if (won && won.length > 0) {
-      await finalizeContributionSettlement(supabase, c.id, paidAt);
+      const summary = await finalizeContributionSettlement(
+        supabase,
+        c.id,
+        paidAt,
+        { skipNotificationsAndEmail: true },
+      );
+      if (summary) {
+        settledItems.push(summary);
+      }
+    }
+  }
+
+  if (settledItems.length > 0) {
+    // Vérification du palier 100% une seule fois par (sessionId, dueDate)
+    const checkedMilestones = new Set<string>();
+    for (const item of settledItems) {
+      const key = `${item.sessionId}::${item.dueDate}`;
+      if (!checkedMilestones.has(key)) {
+        checkedMilestones.add(key);
+        await checkAndTriggerMilestone100Percent(
+          supabase,
+          item.sessionId,
+          item.sessionLabel,
+          item.dueDate,
+        );
+      }
+    }
+
+    if (settledItems.length === 1) {
+      await sendSingleSettlementNotificationsAndEmail(
+        supabase,
+        settledItems[0],
+        transId,
+      );
+    } else {
+      const relativePayerIds = [
+        ...new Set(
+          settledItems
+            .filter((i) => i.paidByUserId && i.paidByUserId !== i.owner.id)
+            .map((i) => i.paidByUserId!),
+        ),
+      ];
+      const payerMap = new Map<
+        string,
+        { id: string; name: string; email: string; preferredLang: string | null }
+      >();
+      if (relativePayerIds.length > 0) {
+        const { data: payerRows } = await supabase
+          .from("users")
+          .select("id, name, email, preferredLang")
+          .in("id", relativePayerIds);
+        for (const row of (payerRows ?? []) as {
+          id: string;
+          name: string;
+          email: string;
+          preferredLang: string | null;
+        }[]) {
+          payerMap.set(row.id, row);
+        }
+      }
+
+      // 1. UN seul email consolidé + UNE notification par propriétaire de compte
+      const byOwner = new Map<string, SettledContributionSummary[]>();
+      for (const item of settledItems) {
+        const list = byOwner.get(item.owner.id) ?? [];
+        list.push(item);
+        byOwner.set(item.owner.id, list);
+      }
+
+      for (const [ownerId, ownerItems] of byOwner.entries()) {
+        const owner = ownerItems[0].owner;
+        const ownerLang: "fr" | "en" = owner.preferredLang === "en" ? "en" : "fr";
+        const ownerNetTotal = ownerItems.reduce((sum, i) => sum + i.totalPaid, 0);
+        const distinctSessions = [
+          ...new Set(ownerItems.map((i) => i.sessionLabel).filter(Boolean)),
+        ];
+        const distinctSessionIds = [...new Set(ownerItems.map((i) => i.sessionId))];
+        const sessionSummary = formatSessionSummaryEdge(
+          distinctSessions,
+          ownerLang,
+        );
+        const relativeNamesForOwner = [
+          ...new Set(
+            ownerItems
+              .filter((i) => i.paidByUserId && i.paidByUserId !== ownerId)
+              .map((i) => payerMap.get(i.paidByUserId!)?.name)
+              .filter((n): n is string => Boolean(n)),
+          ),
+        ];
+        const paidByName =
+          relativeNamesForOwner.length > 0
+            ? relativeNamesForOwner.join(", ")
+            : undefined;
+        const receiptUrl =
+          ownerItems.length === 1
+            ? `${getAppBaseUrl()}/api/files/${ownerItems[0].receiptKey}`
+            : `${getAppBaseUrl()}/api/files/receipts/${owner.id}/bulk-${attempt.bulkPaymentId}-owner.pdf`;
+
+        const ownerEmail = buildPaymentReceiptEmailHtml(ownerLang, {
+          recipientName: owner.name,
+          items: ownerItems.map((i) => ({
+            beneficiaryName: i.beneficiaryName,
+            sessionLabel: i.sessionLabel,
+          })),
+          paidByName,
+          sessionLabel: sessionSummary,
+          amount: ownerNetTotal,
+          transRef: transId,
+          receiptUrl,
+        });
+        await sendReceiptEmailSafeEdge({
+          to: owner.email,
+          subject: ownerEmail.subject,
+          html: ownerEmail.html,
+        });
+
+        const singleSessionId =
+          distinctSessionIds.length === 1 ? distinctSessionIds[0] : undefined;
+        const namesInline = ownerItems.map((i) => i.beneficiaryName).join(", ");
+        await insertInAppNotifications(supabase, {
+          ...(singleSessionId ? { tontineSessionId: singleSessionId } : {}),
+          type: "PAYMENT_SUCCESS",
+          recipients: [
+            {
+              userId: owner.id,
+              message:
+                ownerLang === "en"
+                  ? `Your payment of ${formatXAF(ownerNetTotal)} for ${ownerItems.length} names (${namesInline}) was received. Thank you!`
+                  : `Votre paiement de ${formatXAF(ownerNetTotal)} pour ${ownerItems.length} noms (${namesInline}) a été reçu. Merci ! ✅🎉`,
+              actionUrl: singleSessionId
+                ? `/sessions/${singleSessionId}`
+                : "/history",
+            },
+          ],
+        });
+      }
+
+      // 2. UN seul email consolidé + UNE notification par proche payeur distinct
+      const byRelativePayer = new Map<string, SettledContributionSummary[]>();
+      for (const item of settledItems) {
+        if (item.paidByUserId && item.paidByUserId !== item.owner.id) {
+          const list = byRelativePayer.get(item.paidByUserId) ?? [];
+          list.push(item);
+          byRelativePayer.set(item.paidByUserId, list);
+        }
+      }
+
+      for (const [payerId, payerItems] of byRelativePayer.entries()) {
+        const payer = payerMap.get(payerId);
+        if (!payer) continue;
+        const payerLang: "fr" | "en" = payer.preferredLang === "en" ? "en" : "fr";
+        const payerNetTotal = payerItems.reduce((sum, i) => sum + i.totalPaid, 0);
+        const distinctOwnerIds = [...new Set(payerItems.map((i) => i.owner.id))];
+        const showOwnerInline = distinctOwnerIds.length > 1;
+        const distinctSessions = [
+          ...new Set(payerItems.map((i) => i.sessionLabel).filter(Boolean)),
+        ];
+        const sessionSummary = formatSessionSummaryEdge(
+          distinctSessions,
+          payerLang,
+        );
+        const receiptUrl =
+          payerItems.length === 1
+            ? `${getAppBaseUrl()}/api/files/${payerItems[0].receiptKey}`
+            : `${getAppBaseUrl()}/api/files/receipts/${payer.id}/bulk-${attempt.bulkPaymentId}-payer.pdf`;
+
+        const payerEmail = buildPaymentReceiptEmailHtml(payerLang, {
+          recipientName: payer.name,
+          items: payerItems.map((i) => ({
+            beneficiaryName: showOwnerInline
+              ? `${i.owner.name} — ${i.beneficiaryName}`
+              : i.beneficiaryName,
+            sessionLabel: i.sessionLabel,
+          })),
+          paidByName: payer.name,
+          sessionLabel: sessionSummary,
+          amount: payerNetTotal,
+          transRef: transId,
+          receiptUrl,
+          isPayerCopy: true,
+        });
+        await sendReceiptEmailSafeEdge({
+          to: payer.email,
+          subject: payerEmail.subject,
+          html: payerEmail.html,
+        });
+
+        const namesInline = payerItems.map((i) => i.beneficiaryName).join(", ");
+        await insertInAppNotifications(supabase, {
+          type: "PAYMENT_SUCCESS",
+          recipients: [
+            {
+              userId: payer.id,
+              message:
+                payerLang === "en"
+                  ? `Your contribution of ${formatXAF(payerNetTotal)} for ${payerItems.length} names (${namesInline}) was successful! Your receipt is available.`
+                  : `Votre cotisation de ${formatXAF(payerNetTotal)} pour ${payerItems.length} noms (${namesInline}) a été validée avec succès ! Votre reçu est disponible.`,
+              actionUrl: "/history",
+            },
+          ],
+        });
+      }
     }
   }
 

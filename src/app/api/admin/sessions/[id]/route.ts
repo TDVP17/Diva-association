@@ -14,7 +14,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     where: { id },
     include: {
       payouts: {
-        select: { dueDate: true, status: true, releasedAt: true },
+        select: { id: true, membershipSlotId: true, dueDate: true, status: true, releasedAt: true },
       },
       memberships: {
         where: { status: "APPROVED" },
@@ -103,21 +103,32 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     registeredSlots,
     slots: s.memberships
       .flatMap((m) =>
-        m.slots.map((slot) => ({
-          id: slot.id,
-          membershipId: m.id,
-          userId: m.userId,
-          beneficiaryName: slot.beneficiaryName,
-          name: m.user.name,
-          memberCode: m.user.memberCode,
-          avatar: m.user.avatar ?? m.user.image,
-          hasPhone: !!m.user.phone,
-          officialPosition: slot.officialPosition,
-          ballDrawn: slot.ballDrawn,
-          createdAt: slot.createdAt,
-          paidThisCycle: paidSlotIds.has(slot.id),
-          hasPendingProof: pendingProofSlotIds.has(slot.id),
-        })),
+        m.slots.map((slot) => {
+          const slotPayout = s.payouts.find(
+            (p) =>
+              p.membershipSlotId === slot.id &&
+              (p.status === "CONFIRMED" || p.status === "RELEASED" || Boolean(p.releasedAt)),
+          );
+          return {
+            id: slot.id,
+            membershipId: m.id,
+            userId: m.userId,
+            beneficiaryName: slot.beneficiaryName,
+            name: m.user.name,
+            phone: m.user.phone,
+            memberCode: m.user.memberCode,
+            avatar: m.user.avatar ?? m.user.image,
+            hasPhone: !!m.user.phone,
+            officialPosition: slot.officialPosition,
+            ballDrawn: slot.ballDrawn,
+            createdAt: slot.createdAt,
+            paidThisCycle: paidSlotIds.has(slot.id),
+            hasPendingProof: pendingProofSlotIds.has(slot.id),
+            hasReceivedPayout: Boolean(slotPayout),
+            payoutStatus: slotPayout?.status ?? "NONE",
+            payoutId: slotPayout?.id ?? null,
+          };
+        }),
       )
       .sort((a, b) => {
         if (a.officialPosition !== null && b.officialPosition !== null) {

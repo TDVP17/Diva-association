@@ -58,6 +58,7 @@ describe("fallback-ussd formatter & resolver", () => {
 
   it("resolves active fallback merchant dynamically with operator matching and alternate option", () => {
     const config: FallbackPaymentConfigData = {
+      isEnabled: true,
       orangeUssdCode: "#150*11*698416666*{montant}#",
       orangeBeneficiaryName: "Valentine Parfaite",
       mtnUssdCode: "*126*1*1*677000000*{montant}#",
@@ -81,6 +82,9 @@ describe("fallback-ussd formatter & resolver", () => {
     expect(resolvedMtn?.ussdCode).toBe("*126*1*1*677000000*4650#");
     expect(resolvedMtn?.beneficiaryName).toBe("Tresorier DIVA");
     expect(resolvedMtn?.alternate?.provider).toBe("ORANGE");
+
+    // When fallback is disabled by admin, returns null
+    expect(resolveActiveFallbackMerchant({ ...config, isEnabled: false }, "ORANGE", 3100)).toBeNull();
 
     // Empty config returns null (never any hardcoded values)
     expect(resolveActiveFallbackMerchant(EMPTY_FALLBACK_PAYMENT_CONFIG, "ORANGE", 1550)).toBeNull();

@@ -1,4 +1,5 @@
 export interface FallbackPaymentConfigData {
+  isEnabled: boolean;
   orangeUssdCode: string;
   orangeBeneficiaryName: string;
   mtnUssdCode: string;
@@ -6,6 +7,7 @@ export interface FallbackPaymentConfigData {
 }
 
 export const EMPTY_FALLBACK_PAYMENT_CONFIG: FallbackPaymentConfigData = {
+  isEnabled: true,
   orangeUssdCode: "",
   orangeBeneficiaryName: "",
   mtnUssdCode: "",
@@ -95,7 +97,7 @@ export function resolveActiveFallbackMerchant(
     beneficiaryName: string;
   };
 } | null {
-  if (!config) return null;
+  if (!config || config.isEnabled === false) return null;
 
   const hasOrange = Boolean(config.orangeUssdCode.trim() || config.orangeBeneficiaryName.trim());
   const hasMtn = Boolean(config.mtnUssdCode.trim() || config.mtnBeneficiaryName.trim());

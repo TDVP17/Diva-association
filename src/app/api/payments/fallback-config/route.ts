@@ -9,6 +9,7 @@ import {
 } from "@/lib/fallback-payment-config";
 
 const updateSchema = z.object({
+  isEnabled: z.boolean().optional().default(true),
   orangeUssdCode: z.string().max(120).optional().default(""),
   orangeBeneficiaryName: z.string().max(160).optional().default(""),
   mtnUssdCode: z.string().max(120).optional().default(""),

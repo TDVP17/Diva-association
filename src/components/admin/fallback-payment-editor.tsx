@@ -20,6 +20,7 @@ export function FallbackPaymentEditor({
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) =>
     translate(lang, key, vars);
 
+  const [isEnabled, setIsEnabled] = useState<boolean>(initialConfig?.isEnabled ?? true);
   const [orangeUssdCode, setOrangeUssdCode] = useState(initialConfig?.orangeUssdCode ?? "");
   const [orangeBeneficiaryName, setOrangeBeneficiaryName] = useState(
     initialConfig?.orangeBeneficiaryName ?? "",
@@ -39,6 +40,7 @@ export function FallbackPaymentEditor({
       .then((r) => (r.ok ? r.json() : null))
       .then((data: FallbackPaymentConfigData | null) => {
         if (!data || cancelled) return;
+        setIsEnabled(data.isEnabled ?? true);
         setOrangeUssdCode(data.orangeUssdCode ?? "");
         setOrangeBeneficiaryName(data.orangeBeneficiaryName ?? "");
         setMtnUssdCode(data.mtnUssdCode ?? "");
@@ -60,6 +62,7 @@ export function FallbackPaymentEditor({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          isEnabled,
           orangeUssdCode,
           orangeBeneficiaryName,
           mtnUssdCode,
@@ -88,104 +91,143 @@ export function FallbackPaymentEditor({
 
   return (
     <form onSubmit={handleSave} className="flex flex-col gap-4">
+      {/* Toggle Activer / Désactiver le code marchand */}
+      <div className="p-3.5 rounded-xl border border-outline-variant bg-surface-container-lowest flex items-center justify-between gap-3 shadow-2xs">
+        <div>
+          <span className="font-bold text-sm text-on-surface block">
+            {lang === "fr" ? "Paiement par code marchand de secours" : "Fallback merchant payment"}
+          </span>
+          <span className="text-xs text-on-surface-variant block mt-0.5">
+            {isEnabled
+              ? lang === "fr"
+                ? "Actif : En cas de défaillance réseau, les membres verront les codes marchands ci-dessous."
+                : "Active: When auto-payment fails, members will see the merchant codes below."
+              : lang === "fr"
+                ? "Désactivé : En cas d'échec, le membre est invité à réessayer ou utiliser l'opérateur opposé."
+                : "Disabled: When auto-payment fails, member is asked to retry or use opposing operator."}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsEnabled(!isEnabled)}
+          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+            isEnabled ? "bg-emerald-600" : "bg-slate-300"
+          }`}
+          role="switch"
+          aria-checked={isEnabled}
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+              isEnabled ? "translate-x-5" : "translate-x-0"
+            }`}
+          />
+        </button>
+      </div>
+
       <p className="text-xs text-on-surface-variant leading-relaxed">
         {t("fallbackConfigDesc")}
       </p>
 
-      <div className="p-3 rounded-xl border border-orange-300 bg-orange-50/50 flex flex-col gap-2.5">
-        <div className="flex items-center gap-2">
-          <span className="px-2 py-0.5 rounded font-bold text-[11px] bg-[#FF6600] text-white">
-            Orange Money
-          </span>
-          <span className="text-xs font-bold text-orange-950">
-            {t("orangeMerchantCodeTitle")}
-          </span>
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-orange-950 mb-1">
-            {t("fallbackOrangeCodeLabel")}
-          </label>
-          <input
-            type="text"
-            value={orangeUssdCode}
-            onChange={(e) => setOrangeUssdCode(e.target.value)}
-            placeholder={t("fallbackOrangeCodePlaceholder")}
-            className="w-full rounded-lg border border-orange-300 bg-white px-3 py-2 text-sm font-mono text-on-surface"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-orange-950 mb-1">
-            {t("fallbackOrangeBeneficiaryLabel")}
-          </label>
-          <input
-            type="text"
-            value={orangeBeneficiaryName}
-            onChange={(e) => setOrangeBeneficiaryName(e.target.value)}
-            placeholder={t("fallbackOrangeBeneficiaryPlaceholder")}
-            className="w-full rounded-lg border border-orange-300 bg-white px-3 py-2 text-sm text-on-surface"
-          />
-        </div>
-
-        {orangePreview1 && (
-          <div className="rounded-lg bg-white/90 border border-orange-200 p-2 text-[11px] text-orange-950 flex flex-col gap-0.5">
-            <span>
-              • 1 nom ({formatXAF(perSlot)}) : <code className="font-mono font-bold">{orangePreview1}</code>
+      <div
+        className={`transition-opacity duration-200 flex flex-col gap-4 ${
+          !isEnabled ? "opacity-50 pointer-events-none" : ""
+        }`}
+      >
+        <div className="p-3 rounded-xl border border-orange-300 bg-orange-50/50 flex flex-col gap-2.5">
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded font-bold text-[11px] bg-[#FF6600] text-white">
+              Orange Money
             </span>
-            <span>
-              • 2 noms ({formatXAF(perSlot * 2)}) : <code className="font-mono font-bold">{orangePreview2}</code>
+            <span className="text-xs font-bold text-orange-950">
+              {t("orangeMerchantCodeTitle")}
             </span>
           </div>
-        )}
-      </div>
 
-      <div className="p-3 rounded-xl border border-amber-300 bg-amber-50/50 flex flex-col gap-2.5">
-        <div className="flex items-center gap-2">
-          <span className="px-2 py-0.5 rounded font-bold text-[11px] bg-yellow-400 text-slate-950">
-            MTN MoMo
-          </span>
-          <span className="text-xs font-bold text-amber-950">
-            {t("mtnMerchantCodeTitle")}
-          </span>
+          <div>
+            <label className="block text-xs font-semibold text-orange-950 mb-1">
+              {t("fallbackOrangeCodeLabel")}
+            </label>
+            <input
+              type="text"
+              value={orangeUssdCode}
+              onChange={(e) => setOrangeUssdCode(e.target.value)}
+              placeholder={t("fallbackOrangeCodePlaceholder")}
+              className="w-full rounded-lg border border-orange-300 bg-white px-3 py-2 text-sm font-mono text-on-surface"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-orange-950 mb-1">
+              {t("fallbackOrangeBeneficiaryLabel")}
+            </label>
+            <input
+              type="text"
+              value={orangeBeneficiaryName}
+              onChange={(e) => setOrangeBeneficiaryName(e.target.value)}
+              placeholder={t("fallbackOrangeBeneficiaryPlaceholder")}
+              className="w-full rounded-lg border border-orange-300 bg-white px-3 py-2 text-sm text-on-surface"
+            />
+          </div>
+
+          {orangePreview1 && (
+            <div className="rounded-lg bg-white/90 border border-orange-200 p-2 text-[11px] text-orange-950 flex flex-col gap-0.5">
+              <span>
+                • 1 nom ({formatXAF(perSlot)}) : <code className="font-mono font-bold">{orangePreview1}</code>
+              </span>
+              <span>
+                • 2 noms ({formatXAF(perSlot * 2)}) : <code className="font-mono font-bold">{orangePreview2}</code>
+              </span>
+            </div>
+          )}
         </div>
 
-        <div>
-          <label className="block text-xs font-semibold text-amber-950 mb-1">
-            {t("fallbackMtnCodeLabel")}
-          </label>
-          <input
-            type="text"
-            value={mtnUssdCode}
-            onChange={(e) => setMtnUssdCode(e.target.value)}
-            placeholder={t("fallbackMtnCodePlaceholder")}
-            className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-mono text-on-surface"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold text-amber-950 mb-1">
-            {t("fallbackMtnBeneficiaryLabel")}
-          </label>
-          <input
-            type="text"
-            value={mtnBeneficiaryName}
-            onChange={(e) => setMtnBeneficiaryName(e.target.value)}
-            placeholder={t("fallbackMtnBeneficiaryPlaceholder")}
-            className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-on-surface"
-          />
-        </div>
-
-        {mtnPreview1 && (
-          <div className="rounded-lg bg-white/90 border border-amber-200 p-2 text-[11px] text-amber-950 flex flex-col gap-0.5">
-            <span>
-              • 1 nom ({formatXAF(perSlot)}) : <code className="font-mono font-bold">{mtnPreview1}</code>
+        <div className="p-3 rounded-xl border border-amber-300 bg-amber-50/50 flex flex-col gap-2.5">
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded font-bold text-[11px] bg-yellow-400 text-slate-950">
+              MTN MoMo
             </span>
-            <span>
-              • 2 noms ({formatXAF(perSlot * 2)}) : <code className="font-mono font-bold">{mtnPreview2}</code>
+            <span className="text-xs font-bold text-amber-950">
+              {t("mtnMerchantCodeTitle")}
             </span>
           </div>
-        )}
+
+          <div>
+            <label className="block text-xs font-semibold text-amber-950 mb-1">
+              {t("fallbackMtnCodeLabel")}
+            </label>
+            <input
+              type="text"
+              value={mtnUssdCode}
+              onChange={(e) => setMtnUssdCode(e.target.value)}
+              placeholder={t("fallbackMtnCodePlaceholder")}
+              className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-mono text-on-surface"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-amber-950 mb-1">
+              {t("fallbackMtnBeneficiaryLabel")}
+            </label>
+            <input
+              type="text"
+              value={mtnBeneficiaryName}
+              onChange={(e) => setMtnBeneficiaryName(e.target.value)}
+              placeholder={t("fallbackMtnBeneficiaryPlaceholder")}
+              className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-on-surface"
+            />
+          </div>
+
+          {mtnPreview1 && (
+            <div className="rounded-lg bg-white/90 border border-amber-200 p-2 text-[11px] text-amber-950 flex flex-col gap-0.5">
+              <span>
+                • 1 nom ({formatXAF(perSlot)}) : <code className="font-mono font-bold">{mtnPreview1}</code>
+              </span>
+              <span>
+                • 2 noms ({formatXAF(perSlot * 2)}) : <code className="font-mono font-bold">{mtnPreview2}</code>
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       <p className="text-[11px] text-on-surface-variant italic">
@@ -205,4 +247,3 @@ export function FallbackPaymentEditor({
     </form>
   );
 }
-

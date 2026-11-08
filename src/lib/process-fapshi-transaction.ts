@@ -1,13 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { getPaymentStatus, type FapshiPaymentStatus, type PaymentStatusResult } from "@/lib/fapshi";
-import { settleContribution } from "@/lib/settle-contribution";
+import { settleContribution, settleContributionsBatch } from "@/lib/settle-contribution";
 import { settleFine } from "@/lib/settle-fine";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { triggerAutomatedRefund } from "@/lib/trigger-fapshi-refund";
 import { formatXAF } from "@/lib/format-currency";
-import { sendEmailSafe } from "@/lib/email/resend";
-import { renderBrandedEmailHtml } from "@/lib/email/template";
-import type { Lang } from "@/lib/i18n/translations";
 import type { PaymentAttempt } from "@/generated/prisma/client";
 
 import { TONTINE_TYPE_LABELS as TONTINE_LABELS } from "@/lib/tontine-labels";
@@ -236,115 +233,12 @@ async function settleBulkPayment(
   if (contributions.length === 1) {
     await settleContribution(contributions[0], { paidAt, origin });
   } else if (contributions.length > 1) {
-    // 1. Settle each individual contribution (generate PDF receipt, mark PAID, settle unpaid fines)
-    // without blasting duplicate individual emails to the payer!
-    for (const contribution of contributions) {
-      await settleContribution(contribution, {
-        paidAt,
-        origin,
-        skipEmail: true,
-        skipNotification: true,
-      });
-    }
-
-    // 2. Identify payer and compute net cotisation total (WITHOUT the 3.1% Fapshi fees)
-    const payer = contributions[0].paidByUser ?? contributions[0].membershipSlot.membership.user;
-    const payerLang: Lang = payer.preferredLang === "en" ? "en" : "fr";
-    const totalNetPaid = contributions.reduce(
-      (sum, c) => sum + Number(c.amountPaid || 0) + Number(c.feePaid || 0) + Number(c.finePaid || 0),
-      0,
-    );
-
-    // 3. Send ONE SINGLE recap email to the payer
-    const emailTitle =
-      payerLang === "fr"
-        ? `Confirmation de paiement groupé (${contributions.length} noms) — DIVA Asso`
-        : `Combined Payment Confirmation (${contributions.length} names) — DIVA Asso`;
-
-    const emailBodyHtml = renderBrandedEmailHtml({
-      title: emailTitle,
-      bodyHtml: `
-        <p style="margin-top: 0;">${
-          payerLang === "fr"
-            ? `Salut, ${payer.name.split(/\s+/)[0] || payer.name} 👋 ! Votre paiement groupé a bien été reçu et validé avec succès.`
-            : `Hello, ${payer.name.split(/\s+/)[0] || payer.name} 👋! Your combined payment was successfully received and confirmed.`
-        }</p>
-        <table width="100%" style="margin: 18px 0; border-collapse: collapse; font-size: 14px;">
-          <tr>
-            <td style="padding: 6px 0; color: #64748b;"><strong>${payerLang === "fr" ? "Nombre de parts" : "Number of names"} :</strong></td>
-            <td style="padding: 6px 0; font-weight: 600; text-align: right;">${contributions.length}</td>
-          </tr>
-          <tr>
-            <td style="padding: 6px 0; color: #64748b;"><strong>${payerLang === "fr" ? "Montant total cotisé" : "Total contributed"} :</strong></td>
-            <td style="padding: 6px 0; font-weight: 700; color: #003528; text-align: right; font-size: 16px;">${formatXAF(totalNetPaid)}</td>
-          </tr>
-          <tr>
-            <td style="padding: 6px 0; color: #64748b;"><strong>${payerLang === "fr" ? "Référence" : "Reference"} :</strong></td>
-            <td style="padding: 6px 0; font-family: monospace; text-align: right; font-size: 13px;">${transId}</td>
-          </tr>
-        </table>
-        <p style="margin-bottom: 0;">${
-          payerLang === "fr"
-            ? "Vos reçus officiels détaillés sont disponibles et téléchargeables dans votre historique personnel."
-            : "Your detailed official receipts are available and downloadable in your personal history."
-        }</p>
-      `,
-      actionUrl: "/history",
-      actionLabel: payerLang === "fr" ? "Consulter mes reçus" : "View my receipts",
-      lang: payerLang,
-      recipientName: payer.name,
+    await settleContributionsBatch(contributions, {
+      paidAt,
+      origin,
+      transRefOverride: transId,
+      bulkPaymentId: attempt.bulkPaymentId!,
     });
-
-    await sendEmailSafe(payer.email, emailTitle, emailBodyHtml);
-
-    // 4. Send ONE SINGLE in-app notification to the payer
-    await scheduleInAppNotifications({
-      type: "PAYMENT_SUCCESS",
-      recipients: [
-        {
-          userId: payer.id,
-          message:
-            payerLang === "fr"
-              ? `Votre paiement groupé de ${formatXAF(totalNetPaid)} pour ${contributions.length} noms a été validé avec succès ! Reçus disponibles dans votre historique.`
-              : `Your combined payment of ${formatXAF(totalNetPaid)} for ${contributions.length} names was successful! Receipts available in your history.`,
-          actionUrl: "/history",
-        },
-      ],
-    });
-
-    // 5. If paid by a relative for someone else, notify each distinct beneficiary
-    const beneficiaryUserIds = [
-      ...new Set(
-        contributions
-          .map((c) => c.membershipSlot.membership.userId)
-          .filter((id) => id !== payer.id),
-      ),
-    ];
-    for (const benUserId of beneficiaryUserIds) {
-      const benContributions = contributions.filter(
-        (c) => c.membershipSlot.membership.userId === benUserId,
-      );
-      const benUser = benContributions[0].membershipSlot.membership.user;
-      const benLang: Lang = benUser.preferredLang === "en" ? "en" : "fr";
-      const benAmount = benContributions.reduce(
-        (sum, c) =>
-          sum + Number(c.amountPaid || 0) + Number(c.feePaid || 0) + Number(c.finePaid || 0),
-        0,
-      );
-      await scheduleInAppNotifications({
-        type: "PAYMENT_SUCCESS",
-        recipients: [
-          {
-            userId: benUserId,
-            message:
-              benLang === "fr"
-                ? `Votre proche ${payer.name} a validé votre cotisation de ${formatXAF(benAmount)} pour ${benContributions.length} part(s). Reçu disponible dans l'application.`
-                : `Your relative ${payer.name} settled your contribution of ${formatXAF(benAmount)} for ${benContributions.length} slot(s). Receipt available in the app.`,
-            actionUrl: "/history",
-          },
-        ],
-      });
-    }
   }
 
   await prisma.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "SUCCESSFUL" } });

@@ -983,6 +983,7 @@ model AssociationRules {
 /// Mobile Money / Orange Money USSD push fails due to operator/network issues.
 model FallbackPaymentConfig {
   id                    String   @id @default("singleton")
+  isEnabled             Boolean  @default(true)
   orangeUssdCode        String   @default("")
   orangeBeneficiaryName String   @default("")
   mtnUssdCode           String   @default("")

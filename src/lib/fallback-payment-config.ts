@@ -12,6 +12,7 @@ export async function getFallbackPaymentConfig(): Promise<FallbackPaymentConfigD
   });
   if (!row) return { ...EMPTY_FALLBACK_PAYMENT_CONFIG };
   return {
+    isEnabled: row.isEnabled ?? true,
     orangeUssdCode: row.orangeUssdCode ?? "",
     orangeBeneficiaryName: row.orangeBeneficiaryName ?? "",
     mtnUssdCode: row.mtnUssdCode ?? "",
@@ -20,14 +21,16 @@ export async function getFallbackPaymentConfig(): Promise<FallbackPaymentConfigD
 }
 
 export async function setFallbackPaymentConfig(
-  data: FallbackPaymentConfigData,
+  data: Partial<FallbackPaymentConfigData>,
   adminId: string,
 ): Promise<FallbackPaymentConfigData> {
-  const cleaned: FallbackPaymentConfigData = {
-    orangeUssdCode: data.orangeUssdCode.trim(),
-    orangeBeneficiaryName: data.orangeBeneficiaryName.trim(),
-    mtnUssdCode: data.mtnUssdCode.trim(),
-    mtnBeneficiaryName: data.mtnBeneficiaryName.trim(),
+  const isEnabled = data.isEnabled ?? true;
+  const cleaned = {
+    isEnabled,
+    orangeUssdCode: (data.orangeUssdCode ?? "").trim(),
+    orangeBeneficiaryName: (data.orangeBeneficiaryName ?? "").trim(),
+    mtnUssdCode: (data.mtnUssdCode ?? "").trim(),
+    mtnBeneficiaryName: (data.mtnBeneficiaryName ?? "").trim(),
   };
 
   const saved = await prisma.fallbackPaymentConfig.upsert({
@@ -44,10 +47,10 @@ export async function setFallbackPaymentConfig(
   });
 
   return {
+    isEnabled: saved.isEnabled,
     orangeUssdCode: saved.orangeUssdCode,
     orangeBeneficiaryName: saved.orangeBeneficiaryName,
     mtnUssdCode: saved.mtnUssdCode,
     mtnBeneficiaryName: saved.mtnBeneficiaryName,
   };
 }
-

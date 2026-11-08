@@ -611,7 +611,6 @@ export default async function SessionDetailPage({
           amount={
             Number(paidContribution.amountPaid) + Number(paidContribution.feePaid) + Number(paidContribution.finePaid)
           }
-          paymentFee={Number(paidContribution.providerFeeAmount ?? 0)}
           paidByName={paidContribution.paidByUser?.name ?? paidContribution.membershipSlot.membership.user.name}
           date={(paidContribution.paidAt ?? paidContribution.dueDate).toLocaleDateString("en-GB", {
             timeZone: "Africa/Douala",

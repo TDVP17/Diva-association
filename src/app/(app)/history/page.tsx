@@ -5,7 +5,6 @@ import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { formatXAF } from "@/lib/format-currency";
 import { TONTINE_TYPE_LABELS } from "@/lib/tontine-labels";
 import { normalizeCameroonPhone } from "@/lib/fapshi";
-import { detectMobileMoneyProvider } from "@/lib/mobile-money-provider";
 
 interface Row {
   kind: "contribution" | "fine" | "relative_contribution" | "duplicate_refund" | "payout";
@@ -13,14 +12,13 @@ interface Row {
   date: Date;
   sessionLabel: string;
   beneficiaryName: string;
+  namesCount: number;
   position?: number | null;
   reason: string;
   totalAmount: number;
   pureAmount?: number;
   feeAmount?: number;
   fineAmount?: number;
-  providerFeeAmount?: number;
-  operatorName?: string | null;
   status: string;
   payerName?: string | null;
   payerPhone?: string | null;
@@ -62,7 +60,7 @@ export default async function HistoryPage() {
       include: {
         membershipSlot: {
           include: {
-            membership: { include: { user: { select: { name: true } }, tontineSession: true } },
+            membership: { include: { user: { select: { id: true, name: true } }, tontineSession: true } },
           },
         },
       },
@@ -108,55 +106,53 @@ export default async function HistoryPage() {
 
   const rows: Row[] = [];
 
-  // 1. Contributions pour ses propres parts
+  // 1. Group & consolidate own contributions (if multiple slots paid together)
+  type RawContribution = {
+    id: string;
+    beneficiaryName: string;
+    dueDate: Date;
+    paidAt: Date | null;
+    amountPaid: number;
+    feePaid: number;
+    finePaid: number;
+    status: string;
+    fapshiTxRef: string | null;
+    bulkPaymentId: string | null;
+    receiptPdfUrl: string | null;
+    paidByUserName: string | null;
+    payerPhone: string | null;
+    sessionLabel: string;
+    tontineSessionId: string;
+  };
+
+  const rawOwnContributions: RawContribution[] = [];
   for (const slot of slots) {
     const sessionLabel =
-      slot.membership.tontineSession.title || TONTINE_TYPE_LABELS[slot.membership.tontineSession.type] || slot.membership.tontineSession.type;
+      slot.membership.tontineSession.title ||
+      TONTINE_TYPE_LABELS[slot.membership.tontineSession.type] ||
+      slot.membership.tontineSession.type;
     for (const c of slot.contributions) {
       if (isArchived(c.dueDate)) continue;
-      const pureAmount = Number(c.amountPaid);
-      const feeAmount = Number(c.feePaid);
-      const fineAmount = Number(c.finePaid);
-      const providerFeeAmount = Number(
-        c.providerFeeAmount ??
-          (c.paymentProvider === "FAPSHI" ? Math.round((pureAmount + feeAmount) * 0.031) : 0),
-      );
-      const detectedOp = c.payerPhone ? detectMobileMoneyProvider(c.payerPhone) : null;
-      const operatorName =
-        detectedOp === "ORANGE"
-          ? "Orange"
-          : detectedOp === "MTN"
-            ? "MTN"
-            : providerFeeAmount > 0
-              ? (lang === "fr" ? "Opérateur" : "Operator")
-              : null;
-      const totalAmount = pureAmount + feeAmount + fineAmount + providerFeeAmount;
-      const effectiveDate = c.paidAt ?? c.dueDate;
-
-      rows.push({
-        kind: "contribution",
+      rawOwnContributions.push({
         id: c.id,
-        date: effectiveDate,
-        sessionLabel,
         beneficiaryName: slot.beneficiaryName,
-        reason: c.paidByUser
-          ? `${t("cycleContributionReason")} — ${sessionLabel} (${t("paidByRelativeBadge", { name: c.paidByUser.name })})`
-          : `${t("cycleContributionReason")} — ${sessionLabel}`,
-        totalAmount,
-        pureAmount,
-        feeAmount,
-        fineAmount: fineAmount > 0 ? fineAmount : undefined,
-        providerFeeAmount: providerFeeAmount > 0 ? providerFeeAmount : undefined,
-        operatorName,
+        dueDate: c.dueDate,
+        paidAt: c.paidAt,
+        amountPaid: Number(c.amountPaid),
+        feePaid: Number(c.feePaid),
+        finePaid: Number(c.finePaid),
         status: c.status,
-        payerName: c.paidByUser?.name ?? user?.name ?? null,
+        fapshiTxRef: c.fapshiTxRef,
+        bulkPaymentId: c.bulkPaymentId,
+        receiptPdfUrl: c.receiptPdfUrl,
+        paidByUserName: c.paidByUser?.name ?? null,
         payerPhone: c.payerPhone,
-        txRef: c.fapshiTxRef,
-        receiptPdfUrl: c.status === "PAID" ? c.receiptPdfUrl : null,
+        sessionLabel,
+        tontineSessionId: slot.membership.tontineSessionId,
       });
     }
 
-    // Amendes de retard
+    // Fines
     for (const f of slot.fines) {
       if (isArchived(f.dueDate)) continue;
       rows.push({
@@ -165,6 +161,7 @@ export default async function HistoryPage() {
         date: f.createdAt ?? f.dueDate,
         sessionLabel,
         beneficiaryName: slot.beneficiaryName,
+        namesCount: 1,
         reason: `${t("fineLabel")} — ${sessionLabel} (${slot.beneficiaryName})`,
         totalAmount: Number(f.amount),
         status: f.status,
@@ -176,9 +173,90 @@ export default async function HistoryPage() {
     }
   }
 
-  // 2. Cotisations payées pour des proches (paymentsMadeForOthers)
+  // Group own contributions by payment batch
+  const ownGroups = new Map<string, RawContribution[]>();
+  for (const c of rawOwnContributions) {
+    let key: string;
+    if (c.bulkPaymentId) {
+      key = `bulk_${c.bulkPaymentId}`;
+    } else if (c.fapshiTxRef) {
+      key = `tx_${c.fapshiTxRef}`;
+    } else if (c.paidAt) {
+      // Group if paid in the same 5-second window for the same session
+      const timeBucket = Math.floor(c.paidAt.getTime() / 5000);
+      key = `time_${c.tontineSessionId}_${timeBucket}_${c.dueDate.toISOString().slice(0, 10)}`;
+    } else {
+      key = `single_${c.id}`;
+    }
+
+    const list = ownGroups.get(key) ?? [];
+    list.push(c);
+    ownGroups.set(key, list);
+  }
+
+  for (const group of ownGroups.values()) {
+    const first = group[0];
+    const effectiveDate = first.paidAt ?? first.dueDate;
+    const distinctNames = [...new Set(group.map((item) => item.beneficiaryName))];
+    const beneficiaryName = distinctNames.join(", ");
+    const pureAmount = group.reduce((sum, item) => sum + item.amountPaid, 0);
+    const feeAmount = group.reduce((sum, item) => sum + item.feePaid, 0);
+    const fineAmount = group.reduce((sum, item) => sum + item.finePaid, 0);
+    const totalAmount = pureAmount + feeAmount + fineAmount; // Net amount strictly without operator fees
+
+    const paidByLabel = first.paidByUserName
+      ? ` (${t("paidByRelativeBadge", { name: first.paidByUserName })})`
+      : "";
+    const reason = `${t("cycleContributionReason")} — ${first.sessionLabel}${paidByLabel}`;
+
+    const receiptPdfUrl = first.status === "PAID"
+      ? (first.bulkPaymentId
+          ? `/api/files/bulk-${first.bulkPaymentId}-owner.pdf`
+          : first.receiptPdfUrl)
+      : null;
+
+    rows.push({
+      kind: "contribution",
+      id: first.id,
+      date: effectiveDate,
+      sessionLabel: first.sessionLabel,
+      beneficiaryName,
+      namesCount: group.length,
+      reason,
+      totalAmount,
+      pureAmount,
+      feeAmount,
+      fineAmount: fineAmount > 0 ? fineAmount : undefined,
+      status: first.status,
+      payerName: first.paidByUserName ?? user?.name ?? null,
+      payerPhone: first.payerPhone,
+      txRef: first.fapshiTxRef,
+      receiptPdfUrl,
+    });
+  }
+
+  // 2. Group & consolidate contributions made for relatives
+  type RawRelativeContribution = {
+    id: string;
+    beneficiaryName: string;
+    targetMemberName: string;
+    targetUserId: string;
+    dueDate: Date;
+    paidAt: Date | null;
+    amountPaid: number;
+    feePaid: number;
+    finePaid: number;
+    status: string;
+    fapshiTxRef: string | null;
+    bulkPaymentId: string | null;
+    receiptPdfUrl: string | null;
+    payerPhone: string | null;
+    sessionLabel: string;
+    tontineSessionId: string;
+  };
+
+  const rawRelativeList: RawRelativeContribution[] = [];
   for (const c of contributionsForOthers) {
-    // Si c'est déjà listé dans slots (car c'est sa propre part), ne pas dupliquer
     if (slots.some((s) => s.id === c.membershipSlotId)) continue;
     if (isArchived(c.dueDate)) continue;
 
@@ -186,47 +264,86 @@ export default async function HistoryPage() {
       c.membershipSlot.membership.tontineSession.title ||
       TONTINE_TYPE_LABELS[c.membershipSlot.membership.tontineSession.type] ||
       c.membershipSlot.membership.tontineSession.type;
-    const pureAmount = Number(c.amountPaid);
-    const feeAmount = Number(c.feePaid);
-    const fineAmount = Number(c.finePaid);
-    const providerFeeAmount = Number(
-      c.providerFeeAmount ??
-        (c.paymentProvider === "FAPSHI" ? Math.round((pureAmount + feeAmount) * 0.031) : 0),
-    );
-    const detectedOp = c.payerPhone ? detectMobileMoneyProvider(c.payerPhone) : null;
-    const operatorName =
-      detectedOp === "ORANGE"
-        ? "Orange"
-        : detectedOp === "MTN"
-          ? "MTN"
-          : providerFeeAmount > 0
-            ? (lang === "fr" ? "Opérateur" : "Operator")
-            : null;
-    const totalAmount = pureAmount + feeAmount + fineAmount + providerFeeAmount;
-    const memberName = c.membershipSlot.membership.user.name;
+
+    rawRelativeList.push({
+      id: c.id,
+      beneficiaryName: c.membershipSlot.beneficiaryName,
+      targetMemberName: c.membershipSlot.membership.user.name,
+      targetUserId: c.membershipSlot.membership.user.id,
+      dueDate: c.dueDate,
+      paidAt: c.paidAt,
+      amountPaid: Number(c.amountPaid),
+      feePaid: Number(c.feePaid),
+      finePaid: Number(c.finePaid),
+      status: c.status,
+      fapshiTxRef: c.fapshiTxRef,
+      bulkPaymentId: c.bulkPaymentId,
+      receiptPdfUrl: c.receiptPdfUrl,
+      payerPhone: c.payerPhone,
+      sessionLabel,
+      tontineSessionId: c.membershipSlot.membership.tontineSessionId,
+    });
+  }
+
+  const relativeGroups = new Map<string, RawRelativeContribution[]>();
+  for (const c of rawRelativeList) {
+    let key: string;
+    if (c.bulkPaymentId) {
+      key = `bulk_${c.bulkPaymentId}`;
+    } else if (c.fapshiTxRef) {
+      key = `tx_${c.fapshiTxRef}`;
+    } else if (c.paidAt) {
+      const timeBucket = Math.floor(c.paidAt.getTime() / 5000);
+      key = `time_${c.targetUserId}_${c.tontineSessionId}_${timeBucket}_${c.dueDate.toISOString().slice(0, 10)}`;
+    } else {
+      key = `single_${c.id}`;
+    }
+
+    const list = relativeGroups.get(key) ?? [];
+    list.push(c);
+    relativeGroups.set(key, list);
+  }
+
+  for (const group of relativeGroups.values()) {
+    const first = group[0];
+    const effectiveDate = first.paidAt ?? first.dueDate;
+    const distinctNames = [...new Set(group.map((item) => item.beneficiaryName))];
+    const slotNamesJoined = distinctNames.join(", ");
+    const beneficiaryName = `${slotNamesJoined} (${first.targetMemberName})`;
+    const pureAmount = group.reduce((sum, item) => sum + item.amountPaid, 0);
+    const feeAmount = group.reduce((sum, item) => sum + item.feePaid, 0);
+    const fineAmount = group.reduce((sum, item) => sum + item.finePaid, 0);
+    const totalAmount = pureAmount + feeAmount + fineAmount; // Net amount strictly without operator fees
+
+    const reason = `${t("relativeContributionReason")} — ${first.sessionLabel} (${first.targetMemberName})`;
+
+    const receiptPdfUrl = first.status === "PAID"
+      ? (first.bulkPaymentId
+          ? `/api/files/bulk-${first.bulkPaymentId}-payer.pdf`
+          : first.receiptPdfUrl)
+      : null;
 
     rows.push({
       kind: "relative_contribution",
-      id: c.id,
-      date: c.paidAt ?? c.dueDate,
-      sessionLabel,
-      beneficiaryName: `${c.membershipSlot.beneficiaryName} (${memberName})`,
-      reason: `${t("relativeContributionReason")} — ${sessionLabel} (${memberName})`,
+      id: first.id,
+      date: effectiveDate,
+      sessionLabel: first.sessionLabel,
+      beneficiaryName,
+      namesCount: group.length,
+      reason,
       totalAmount,
       pureAmount,
       feeAmount,
       fineAmount: fineAmount > 0 ? fineAmount : undefined,
-      providerFeeAmount: providerFeeAmount > 0 ? providerFeeAmount : undefined,
-      operatorName,
-      status: c.status,
+      status: first.status,
       payerName: user?.name ?? t("youLabel"),
-      payerPhone: c.payerPhone,
-      txRef: c.fapshiTxRef,
-      receiptPdfUrl: c.status === "PAID" ? c.receiptPdfUrl : null,
+      payerPhone: first.payerPhone,
+      txRef: first.fapshiTxRef,
+      receiptPdfUrl,
     });
   }
 
-  // 3. Remboursements automatiques de doublons (problème réseau)
+  // 3. Duplicate refunds
   for (const attempt of duplicateAttempts) {
     const sessionTitle =
       attempt.contribution?.membershipSlot?.membership?.tontineSession?.title ??
@@ -240,6 +357,7 @@ export default async function HistoryPage() {
       date: attempt.refundedAt ?? attempt.updatedAt,
       sessionLabel: sessionTitle,
       beneficiaryName: slotName,
+      namesCount: 1,
       reason: t("duplicateRefundTitle"),
       totalAmount: Number(attempt.amount),
       status: attempt.status,
@@ -249,7 +367,7 @@ export default async function HistoryPage() {
     });
   }
 
-  // 5. Gains de tontine reçus ("bouffes")
+  // 4. Payouts received ("bouffes")
   for (const p of payouts) {
     if (isArchived(p.releasedAt ?? p.dueDate)) continue;
     const sessionLabel =
@@ -266,6 +384,7 @@ export default async function HistoryPage() {
       date: p.releasedAt ?? p.detailsSubmittedAt,
       sessionLabel,
       beneficiaryName: p.membershipSlot.beneficiaryName,
+      namesCount: 1,
       position: p.membershipSlot.officialPosition,
       reason:
         lang === "fr"
@@ -282,7 +401,7 @@ export default async function HistoryPage() {
     });
   }
 
-  // Trier par date décroissante
+  // Sort by date descending
   rows.sort((a, b) => b.date.getTime() - a.date.getTime());
 
   return (
@@ -331,7 +450,7 @@ export default async function HistoryPage() {
                             : "border-red-200 bg-red-50/10"
                 }`}
               >
-                {/* Entête de carte avec type, statut et montant */}
+                {/* Header: badge, status, total */}
                 <div className="flex items-start justify-between gap-3 mb-2.5">
                   <div className="flex items-center gap-2 flex-wrap min-w-0">
                     {r.kind === "payout" ? (
@@ -361,7 +480,7 @@ export default async function HistoryPage() {
                       </span>
                     )}
 
-                    {/* Badge de statut vérifié / coché */}
+                    {/* Status badge */}
                     {isPayout ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-[#d1fae5] text-[#065f46]">
                         <span className="material-symbols-outlined text-[14px]">check_circle</span>
@@ -424,17 +543,17 @@ export default async function HistoryPage() {
                   </div>
                 </div>
 
-                {/* Raison & Titre */}
+                {/* Reason title */}
                 <h3 className="font-label-md text-sm sm:text-base font-bold text-on-surface mb-2">
                   {r.reason}
                 </h3>
 
-                {/* Grille de détails avec précision */}
+                {/* Details box without clutter */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-on-surface-variant bg-surface-container-low/50 rounded-lg p-3 border border-surface-variant/60">
+                  {/* Clean date and time (no 'Date et Heure :' label) */}
                   <div className="flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-[16px] text-primary">calendar_today</span>
-                    <span>
-                      <strong className="text-on-surface">{t("dateAndTimeLabel")} :</strong>{" "}
+                    <span className="text-on-surface font-medium">
                       {r.date.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-GB", {
                         timeZone: "Africa/Douala",
                         day: "numeric",
@@ -450,14 +569,20 @@ export default async function HistoryPage() {
                     </span>
                   </div>
 
+                  {/* Beneficiary name(s) */}
                   <div className="flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[16px] text-primary">person</span>
+                    <span className="material-symbols-outlined text-[16px] text-primary">
+                      {r.namesCount > 1 ? "group" : "person"}
+                    </span>
                     <span>
-                      <strong className="text-on-surface">{t("beneficiaryName")} :</strong> {r.beneficiaryName}
+                      <strong className="text-on-surface">
+                        {r.namesCount > 1 ? (lang === "fr" ? "Noms" : "Names") : t("beneficiaryName")} :
+                      </strong>{" "}
+                      {r.beneficiaryName}
                     </span>
                   </div>
 
-                  {/* Détails spécifiques pour les gains de tontine */}
+                  {/* Payout extra info */}
                   {r.kind === "payout" && (
                     <div className="flex items-center gap-1.5 sm:col-span-2 text-emerald-950 font-semibold bg-emerald-50/80 p-2 rounded-lg border border-emerald-200">
                       <span className="material-symbols-outlined text-[16px] text-emerald-700">stars</span>
@@ -472,7 +597,7 @@ export default async function HistoryPage() {
                     </div>
                   )}
 
-                  {/* Montant cotisé & Décomposition des frais */}
+                  {/* Pure amount and fee breakdown (strict: NO 3.1% operator fee display!) */}
                   {r.pureAmount !== undefined && (
                     <div className="flex flex-col gap-1 sm:col-span-2 bg-surface-container-highest/40 p-2.5 rounded-lg border border-outline-variant/50">
                       <div className="flex items-center justify-between text-xs">
@@ -494,23 +619,16 @@ export default async function HistoryPage() {
                           <span className="font-semibold text-error">+{formatXAF(r.fineAmount)}</span>
                         </div>
                       )}
-                      {r.providerFeeAmount !== undefined && r.providerFeeAmount > 0 && (
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-on-surface-variant flex items-center gap-1">
-                            <span>{lang === "fr" ? `Frais ${r.operatorName || "opérateur"}` : `${r.operatorName || "Operator"} fee`}</span>
-                            <span className="text-[10px] px-1 py-0.2 rounded bg-amber-100 text-amber-900 font-medium">3,1%</span>
-                          </span>
-                          <span className="font-semibold text-amber-950">+{formatXAF(r.providerFeeAmount)}</span>
-                        </div>
-                      )}
                       <div className="flex items-center justify-between text-xs border-t border-outline-variant/60 pt-1 mt-0.5">
-                        <strong className="text-on-surface uppercase tracking-wider">{lang === "fr" ? "Total débité" : "Total charged"} :</strong>
+                        <strong className="text-on-surface uppercase tracking-wider">
+                          {lang === "fr" ? "Total" : "Total"} :
+                        </strong>
                         <strong className="text-primary font-bold">{formatXAF(r.totalAmount)}</strong>
                       </div>
                     </div>
                   )}
 
-                  {/* Téléphone et Payeur */}
+                  {/* Payer phone */}
                   {r.payerPhone && (
                     <div className="flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-[16px] text-primary">smartphone</span>
@@ -520,7 +638,7 @@ export default async function HistoryPage() {
                     </div>
                   )}
 
-                  {/* Référence de transaction */}
+                  {/* Transaction ref */}
                   {r.txRef && (
                     <div className="flex items-center gap-1.5 font-mono text-[11px] truncate">
                       <span className="material-symbols-outlined text-[16px] text-primary">tag</span>
@@ -531,7 +649,7 @@ export default async function HistoryPage() {
                   )}
                 </div>
 
-                {/* Note ou explication du remboursement de doublon */}
+                {/* Refund reason */}
                 {r.refundReason && (
                   <p className="mt-2 text-xs text-cyan-900 bg-cyan-100/70 p-2 rounded-md border border-cyan-200 flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-[16px]">info</span>
@@ -539,7 +657,7 @@ export default async function HistoryPage() {
                   </p>
                 )}
 
-                {/* Téléchargement de reçu si disponible & Partage WhatsApp */}
+                {/* Download PDF & WhatsApp share */}
                 {r.receiptPdfUrl && (
                   <div className="mt-3 pt-2.5 border-t border-surface-variant flex items-center justify-end gap-2 flex-wrap">
                     <a

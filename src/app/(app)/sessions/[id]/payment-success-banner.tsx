@@ -10,7 +10,6 @@ interface Props {
   beneficiaryName: string;
   sessionLabel: string;
   amount: number;
-  paymentFee: number;
   paidByName: string;
   date: string;
   time: string;
@@ -23,7 +22,6 @@ export function PaymentSuccessBanner({
   beneficiaryName,
   sessionLabel,
   amount,
-  paymentFee,
   paidByName,
   date,
   time,
@@ -35,7 +33,6 @@ export function PaymentSuccessBanner({
   }, []);
 
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
-  const total = amount + paymentFee;
 
   return (
     <section className="mb-stack-gap-lg bg-white rounded-xl p-5 shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border-2 border-[#a7f3d0]">
@@ -46,9 +43,7 @@ export function PaymentSuccessBanner({
       <div className="flex flex-col gap-2">
         <Row label={t("contributedForLabel")} value={beneficiaryName} />
         <Row label={t("contributionLabel")} value={sessionLabel} />
-        <Row label={t("amountLabel")} value={formatXAF(amount)} />
-        {paymentFee > 0 && <Row label={t("paymentFeeLabel")} value={formatXAF(paymentFee)} />}
-        <Row label={t("totalToBeDeductedLabel")} value={formatXAF(total)} emphasize />
+        <Row label={t("amountLabel")} value={formatXAF(amount)} emphasize />
         <Row label={t("paidByLabel")} value={paidByName} />
         <Row label={t("dateLabelShort")} value={date} />
         <Row label={t("timeLabel")} value={time} />

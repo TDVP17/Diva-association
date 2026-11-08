@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const getPaymentStatus = vi.fn();
 const settleContribution = vi.fn();
+const settleContributionsBatch = vi.fn();
 const settleFine = vi.fn();
 const triggerAutomatedRefund = vi.fn();
 const scheduleInAppNotifications = vi.fn();
@@ -70,7 +71,10 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 vi.mock("@/lib/fapshi", () => ({ getPaymentStatus: (...a: unknown[]) => getPaymentStatus(...a) }));
-vi.mock("@/lib/settle-contribution", () => ({ settleContribution: (...a: unknown[]) => settleContribution(...a) }));
+vi.mock("@/lib/settle-contribution", () => ({
+  settleContribution: (...a: unknown[]) => settleContribution(...a),
+  settleContributionsBatch: (...a: unknown[]) => settleContributionsBatch(...a),
+}));
 vi.mock("@/lib/settle-fine", () => ({ settleFine: (...a: unknown[]) => settleFine(...a) }));
 vi.mock("@/lib/trigger-fapshi-refund", () => ({ triggerAutomatedRefund: (...a: unknown[]) => triggerAutomatedRefund(...a) }));
 vi.mock("@/lib/notifications/dispatch", () => ({
@@ -219,10 +223,25 @@ describe("processFapshiTransaction — bulk (Global Payment) settlement", () => 
     ]);
     txUpdateContribution.mockResolvedValue({});
     txUpdateBulkPayment.mockResolvedValue({});
-    findManyContribution.mockResolvedValue([
-      { id: "c1", membershipSlot: { beneficiaryName: "A" }, paidByUser: null },
-      { id: "c2", membershipSlot: { beneficiaryName: "B" }, paidByUser: null },
-    ]);
+    const bulkContribs = [
+      {
+        id: "c1",
+        membershipSlot: {
+          beneficiaryName: "A",
+          membership: { user: { id: "u1", email: "a@x.com" }, tontineSession: { type: "HEBDO_SUNDAY", title: null } },
+        },
+        paidByUser: null,
+      },
+      {
+        id: "c2",
+        membershipSlot: {
+          beneficiaryName: "B",
+          membership: { user: { id: "u1", email: "a@x.com" }, tontineSession: { type: "HEBDO_SUNDAY", title: null } },
+        },
+        paidByUser: null,
+      },
+    ];
+    findManyContribution.mockResolvedValue(bulkContribs);
 
     const result = await processFapshiTransaction("tx-bulk-1", "http://x");
 
@@ -231,7 +250,16 @@ describe("processFapshiTransaction — bulk (Global Payment) settlement", () => 
     expect(txUpdateBulkPayment).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "bulk-1" }, data: expect.objectContaining({ status: "SUCCESSFUL" }) }),
     );
-    expect(settleContribution).toHaveBeenCalledTimes(2);
+    expect(settleContributionsBatch).toHaveBeenCalledTimes(1);
+    expect(settleContributionsBatch).toHaveBeenCalledWith(
+      bulkContribs,
+      expect.objectContaining({
+        origin: "http://x",
+        transRefOverride: "tx-bulk-1",
+        bulkPaymentId: "bulk-1",
+      }),
+    );
+    expect(settleContribution).not.toHaveBeenCalled();
     expect(updatePaymentAttempt).toHaveBeenCalledWith(
       expect.objectContaining({ data: { status: "SUCCESSFUL" } }),
     );
@@ -246,6 +274,7 @@ describe("processFapshiTransaction — bulk (Global Payment) settlement", () => 
 
     expect(result).toEqual({ status: "SUCCESSFUL", alreadyProcessed: true });
     expect(settleContribution).not.toHaveBeenCalled();
+    expect(settleContributionsBatch).not.toHaveBeenCalled();
     expect(txUpdateContribution).not.toHaveBeenCalled();
   });
 
@@ -259,11 +288,21 @@ describe("processFapshiTransaction — bulk (Global Payment) settlement", () => 
     ]);
     txUpdateContribution.mockResolvedValue({});
     txUpdateBulkPayment.mockResolvedValue({});
-    findManyContribution.mockResolvedValue([{ id: "c2", membershipSlot: { beneficiaryName: "B" }, paidByUser: null }]);
+    findManyContribution.mockResolvedValue([
+      {
+        id: "c2",
+        membershipSlot: {
+          beneficiaryName: "B",
+          membership: { user: { id: "u1" }, tontineSession: { type: "HEBDO_SUNDAY", title: null } },
+        },
+        paidByUser: null,
+      },
+    ]);
 
     await processFapshiTransaction("tx-bulk-1", "http://x");
 
     expect(txUpdateContribution).toHaveBeenCalledTimes(1);
     expect(settleContribution).toHaveBeenCalledTimes(1);
+    expect(settleContributionsBatch).not.toHaveBeenCalled();
   });
 });

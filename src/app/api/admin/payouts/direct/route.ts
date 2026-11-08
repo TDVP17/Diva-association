@@ -26,10 +26,9 @@ const directPayoutSchema = z.object({
 });
 
 function normalizePhone(raw: string): string {
-  const digits = raw.replace(/\D/g, "");
-  if (digits.startsWith("237") && digits.length === 12) {
-    return digits.slice(3);
-  }
+  let digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("00237") && digits.length > 9) digits = digits.slice(5);
+  if (digits.startsWith("237") && digits.length > 9) digits = digits.slice(3);
   return digits;
 }
 
@@ -119,8 +118,27 @@ export async function POST(request: Request) {
 
   const netPayout = customAmount ?? computedNetPayout;
   const normalized = normalizePhone(payoutPhone);
+  if (!/^[6-9]\d{8}$/.test(normalized)) {
+    return NextResponse.json(
+      { error: "Numéro de téléphone invalide. Il doit comporter 9 chiffres camerounais (ex: 6XXXXXXXX)." },
+      { status: 400 },
+    );
+  }
   const provider = detectMobileMoneyProvider(normalized);
+  if (channel === "FAPSHI" && !provider) {
+    return NextResponse.json(
+      { error: "Opérateur non reconnu pour ce numéro. Fapshi supporte uniquement les numéros Orange Money et MTN Mobile Money Cameroun." },
+      { status: 400 },
+    );
+  }
   const medium = provider ? fapshiMediumFor(provider) : undefined;
+  const cleanAccountName = payoutAccountName.trim().replace(/["\\]/g, "");
+  if (!cleanAccountName || cleanAccountName.length < 2) {
+    return NextResponse.json(
+      { error: "Le nom du bénéficiaire sur le compte est requis pour le virement Fapshi." },
+      { status: 400 },
+    );
+  }
 
   let fapshiResult: { transId: string };
   if (channel === "FAPSHI") {
@@ -129,7 +147,7 @@ export async function POST(request: Request) {
         amount: Math.round(netPayout),
         phone: normalized,
         medium,
-        name: payoutAccountName,
+        name: cleanAccountName,
         externalId: `direct-${slot.id}-${dueDate.getTime()}`,
         message: `Cotisation DIVA - Gain de ${slot.beneficiaryName}`,
       });

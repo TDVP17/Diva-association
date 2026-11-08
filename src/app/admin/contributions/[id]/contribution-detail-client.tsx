@@ -41,10 +41,14 @@ interface AdminSlot {
   memberCode: string | null;
   avatar: string | null;
   hasPhone: boolean;
+  phone?: string | null;
   officialPosition: number | null;
   ballDrawn: number | null;
   paidThisCycle: boolean;
   hasPendingProof?: boolean;
+  hasReceivedPayout?: boolean;
+  payoutStatus?: "NONE" | "DETAILS_SUBMITTED" | "RELEASED" | "CONFIRMED";
+  payoutId?: string | null;
 }
 
 interface AdminSession {
@@ -888,6 +892,38 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     }
   }
 
+  async function handleMarkPotBouffed(slotId: string, beneficiaryName: string) {
+    const confirmMsg =
+      lang === "fr"
+        ? `Confirmer que ${beneficiaryName} a bien reçu / bouffé son argent et passer à la cotisation suivante ?`
+        : `Confirm that ${beneficiaryName} has received their payout and advance to the next round?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const res = await fetch("/api/admin/payouts/confirm-turn", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tontineSessionId,
+          membershipSlotId: slotId,
+        }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        window.alert(body?.error || "Erreur lors de la validation du gain.");
+        return;
+      }
+      await refreshSession();
+      window.alert(
+        lang === "fr"
+          ? `Cagnotte de ${beneficiaryName} validée avec succès ! Passage au tour suivant effectué.`
+          : `Payout for ${beneficiaryName} confirmed! Next round unlocked.`,
+      );
+    } catch {
+      window.alert("Erreur de connexion.");
+    }
+  }
+
   function handleSelectDirectPayoutSlot(slotId: string) {
     setDirectPayoutSlotId(slotId);
     setDirectPayoutResult(null);
@@ -895,10 +931,15 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     const foundSlot = session?.slots.find((s) => s.id === slotId);
     if (foundSlot) {
       setDirectPayoutName(foundSlot.beneficiaryName || foundSlot.name);
+      if (foundSlot.phone) {
+        const cleanDigits = foundSlot.phone.replace(/\D/g, "").replace(/^(00237|237)/, "");
+        setDirectPayoutPhone(cleanDigits);
+      }
       const pot = (session?.amount ?? 0) * (session?.slots.length ?? 1);
       setDirectPayoutAmount(String(pot));
     } else {
       setDirectPayoutName("");
+      setDirectPayoutPhone("");
       setDirectPayoutAmount("");
     }
   }
@@ -1752,7 +1793,25 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-1.5 flex-shrink-0 w-full sm:w-auto justify-end">
+                    <div className="flex items-center gap-1.5 flex-shrink-0 w-full sm:w-auto justify-end flex-wrap">
+                      {/* Statut de versement de la cagnotte (A bouffé son argent) */}
+                      {slot.hasReceivedPayout ? (
+                        <span className="px-2.5 py-1.5 rounded-xl bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-bold flex items-center gap-1 shadow-2xs">
+                          <span className="material-symbols-outlined text-[15px] text-emerald-700">check_circle</span>
+                          <span>{lang === "fr" ? "A bouffé ✅" : "Pot received ✅"}</span>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleMarkPotBouffed(slot.id, slot.beneficiaryName)}
+                          className="px-2.5 py-1.5 rounded-xl border border-emerald-600 bg-emerald-50 text-emerald-900 hover:bg-emerald-100 text-xs font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer active:scale-95"
+                          title={lang === "fr" ? "Cocher que ce membre a bouffé son argent et passer au tour suivant" : "Mark payout received"}
+                        >
+                          <span className="material-symbols-outlined text-[15px] text-emerald-700">restaurant</span>
+                          <span>{lang === "fr" ? "A bouffé son argent" : "Mark pot received"}</span>
+                        </button>
+                      )}
+
                       <button
                         type="button"
                         onClick={() => openPickerForPlace(index)}
@@ -3168,7 +3227,15 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                       )}
 
                       {c.status !== "CONFIRMED" && (
-                        <div className="pt-2 border-t border-slate-100 flex items-center justify-end">
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => handleMarkPotBouffed(c.membershipSlotId ?? c.id, c.beneficiaryName)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 text-white hover:bg-emerald-800 text-xs font-bold transition-colors cursor-pointer active:scale-95 shadow-xs"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">restaurant</span>
+                            <span>{lang === "fr" ? "A bouffé son argent" : "Mark pot received"}</span>
+                          </button>
                           <button
                             type="button"
                             onClick={() => handleFillIntoDirectPayout(c)}
