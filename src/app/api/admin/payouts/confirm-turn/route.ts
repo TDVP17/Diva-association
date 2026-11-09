@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
 import { computePayoutPreview } from "@/lib/payout-preview";
-import { getNextDueDate } from "@/lib/tontine-engine";
+import { getNextDueDate, getMostRecentDueDate } from "@/lib/tontine-engine";
 import { logAudit } from "@/lib/audit";
 import { getDesignatedSlot } from "@/lib/round-robin-lock";
 import { payoutReleasedMessage, payoutTurnMessage } from "@/lib/whatsapp/templates";
@@ -63,7 +63,6 @@ export async function POST(request: Request) {
 
   const session = slot.membership.tontineSession;
   const user = slot.membership.user;
-  const dueDate = getNextDueDate(session.type, new Date());
 
   // Existing payout claim or row if any
   const existingPayout = await prisma.payout.findFirst({
@@ -73,6 +72,9 @@ export async function POST(request: Request) {
     },
     orderBy: { detailsSubmittedAt: "desc" },
   });
+
+  // Cycle due date: prefer existing claim's due date, or most recent cycle due date that concluded
+  const dueDate = existingPayout?.dueDate ?? getMostRecentDueDate(session.type, new Date());
 
   const { pot, deducted, netPayout: computedNetPayout, toDeductFineIds, toDeductContributions } =
     await computePayoutPreview(session, slot, dueDate);

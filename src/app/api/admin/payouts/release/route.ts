@@ -18,6 +18,7 @@ import { formatXAF } from "@/lib/format-currency";
 const bodySchema = z.object({
   payoutClaimId: z.string().min(1),
   channel: z.enum(["FAPSHI", "DIRECT"]).default("FAPSHI"),
+  overrideUnpaid: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
@@ -68,11 +69,13 @@ export async function POST(request: Request) {
     select: { beneficiaryName: true },
   });
 
-  if (unpaidSlots.length > 0) {
+  if (unpaidSlots.length > 0 && !parsed.data.overrideUnpaid) {
     const unpaidNames = unpaidSlots.map((s) => s.beneficiaryName).join(", ");
     return NextResponse.json(
       {
         error: `Impossible de verser la cagnotte : tous les membres doivent avoir cotisé avant le versement. Noms en attente (${unpaidSlots.length}) : ${unpaidNames}.`,
+        unpaidCount: unpaidSlots.length,
+        canOverride: true,
       },
       { status: 409 },
     );
@@ -104,9 +107,14 @@ export async function POST(request: Request) {
       });
     } catch (err) {
       if (err instanceof FapshiPayoutError) {
-        return NextResponse.json({ error: err.message }, { status: 502 });
+        return NextResponse.json(
+          {
+            error: `${err.message}. Si votre solde Fapshi Payout est à 0, utilisez le mode 'Virement via mon numéro' (Direct) pour valider le virement.`,
+          },
+          { status: 502 },
+        );
       }
-      return NextResponse.json({ error: "Payout could not be sent. Please try again." }, { status: 502 });
+      return NextResponse.json({ error: "Échec du virement Fapshi. Veuillez réessayer ou choisir 'Virement via mon numéro'." }, { status: 502 });
     }
   } else {
     // Virement direct via le numéro de l'admin (hors Fapshi)

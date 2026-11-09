@@ -9,7 +9,8 @@ import { mimeTypeFor } from "@/lib/mime";
 // role* key (server-only, bypasses Row Level Security) rather than the
 // public anon key — a private bucket's RLS policies would otherwise need to
 // replicate the same owner-or-admin logic a second time, in SQL.
-const bucket = process.env.SUPABASE_STORAGE_BUCKET ?? "diva-storage";
+const primaryBucket = process.env.SUPABASE_STORAGE_BUCKET ?? "diva-storage";
+const fallbackBucket = "uploads";
 
 // Lazily constructed: `createClient` throws immediately if the key is an
 // empty string, which would otherwise break `next build`'s route analysis
@@ -28,19 +29,46 @@ function getClient(): SupabaseClient {
 }
 
 export async function saveFile(key: string, data: Buffer): Promise<string> {
-  const { error } = await getClient()
-    .storage.from(bucket)
-    .upload(key, data, { contentType: mimeTypeFor(key), upsert: true });
-  if (error) {
-    throw new Error(`Supabase Storage upload failed for "${key}": ${error.message}`);
+  const sb = getClient();
+  let uploadResult = await sb.storage.from(primaryBucket).upload(key, data, {
+    contentType: mimeTypeFor(key),
+    upsert: true,
+  });
+
+  if (uploadResult.error && uploadResult.error.message?.toLowerCase().includes("not found")) {
+    // Tenter de créer le bucket s'il n'existe pas
+    await sb.storage.createBucket(primaryBucket, { public: false }).catch(() => null);
+    uploadResult = await sb.storage.from(primaryBucket).upload(key, data, {
+      contentType: mimeTypeFor(key),
+      upsert: true,
+    });
+  }
+
+  if (uploadResult.error && primaryBucket !== fallbackBucket) {
+    // Essai sur le bucket de secours
+    const fallbackResult = await sb.storage.from(fallbackBucket).upload(key, data, {
+      contentType: mimeTypeFor(key),
+      upsert: true,
+    });
+    if (!fallbackResult.error) {
+      return key;
+    }
+  }
+
+  if (uploadResult.error) {
+    throw new Error(`Supabase Storage upload failed for "${key}": ${uploadResult.error.message}`);
   }
   return key;
 }
 
 export async function readStoredFile(key: string): Promise<Buffer> {
-  const { data, error } = await getClient().storage.from(bucket).download(key);
-  if (error) {
-    throw new Error(`Supabase Storage download failed for "${key}": ${error.message}`);
+  const sb = getClient();
+  let downloadResult = await sb.storage.from(primaryBucket).download(key);
+  if (downloadResult.error && primaryBucket !== fallbackBucket) {
+    downloadResult = await sb.storage.from(fallbackBucket).download(key);
   }
-  return Buffer.from(await data.arrayBuffer());
+  if (downloadResult.error || !downloadResult.data) {
+    throw new Error(`Supabase Storage download failed for "${key}": ${downloadResult.error?.message ?? "not found"}`);
+  }
+  return Buffer.from(await downloadResult.data.arrayBuffer());
 }

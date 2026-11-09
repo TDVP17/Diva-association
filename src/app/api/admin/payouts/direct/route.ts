@@ -8,7 +8,7 @@ import { detectMobileMoneyProvider, fapshiMediumFor } from "@/lib/mobile-money-p
 import { sendEmailSafe } from "@/lib/email/resend";
 import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { payoutReleasedMessage } from "@/lib/whatsapp/templates";
-import { getNextDueDate } from "@/lib/tontine-engine";
+import { getNextDueDate, getMostRecentDueDate } from "@/lib/tontine-engine";
 import { logAudit } from "@/lib/audit";
 import { getDesignatedSlot } from "@/lib/round-robin-lock";
 import { payoutTurnMessage } from "@/lib/whatsapp/templates";
@@ -22,6 +22,8 @@ const directPayoutSchema = z.object({
   payoutPhone: z.string().trim().min(9),
   payoutAccountName: z.string().trim().min(1).max(100),
   customAmount: z.coerce.number().positive().optional(),
+  dueDate: z.string().optional(),
+  overrideUnpaid: z.boolean().optional(),
   channel: z.enum(["FAPSHI", "DIRECT"]).default("FAPSHI"),
 });
 
@@ -61,18 +63,22 @@ export async function POST(request: Request) {
 
   const session = slot.membership.tontineSession;
   const user = slot.membership.user;
-  const dueDate = getNextDueDate(session.type, new Date());
 
-  // Check if payout has already been processed for this cycle
+  // Check if payout claim exists for this slot
   const existingPayout = await prisma.payout.findFirst({
     where: {
       tontineSessionId,
       membershipSlotId,
-      dueDate,
     },
+    orderBy: { detailsSubmittedAt: "desc" },
   });
 
-  if (existingPayout && existingPayout.status !== "DETAILS_SUBMITTED") {
+  // Cycle due date: prefer explicit dueDate, or existing claim dueDate, or most recent concluded cycle
+  const dueDate = parsed.data.dueDate
+    ? new Date(parsed.data.dueDate)
+    : (existingPayout?.dueDate ?? getMostRecentDueDate(session.type, new Date()));
+
+  if (existingPayout && existingPayout.status !== "DETAILS_SUBMITTED" && existingPayout.dueDate.getTime() === dueDate.getTime()) {
     return NextResponse.json(
       { error: "A payout has already been released or confirmed for this slot in this cycle" },
       { status: 409 },
@@ -100,11 +106,13 @@ export async function POST(request: Request) {
     select: { beneficiaryName: true },
   });
 
-  if (unpaidSlots.length > 0) {
+  if (unpaidSlots.length > 0 && !parsed.data.overrideUnpaid) {
     const unpaidNames = unpaidSlots.map((s) => s.beneficiaryName).join(", ");
     return NextResponse.json(
       {
         error: `Impossible de verser la cagnotte : tous les membres doivent avoir cotisé avant le versement. Noms en attente (${unpaidSlots.length}) : ${unpaidNames}.`,
+        unpaidCount: unpaidSlots.length,
+        canOverride: true,
       },
       { status: 409 },
     );
@@ -154,10 +162,15 @@ export async function POST(request: Request) {
     } catch (err) {
       console.error("[admin/payouts/direct] Fapshi payout error:", err);
       if (err instanceof FapshiPayoutError) {
-        return NextResponse.json({ error: err.message }, { status: 502 });
+        return NextResponse.json(
+          {
+            error: `${err.message}. Si votre solde Fapshi Payout est insuffisant, vous pouvez choisir 'Virement via mon numéro' (Direct) pour valider le gain.`,
+          },
+          { status: 502 },
+        );
       }
       return NextResponse.json(
-        { error: "Le virement a échoué. Veuillez vérifier le solde ou le numéro." },
+        { error: "Le virement Fapshi a échoué. Veuillez vérifier votre solde Fapshi Payout ou utiliser le mode 'Virement via mon numéro'." },
         { status: 502 },
       );
     }

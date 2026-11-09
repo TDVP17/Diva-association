@@ -153,34 +153,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Nom(s) introuvable(s)." }, { status: 404 });
     }
 
+    // Vérification de session : l'utilisateur doit être connecté pour soumettre une preuve
     if (!session?.user?.id) {
       return NextResponse.json(
         { error: "Veuillez vous connecter pour envoyer une preuve de paiement." },
         { status: 401 },
-      );
-    }
-
-    // Vérification stricte d'appartenance : un membre ne peut soumettre une preuve que pour ses propres parts
-    const isOwner = slots.every((s) => s.membership.userId === session.user.id);
-    if (!isOwner && !isAdminRole(session.user.role)) {
-      const { ip, userAgent } = extractClientInfo(request);
-      await logSecurityEvent({
-        type: "unauthorized_payment_attempt",
-        emailEssaye: session.user.email ?? null,
-        ip,
-        userAgent,
-        details: {
-          action: "payment_proof_foreign_slot",
-          userId: session.user.id,
-          slotIds,
-          foreignOwners: slots
-            .filter((s) => s.membership.userId !== session.user.id)
-            .map((s) => s.membership.userId),
-        },
-      });
-      return NextResponse.json(
-        { error: "Accès refusé : vous ne pouvez pas cotiser pour un autre membre." },
-        { status: 403 },
       );
     }
 
@@ -191,6 +168,33 @@ export async function POST(request: Request) {
       ) {
         return NextResponse.json(
           { error: "Cette cotisation n'accepte pas de paiement pour le moment." },
+          { status: 409 },
+        );
+      }
+    }
+
+    // Vérification anti-doublon stricte : une preuve ne doit être envoyée qu'une seule fois
+    for (const slot of slots) {
+      const tontineSession = slot.membership.tontineSession;
+      const explicitDueDate = slotIds.length === 1 && dueDateStr ? dueDateStr : null;
+      const dueDate = await resolveDueDateForSlot(slot.id, tontineSession, explicitDueDate);
+
+      const existing = await prisma.contribution.findUnique({
+        where: { membershipSlotId_dueDate: { membershipSlotId: slot.id, dueDate } },
+      });
+
+      if (existing?.status === "PAID") {
+        return NextResponse.json(
+          { error: `Le nom ${slot.beneficiaryName} est déjà validé et payé pour ce tour.` },
+          { status: 409 },
+        );
+      }
+
+      if (existing?.status === "PENDING" && existing.proofImageUrl) {
+        return NextResponse.json(
+          {
+            error: `Une preuve de paiement a déjà été transmise pour ${slot.beneficiaryName}. Elle est en cours de vérification par DIVA Asso. Il n'est pas nécessaire de la renvoyer.`,
+          },
           { status: 409 },
         );
       }

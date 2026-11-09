@@ -67,6 +67,7 @@ export function NetworkFallbackProofStep({
 
   const [images, setImages] = useState<PreviewImageItem[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [submittedSuccess, setSubmittedSuccess] = useState(false);
   const [proofError, setProofError] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
 
@@ -160,7 +161,7 @@ export function NetworkFallbackProofStep({
   }
 
   async function submitProofToDivaAsso() {
-    if (images.length === 0 || selectedSlots.length === 0 || uploading) return;
+    if (images.length === 0 || selectedSlots.length === 0 || uploading || submittedSuccess) return;
     setUploading(true);
     setProofError(null);
 
@@ -195,6 +196,7 @@ export function NetworkFallbackProofStep({
         return;
       }
 
+      setSubmittedSuccess(true);
       onProofSubmitted();
     } catch (err) {
       console.error("[NetworkFallbackProofStep] upload error:", err);
@@ -445,6 +447,16 @@ export function NetworkFallbackProofStep({
               )}
 
               {proofError && <p className="text-xs text-error font-medium">{proofError}</p>}
+              {submittedSuccess && (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-xs text-emerald-900 font-semibold flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px] text-emerald-700">check_circle</span>
+                  <span>
+                    {lang === "fr"
+                      ? "Preuve bien transmise à DIVA Asso ! Votre reçu sera validé une fois la capture vérifiée."
+                      : "Proof submitted to DIVA Asso! Your receipt will be validated once reviewed."}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
@@ -460,11 +472,19 @@ export function NetworkFallbackProofStep({
             <button
               type="button"
               onClick={submitProofToDivaAsso}
-              disabled={images.length === 0 || uploading || selectedSlots.length === 0}
+              disabled={images.length === 0 || uploading || submittedSuccess || selectedSlots.length === 0}
               className="flex-1 px-3 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-xs sm:text-sm font-bold hover:opacity-90 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[16px]">send</span>
-              <span>{uploading ? t("proofSubmitting") : t("sendToAdminAction")}</span>
+              <span className="material-symbols-outlined text-[16px]">
+                {submittedSuccess ? "check" : "send"}
+              </span>
+              <span>
+                {uploading
+                  ? t("proofSubmitting")
+                  : submittedSuccess
+                    ? (lang === "fr" ? "Preuve envoyée" : "Proof submitted")
+                    : t("sendToAdminAction")}
+              </span>
             </button>
           </div>
         </>

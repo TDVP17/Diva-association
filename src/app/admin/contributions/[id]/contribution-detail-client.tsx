@@ -243,6 +243,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [showSettingsAccordion, setShowSettingsAccordion] = useState(false);
+  const [showPayoutOrderAccordion, setShowPayoutOrderAccordion] = useState(false);
 
   const [showRelaunchModal, setShowRelaunchModal] = useState(false);
   const [relaunchFields, setRelaunchFields] = useState<{
@@ -841,7 +842,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     }
   }
 
-  async function confirmReleasePayout() {
+  async function confirmReleasePayout(forceOverride = false) {
     if (!reviewingClaimId) return;
     setReleasing(true);
     setPayoutResult(null);
@@ -853,10 +854,21 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
         body: JSON.stringify({
           payoutClaimId: reviewingClaimId,
           channel: payoutChannel,
+          overrideUnpaid: forceOverride,
         }),
       });
       const body = await res.json();
       if (!res.ok) {
+        if (body?.canOverride && !forceOverride) {
+          const proceed = window.confirm(
+            (body.error || "Tous les membres n'ont pas encore cotisé.") +
+              "\n\nÊtes-vous sûr de vouloir forcer le versement de la cagnotte maintenant ?",
+          );
+          if (proceed) {
+            setReleasing(false);
+            return confirmReleasePayout(true);
+          }
+        }
         if (body?.error) console.error("[confirmReleasePayout] server error:", body.error);
         setPayoutError(body?.error || t("failedToReleasePayout"));
         return;
@@ -944,8 +956,8 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     }
   }
 
-  async function executeDirectPayout(e: React.FormEvent) {
-    e.preventDefault();
+  async function executeDirectPayout(e?: React.FormEvent, forceOverride = false) {
+    if (e) e.preventDefault();
     if (!directPayoutSlotId || !directPayoutName.trim() || !directPayoutPhone.trim()) {
       return;
     }
@@ -963,10 +975,21 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
           payoutPhone: directPayoutPhone.trim(),
           customAmount: directPayoutAmount ? Number(directPayoutAmount) : undefined,
           channel: directPayoutChannel,
+          overrideUnpaid: forceOverride,
         }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
+        if (data?.canOverride && !forceOverride) {
+          const proceed = window.confirm(
+            (data.error || "Tous les membres n'ont pas encore cotisé.") +
+              "\n\nÊtes-vous sûr de vouloir forcer le versement de la cagnotte maintenant ?",
+          );
+          if (proceed) {
+            setDirectPayoutLoading(false);
+            return executeDirectPayout(undefined, true);
+          }
+        }
         setDirectPayoutError(data?.error || t("failedToReleasePayout"));
       } else {
         const refStr = data?.transId ? ` — Réf: ${data.transId}` : "";
@@ -1478,13 +1501,52 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
             )}
           </div>
 
-          <section className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4 flex flex-col h-full">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="font-title-md text-title-md text-primary flex items-center gap-2">
-                <span className="material-symbols-outlined">format_list_numbered</span>
-                {t("payoutOrder")}
-              </h3>
-            </div>
+          {/* Section Ordre de bouffe repliable (fermée par défaut à la demande de l'administrateur) */}
+          <div className="rounded-2xl border border-outline-variant/60 bg-surface overflow-hidden shadow-2xs transition-all">
+            <button
+              type="button"
+              onClick={() => setShowPayoutOrderAccordion((prev) => !prev)}
+              className="w-full px-4 py-3.5 sm:px-5 sm:py-4 flex items-center justify-between gap-3 text-left hover:bg-slate-50 transition-colors cursor-pointer"
+              aria-expanded={showPayoutOrderAccordion}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-primary flex items-center justify-center flex-shrink-0">
+                  <span className="material-symbols-outlined text-[20px]">format_list_numbered</span>
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-title-md text-sm sm:text-base font-bold text-on-surface">
+                      {t("payoutOrder")}
+                    </h3>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                      {t("assignedCountBadge", {
+                        assigned: String(assignedIds.size),
+                        total: String(session?.slots.length ?? 0),
+                      })}
+                    </span>
+                  </div>
+                  <p className="text-[11px] sm:text-xs text-on-surface-variant mt-0.5 truncate">
+                    {lang === "fr"
+                      ? "Attribution et ordre des bénéficiaires de la cagnotte"
+                      : "Beneficiary order and assignment"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-primary flex-shrink-0">
+                <span>{showPayoutOrderAccordion ? (lang === "fr" ? "Fermer" : "Close") : (lang === "fr" ? "Ouvrir" : "Open")}</span>
+                <span
+                  className={`material-symbols-outlined text-[20px] transition-transform duration-200 ${
+                    showPayoutOrderAccordion ? "rotate-180" : ""
+                  }`}
+                >
+                  expand_more
+                </span>
+              </div>
+            </button>
+
+            {showPayoutOrderAccordion && (
+              <div className="p-4 sm:p-5 pt-2 border-t border-outline-variant/30 animate-in fade-in duration-200 flex flex-col">
 
             {positionsFeedback && (
               <div
@@ -2107,7 +2169,9 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                 </div>
               </div>
             )}
-          </section>
+              </div>
+            )}
+          </div>
 
           <section className="bg-primary text-on-primary rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4 relative overflow-hidden">
             <h3 className="font-title-md text-title-md flex items-center gap-2 mb-4 relative z-10">
@@ -3429,7 +3493,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
 
                         <div className="flex flex-col gap-2 mt-1">
                           <button
-                            onClick={confirmReleasePayout}
+                            onClick={() => confirmReleasePayout()}
                             disabled={releasing}
                             className={`w-full font-label-md text-label-md py-3 rounded-xl hover:opacity-95 disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm font-semibold transition-colors ${
                               payoutChannel === "DIRECT"
