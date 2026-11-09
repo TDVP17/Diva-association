@@ -86,6 +86,10 @@ interface PayoutClaim {
   memberName: string;
   payoutPhone: string;
   payoutAccountName: string;
+  payoutMtnPhone?: string | null;
+  payoutMtnName?: string | null;
+  payoutOrangePhone?: string | null;
+  payoutOrangeName?: string | null;
   netPayout: number | null;
   fapshiTransId?: string | null;
   detailsSubmittedAt: string;
@@ -150,7 +154,12 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     memberName: string;
     payoutPhone: string;
     payoutAccountName: string;
+    payoutMtnPhone?: string | null;
+    payoutMtnName?: string | null;
+    payoutOrangePhone?: string | null;
+    payoutOrangeName?: string | null;
   } | null>(null);
+  const [selectedPayoutOperator, setSelectedPayoutOperator] = useState<"MTN" | "ORANGE">("MTN");
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [releasing, setReleasing] = useState(false);
   const [confirmingOverrideId, setConfirmingOverrideId] = useState<string | null>(null);
@@ -176,7 +185,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     }, 2000);
   }
 
-  function handleFillIntoDirectPayout(c: PayoutClaim) {
+  function handleFillIntoDirectPayout(c: PayoutClaim, operator?: "MTN" | "ORANGE") {
     setActiveTab("foodTurn");
     if (c.membershipSlotId) {
       setDirectPayoutSlotId(c.membershipSlotId);
@@ -184,8 +193,17 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
       const found = session?.slots.find((s) => s.beneficiaryName === c.beneficiaryName || s.name === c.memberName);
       if (found) setDirectPayoutSlotId(found.id);
     }
-    setDirectPayoutName(c.payoutAccountName || c.beneficiaryName);
-    const cleanDigits = (c.payoutPhone || "").replace(/\D/g, "").replace(/^237/, "");
+
+    const useOrange = operator === "ORANGE" || (!operator && c.payoutOrangePhone && !c.payoutMtnPhone);
+    const chosenName = useOrange
+      ? (c.payoutOrangeName || c.payoutAccountName || c.beneficiaryName)
+      : (c.payoutMtnName || c.payoutAccountName || c.beneficiaryName);
+    const rawChosenPhone = useOrange
+      ? (c.payoutOrangePhone || c.payoutPhone || "")
+      : (c.payoutMtnPhone || c.payoutPhone || "");
+    const cleanDigits = rawChosenPhone.replace(/\D/g, "").slice(-9);
+
+    setDirectPayoutName(chosenName);
     setDirectPayoutPhone(cleanDigits);
     if (c.netPayout) {
       setDirectPayoutAmount(String(c.netPayout));
@@ -855,6 +873,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
           payoutClaimId: reviewingClaimId,
           channel: payoutChannel,
           overrideUnpaid: forceOverride,
+          selectedOperator: selectedPayoutOperator,
         }),
       });
       const body = await res.json();
@@ -3339,50 +3358,152 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                             {payoutPreview.beneficiaryName} ({payoutPreview.memberName})
                           </span>
                         </div>
-                        <div className="flex items-center justify-between bg-slate-50 rounded-lg p-2.5 border border-slate-200">
-                          <div>
-                            <span className="text-xs text-slate-500 font-medium block">{t("payoutAccountNameLabel")}</span>
-                            <span className="text-sm font-bold text-slate-900">{payoutPreview.payoutAccountName}</span>
+                        {/* Affichage clair des deux comptes (MTN & ORANGE) */}
+                        <div className="flex flex-col gap-2">
+                          <span className="text-xs font-bold text-slate-800">
+                            {lang === "fr" ? "Coordonnées de virement fournies par le membre :" : "Payout details submitted by member:"}
+                          </span>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            {/* CARTE MTN */}
+                            {(() => {
+                              const mtnNum = (payoutPreview.payoutMtnPhone || (detectMobileMoneyProvider(payoutPreview.payoutPhone) === "MTN" ? payoutPreview.payoutPhone : "")).replace(/\D/g, "").slice(-9);
+                              const mtnAcc = payoutPreview.payoutMtnName || payoutPreview.payoutAccountName;
+                              return (
+                                <div
+                                  onClick={() => setSelectedPayoutOperator("MTN")}
+                                  className={`rounded-xl border p-3 flex flex-col justify-between gap-2 cursor-pointer transition-all ${
+                                    selectedPayoutOperator === "MTN"
+                                      ? "border-amber-500 bg-amber-50/90 ring-2 ring-amber-400/40 shadow-xs"
+                                      : "border-slate-200 bg-slate-50/70 hover:bg-slate-100"
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="inline-flex items-center gap-1 rounded bg-[#FFCC00] px-2 py-0.5 text-[11px] font-bold text-black shadow-2xs">
+                                      MTN MoMo
+                                    </span>
+                                    <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                                      <input
+                                        type="radio"
+                                        name="payout-op-select"
+                                        checked={selectedPayoutOperator === "MTN"}
+                                        onChange={() => setSelectedPayoutOperator("MTN")}
+                                        className="accent-amber-500"
+                                      />
+                                      {selectedPayoutOperator === "MTN" ? (lang === "fr" ? "Sélectionné" : "Selected") : (lang === "fr" ? "Choisir" : "Select")}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-[11px] text-slate-500 block">Numéro MTN :</span>
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm font-bold font-numeric-data text-slate-900">
+                                        {mtnNum ? `+237 ${mtnNum}` : "Non spécifié"}
+                                      </span>
+                                      {mtnNum && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => handleCopy(mtnNum, `prev-mtn-phone-${c.id}`, e)}
+                                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100"
+                                        >
+                                          <span className="material-symbols-outlined text-[13px]">
+                                            {copiedKey === `prev-mtn-phone-${c.id}` ? "check" : "content_copy"}
+                                          </span>
+                                          {copiedKey === `prev-mtn-phone-${c.id}` ? t("copied") : t("copy")}
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <span className="text-[11px] text-slate-500 block">Nom sur le compte MTN :</span>
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs font-semibold text-slate-900 truncate">{mtnAcc}</span>
+                                      {mtnAcc && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => handleCopy(mtnAcc, `prev-mtn-name-${c.id}`, e)}
+                                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100"
+                                        >
+                                          <span className="material-symbols-outlined text-[13px]">
+                                            {copiedKey === `prev-mtn-name-${c.id}` ? "check" : "content_copy"}
+                                          </span>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+
+                            {/* CARTE ORANGE */}
+                            {(() => {
+                              const orangeNum = (payoutPreview.payoutOrangePhone || (detectMobileMoneyProvider(payoutPreview.payoutPhone) === "ORANGE" ? payoutPreview.payoutPhone : "")).replace(/\D/g, "").slice(-9);
+                              const orangeAcc = payoutPreview.payoutOrangeName || payoutPreview.payoutAccountName;
+                              return (
+                                <div
+                                  onClick={() => setSelectedPayoutOperator("ORANGE")}
+                                  className={`rounded-xl border p-3 flex flex-col justify-between gap-2 cursor-pointer transition-all ${
+                                    selectedPayoutOperator === "ORANGE"
+                                      ? "border-orange-500 bg-orange-50/90 ring-2 ring-orange-400/40 shadow-xs"
+                                      : "border-slate-200 bg-slate-50/70 hover:bg-slate-100"
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="inline-flex items-center gap-1 rounded bg-[#FF6600] px-2 py-0.5 text-[11px] font-bold text-white shadow-2xs">
+                                      Orange Money
+                                    </span>
+                                    <span className="text-xs font-bold text-slate-700 flex items-center gap-1">
+                                      <input
+                                        type="radio"
+                                        name="payout-op-select"
+                                        checked={selectedPayoutOperator === "ORANGE"}
+                                        onChange={() => setSelectedPayoutOperator("ORANGE")}
+                                        className="accent-orange-500"
+                                      />
+                                      {selectedPayoutOperator === "ORANGE" ? (lang === "fr" ? "Sélectionné" : "Selected") : (lang === "fr" ? "Choisir" : "Select")}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <span className="text-[11px] text-slate-500 block">Numéro Orange :</span>
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-sm font-bold font-numeric-data text-slate-900">
+                                        {orangeNum ? `+237 ${orangeNum}` : "Non spécifié"}
+                                      </span>
+                                      {orangeNum && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => handleCopy(orangeNum, `prev-orange-phone-${c.id}`, e)}
+                                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100"
+                                        >
+                                          <span className="material-symbols-outlined text-[13px]">
+                                            {copiedKey === `prev-orange-phone-${c.id}` ? "check" : "content_copy"}
+                                          </span>
+                                          {copiedKey === `prev-orange-phone-${c.id}` ? t("copied") : t("copy")}
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <span className="text-[11px] text-slate-500 block">Nom sur le compte Orange :</span>
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs font-semibold text-slate-900 truncate">{orangeAcc}</span>
+                                      {orangeAcc && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => handleCopy(orangeAcc, `prev-orange-name-${c.id}`, e)}
+                                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100"
+                                        >
+                                          <span className="material-symbols-outlined text-[13px]">
+                                            {copiedKey === `prev-orange-name-${c.id}` ? "check" : "content_copy"}
+                                          </span>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
-                          <button
-                            type="button"
-                            onClick={(e) => handleCopy(payoutPreview.payoutAccountName, `prev-name-${c.id}`, e)}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100"
-                          >
-                            <span className="material-symbols-outlined text-[13px]">
-                              {copiedKey === `prev-name-${c.id}` ? "check" : "content_copy"}
-                            </span>
-                            {copiedKey === `prev-name-${c.id}` ? t("copied") : t("copy")}
-                          </button>
                         </div>
-                        <div className="flex items-center justify-between bg-slate-50 rounded-lg p-2.5 border border-slate-200">
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs text-slate-500 font-medium">{t("payoutPhoneLabel")}</span>
-                              {(() => {
-                                const digits = (payoutPreview.payoutPhone || "").replace(/\D/g, "").replace(/^237/, "");
-                                const p = detectMobileMoneyProvider(digits);
-                                if (p === "MTN") return <span className="px-1 py-0.2 rounded text-[10px] font-bold bg-[#FFCC00] text-black">MTN</span>;
-                                if (p === "ORANGE") return <span className="px-1 py-0.2 rounded text-[10px] font-bold bg-[#FF6600] text-white">Orange</span>;
-                                return null;
-                              })()}
-                            </div>
-                            <span className="text-sm font-bold font-numeric-data text-slate-900">{payoutPreview.payoutPhone}</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              const digits = (payoutPreview.payoutPhone || "").replace(/\D/g, "").replace(/^237/, "");
-                              handleCopy(digits, `prev-phone-${c.id}`, e);
-                            }}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100"
-                          >
-                            <span className="material-symbols-outlined text-[13px]">
-                              {copiedKey === `prev-phone-${c.id}` ? "check" : "content_copy"}
-                            </span>
-                            {copiedKey === `prev-phone-${c.id}` ? t("copied") : t("copy")}
-                          </button>
-                        </div>
+
                         <div className="flex justify-between items-center pt-1 border-t border-slate-200">
                           <span className="font-label-sm text-label-sm text-on-surface-variant">{t("amountToSendLabel")}</span>
                           <span className="font-numeric-data text-lg font-bold text-primary">{formatXAF(payoutPreview.netPayout)}</span>
@@ -3443,53 +3564,63 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                               </div>
                               <p className="text-[11px] text-slate-600 leading-snug">
                                 {lang === "fr"
-                                  ? "Débit automatique de votre solde Fapshi vers le numéro du membre."
-                                  : "Automatic transfer from your Fapshi balance to the beneficiary."}
+                                  ? "Débit automatique de votre solde Fapshi vers le numéro sélectionné."
+                                  : "Automatic transfer from your Fapshi balance to the selected number."}
                               </p>
                             </button>
                           </div>
                         </div>
 
-                        {payoutChannel === "DIRECT" ? (
-                          <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 flex items-start gap-2">
-                            <span className="material-symbols-outlined text-[18px] text-emerald-700 flex-shrink-0 mt-0.5">verified</span>
-                            <div className="leading-relaxed">
-                              {lang === "fr" ? (
-                                <>
-                                  <strong>Virement hors Fapshi :</strong> Effectuez le transfert de{" "}
-                                  <span className="font-bold underline">{formatXAF(payoutPreview.netPayout)}</span> depuis votre téléphone
-                                  vers le <strong>{payoutPreview.payoutPhone}</strong> ({payoutPreview.payoutAccountName}). En validant ci-dessous,
-                                  vous confirmez que la personne a bien reçu ses fonds. Aucun compte Fapshi ne sera débité.
-                                </>
-                              ) : (
-                                <>
-                                  <strong>Direct transfer outside Fapshi:</strong> Send{" "}
-                                  <span className="font-bold underline">{formatXAF(payoutPreview.netPayout)}</span> from your phone to{" "}
-                                  <strong>{payoutPreview.payoutPhone}</strong> ({payoutPreview.payoutAccountName}). Validate below that funds were received.
-                                </>
-                              )}
+                        {(() => {
+                          const isOrange = selectedPayoutOperator === "ORANGE";
+                          const activePhone = isOrange
+                            ? (payoutPreview.payoutOrangePhone || payoutPreview.payoutPhone)
+                            : (payoutPreview.payoutMtnPhone || payoutPreview.payoutPhone);
+                          const activeName = isOrange
+                            ? (payoutPreview.payoutOrangeName || payoutPreview.payoutAccountName)
+                            : (payoutPreview.payoutMtnName || payoutPreview.payoutAccountName);
+
+                          return payoutChannel === "DIRECT" ? (
+                            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 flex items-start gap-2">
+                              <span className="material-symbols-outlined text-[18px] text-emerald-700 flex-shrink-0 mt-0.5">verified</span>
+                              <div className="leading-relaxed">
+                                {lang === "fr" ? (
+                                  <>
+                                    <strong>Virement hors Fapshi ({isOrange ? "Orange Money" : "MTN MoMo"}) :</strong> Effectuez le transfert de{" "}
+                                    <span className="font-bold underline">{formatXAF(payoutPreview.netPayout)}</span> depuis votre téléphone
+                                    vers le <strong>{activePhone}</strong> ({activeName}). En validant ci-dessous,
+                                    vous confirmez que la personne a bien reçu ses fonds. Aucun compte Fapshi ne sera débité.
+                                  </>
+                                ) : (
+                                  <>
+                                    <strong>Direct transfer outside Fapshi ({isOrange ? "Orange Money" : "MTN MoMo"}):</strong> Send{" "}
+                                    <span className="font-bold underline">{formatXAF(payoutPreview.netPayout)}</span> from your phone to{" "}
+                                    <strong>{activePhone}</strong> ({activeName}). Validate below that funds were received.
+                                  </>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ) : (
-                          <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-950 flex items-start gap-2">
-                            <span className="material-symbols-outlined text-[18px] text-blue-700 flex-shrink-0 mt-0.5">account_balance_wallet</span>
-                            <div className="leading-relaxed">
-                              {lang === "fr" ? (
-                                <>
-                                  <strong>Débit Fapshi :</strong> Le compte Fapshi Diva sera débité de{" "}
-                                  <span className="font-bold">{formatXAF(payoutPreview.netPayout)}</span> et transféré automatiquement vers le numéro{" "}
-                                  <strong>{payoutPreview.payoutPhone}</strong>.
-                                </>
-                              ) : (
-                                <>
-                                  <strong>Fapshi debit:</strong> The admin Fapshi balance will be debited{" "}
-                                  <span className="font-bold">{formatXAF(payoutPreview.netPayout)}</span> and sent automatically to{" "}
-                                  <strong>{payoutPreview.payoutPhone}</strong>.
-                                </>
-                              )}
+                          ) : (
+                            <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-950 flex items-start gap-2">
+                              <span className="material-symbols-outlined text-[18px] text-blue-700 flex-shrink-0 mt-0.5">account_balance_wallet</span>
+                              <div className="leading-relaxed">
+                                {lang === "fr" ? (
+                                  <>
+                                    <strong>Débit Fapshi vers {isOrange ? "Orange Money" : "MTN MoMo"} :</strong> Le compte Fapshi Diva sera débité de{" "}
+                                    <span className="font-bold">{formatXAF(payoutPreview.netPayout)}</span> et transféré automatiquement vers le numéro{" "}
+                                    <strong>{activePhone}</strong> ({activeName}).
+                                  </>
+                                ) : (
+                                  <>
+                                    <strong>Fapshi debit to {isOrange ? "Orange Money" : "MTN MoMo"}:</strong> The admin Fapshi balance will be debited{" "}
+                                    <span className="font-bold">{formatXAF(payoutPreview.netPayout)}</span> and sent automatically to{" "}
+                                    <strong>{activePhone}</strong> ({activeName}).
+                                  </>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          );
+                        })()}
 
                         <div className="flex flex-col gap-2 mt-1">
                           <button
@@ -3506,23 +3637,33 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                             ) : payoutChannel === "DIRECT" ? (
                               <>
                                 <span className="material-symbols-outlined text-[20px]">check_circle</span>
-                                <span>{lang === "fr" ? "Valider que la personne a reçu les fonds" : "Confirm funds received"}</span>
+                                <span>{lang === "fr" ? `Valider versement (${selectedPayoutOperator}) reçu` : `Confirm ${selectedPayoutOperator} payout received`}</span>
                               </>
                             ) : (
                               <>
                                 <span className="material-symbols-outlined text-[20px]">bolt</span>
-                                <span>{lang === "fr" ? "Transférer via Fapshi" : "Disburse via Fapshi"}</span>
+                                <span>{lang === "fr" ? `Transférer via Fapshi (${selectedPayoutOperator})` : `Disburse via Fapshi (${selectedPayoutOperator})`}</span>
                               </>
                             )}
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleFillIntoDirectPayout(c)}
-                            className="w-full border border-slate-300 bg-slate-50 text-slate-700 font-label-sm text-xs py-2 rounded-lg hover:bg-slate-100 flex items-center justify-center gap-1.5"
-                          >
-                            <span className="material-symbols-outlined text-[16px]">edit_note</span>
-                            <span>{t("fillInPayoutForm")}</span>
-                          </button>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleFillIntoDirectPayout(c, "MTN")}
+                              className="border border-amber-300 bg-amber-50/80 text-amber-950 font-label-sm text-xs py-2 rounded-lg hover:bg-amber-100 flex items-center justify-center gap-1 font-bold"
+                            >
+                              <span className="material-symbols-outlined text-[15px]">edit_note</span>
+                              <span>Remplir avec MTN</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleFillIntoDirectPayout(c, "ORANGE")}
+                              className="border border-orange-300 bg-orange-50/80 text-orange-950 font-label-sm text-xs py-2 rounded-lg hover:bg-orange-100 flex items-center justify-center gap-1 font-bold"
+                            >
+                              <span className="material-symbols-outlined text-[15px]">edit_note</span>
+                              <span>Remplir avec Orange</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )}

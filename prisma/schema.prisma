@@ -571,6 +571,10 @@ model Payout {
   /// actual transfer once this flow exists.
   payoutPhone        String
   payoutAccountName  String
+  payoutMtnPhone     String?
+  payoutMtnName      String?
+  payoutOrangePhone  String?
+  payoutOrangeName   String?
   detailsSubmittedAt DateTime     @default(now())
   /// All null until the admin actually executes the transfer.
   pot                Decimal?     @db.Decimal(12, 2)

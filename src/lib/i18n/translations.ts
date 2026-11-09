@@ -253,12 +253,12 @@ export const translations = {
     waDuplicateRefunded:
       "Hello, {name} 👋 Your payment was received twice for the same name. The second payment of {amount} has been automatically refunded.",
     waPayoutTurn:
-      "Hello, {name} 👋 🎉\n\nIt's your turn to receive the {cotisation} payout (position #{position})!\n\n💰 Total amount: {amount}\n📅 Estimated date: {date}\n\n👉 ACTION REQUIRED: Please log in and provide your Mobile Money or Orange Money account number and exact registered account name so the administrator can send your transfer.\n\nDIVA Asso Team",
+      "Hello, {name} 👋 🎉\n\nIt's your turn to receive the {cotisation} payout (position #{position})!\n\n💰 Total amount: {amount}\n📅 Estimated date: {date}\n\n👉 ACTION REQUIRED: Please log in and provide BOTH an MTN Mobile Money number and an Orange Money number (with the exact registered account name for each) so that DIVA Asso can send your transfer.\n\nDIVA Asso Team",
     payoutTurnNotifMessage:
-      "Hello, {name} 👋! It's your turn to receive the {cotisation} payout! 🎉 All members have contributed: please provide your phone number and Orange/MTN Money account name to receive your payout.",
+      "Hello, {name} 👋! It's your turn to receive the {cotisation} payout! 🎉 All members have contributed: please provide BOTH your MTN Mobile Money and Orange Money numbers with their respective account names to receive your payout.",
     payoutTurnBannerTitle: "It's your turn to receive the payout!",
     payoutTurnBannerDesc:
-      "To receive your payout, you must provide your Mobile Money or Orange Money account number (MTN / Orange) and the exact name on your account below. The administrator will process your transfer directly.",
+      "To receive your payout, you must provide BOTH an MTN Mobile Money number and an Orange Money number with the exact registered name on each account. DIVA Asso will process your payout.",
     copyAccountName: "Copy Name",
     copyAccountNumber: "Copy Number",
     nameCopied: "Account name copied!",
@@ -266,9 +266,20 @@ export const translations = {
     fillInPayoutForm: "Fill into payout form",
     openAndFillPayout: "Open & Fill Payout",
     payoutDetailsSubmittedNotice:
-      "Your payout details have been submitted to DIVA Asso (Name: {name}, Phone: {phone}). The transfer is being processed.",
+      "Your payout details have been submitted to DIVA Asso (MTN: {mtnPhone} - {mtnName} | Orange: {orangePhone} - {orangeName}). The transfer is being processed.",
     payoutTurnAlertPrompt:
-      "Action required: You must provide your Mobile Money / Orange Money account number and exact account name to receive your payout.",
+      "Action required: You must provide both your MTN and Orange Money account numbers with names to receive your payout.",
+    mtnSectionTitle: "MTN Mobile Money Account",
+    orangeSectionTitle: "Orange Money Account",
+    mtnPhoneLabel: "MTN Mobile Money Number",
+    orangePhoneLabel: "Orange Money Number",
+    mtnAccountNameLabel: "Account Holder Name (MTN)",
+    orangeAccountNameLabel: "Account Holder Name (Orange)",
+    bothAccountsRequiredNotice:
+      "Both MTN and Orange numbers with their respective account names are mandatory before submitting to DIVA Asso.",
+    invalidMtnNumber: "Please enter a valid MTN Mobile Money number (starts with 67x, 680-684, 650-654).",
+    invalidOrangeNumber: "Please enter a valid Orange Money number (starts with 69x, 685-689, 655-659).",
+    submitToDivaAsso: "Send to DIVA Asso",
     waPayoutReleased:
       "🎉 Payout released — DIVA Asso\n\nCongratulations {name} ({beneficiary})! Your payout of {amount} has been successfully sent to your Mobile Money / Orange Money account.",
     waPayoutReleasedWithDeduction:
@@ -1501,12 +1512,12 @@ export const translations = {
     waDuplicateRefunded:
       "Salut, {name} 👋 Votre paiement a été reçu deux fois pour le même nom. Le second paiement de {amount} a été automatiquement remboursé.",
     waPayoutTurn:
-      "Salut, {name} 👋 🎉\n\nC'est votre tour de bouffer la cagnotte de la cotisation {cotisation} (position n°{position}) !\n\n💰 Montant total : {amount}\n📅 Date de versement prévue : {date}\n\n👉 ACTION REQUISE : Veuillez renseigner votre numéro de téléphone et le nom du compte Orange/MTN Money pour recevoir votre virement.\n\nL'équipe DIVA Asso",
+      "Salut, {name} 👋 🎉\n\nC'est votre tour de bouffer la cagnotte de la cotisation {cotisation} (position n°{position}) !\n\n💰 Montant total : {amount}\n📅 Date de versement prévue : {date}\n\n👉 ACTION REQUISE : Veuillez vous connecter et fournir obligatoirement deux numéros : un compte MTN Mobile Money et un compte Orange Money (avec le nom exact enregistré sur chaque compte) pour que DIVA Asso effectue votre virement.\n\nL'équipe DIVA Asso",
     payoutTurnNotifMessage:
-      "Salut, {name} 👋 ! C'est à votre tour de bouffer la cagnotte de {cotisation} ! 🎉 Tous les membres ont cotisé : veuillez fournir votre numéro de téléphone et le nom du compte Orange/MTN Money pour recevoir votre virement.",
+      "Salut, {name} 👋 ! C'est à votre tour de bouffer la cagnotte de {cotisation} ! 🎉 Tous les membres ont cotisé : veuillez fournir obligatoirement vos deux numéros (un MTN et un Orange) avec les noms de chaque compte pour recevoir votre virement.",
     payoutTurnBannerTitle: "C'est votre tour de bouffer la cagnotte !",
     payoutTurnBannerDesc:
-      "Pour recevoir votre virement, vous devez impérativement renseigner ci-dessous votre numéro de compte Mobile Money ou Orange Money (au choix : MTN ou Orange) et le nom complet exact enregistré sur ce compte. L'administrateur effectuera directement votre versement sur votre compte.",
+      "Pour recevoir votre virement, vous devez obligatoirement renseigner ci-dessous vos deux numéros (un numéro MTN Mobile Money et un numéro Orange Money) avec le nom exact enregistré sur chaque compte. DIVA Asso effectuera directement votre versement.",
     copyAccountName: "Copier le nom",
     copyAccountNumber: "Copier le numéro",
     nameCopied: "Nom du compte copié !",
@@ -1514,9 +1525,20 @@ export const translations = {
     fillInPayoutForm: "Remplir dans le formulaire de virement",
     openAndFillPayout: "Ouvrir et remplir le virement",
     payoutDetailsSubmittedNotice:
-      "Vos coordonnées ont été transmises à DIVA Asso (Nom : {name}, Numéro : {phone}). Le virement est en cours de traitement.",
+      "Vos coordonnées ont été transmises à DIVA Asso (MTN : {mtnPhone} - {mtnName} | Orange : {orangePhone} - {orangeName}). Le virement est en cours de traitement.",
     payoutTurnAlertPrompt:
-      "Action requise : Vous devez fournir votre numéro de compte Mobile Money ou Orange Money et votre nom pour recevoir votre virement.",
+      "Action requise : Vous devez obligatoirement fournir vos deux numéros (MTN et Orange) avec leurs noms respectifs pour recevoir votre virement.",
+    mtnSectionTitle: "Compte MTN Mobile Money",
+    orangeSectionTitle: "Compte Orange Money",
+    mtnPhoneLabel: "Numéro MTN Mobile Money",
+    orangePhoneLabel: "Numéro Orange Money",
+    mtnAccountNameLabel: "Nom complet sur le compte MTN",
+    orangeAccountNameLabel: "Nom complet sur le compte Orange",
+    bothAccountsRequiredNotice:
+      "Les deux numéros (un MTN et un Orange) avec le nom de compte de chacun sont strictement obligatoires avant l'envoi à DIVA Asso.",
+    invalidMtnNumber: "Veuillez entrer un numéro MTN valide (commence par 67x, 680-684, 650-654).",
+    invalidOrangeNumber: "Veuillez entrer un numéro Orange valide (commence par 69x, 685-689, 655-659).",
+    submitToDivaAsso: "Envoyer à DIVA Asso",
     waPayoutReleased:
       "🎉 Versement effectué — DIVA Asso\n\nFélicitations {name} ({beneficiary}) ! Votre cagnotte de {amount} a été transférée avec succès sur votre compte Mobile Money / Orange Money.",
     waPayoutReleasedWithDeduction:

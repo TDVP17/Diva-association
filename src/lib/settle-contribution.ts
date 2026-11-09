@@ -179,8 +179,8 @@ export async function settleContribution(
           const benFirstName = benRawName.split(/\s+/)[0] || benRawName;
           const alertMsg =
             benLang === "fr"
-              ? `Salut, ${benFirstName} 👋 ! C'est à votre tour de bouffer la cagnotte de ${sessionLabel} ! 🎉 Tous les membres ont cotisé : veuillez fournir votre numéro de téléphone et le nom du compte Orange/MTN Money pour recevoir votre virement.`
-              : `Hello, ${benFirstName} 👋! It's your turn to receive the ${sessionLabel} payout! 🎉 All members have contributed: please provide your phone number and Orange/MTN Money account name to receive your payout.`;
+              ? `Salut, ${benFirstName} 👋 ! C'est à votre tour de bouffer la cagnotte de ${sessionLabel} ! 🎉 Tous les membres ont cotisé : veuillez fournir obligatoirement vos deux numéros (un MTN et un Orange) avec les noms de chaque compte pour que DIVA Asso effectue votre virement.`
+              : `Hello, ${benFirstName} 👋! It's your turn to receive the ${sessionLabel} payout! 🎉 All members have contributed: please provide BOTH your MTN Mobile Money and Orange Money numbers with their respective account names so DIVA Asso can process your transfer.`;
 
           await scheduleInAppNotifications({
             tontineSessionId: membership.tontineSessionId,

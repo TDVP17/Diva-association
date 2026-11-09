@@ -15,6 +15,10 @@ interface FoodRequestRow {
   memberName: string;
   payoutPhone: string;
   payoutAccountName: string;
+  payoutMtnPhone?: string | null;
+  payoutMtnName?: string | null;
+  payoutOrangePhone?: string | null;
+  payoutOrangeName?: string | null;
   tontineSessionId: string;
   contributionLabel: string;
   detailsSubmittedAt: string;
@@ -59,26 +63,27 @@ export function FoodRequestsClient({ lang }: { lang: Lang }) {
       ) : (
         <div className="flex flex-col gap-4">
           {rows.map((r) => {
-            const cleanDigits = (r.payoutPhone || "").replace(/\D/g, "").replace(/^237/, "");
-            const provider = detectMobileMoneyProvider(cleanDigits);
-            const isNameCopied = copiedKey === `name-${r.id}`;
-            const isPhoneCopied = copiedKey === `phone-${r.id}`;
+            const mtnDigits = (r.payoutMtnPhone || (detectMobileMoneyProvider(r.payoutPhone) === "MTN" ? r.payoutPhone : "")).replace(/\D/g, "").slice(-9);
+            const mtnName = r.payoutMtnName || r.payoutAccountName;
+
+            const orangeDigits = (r.payoutOrangePhone || (detectMobileMoneyProvider(r.payoutPhone) === "ORANGE" ? r.payoutPhone : "")).replace(/\D/g, "").slice(-9);
+            const orangeName = r.payoutOrangeName || r.payoutAccountName;
 
             return (
               <div
                 key={r.id}
-                className="rounded-xl p-4 flex flex-col gap-3 border-2 border-error/40 bg-error-container/15 hover:bg-error-container/20 transition-all shadow-xs"
+                className="rounded-xl p-4 flex flex-col gap-3.5 border-2 border-emerald-600/40 bg-emerald-50/20 hover:bg-emerald-50/30 transition-all shadow-xs"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 text-error font-label-sm text-label-sm font-bold mb-1">
-                      <span className="material-symbols-outlined text-[18px]">warning</span>
-                      {t("foodTurnActionRequired")}
+                    <div className="flex items-center gap-2 text-emerald-800 font-label-sm text-label-sm font-bold mb-1">
+                      <span className="material-symbols-outlined text-[18px]">verified</span>
+                      <span>{lang === "fr" ? "Coordonnées de virement fournies (MTN & Orange)" : "Payout details submitted (MTN & Orange)"}</span>
                     </div>
-                    <p className="font-title-md text-title-md text-on-surface truncate font-semibold">
+                    <p className="font-title-md text-title-md text-slate-900 truncate font-semibold">
                       {r.beneficiaryName} ({r.memberName})
                     </p>
-                    <p className="font-label-sm text-label-sm text-on-surface-variant truncate mt-0.5">
+                    <p className="font-label-sm text-label-sm text-slate-500 truncate mt-0.5">
                       {r.contributionLabel}
                     </p>
                   </div>
@@ -93,65 +98,109 @@ export function FoodRequestsClient({ lang }: { lang: Lang }) {
                   </span>
                 </div>
 
-                {/* Box coordonnees Fapshi avec boutons copier */}
-                <div className="rounded-lg border border-slate-200 bg-white p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-xs">
-                  <div className="flex flex-col gap-1.5 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap text-sm">
-                      <span className="text-slate-500 font-medium">{t("payoutAccountNameLabel")}:</span>
-                      <span className="font-bold text-slate-900 truncate">{r.payoutAccountName}</span>
-                      <button
-                        onClick={(e) => handleCopy(r.payoutAccountName, `name-${r.id}`, e)}
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold transition-colors ${
-                          isNameCopied
-                            ? "bg-emerald-600 text-white"
-                            : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                        }`}
-                        title={t("copyAccountName")}
-                      >
-                        <span className="material-symbols-outlined text-[14px]">
-                          {isNameCopied ? "check" : "content_copy"}
+                {/* Box des deux numéros (MTN & ORANGE) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* COMPTE MTN */}
+                  <div className="rounded-xl border border-amber-300 bg-amber-50/60 p-3 flex flex-col justify-between gap-2.5 shadow-2xs">
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex items-center gap-1 rounded bg-[#FFCC00] px-2 py-0.5 text-[11px] font-bold text-black shadow-2xs">
+                          MTN Mobile Money
                         </span>
-                        {isNameCopied ? t("copied") : t("copyAccountName")}
-                      </button>
+                        <button
+                          onClick={(e) => handleCopy(mtnDigits, `mtn-phone-${r.id}`, e)}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-white border border-amber-300 text-slate-700 hover:bg-amber-100"
+                        >
+                          <span className="material-symbols-outlined text-[13px]">
+                            {copiedKey === `mtn-phone-${r.id}` ? "check" : "content_copy"}
+                          </span>
+                          {copiedKey === `mtn-phone-${r.id}` ? t("copied") : t("copy")}
+                        </button>
+                      </div>
+
+                      <div className="text-sm">
+                        <span className="text-slate-500 text-xs block">Numéro :</span>
+                        <span className="font-bold font-numeric-data text-slate-900">{mtnDigits ? `+237 ${mtnDigits}` : "Non spécifié"}</span>
+                      </div>
+
+                      <div className="text-sm">
+                        <span className="text-slate-500 text-xs block">Nom du compte :</span>
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-semibold text-slate-900 truncate">{mtnName || "Non spécifié"}</span>
+                          {mtnName && (
+                            <button
+                              onClick={(e) => handleCopy(mtnName, `mtn-name-${r.id}`, e)}
+                              className="text-slate-500 hover:text-slate-800 p-0.5"
+                              title={t("copyAccountName")}
+                            >
+                              <span className="material-symbols-outlined text-[15px]">
+                                {copiedKey === `mtn-name-${r.id}` ? "check" : "content_copy"}
+                              </span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-2 flex-wrap text-sm">
-                      <span className="text-slate-500 font-medium">{t("payoutPhoneLabel")}:</span>
-                      <span className="font-bold font-numeric-data text-slate-900">{r.payoutPhone}</span>
-                      {provider === "MTN" && (
-                        <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[11px] font-bold bg-[#FFCC00] text-black">
-                          MTN MoMo
-                        </span>
-                      )}
-                      {provider === "ORANGE" && (
-                        <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[11px] font-bold bg-[#FF6600] text-white">
-                          Orange Money
-                        </span>
-                      )}
-                      <button
-                        onClick={(e) => handleCopy(cleanDigits, `phone-${r.id}`, e)}
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold transition-colors ${
-                          isPhoneCopied
-                            ? "bg-emerald-600 text-white"
-                            : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                        }`}
-                        title={t("copyAccountNumber")}
-                      >
-                        <span className="material-symbols-outlined text-[14px]">
-                          {isPhoneCopied ? "check" : "content_copy"}
-                        </span>
-                        {isPhoneCopied ? t("copied") : t("copyAccountNumber")}
-                      </button>
-                    </div>
+                    <Link
+                      href={`/admin/contributions/${r.tontineSessionId}?tab=foodTurn&fillSlot=${r.membershipSlotId ?? ""}&fillName=${encodeURIComponent(mtnName)}&fillPhone=${encodeURIComponent(mtnDigits)}`}
+                      className="w-full bg-[#FFCC00] hover:bg-[#e6b800] text-black font-label-sm text-xs py-2 rounded-lg flex items-center justify-center gap-1.5 font-bold transition-colors shadow-2xs"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">send_money</span>
+                      <span>{lang === "fr" ? "Payer via MTN" : "Pay with MTN"}</span>
+                    </Link>
                   </div>
 
-                  <Link
-                    href={`/admin/contributions/${r.tontineSessionId}?tab=foodTurn&fillSlot=${r.membershipSlotId ?? ""}&fillName=${encodeURIComponent(r.payoutAccountName)}&fillPhone=${encodeURIComponent(cleanDigits)}`}
-                    className="self-stretch sm:self-center bg-primary text-on-primary font-label-sm text-label-sm px-3.5 py-2 rounded-lg hover:opacity-90 flex items-center justify-center gap-1.5 transition-opacity whitespace-nowrap shadow-xs"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">send_money</span>
-                    <span>{t("openAndFillPayout")}</span>
-                  </Link>
+                  {/* COMPTE ORANGE */}
+                  <div className="rounded-xl border border-orange-300 bg-orange-50/60 p-3 flex flex-col justify-between gap-2.5 shadow-2xs">
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex items-center gap-1 rounded bg-[#FF6600] px-2 py-0.5 text-[11px] font-bold text-white shadow-2xs">
+                          Orange Money
+                        </span>
+                        <button
+                          onClick={(e) => handleCopy(orangeDigits, `orange-phone-${r.id}`, e)}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-white border border-orange-300 text-slate-700 hover:bg-orange-100"
+                        >
+                          <span className="material-symbols-outlined text-[13px]">
+                            {copiedKey === `orange-phone-${r.id}` ? "check" : "content_copy"}
+                          </span>
+                          {copiedKey === `orange-phone-${r.id}` ? t("copied") : t("copy")}
+                        </button>
+                      </div>
+
+                      <div className="text-sm">
+                        <span className="text-slate-500 text-xs block">Numéro :</span>
+                        <span className="font-bold font-numeric-data text-slate-900">{orangeDigits ? `+237 ${orangeDigits}` : "Non spécifié"}</span>
+                      </div>
+
+                      <div className="text-sm">
+                        <span className="text-slate-500 text-xs block">Nom du compte :</span>
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="font-semibold text-slate-900 truncate">{orangeName || "Non spécifié"}</span>
+                          {orangeName && (
+                            <button
+                              onClick={(e) => handleCopy(orangeName, `orange-name-${r.id}`, e)}
+                              className="text-slate-500 hover:text-slate-800 p-0.5"
+                              title={t("copyAccountName")}
+                            >
+                              <span className="material-symbols-outlined text-[15px]">
+                                {copiedKey === `orange-name-${r.id}` ? "check" : "content_copy"}
+                              </span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <Link
+                      href={`/admin/contributions/${r.tontineSessionId}?tab=foodTurn&fillSlot=${r.membershipSlotId ?? ""}&fillName=${encodeURIComponent(orangeName)}&fillPhone=${encodeURIComponent(orangeDigits)}`}
+                      className="w-full bg-[#FF6600] hover:bg-[#e65c00] text-white font-label-sm text-xs py-2 rounded-lg flex items-center justify-center gap-1.5 font-bold transition-colors shadow-2xs"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">send_money</span>
+                      <span>{lang === "fr" ? "Payer via Orange" : "Pay with Orange"}</span>
+                    </Link>
+                  </div>
                 </div>
               </div>
             );

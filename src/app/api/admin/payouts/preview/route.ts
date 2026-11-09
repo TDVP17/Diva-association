@@ -41,5 +41,9 @@ export async function GET(request: Request) {
     memberName: slot.membership.user.name,
     payoutPhone: claim.payoutPhone,
     payoutAccountName: claim.payoutAccountName,
+    payoutMtnPhone: claim.payoutMtnPhone || (claim.payoutPhone?.startsWith("67") || claim.payoutPhone?.startsWith("68") || claim.payoutPhone?.startsWith("65") ? claim.payoutPhone : null),
+    payoutMtnName: claim.payoutMtnName || claim.payoutAccountName,
+    payoutOrangePhone: claim.payoutOrangePhone || (claim.payoutPhone?.startsWith("69") ? claim.payoutPhone : null),
+    payoutOrangeName: claim.payoutOrangeName || claim.payoutAccountName,
   });
 }

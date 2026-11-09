@@ -5,11 +5,16 @@ import { prisma } from "@/lib/prisma";
 import { getDesignatedSlot } from "@/lib/round-robin-lock";
 import { getSessionActiveRoundAndDueDate } from "@/lib/tontine-engine";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
+import { detectMobileMoneyProvider } from "@/lib/mobile-money-provider";
 
 const bodySchema = z.object({
   membershipSlotId: z.string().min(1),
-  phone: z.string().trim().min(6).max(20),
-  accountName: z.string().trim().min(1).max(200),
+  mtnPhone: z.string().trim().min(9).max(20).optional(),
+  mtnAccountName: z.string().trim().min(1).max(200).optional(),
+  orangePhone: z.string().trim().min(9).max(20).optional(),
+  orangeAccountName: z.string().trim().min(1).max(200).optional(),
+  phone: z.string().trim().optional(),
+  accountName: z.string().trim().optional(),
 });
 
 export async function POST(request: Request) {
@@ -22,7 +27,47 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
-  const { membershipSlotId, phone, accountName } = parsed.data;
+  const { membershipSlotId } = parsed.data;
+
+  // Extract MTN and Orange details, supporting both new dual format and legacy fallback
+  let cleanMtn = (parsed.data.mtnPhone || "").replace(/\D/g, "").slice(-9);
+  let mtnName = (parsed.data.mtnAccountName || "").trim();
+  let cleanOrange = (parsed.data.orangePhone || "").replace(/\D/g, "").slice(-9);
+  let orangeName = (parsed.data.orangeAccountName || "").trim();
+
+  // If user used legacy single phone fields, attempt to map
+  if ((!cleanMtn || !cleanOrange) && parsed.data.phone && parsed.data.accountName) {
+    const singleClean = parsed.data.phone.replace(/\D/g, "").slice(-9);
+    const prov = detectMobileMoneyProvider(singleClean);
+    if (prov === "MTN" && !cleanMtn) {
+      cleanMtn = singleClean;
+      mtnName = mtnName || parsed.data.accountName.trim();
+    } else if (prov === "ORANGE" && !cleanOrange) {
+      cleanOrange = singleClean;
+      orangeName = orangeName || parsed.data.accountName.trim();
+    }
+  }
+
+  if (!cleanMtn || !cleanOrange || !mtnName || !orangeName) {
+    return NextResponse.json(
+      { error: "Vous devez obligatoirement fournir deux numéros (un MTN et un Orange) avec les noms exacts de compte pour chacun avant de soumettre à DIVA Asso." },
+      { status: 400 },
+    );
+  }
+
+  if (detectMobileMoneyProvider(cleanMtn) !== "MTN") {
+    return NextResponse.json(
+      { error: "Le numéro MTN fourni n'est pas un numéro MTN valide (commence par 67x, 680-684, 650-654)." },
+      { status: 400 },
+    );
+  }
+
+  if (detectMobileMoneyProvider(cleanOrange) !== "ORANGE") {
+    return NextResponse.json(
+      { error: "Le numéro Orange fourni n'est pas un numéro Orange valide (commence par 69x, 685-689, 655-659)." },
+      { status: 400 },
+    );
+  }
 
   const slot = await prisma.membershipSlot.findUnique({
     where: { id: membershipSlotId },
@@ -125,16 +170,24 @@ export async function POST(request: Request) {
       },
       update: {
         membershipSlotId: slot.id,
-        payoutPhone: phone,
-        payoutAccountName: accountName,
+        payoutPhone: cleanMtn,
+        payoutAccountName: mtnName,
+        payoutMtnPhone: cleanMtn,
+        payoutMtnName: mtnName,
+        payoutOrangePhone: cleanOrange,
+        payoutOrangeName: orangeName,
         detailsSubmittedAt: new Date(),
       },
       create: {
         tontineSessionId: slot.membership.tontineSessionId,
         membershipSlotId: slot.id,
         dueDate,
-        payoutPhone: phone,
-        payoutAccountName: accountName,
+        payoutPhone: cleanMtn,
+        payoutAccountName: mtnName,
+        payoutMtnPhone: cleanMtn,
+        payoutMtnName: mtnName,
+        payoutOrangePhone: cleanOrange,
+        payoutOrangeName: orangeName,
       },
     });
 
@@ -146,8 +199,7 @@ export async function POST(request: Request) {
         recipients: [
           {
             userId: session.user.id,
-            message:
-              "Vos coordonnées de paiement ont été soumises. L'administrateur traitera votre virement sous peu.",
+            message: `Vos coordonnées de paiement (MTN : ${cleanMtn} - ${mtnName} | Orange : ${cleanOrange} - ${orangeName}) ont été soumises à DIVA Asso. Le virement sera traité sous peu.`,
             actionUrl: `/sessions/${slot.membership.tontineSessionId}`,
           },
         ],

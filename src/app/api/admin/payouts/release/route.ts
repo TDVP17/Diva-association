@@ -19,6 +19,9 @@ const bodySchema = z.object({
   payoutClaimId: z.string().min(1),
   channel: z.enum(["FAPSHI", "DIRECT"]).default("FAPSHI"),
   overrideUnpaid: z.boolean().optional(),
+  selectedOperator: z.enum(["MTN", "ORANGE"]).optional(),
+  selectedPhone: z.string().optional(),
+  selectedAccountName: z.string().optional(),
 });
 
 export async function POST(request: Request) {
@@ -88,11 +91,28 @@ export async function POST(request: Request) {
     claim.dueDate,
   );
 
-  const rawPhone = (claim.payoutPhone || "").replace(/\D/g, "");
+  let targetPhone = claim.payoutPhone;
+  let targetName = claim.payoutAccountName;
+
+  if (parsed.data.selectedOperator === "ORANGE") {
+    targetPhone = claim.payoutOrangePhone || claim.payoutPhone;
+    targetName = claim.payoutOrangeName || claim.payoutAccountName;
+  } else if (parsed.data.selectedOperator === "MTN") {
+    targetPhone = claim.payoutMtnPhone || claim.payoutPhone;
+    targetName = claim.payoutMtnName || claim.payoutAccountName;
+  }
+  if (parsed.data.selectedPhone) {
+    targetPhone = parsed.data.selectedPhone;
+  }
+  if (parsed.data.selectedAccountName) {
+    targetName = parsed.data.selectedAccountName;
+  }
+
+  const rawPhone = (targetPhone || "").replace(/\D/g, "");
   const normalizedPhone = rawPhone.startsWith("237") && rawPhone.length === 12 ? rawPhone.slice(3) : rawPhone;
   const provider = detectMobileMoneyProvider(normalizedPhone);
   const medium = provider ? fapshiMediumFor(provider) : undefined;
-  const payoutName = (claim.payoutAccountName || slot.beneficiaryName).trim();
+  const payoutName = (targetName || slot.beneficiaryName).trim();
 
   let fapshiResult: { transId: string };
   if (channel === "FAPSHI") {
@@ -162,6 +182,8 @@ export async function POST(request: Request) {
         pot,
         deducted,
         netPayout,
+        payoutPhone: normalizedPhone,
+        payoutAccountName: payoutName,
         fapshiTransId: fapshiResult.transId,
         releasedByAdminId: admin.user.id,
         releasedAt: new Date(),
