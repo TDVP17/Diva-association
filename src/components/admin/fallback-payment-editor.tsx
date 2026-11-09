@@ -29,6 +29,21 @@ export function FallbackPaymentEditor({
   const [mtnBeneficiaryName, setMtnBeneficiaryName] = useState(
     initialConfig?.mtnBeneficiaryName ?? "",
   );
+
+  // Suspension des opérateurs
+  const [isOrangeSuspended, setIsOrangeSuspended] = useState<boolean>(
+    initialConfig?.isOrangeSuspended ?? false,
+  );
+  const [orangeSuspendedReason, setOrangeSuspendedReason] = useState(
+    initialConfig?.orangeSuspendedReason ?? "",
+  );
+  const [isMtnSuspended, setIsMtnSuspended] = useState<boolean>(
+    initialConfig?.isMtnSuspended ?? false,
+  );
+  const [mtnSuspendedReason, setMtnSuspendedReason] = useState(
+    initialConfig?.mtnSuspendedReason ?? "",
+  );
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
@@ -45,6 +60,10 @@ export function FallbackPaymentEditor({
         setOrangeBeneficiaryName(data.orangeBeneficiaryName ?? "");
         setMtnUssdCode(data.mtnUssdCode ?? "");
         setMtnBeneficiaryName(data.mtnBeneficiaryName ?? "");
+        setIsOrangeSuspended(data.isOrangeSuspended ?? false);
+        setOrangeSuspendedReason(data.orangeSuspendedReason ?? "");
+        setIsMtnSuspended(data.isMtnSuspended ?? false);
+        setMtnSuspendedReason(data.mtnSuspendedReason ?? "");
       })
       .catch(() => {});
     return () => {
@@ -67,6 +86,10 @@ export function FallbackPaymentEditor({
           orangeBeneficiaryName,
           mtnUssdCode,
           mtnBeneficiaryName,
+          isOrangeSuspended,
+          orangeSuspendedReason,
+          isMtnSuspended,
+          mtnSuspendedReason,
         }),
       });
       const body = await res.json().catch(() => null);
@@ -90,8 +113,143 @@ export function FallbackPaymentEditor({
   const mtnPreview2 = formatMerchantUssdCode(mtnUssdCode, perSlot * 2, "MTN");
 
   return (
-    <form onSubmit={handleSave} className="flex flex-col gap-4">
-      {/* Toggle Activer / Désactiver le code marchand */}
+    <form onSubmit={handleSave} className="flex flex-col gap-5">
+      {/* SECTION 1 : SUSPENSION TEMPORAIRE DES OPÉRATEURS (ORANGE / MTN) */}
+      <div className="p-4 rounded-2xl border-2 border-red-500/30 bg-red-50/20 flex flex-col gap-4 shadow-xs">
+        <div className="flex items-start gap-2.5">
+          <span className="material-symbols-outlined text-red-600 text-2xl flex-shrink-0 mt-0.5">pause_circle</span>
+          <div>
+            <h4 className="font-bold text-sm text-slate-900">
+              {lang === "fr" ? "Suspension temporaire d'un opérateur (Orange / MTN)" : "Temporary operator suspension (Orange / MTN)"}
+            </h4>
+            <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+              {lang === "fr"
+                ? "Activez la suspension d'un opérateur si ses paiements sont en panne ou indisponibles. Lorsqu'un membre entre un numéro de cet opérateur, une alerte rouge affichera votre message et le paiement passera obligatoirement via l'opérateur opposé."
+                : "Suspend an operator when down. Members entering that operator's number will see your red alert message and will be required to use the opposite operator."}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* SUSPENSION ORANGE MONEY */}
+          <div className={`p-3.5 rounded-xl border-2 transition-all flex flex-col gap-3 ${
+            isOrangeSuspended
+              ? "border-red-500 bg-red-50/80 shadow-xs"
+              : "border-orange-200 bg-white"
+          }`}>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded font-bold text-[11px] bg-[#FF6600] text-white">
+                  Orange Money
+                </span>
+                <span className="text-xs font-bold text-slate-900">
+                  {lang === "fr" ? "Suspendre Orange" : "Suspend Orange"}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsOrangeSuspended(!isOrangeSuspended)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  isOrangeSuspended ? "bg-red-600" : "bg-slate-300"
+                }`}
+                role="switch"
+                aria-checked={isOrangeSuspended}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    isOrangeSuspended ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {isOrangeSuspended && (
+              <div className="flex flex-col gap-1.5 animate-fadeIn">
+                <label className="text-[11px] font-bold text-red-950 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[14px] text-red-600">notification_important</span>
+                  {lang === "fr" ? "Message d'alerte rouge affiché aux membres :" : "Red alert message shown to members:"}
+                </label>
+                <textarea
+                  rows={2}
+                  value={orangeSuspendedReason}
+                  onChange={(e) => setOrangeSuspendedReason(e.target.value)}
+                  placeholder={
+                    lang === "fr"
+                      ? "Ex: Les paiements via Orange Money sont indisponibles pour le moment (Jusqu'au 25 Novembre). Veuillez payer avec MTN Mobile Money."
+                      : "e.g. Orange Money payments are temporarily unavailable. Please pay with MTN Mobile Money."
+                  }
+                  className="w-full rounded-lg border border-red-300 bg-white p-2 text-xs text-slate-900 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                />
+                <span className="text-[10px] text-red-700 italic">
+                  {lang === "fr"
+                    ? "Si le membre entre un 69X, ce message s'affiche en rouge et le paiement Orange est bloqué."
+                    : "If member enters an Orange number, this message is shown and Orange payment is blocked."}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* SUSPENSION MTN MOBILE MONEY */}
+          <div className={`p-3.5 rounded-xl border-2 transition-all flex flex-col gap-3 ${
+            isMtnSuspended
+              ? "border-red-500 bg-red-50/80 shadow-xs"
+              : "border-amber-200 bg-white"
+          }`}>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded font-bold text-[11px] bg-yellow-400 text-slate-950">
+                  MTN MoMo
+                </span>
+                <span className="text-xs font-bold text-slate-900">
+                  {lang === "fr" ? "Suspendre MTN" : "Suspend MTN"}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMtnSuspended(!isMtnSuspended)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  isMtnSuspended ? "bg-red-600" : "bg-slate-300"
+                }`}
+                role="switch"
+                aria-checked={isMtnSuspended}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    isMtnSuspended ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {isMtnSuspended && (
+              <div className="flex flex-col gap-1.5 animate-fadeIn">
+                <label className="text-[11px] font-bold text-red-950 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[14px] text-red-600">notification_important</span>
+                  {lang === "fr" ? "Message d'alerte rouge affiché aux membres :" : "Red alert message shown to members:"}
+                </label>
+                <textarea
+                  rows={2}
+                  value={mtnSuspendedReason}
+                  onChange={(e) => setMtnSuspendedReason(e.target.value)}
+                  placeholder={
+                    lang === "fr"
+                      ? "Ex: Les paiements via MTN Mobile Money sont indisponibles pour le moment. Veuillez effectuer votre paiement avec Orange Money."
+                      : "e.g. MTN Mobile Money payments are temporarily unavailable. Please pay with Orange Money."
+                  }
+                  className="w-full rounded-lg border border-red-300 bg-white p-2 text-xs text-slate-900 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                />
+                <span className="text-[10px] text-red-700 italic">
+                  {lang === "fr"
+                    ? "Si le membre entre un 67X, ce message s'affiche en rouge et le paiement MTN est bloqué."
+                    : "If member enters an MTN number, this message is shown and MTN payment is blocked."}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* SECTION 2 : CODE MARCHAND DE SECOURS (USSD FALLBACK) */}
       <div className="p-3.5 rounded-xl border border-outline-variant bg-surface-container-lowest flex items-center justify-between gap-3 shadow-2xs">
         <div>
           <span className="font-bold text-sm text-on-surface block">
@@ -100,11 +258,11 @@ export function FallbackPaymentEditor({
           <span className="text-xs text-on-surface-variant block mt-0.5">
             {isEnabled
               ? lang === "fr"
-                ? "Actif : En cas de défaillance réseau, les membres verront les codes marchands ci-dessous."
-                : "Active: When auto-payment fails, members will see the merchant codes below."
+                ? "Actif : En cas de défaillance réseau persistante, les membres verront les codes marchands ci-dessous."
+                : "Active: When auto-payment fails repeatedly, members will see the merchant codes below."
               : lang === "fr"
-                ? "Désactivé : En cas d'échec, le membre est invité à réessayer ou utiliser l'opérateur opposé."
-                : "Disabled: When auto-payment fails, member is asked to retry or use opposing operator."}
+                ? "Désactivé : En cas d'échec, le membre est invité à vérifier son solde, utiliser l'opérateur opposé ou réessayer plus tard."
+                : "Disabled: When auto-payment fails, member is asked to check balance, use opposing operator or retry later."}
           </span>
         </div>
         <button
@@ -240,7 +398,7 @@ export function FallbackPaymentEditor({
       <button
         type="submit"
         disabled={saving}
-        className="py-2.5 px-5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-60 self-start"
+        className="py-2.5 px-5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-60 self-start cursor-pointer"
       >
         {saving ? t("savingEllipsis") : t("saveChanges")}
       </button>

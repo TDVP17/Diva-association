@@ -14,6 +14,10 @@ const updateSchema = z.object({
   orangeBeneficiaryName: z.string().max(160).optional().default(""),
   mtnUssdCode: z.string().max(120).optional().default(""),
   mtnBeneficiaryName: z.string().max(160).optional().default(""),
+  isOrangeSuspended: z.boolean().optional().default(false),
+  orangeSuspendedReason: z.string().max(300).optional().default(""),
+  isMtnSuspended: z.boolean().optional().default(false),
+  mtnSuspendedReason: z.string().max(300).optional().default(""),
 });
 
 export async function GET() {
@@ -24,10 +28,15 @@ export async function GET() {
     console.error("[fallback-config GET] unexpected error:", err);
     return NextResponse.json(
       {
+        isEnabled: true,
         orangeUssdCode: "",
         orangeBeneficiaryName: "",
         mtnUssdCode: "",
         mtnBeneficiaryName: "",
+        isOrangeSuspended: false,
+        orangeSuspendedReason: "",
+        isMtnSuspended: false,
+        mtnSuspendedReason: "",
       },
       { status: 200 },
     );

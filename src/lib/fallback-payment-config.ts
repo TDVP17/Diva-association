@@ -17,6 +17,10 @@ export async function getFallbackPaymentConfig(): Promise<FallbackPaymentConfigD
     orangeBeneficiaryName: row.orangeBeneficiaryName ?? "",
     mtnUssdCode: row.mtnUssdCode ?? "",
     mtnBeneficiaryName: row.mtnBeneficiaryName ?? "",
+    isOrangeSuspended: row.isOrangeSuspended ?? false,
+    orangeSuspendedReason: row.orangeSuspendedReason ?? "",
+    isMtnSuspended: row.isMtnSuspended ?? false,
+    mtnSuspendedReason: row.mtnSuspendedReason ?? "",
   };
 }
 
@@ -31,6 +35,10 @@ export async function setFallbackPaymentConfig(
     orangeBeneficiaryName: (data.orangeBeneficiaryName ?? "").trim(),
     mtnUssdCode: (data.mtnUssdCode ?? "").trim(),
     mtnBeneficiaryName: (data.mtnBeneficiaryName ?? "").trim(),
+    isOrangeSuspended: Boolean(data.isOrangeSuspended),
+    orangeSuspendedReason: (data.orangeSuspendedReason ?? "").trim(),
+    isMtnSuspended: Boolean(data.isMtnSuspended),
+    mtnSuspendedReason: (data.mtnSuspendedReason ?? "").trim(),
   };
 
   const saved = await prisma.fallbackPaymentConfig.upsert({
@@ -52,5 +60,9 @@ export async function setFallbackPaymentConfig(
     orangeBeneficiaryName: saved.orangeBeneficiaryName,
     mtnUssdCode: saved.mtnUssdCode,
     mtnBeneficiaryName: saved.mtnBeneficiaryName,
+    isOrangeSuspended: saved.isOrangeSuspended,
+    orangeSuspendedReason: saved.orangeSuspendedReason,
+    isMtnSuspended: saved.isMtnSuspended,
+    mtnSuspendedReason: saved.mtnSuspendedReason,
   };
 }

@@ -48,26 +48,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "This contribution is already paid" }, { status: 409 });
     }
 
-    const hasSubmittedProof = Boolean(
-      existing?.proofImageUrl || (existing?.proofImageUrls && existing.proofImageUrls.length > 0),
-    );
-    if (!hasSubmittedProof) {
-      return NextResponse.json(
-        {
-          error:
-            "Le cochage manuel par l'admin est uniquement autorisé lorsqu'un membre a envoyé une preuve de paiement suite à un problème réseau.",
-        },
-        { status: 400 },
-      );
-    }
-
-    const contribution = await prisma.contribution.update({
-      where: { id: existing!.id },
-      data: {
+    const contribution = await prisma.contribution.upsert({
+      where: { membershipSlotId_dueDate: { membershipSlotId, dueDate } },
+      create: {
+        membershipSlotId,
+        dueDate,
         amountPaid: amount,
         feePaid: fee,
+        finePaid: 0,
+        status: "PAID",
+        paidAt: new Date(),
         recordedByAdminId: admin.user.id,
-        paidByUserId: existing!.paidByUserId ?? slot.membership.userId,
+        paidByUserId: slot.membership.userId,
+      },
+      update: {
+        amountPaid: amount,
+        feePaid: fee,
+        status: "PAID",
+        paidAt: new Date(),
+        recordedByAdminId: admin.user.id,
+        paidByUserId: existing?.paidByUserId ?? slot.membership.userId,
         failureReason: null,
       },
       include: {

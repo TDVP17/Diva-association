@@ -119,6 +119,18 @@ export function PaymentConfirmDialog({
   const [canManageSavedMethods, setCanManageSavedMethods] = useState(false);
   const [selectedMethodId, setSelectedMethodId] = useState<string>("new");
   const [saveNewNumber, setSaveNewNumber] = useState(false);
+  const [fallbackConfig, setFallbackConfig] = useState<{
+    isEnabled: boolean;
+    orangeUssdCode: string;
+    orangeBeneficiaryName: string;
+    mtnUssdCode: string;
+    mtnBeneficiaryName: string;
+    isOrangeSuspended?: boolean;
+    orangeSuspendedReason?: string;
+    isMtnSuspended?: boolean;
+    mtnSuspendedReason?: string;
+  } | null>(null);
+  const [showFallbackProof, setShowFallbackProof] = useState(false);
   // The phone actually sent to the payment endpoint — distinct from the
   // `phone` input state, which stays empty when a saved method (not the
   // free-text field) is what's being used.
@@ -142,6 +154,14 @@ export function PaymentConfirmDialog({
       .catch(() => {
         if (!cancelled) setSavedMethods([]);
       });
+
+    fetch("/api/payments/fallback-config")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setFallbackConfig(data);
+      })
+      .catch(() => {});
+
     return () => {
       cancelled = true;
     };
@@ -161,6 +181,20 @@ export function PaymentConfirmDialog({
     : getOperatorInfo(phone, lang);
 
   const detectedProvider = operatorInfo.provider;
+  const isOrangeSuspended = detectedProvider === "ORANGE" && Boolean(fallbackConfig?.isOrangeSuspended);
+  const isMtnSuspended = detectedProvider === "MTN" && Boolean(fallbackConfig?.isMtnSuspended);
+  const isCurrentOperatorSuspended = isOrangeSuspended || isMtnSuspended;
+  const suspendedReason = isOrangeSuspended
+    ? (fallbackConfig?.orangeSuspendedReason?.trim() ||
+        (lang === "fr"
+          ? "Les paiements via Orange Money sont indisponibles pour le moment. Veuillez utiliser un numéro MTN."
+          : "Orange Money payments are currently unavailable. Please use an MTN number."))
+    : isMtnSuspended
+    ? (fallbackConfig?.mtnSuspendedReason?.trim() ||
+        (lang === "fr"
+          ? "Les paiements via MTN Mobile Money sont indisponibles pour le moment. Veuillez utiliser un numéro Orange."
+          : "MTN Mobile Money payments are currently unavailable. Please use an Orange number."))
+    : null;
   const isOperatorInvalid = usingNewNumber && operatorInfo.status === "unknown";
 
   const providerFeeAmount = quote ? Math.round(quote.baseTotal * 0.031) : 0;
@@ -391,6 +425,10 @@ export function PaymentConfirmDialog({
         return;
       }
     }
+    if (isCurrentOperatorSuspended) {
+      setPhoneError(suspendedReason);
+      return;
+    }
     setPhoneError(null);
     setSubmitting(true);
     setPayError(null);
@@ -447,6 +485,7 @@ export function PaymentConfirmDialog({
     setPayError(null);
     setFailedReason(null);
     setShowWaitingHint(false);
+    setShowFallbackProof(false);
     setTransId(null);
   }
 
@@ -611,6 +650,44 @@ export function PaymentConfirmDialog({
                     )}
                   </>
                 )}
+
+                {isCurrentOperatorSuspended && (
+                  <div className="w-full p-3.5 rounded-xl border-2 border-rose-500 bg-rose-50 text-rose-950 flex flex-col gap-2 mt-3 animate-in fade-in duration-150">
+                    <div className="flex items-center gap-2 font-bold text-xs sm:text-sm text-rose-900">
+                      <span className="material-symbols-outlined text-rose-600 text-[20px]">warning</span>
+                      <span>
+                        {isOrangeSuspended
+                          ? (lang === "fr" ? "Paiements Orange Money temporairement suspendus" : "Orange Money payments temporarily suspended")
+                          : (lang === "fr" ? "Paiements MTN MoMo temporairement suspendus" : "MTN MoMo payments temporarily suspended")}
+                      </span>
+                    </div>
+                    <p className="text-xs text-rose-900 leading-relaxed font-semibold">
+                      {suspendedReason}
+                    </p>
+                    <p className="text-xs text-rose-800">
+                      {isOrangeSuspended
+                        ? (lang === "fr" ? "Veuillez effectuer votre paiement avec un numéro MTN MoMo." : "Please complete your payment using an MTN MoMo number.")
+                        : (lang === "fr" ? "Veuillez effectuer votre paiement avec un numéro Orange Money." : "Please complete your payment using an Orange Money number.")}
+                    </p>
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedMethodId("new");
+                          setPhone("");
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">swap_horiz</span>
+                        <span>
+                          {isOrangeSuspended
+                            ? (lang === "fr" ? "Utiliser un numéro MTN" : "Use an MTN number")
+                            : (lang === "fr" ? "Utiliser un numéro Orange" : "Use an Orange number")}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -625,7 +702,7 @@ export function PaymentConfirmDialog({
               </button>
               <button
                 onClick={() => handleConfirm()}
-                disabled={!quote || submitting || (usingNewNumber ? !phone.trim() || isOperatorInvalid : !selectedMethodId)}
+                disabled={!quote || submitting || isCurrentOperatorSuspended || (usingNewNumber ? !phone.trim() || isOperatorInvalid : !selectedMethodId)}
                 className="flex-1 px-3 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-60 cursor-pointer"
               >
                 {submitting
@@ -715,11 +792,11 @@ export function PaymentConfirmDialog({
           const digits = rawNum.replace(/\D/g, "").replace(/^237/, "");
           const activeProvider = digits ? detectMobileMoneyProvider(digits) : null;
           const operatorName = activeProvider === "ORANGE" ? "Orange Money" : activeProvider === "MTN" ? "MTN MoMo" : "votre opérateur";
+          const oppositeOperator = activeProvider === "ORANGE" ? "MTN MoMo" : activeProvider === "MTN" ? "Orange Money" : (lang === "fr" ? "l'opérateur opposé" : "the other operator");
           const lowerReason = (failedReason || "").toLowerCase();
           const isBalance = ["balance", "solde", "fund", "fonds", "provision", "insufficient", "insuffisant"].some((k) => lowerReason.includes(k));
-          const isNetworkOrOperator = !isBalance;
 
-          if (isNetworkOrOperator && !fineId) {
+          if (showFallbackProof && !fineId) {
             const slotsForFallback: FallbackPayableSlot[] =
               fallbackAvailableSlots && fallbackAvailableSlots.length > 0
                 ? fallbackAvailableSlots
@@ -753,63 +830,138 @@ export function PaymentConfirmDialog({
                     onClose();
                   }
                 }}
-                onClose={onClose}
+                onClose={() => setShowFallbackProof(false)}
                 onDiscardDraft={onDiscardDraft}
               />
             );
           }
 
+          const switchToOppositeOperator = () => {
+            setSelectedMethodId("new");
+            setPhone("");
+            setPayError(null);
+            setStep("form");
+          };
+
           return (
             <div className="flex flex-col items-center text-center gap-4">
-              <span className="material-symbols-outlined text-error text-4xl">error</span>
-
-              {/* Error Explanation Card */}
               <div
-                className={`w-full text-left p-3.5 rounded-xl border text-on-surface flex flex-col gap-2 ${
-                  isBalance ? "border-error/40 bg-error/5" : "border-warning/40 bg-warning/10"
+                className={`w-14 h-14 rounded-full flex items-center justify-center ${
+                  isBalance ? "bg-rose-100 text-rose-600" : "bg-amber-100 text-amber-600"
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <span className={`material-symbols-outlined text-xl ${isBalance ? "text-error" : "text-warning"}`}>
-                    {isBalance ? "account_balance_wallet" : "signal_wifi_off"}
-                  </span>
-                  <span className="font-label-md text-label-md font-bold text-on-surface">
-                    {isBalance ? t("checkBalanceTitle") : t("networkUnavailableTitle")}
-                  </span>
-                  {failCount > 0 && (
-                    <span className="ml-auto font-label-sm text-[10px] bg-black/5 text-on-surface-variant px-1.5 py-0.5 rounded-full font-medium">
-                      {t("failureAttemptCount", { count: String(failCount) })}
-                    </span>
-                  )}
-                </div>
-                <p className="font-body-md text-body-md text-on-surface leading-relaxed">
-                  {isBalance
-                    ? t("paymentFailedCheckBalance", { operator: operatorName })
-                    : t("paymentFailedOperatorNetwork", { operator: operatorName })}
-                </p>
+                <span className="material-symbols-outlined text-3xl">
+                  {isBalance ? "account_balance_wallet" : "error"}
+                </span>
               </div>
 
-              <div className="flex gap-3 w-full">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex-1 px-3 py-2.5 rounded-lg border border-outline text-on-surface font-label-md text-label-md hover:bg-surface-variant/50 transition-colors"
-                >
-                  {t("cancelAction")}
-                </button>
-                <button
-                  type="button"
-                  onClick={retry}
-                  className="flex-1 px-3 py-2.5 rounded-lg border border-primary text-primary font-label-md text-label-md hover:bg-primary/10 active:scale-95 transition-all"
-                >
-                  {t("tryAgain")}
-                </button>
+              <div className="flex flex-col gap-1">
+                <h2 className="font-headline-sm text-lg sm:text-xl font-bold text-on-surface">
+                  {isBalance
+                    ? (lang === "fr" ? "Solde insuffisant" : "Insufficient balance")
+                    : (lang === "fr" ? "Échec du paiement" : "Payment failed")}
+                </h2>
+                {failCount > 0 && (
+                  <span className="font-label-sm text-[11px] text-on-surface-variant font-medium">
+                    {t("failureAttemptCount", { count: String(failCount) })}
+                  </span>
+                )}
               </div>
+
+              <div
+                className={`w-full text-left p-4 rounded-xl border text-on-surface flex flex-col gap-2.5 ${
+                  isBalance ? "border-rose-300 bg-rose-50/70" : "border-amber-300 bg-amber-50/70"
+                }`}
+              >
+                {isBalance ? (
+                  <>
+                    <p className="text-xs sm:text-sm text-rose-950 font-medium leading-relaxed">
+                      {lang === "fr"
+                        ? `Votre solde ${operatorName} est insuffisant pour effectuer ce paiement. Veuillez recharger votre compte puis réessayer.`
+                        : `Your ${operatorName} balance is insufficient for this payment. Please top up your account and try again.`}
+                    </p>
+                    <p className="text-xs text-rose-800">
+                      {lang === "fr"
+                        ? `Vous pouvez également effectuer le paiement avec ${oppositeOperator} si vous disposez des fonds nécessaires.`
+                        : `You can also pay with ${oppositeOperator} if you have sufficient funds with that operator.`}
+                    </p>
+                  </>
+                ) : (
+                  <div className="flex flex-col gap-2 text-xs sm:text-sm text-amber-950">
+                    <p className="font-semibold text-amber-900">
+                      {lang === "fr"
+                        ? "Le paiement n'a pas pu aboutir. Veuillez suivre l'une de ces démarches :"
+                        : "The payment could not be completed. Please follow one of these steps:"}
+                    </p>
+                    <ul className="flex flex-col gap-1.5 list-disc pl-4 text-xs text-amber-950">
+                      <li>
+                        <strong>{lang === "fr" ? "1. Consulter votre solde" : "1. Check your balance"} :</strong>{" "}
+                        {lang === "fr"
+                          ? `Vérifiez que votre solde ${operatorName} est bien suffisant.`
+                          : `Verify that your ${operatorName} account has sufficient funds.`}
+                      </li>
+                      <li>
+                        <strong>{lang === "fr" ? `2. Essayer avec ${oppositeOperator}` : `2. Try with ${oppositeOperator}`} :</strong>{" "}
+                        {lang === "fr"
+                          ? `Si le réseau de votre opérateur est indisponible, utilisez un numéro ${oppositeOperator}.`
+                          : `If your operator network is unavailable, try an ${oppositeOperator} number.`}
+                      </li>
+                      <li>
+                        <strong>{lang === "fr" ? "3. Réessayer plus tard" : "3. Try again later"} :</strong>{" "}
+                        {lang === "fr"
+                          ? "Le signal USSD ou réseau opérateur peut être rétabli dans un instant."
+                          : "Operator USSD network prompt may be restored shortly."}
+                      </li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2 w-full pt-1">
+                <button
+                  type="button"
+                  onClick={switchToOppositeOperator}
+                  className="w-full px-4 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-xs sm:text-sm font-bold hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-[18px]">swap_horiz</span>
+                  <span>{lang === "fr" ? `Essayer avec ${oppositeOperator}` : `Try with ${oppositeOperator}`}</span>
+                </button>
+
+                <div className="flex gap-2 w-full">
+                  <button
+                    type="button"
+                    onClick={retry}
+                    className="flex-1 px-3 py-2.5 rounded-lg border border-primary text-primary font-label-md text-xs sm:text-sm font-bold hover:bg-primary/10 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">replay</span>
+                    <span>{lang === "fr" ? "Réessayer" : "Try again"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="flex-1 px-3 py-2.5 rounded-lg border border-outline text-on-surface font-label-md text-xs sm:text-sm font-semibold hover:bg-surface-variant/50 transition-colors cursor-pointer"
+                  >
+                    {lang === "fr" ? "Réessayer plus tard" : "Try later"}
+                  </button>
+                </div>
+
+                {Boolean(fallbackConfig?.isEnabled) && !fineId && (
+                  <button
+                    type="button"
+                    onClick={() => setShowFallbackProof(true)}
+                    className="w-full mt-1 px-3 py-2 rounded-lg border border-amber-400 bg-amber-50 hover:bg-amber-100 text-amber-950 font-label-sm text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-amber-700">qr_code_2</span>
+                    <span>{lang === "fr" ? "Payer par code marchand / capture" : "Pay via merchant code / proof"}</span>
+                  </button>
+                )}
+              </div>
+
               {onDiscardDraft && (
                 <button
                   type="button"
                   onClick={onDiscardDraft}
-                  className="text-error font-label-sm text-label-sm hover:underline flex items-center gap-1 mt-1"
+                  className="text-error font-label-sm text-label-sm hover:underline flex items-center gap-1 mt-1 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[16px]">delete</span>
                   {t("deleteDraftAction")}

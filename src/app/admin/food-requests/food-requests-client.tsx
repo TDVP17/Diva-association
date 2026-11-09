@@ -88,11 +88,10 @@ export function FoodRequestsClient({ lang }: { lang: Lang }) {
                     </p>
                   </div>
                   <span
-                    className={`inline-flex items-center px-2.5 py-1 rounded-md font-label-sm text-label-sm flex-shrink-0 font-medium ${
-                      r.status === "RELEASED"
+                    className={`inline-flex items-center px-2.5 py-1 rounded-md font-label-sm text-label-sm flex-shrink-0 font-medium ${r.status === "RELEASED"
                         ? "bg-secondary-container/40 text-on-secondary-container"
                         : "bg-amber-100 text-amber-900 border border-amber-300"
-                    }`}
+                      }`}
                   >
                     {t(PAYOUT_CLAIM_STATUS_KEY[r.status])}
                   </span>

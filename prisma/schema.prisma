@@ -992,6 +992,10 @@ model FallbackPaymentConfig {
   orangeBeneficiaryName String   @default("")
   mtnUssdCode           String   @default("")
   mtnBeneficiaryName    String   @default("")
+  isOrangeSuspended     Boolean  @default(false)
+  orangeSuspendedReason String   @default("")
+  isMtnSuspended        Boolean  @default(false)
+  mtnSuspendedReason    String   @default("")
   updatedAt             DateTime @updatedAt
   updatedByAdminId      String?
 

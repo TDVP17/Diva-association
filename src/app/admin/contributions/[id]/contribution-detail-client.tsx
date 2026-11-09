@@ -391,6 +391,39 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
     });
   }, [tontineSessionId]);
 
+  const [markingPaidSlotId, setMarkingPaidSlotId] = useState<string | null>(null);
+
+  async function markSlotPaidManually(slot: AdminSlot) {
+    const confirmMsg =
+      lang === "fr"
+        ? `Confirmer que ${slot.beneficiaryName} (${slot.name}) a bien cotisé pour ce cycle ? (Validation manuelle sans preuve)`
+        : `Confirm that ${slot.beneficiaryName} (${slot.name}) has paid for this cycle? (Manual validation without proof)`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setMarkingPaidSlotId(slot.id);
+    try {
+      const res = await fetch("/api/admin/contributions/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ membershipSlotId: slot.id }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        alert(body?.error || (lang === "fr" ? "Erreur lors de la validation." : "Validation error."));
+        return;
+      }
+      await refreshSession();
+      fetch(`/api/admin/sessions/${tontineSessionId}/ledger`).then((r) => r.json()).then(setLedger);
+      fetch(`/api/admin/transactions?tontineSessionId=${tontineSessionId}`)
+        .then((r) => r.json())
+        .then((b) => setTransactions(b.transactions ?? []));
+    } catch {
+      alert(lang === "fr" ? "Erreur réseau. Veuillez réessayer." : "Network error. Please try again.");
+    } finally {
+      setMarkingPaidSlotId(null);
+    }
+  }
+
   // Initial load. Inlined (rather than calling refreshSession) so each
   // fetch's setState lives directly in a `.then`, avoiding the
   // set-state-in-effect lint rule that a bare async-function call trips.
@@ -2408,6 +2441,26 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                   </div>
 
                   <div className="flex items-center gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-outline-variant/20 w-full md:w-auto flex-wrap">
+                    {!s.paidThisCycle && session.status !== "CLOSED" && (
+                      <button
+                        type="button"
+                        onClick={() => markSlotPaidManually(s)}
+                        disabled={markingPaidSlotId === s.id}
+                        className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-600 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-label-sm text-xs font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-50"
+                        title={
+                          lang === "fr"
+                            ? `Cocher que ${s.beneficiaryName} a cotisé pour ce cycle (même sans preuve)`
+                            : `Mark ${s.beneficiaryName} as paid for this cycle (even without proof)`
+                        }
+                      >
+                        <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                        <span>
+                          {markingPaidSlotId === s.id
+                            ? (lang === "fr" ? "Validation..." : "Validating...")
+                            : (lang === "fr" ? "Cocher cotisé" : "Mark paid")}
+                        </span>
+                      </button>
+                    )}
                     {session.status !== "CLOSED" && (
                       <button
                         type="button"

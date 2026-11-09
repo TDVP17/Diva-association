@@ -4,6 +4,10 @@ export interface FallbackPaymentConfigData {
   orangeBeneficiaryName: string;
   mtnUssdCode: string;
   mtnBeneficiaryName: string;
+  isOrangeSuspended?: boolean;
+  orangeSuspendedReason?: string;
+  isMtnSuspended?: boolean;
+  mtnSuspendedReason?: string;
 }
 
 export const EMPTY_FALLBACK_PAYMENT_CONFIG: FallbackPaymentConfigData = {
@@ -12,6 +16,10 @@ export const EMPTY_FALLBACK_PAYMENT_CONFIG: FallbackPaymentConfigData = {
   orangeBeneficiaryName: "",
   mtnUssdCode: "",
   mtnBeneficiaryName: "",
+  isOrangeSuspended: false,
+  orangeSuspendedReason: "",
+  isMtnSuspended: false,
+  mtnSuspendedReason: "",
 };
 
 /**
