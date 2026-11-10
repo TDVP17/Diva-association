@@ -20,6 +20,7 @@ export type ContributionWithSlot = Contribution & {
 export interface PaymentSuccessEmailItem {
   beneficiaryName: string;
   sessionLabel?: string;
+  amount?: number;
 }
 
 function escapeHtml(text: string): string {
@@ -135,66 +136,68 @@ export async function settleContribution(
   // When ALL members have contributed for this cycle, if the designated beneficiary
   // has already drawn their lucky ball, alert them to submit their payout details.
   try {
-    const designatedSlot = await prisma.membershipSlot.findFirst({
-      where: {
-        membership: { tontineSessionId: membership.tontineSessionId, status: "APPROVED" },
-        officialPosition: { not: null },
-        ballDrawn: { not: null },
-        payouts: { none: {} },
-      },
-      include: {
-        membership: { include: { user: true } },
-      },
-      orderBy: { officialPosition: "asc" },
-    });
-
-    if (designatedSlot) {
-      const allApprovedSlots = await prisma.membershipSlot.findMany({
-        where: { membership: { tontineSessionId: membership.tontineSessionId, status: "APPROVED" } },
-        select: { id: true },
-      });
-      const totalRequired = allApprovedSlots.length;
-      const paidCount = await prisma.contribution.count({
+    if (prisma.membershipSlot?.findFirst) {
+      const designatedSlot = await prisma.membershipSlot.findFirst({
         where: {
-          membershipSlotId: { in: allApprovedSlots.map((s) => s.id) },
-          dueDate: contribution.dueDate,
-          status: "PAID",
+          membership: { tontineSessionId: membership.tontineSessionId, status: "APPROVED" },
+          officialPosition: { not: null },
+          ballDrawn: { not: null },
+          payouts: { none: {} },
         },
+        include: {
+          membership: { include: { user: true } },
+        },
+        orderBy: { officialPosition: "asc" },
       });
 
-      if (totalRequired > 0 && paidCount >= totalRequired) {
-        const alreadyAlerted = await prisma.notification.findFirst({
+      if (designatedSlot) {
+        const allApprovedSlots = await prisma.membershipSlot.findMany({
+          where: { membership: { tontineSessionId: membership.tontineSessionId, status: "APPROVED" } },
+          select: { id: true },
+        });
+        const totalRequired = allApprovedSlots.length;
+        const paidCount = await prisma.contribution.count({
           where: {
-            userId: designatedSlot.membership.userId,
-            tontineSessionId: membership.tontineSessionId,
-            type: "PAYOUT_TURN",
-            createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+            membershipSlotId: { in: allApprovedSlots.map((s) => s.id) },
+            dueDate: contribution.dueDate,
+            status: "PAID",
           },
         });
 
-        if (!alreadyAlerted) {
-          const benUser = designatedSlot.membership.user;
-          const benLang: Lang = benUser.preferredLang === "en" ? "en" : "fr";
-          const benRawName = benUser.name.trim();
-          const benFirstName = benRawName.split(/\s+/)[0] || benRawName;
-          const alertMsg =
-            benLang === "fr"
-              ? `Salut, ${benFirstName} 👋 ! C'est à votre tour de bouffer la cagnotte de ${sessionLabel} ! 🎉 Tous les membres ont cotisé : veuillez fournir obligatoirement vos deux numéros (un MTN et un Orange) avec les noms de chaque compte pour que DIVA Asso effectue votre virement.`
-              : `Hello, ${benFirstName} 👋! It's your turn to receive the ${sessionLabel} payout! 🎉 All members have contributed: please provide BOTH your MTN Mobile Money and Orange Money numbers with their respective account names so DIVA Asso can process your transfer.`;
-
-          await scheduleInAppNotifications({
-            tontineSessionId: membership.tontineSessionId,
-            type: "PAYOUT_TURN",
-            recipients: [
-              {
-                userId: benUser.id,
-                message: alertMsg,
-                messageKey: "payoutTurnNotifMessage",
-                messageVars: { name: benFirstName, cotisation: sessionLabel },
-                actionUrl: `/sessions/${membership.tontineSessionId}`,
-              },
-            ],
+        if (totalRequired > 0 && paidCount >= totalRequired) {
+          const alreadyAlerted = await prisma.notification.findFirst({
+            where: {
+              userId: designatedSlot.membership.userId,
+              tontineSessionId: membership.tontineSessionId,
+              type: "PAYOUT_TURN",
+              createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+            },
           });
+
+          if (!alreadyAlerted) {
+            const benUser = designatedSlot.membership.user;
+            const benLang: Lang = benUser.preferredLang === "en" ? "en" : "fr";
+            const benRawName = benUser.name.trim();
+            const benFirstName = benRawName.split(/\s+/)[0] || benRawName;
+            const alertMsg =
+              benLang === "fr"
+                ? `Salut, ${benFirstName} 👋 ! C'est à votre tour de bouffer la cagnotte de ${sessionLabel} ! 🎉 Tous les membres ont cotisé : veuillez fournir obligatoirement vos deux numéros (un MTN et un Orange) avec les noms de chaque compte pour que DIVA Asso effectue votre virement.`
+                : `Hello, ${benFirstName} 👋! It's your turn to receive the ${sessionLabel} payout! 🎉 All members have contributed: please provide BOTH your MTN Mobile Money and Orange Money numbers with their respective account names so DIVA Asso can process your transfer.`;
+
+            await scheduleInAppNotifications({
+              tontineSessionId: membership.tontineSessionId,
+              type: "PAYOUT_TURN",
+              recipients: [
+                {
+                  userId: benUser.id,
+                  message: alertMsg,
+                  messageKey: "payoutTurnNotifMessage",
+                  messageVars: { name: benFirstName, cotisation: sessionLabel },
+                  actionUrl: `/sessions/${membership.tontineSessionId}`,
+                },
+              ],
+            });
+          }
         }
       }
     }
@@ -304,6 +307,7 @@ export async function settleContributionsBatch(
       return {
         beneficiaryName: c.membershipSlot.beneficiaryName,
         sessionLabel: s.title || TONTINE_TYPE_LABELS[s.type],
+        amount: Number(c.amountPaid || 0) + Number(c.feePaid || 0) + Number(c.finePaid || 0),
       };
     });
 
@@ -428,6 +432,7 @@ export async function settleContributionsBatch(
       return {
         beneficiaryName: baseName,
         sessionLabel: s.title || TONTINE_TYPE_LABELS[s.type],
+        amount: Number(c.amountPaid || 0) + Number(c.feePaid || 0) + Number(c.finePaid || 0),
       };
     });
 
@@ -544,10 +549,12 @@ export function paymentSuccessEmailHtml(
       : rawItems
           .map(
             (item) =>
-              `<div style="padding: 2px 0; line-height: 1.4;">${escapeHtml(item.beneficiaryName)}${
+              `<div style="padding: 3px 0; line-height: 1.4; display: flex; justify-content: space-between; gap: 12px; text-align: left;"><span>• ${escapeHtml(item.beneficiaryName)}${
                 showSessionInline && item.sessionLabel
                   ? ` <span style="font-weight: 400; color: #64748b; font-size: 12px;">(${escapeHtml(item.sessionLabel)})</span>`
                   : ""
+              }</span>${
+                item.amount !== undefined ? `<strong style="color: #003528; text-align: right; white-space: nowrap;">${formatXAF(item.amount)}</strong>` : ""
               }</div>`,
           )
           .join("");

@@ -130,7 +130,11 @@ export function CotisationMembersList({
     if (isDraftSession || lockedReason) return;
     const targetSlot = members.find((m) => m.id === slotId);
     if (!targetSlot?.ballDrawn) return;
-    setActiveSlotIdForPay(slotId);
+    if (myUnpaidSlotIds.length > 1) {
+      setShowBulkDialog(true);
+    } else {
+      setActiveSlotIdForPay(slotId);
+    }
   }
 
   return (

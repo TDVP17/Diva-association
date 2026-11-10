@@ -177,13 +177,14 @@ export default async function HistoryPage() {
   const ownGroups = new Map<string, RawContribution[]>();
   for (const c of rawOwnContributions) {
     let key: string;
+    const rootTx = c.fapshiTxRef ? c.fapshiTxRef.split("-")[0].trim() : null;
     if (c.bulkPaymentId) {
       key = `bulk_${c.bulkPaymentId}`;
-    } else if (c.fapshiTxRef) {
-      key = `tx_${c.fapshiTxRef}`;
+    } else if (rootTx) {
+      key = `tx_${rootTx}`;
     } else if (c.paidAt) {
-      // Group if paid in the same 5-second window for the same session
-      const timeBucket = Math.floor(c.paidAt.getTime() / 5000);
+      // Group if paid in the same 60-second window for the same session
+      const timeBucket = Math.floor(c.paidAt.getTime() / 60000);
       key = `time_${c.tontineSessionId}_${timeBucket}_${c.dueDate.toISOString().slice(0, 10)}`;
     } else {
       key = `single_${c.id}`;
@@ -288,12 +289,13 @@ export default async function HistoryPage() {
   const relativeGroups = new Map<string, RawRelativeContribution[]>();
   for (const c of rawRelativeList) {
     let key: string;
+    const rootTx = c.fapshiTxRef ? c.fapshiTxRef.split("-")[0].trim() : null;
     if (c.bulkPaymentId) {
       key = `bulk_${c.bulkPaymentId}`;
-    } else if (c.fapshiTxRef) {
-      key = `tx_${c.fapshiTxRef}`;
+    } else if (rootTx) {
+      key = `tx_${rootTx}`;
     } else if (c.paidAt) {
-      const timeBucket = Math.floor(c.paidAt.getTime() / 5000);
+      const timeBucket = Math.floor(c.paidAt.getTime() / 60000);
       key = `time_${c.targetUserId}_${c.tontineSessionId}_${timeBucket}_${c.dueDate.toISOString().slice(0, 10)}`;
     } else {
       key = `single_${c.id}`;
@@ -548,9 +550,9 @@ export default async function HistoryPage() {
                   {r.reason}
                 </h3>
 
-                {/* Details box without clutter */}
+                {/* Details box - clean, compact, cites names and amount directly */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-on-surface-variant bg-surface-container-low/50 rounded-lg p-3 border border-surface-variant/60">
-                  {/* Clean date and time (no 'Date et Heure :' label) */}
+                  {/* Clean date (no clutter) */}
                   <div className="flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-[16px] text-primary">calendar_today</span>
                     <span className="text-on-surface font-medium">
@@ -559,24 +561,18 @@ export default async function HistoryPage() {
                         day: "numeric",
                         month: "short",
                         year: "numeric",
-                      })}{" "}
-                      à{" "}
-                      {r.date.toLocaleTimeString(lang === "fr" ? "fr-FR" : "en-GB", {
-                        timeZone: "Africa/Douala",
-                        hour: "2-digit",
-                        minute: "2-digit",
                       })}
                     </span>
                   </div>
 
-                  {/* Beneficiary name(s) */}
+                  {/* Beneficiary name(s) cited cleanly */}
                   <div className="flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-[16px] text-primary">
                       {r.namesCount > 1 ? "group" : "person"}
                     </span>
                     <span>
                       <strong className="text-on-surface">
-                        {r.namesCount > 1 ? (lang === "fr" ? "Noms" : "Names") : t("beneficiaryName")} :
+                        {r.namesCount > 1 ? (lang === "fr" ? "Noms" : "Names") : (lang === "fr" ? "Nom" : "Name")} :
                       </strong>{" "}
                       {r.beneficiaryName}
                     </span>
@@ -597,34 +593,11 @@ export default async function HistoryPage() {
                     </div>
                   )}
 
-                  {/* Pure amount and fee breakdown (strict: NO 3.1% operator fee display!) */}
-                  {r.pureAmount !== undefined && (
-                    <div className="flex flex-col gap-1 sm:col-span-2 bg-surface-container-highest/40 p-2.5 rounded-lg border border-outline-variant/50">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-on-surface-variant flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[15px] text-primary">savings</span>
-                          {lang === "fr" ? "Cotisation pour le pot" : "Tontine pot"}
-                        </span>
-                        <span className="font-semibold text-on-surface">{formatXAF(r.pureAmount)}</span>
-                      </div>
-                      {r.feeAmount !== undefined && r.feeAmount > 0 && (
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-on-surface-variant">{lang === "fr" ? "Frais" : "Fees"}</span>
-                          <span className="font-semibold text-on-surface">{formatXAF(r.feeAmount)}</span>
-                        </div>
-                      )}
-                      {r.fineAmount !== undefined && r.fineAmount > 0 && (
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-on-surface-variant">{t("fineDetailLabel")}</span>
-                          <span className="font-semibold text-error">+{formatXAF(r.fineAmount)}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between text-xs border-t border-outline-variant/60 pt-1 mt-0.5">
-                        <strong className="text-on-surface uppercase tracking-wider">
-                          {lang === "fr" ? "Total" : "Total"} :
-                        </strong>
-                        <strong className="text-primary font-bold">{formatXAF(r.totalAmount)}</strong>
-                      </div>
+                  {/* Fine detail only when a late fine actually applies */}
+                  {r.fineAmount !== undefined && r.fineAmount > 0 && (
+                    <div className="flex items-center justify-between text-xs sm:col-span-2 bg-amber-50/70 p-2 rounded-lg border border-amber-200">
+                      <span className="text-amber-900 font-medium">{t("fineDetailLabel")}</span>
+                      <span className="font-semibold text-error">+{formatXAF(r.fineAmount)}</span>
                     </div>
                   )}
 

@@ -163,7 +163,7 @@ function buildPaymentReceiptEmailHtml(
   lang: "fr" | "en",
   data: {
     recipientName: string;
-    items: { beneficiaryName: string; sessionLabel?: string }[];
+    items: { beneficiaryName: string; sessionLabel?: string; amount?: number }[];
     paidByName?: string;
     sessionLabel: string;
     amount: number;
@@ -196,10 +196,12 @@ function buildPaymentReceiptEmailHtml(
       : data.items
           .map(
             (item) =>
-              `<div style="padding: 2px 0; line-height: 1.4;">${escapeHtml(item.beneficiaryName)}${
+              `<div style="padding: 3px 0; line-height: 1.4; display: flex; justify-content: space-between; gap: 12px; text-align: left;"><span>• ${escapeHtml(item.beneficiaryName)}${
                 showSessionInline && item.sessionLabel
                   ? ` <span style="font-weight: 400; color: #64748b; font-size: 12px;">(${escapeHtml(item.sessionLabel)})</span>`
                   : ""
+              }</span>${
+                item.amount !== undefined ? `<strong style="color: #003528; text-align: right; white-space: nowrap;">${formatXAF(item.amount)}</strong>` : ""
               }</div>`,
           )
           .join("");
@@ -2587,6 +2589,7 @@ async function settleBulkPayment(
           items: ownerItems.map((i) => ({
             beneficiaryName: i.beneficiaryName,
             sessionLabel: i.sessionLabel,
+            amount: i.totalPaid,
           })),
           paidByName,
           sessionLabel: sessionSummary,
@@ -2657,6 +2660,7 @@ async function settleBulkPayment(
               ? `${i.owner.name} — ${i.beneficiaryName}`
               : i.beneficiaryName,
             sessionLabel: i.sessionLabel,
+            amount: i.totalPaid,
           })),
           paidByName: payer.name,
           sessionLabel: sessionSummary,

@@ -63,6 +63,8 @@ export function BulkPaymentDialog({
   onClose: () => void;
 }) {
   const t = (key: TranslationKey, vars?: Record<string, string>) => translate(lang, key, vars);
+  const [selectedSlotIds, setSelectedSlotIds] = useState<string[]>(membershipSlotIds);
+  const [allSlots, setAllSlots] = useState<QuoteItem[]>([]);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [phone, setPhone] = useState(defaultPhone ?? "");
@@ -108,6 +110,10 @@ export function BulkPaymentDialog({
 
   useEffect(() => {
     let cancelled = false;
+    if (selectedSlotIds.length === 0) {
+      setQuote(null);
+      return;
+    }
     void (async () => {
       try {
         const token = await getSupabaseAccessToken();
@@ -124,10 +130,15 @@ export function BulkPaymentDialog({
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ membershipSlotIds, isRelative }),
+          body: JSON.stringify({ membershipSlotIds: selectedSlotIds, isRelative }),
         });
         const body = await parseJsonOrThrow<Quote>(res, t("couldNotCalculateTotal"));
-        if (!cancelled) setQuote(body);
+        if (!cancelled) {
+          setQuote(body);
+          setQuoteError(null);
+          // Preserve full master list on initial load
+          setAllSlots((prev) => (prev.length === 0 && body.items.length > 0 ? body.items : prev));
+        }
       } catch (err) {
         if (!cancelled) setQuoteError(friendlyErrorMessage(err, t("couldNotCalculateTotal")));
       }
@@ -135,8 +146,7 @@ export function BulkPaymentDialog({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectedSlotIds, isRelative, lang]);
 
   function stopWatching() {
     if (channelCleanupRef.current) {
@@ -282,7 +292,29 @@ export function BulkPaymentDialog({
     };
   }
 
+  function toggleSlot(slotId: string) {
+    setSelectedSlotIds((prev) => {
+      if (prev.includes(slotId)) {
+        if (prev.length <= 1) return prev; // Keep at least one selected
+        return prev.filter((id) => id !== slotId);
+      }
+      return [...prev, slotId];
+    });
+  }
+
+  function selectAllSlots() {
+    if (allSlots.length > 0) {
+      setSelectedSlotIds(allSlots.map((s) => s.membershipSlotId));
+    } else {
+      setSelectedSlotIds(membershipSlotIds);
+    }
+  }
+
   async function handleConfirm() {
+    if (selectedSlotIds.length === 0) {
+      setPayError(lang === "fr" ? "Veuillez sélectionner au moins un nom." : "Please select at least one slot.");
+      return;
+    }
     const digits = phone.replace(/\D/g, "");
     const normalized = digits.startsWith("237") ? digits.slice(3) : digits;
     if (!/^[6-9]\d{8}$/.test(normalized)) {
@@ -328,7 +360,7 @@ export function BulkPaymentDialog({
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          membershipSlotIds,
+          membershipSlotIds: selectedSlotIds,
           phone: normalized,
           isRelative,
         }),
@@ -419,28 +451,65 @@ export function BulkPaymentDialog({
 
             {quote && (
               <div className="flex flex-col gap-2 mb-4 bg-surface-container-low p-3.5 rounded-xl border border-outline-variant">
-                <div className="flex flex-col gap-1 max-h-32 overflow-y-auto pr-1">
-                  {quote.items.map((item) => (
-                    <div key={item.membershipSlotId} className="flex justify-between items-center gap-2 text-xs">
-                      <span className="font-body-md text-body-md text-on-surface-variant truncate">{item.beneficiaryName}</span>
-                      <span className="font-label-md text-label-md text-on-surface flex-shrink-0">{formatXAF(item.baseTotal)}</span>
-                    </div>
-                  ))}
+                <div className="flex items-center justify-between pb-1.5 border-b border-outline-variant/60">
+                  <span className="text-xs font-bold text-on-surface uppercase tracking-wider">
+                    {lang === "fr" ? "Noms à cotiser" : "Slots to pay"}
+                  </span>
+                  {(allSlots.length > 1 || (quote.items && quote.items.length > 1)) && (
+                    <button
+                      type="button"
+                      onClick={selectAllSlots}
+                      className="text-[11px] font-semibold text-primary hover:underline cursor-pointer"
+                    >
+                      {lang === "fr" ? "Tout cocher" : "Select all"}
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1 max-h-40 overflow-y-auto pr-1 divide-y divide-outline-variant/30">
+                  {(allSlots.length > 0 ? allSlots : quote.items).map((item) => {
+                    const isChecked = selectedSlotIds.includes(item.membershipSlotId);
+                    return (
+                      <label
+                        key={item.membershipSlotId}
+                        className={`flex items-center justify-between gap-2 p-1.5 rounded-lg transition-colors cursor-pointer ${
+                          isChecked ? "bg-primary/5 hover:bg-primary/10" : "opacity-60 hover:opacity-100 hover:bg-surface-container"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleSlot(item.membershipSlotId)}
+                            className="w-4 h-4 rounded text-primary focus:ring-primary cursor-pointer accent-[#064e3b]"
+                          />
+                          <span className="font-semibold text-xs sm:text-sm text-on-surface truncate">
+                            {item.beneficiaryName}
+                          </span>
+                        </div>
+                        <span className="font-label-md text-xs font-bold text-on-surface flex-shrink-0">
+                          {formatXAF(item.baseTotal)}
+                        </span>
+                      </label>
+                    );
+                  })}
                 </div>
                 <div className="flex justify-between items-center text-sm pt-2 border-t border-outline-variant">
                   <span className="font-body-md text-body-md text-on-surface-variant">
                     {lang === "fr"
-                      ? `Cotisation pour le pot (${quote.items.length} ${quote.items.length > 1 ? "noms" : "nom"})`
-                      : `Tontine pot (${quote.items.length} ${quote.items.length > 1 ? "slots" : "slot"})`}
+                      ? `Cotisation pour le pot (${selectedSlotIds.length} ${selectedSlotIds.length > 1 ? "noms" : "nom"})`
+                      : `Tontine pot (${selectedSlotIds.length} ${selectedSlotIds.length > 1 ? "slots" : "slot"})`}
                   </span>
-                  <span className="font-label-md text-label-md text-on-surface">{formatXAF(potTotal)}</span>
+                  <span className="font-label-md text-label-md text-on-surface font-semibold">{formatXAF(potTotal)}</span>
                 </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="font-body-md text-body-md text-on-surface-variant">
-                    {lang === "fr" ? "Frais" : "Fees"}
-                  </span>
-                  <span className="font-label-md text-label-md text-on-surface">{formatXAF(feesTotal)}</span>
-                </div>
+                {feesTotal > 0 && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="font-body-md text-body-md text-on-surface-variant">
+                      {lang === "fr" ? "Frais de gestion" : "Fees"}
+                    </span>
+                    <span className="font-label-md text-label-md text-on-surface">{formatXAF(feesTotal)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center text-sm">
                   <span className="font-body-md text-body-md text-on-surface-variant flex items-center gap-1.5">
                     <span>{operatorFeeLabel}</span>
@@ -527,12 +596,14 @@ export function BulkPaymentDialog({
               </button>
               <button
                 onClick={() => handleConfirm()}
-                disabled={!quote || submitting || isCurrentOperatorSuspended || !phone.trim() || isOperatorInvalid}
-                className="flex-1 px-3 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-60"
+                disabled={!quote || submitting || isCurrentOperatorSuspended || !phone.trim() || isOperatorInvalid || selectedSlotIds.length === 0}
+                className="flex-1 px-3 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-60 cursor-pointer"
               >
                 {submitting
                   ? t("redirectingToFapshi")
-                  : `${t("confirmAndPay")} (${formatXAF(totalCharged)})`}
+                  : lang === "fr"
+                    ? `Cotiser (${selectedSlotIds.length} ${selectedSlotIds.length > 1 ? "noms" : "nom"} · ${formatXAF(totalCharged)})`
+                    : `Pay (${selectedSlotIds.length} ${selectedSlotIds.length > 1 ? "slots" : "slot"} · ${formatXAF(totalCharged)})`}
               </button>
             </div>
           </>
@@ -617,7 +688,8 @@ export function BulkPaymentDialog({
           const isBalance = ["balance", "solde", "fund", "fonds", "provision", "insufficient", "insuffisant"].some((k) => lowerReason.includes(k));
 
           if (showFallbackProof) {
-            const slotsForFallback: FallbackPayableSlot[] = (quote?.items ?? []).map((item) => ({
+            const masterList = allSlots.length > 0 ? allSlots : quote?.items ?? [];
+            const slotsForFallback: FallbackPayableSlot[] = masterList.map((item) => ({
               id: item.membershipSlotId,
               beneficiaryName: item.beneficiaryName,
               baseTotal: item.baseTotal,
@@ -633,7 +705,7 @@ export function BulkPaymentDialog({
                 failCount={failCount}
                 payerPhone={phone}
                 availableSlots={slotsForFallback}
-                defaultSelectedSlotIds={membershipSlotIds}
+                defaultSelectedSlotIds={selectedSlotIds}
                 transId={transId}
                 onProofSubmitted={() => {
                   if (onProofSubmitted) {
