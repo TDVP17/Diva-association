@@ -88,8 +88,8 @@ export function PayoutOrderAccordion({
                   ? "Cliquez pour refermer"
                   : "Click to close"
                 : lang === "fr"
-                ? "Cliquez pour voir l'ordre de passage"
-                : "Click to view payout schedule"}
+                  ? "Cliquez pour voir l'ordre de passage"
+                  : "Click to view payout schedule"}
             </p>
           </div>
         </div>
@@ -98,9 +98,8 @@ export function PayoutOrderAccordion({
             {isOpen ? (lang === "fr" ? "Fermer" : "Close") : (lang === "fr" ? "Ouvrir" : "Open")}
           </span>
           <span
-            className={`material-symbols-outlined text-2xl transition-transform duration-200 ${
-              isOpen ? "rotate-180" : ""
-            }`}
+            className={`material-symbols-outlined text-2xl transition-transform duration-200 ${isOpen ? "rotate-180" : ""
+              }`}
           >
             expand_more
           </span>
@@ -134,48 +133,68 @@ export function PayoutOrderAccordion({
             </div>
           ) : (
             <div className="flex flex-col gap-2 mt-2">
-              {rows.map((r, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between p-3 bg-surface-container-lowest rounded-lg border border-surface-variant/40"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-label-md text-xs font-bold flex-shrink-0">
-                      {r.position ?? "—"}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-label-md text-sm text-on-surface truncate font-semibold">
-                        {r.beneficiaryName}
-                      </p>
-                      {r.estimatedDate && (
-                        <p className="font-label-sm text-xs text-on-surface-variant truncate">
-                          {new Date(r.estimatedDate).toLocaleDateString(
-                            lang === "fr" ? "fr-FR" : "en-US",
-                            { day: "numeric", month: "long", year: "numeric" },
-                          )}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-md font-label-sm text-xs flex-shrink-0 ml-2 font-medium ${
-                      STATUS_CLASS[r.status]
-                    }`}
+              {rows.map((r, i) => {
+                const isConfirmed = r.status === "CONFIRMED";
+                const isReleased = r.status === "RELEASED";
+                const isDetailsSubmitted = r.status === "DETAILS_SUBMITTED";
+
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-center justify-between p-3 rounded-xl border transition-colors gap-3 ${isConfirmed
+                        ? "bg-emerald-50/40 border-emerald-200 shadow-2xs"
+                        : "bg-surface-container-lowest border-surface-variant/40"
+                      }`}
                   >
-                    {r.status === "CONFIRMED"
-                      ? t(STATUS_KEY[r.status], {
-                          date: r.memberConfirmedAt
-                            ? new Date(r.memberConfirmedAt).toLocaleDateString("en-US", {
-                                day: "numeric",
-                                month: "short",
-                              })
-                            : "",
-                        })
-                      : t(STATUS_KEY[r.status])}
-                    {r.status === "CONFIRMED" && r.confirmedByAdmin && ` ${t("confirmedByAdminLabel")}`}
-                  </span>
-                </div>
-              ))}
+                    {/* Left: Position circle + Beneficiary name + Date */}
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${isConfirmed
+                            ? "bg-emerald-700 text-white shadow-2xs"
+                            : "bg-primary/10 text-primary"
+                          }`}
+                      >
+                        {r.position ?? "—"}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-sm text-slate-900 truncate leading-snug">
+                          {r.beneficiaryName}
+                        </p>
+                        {r.estimatedDate && (
+                          <p className="text-xs text-slate-500 truncate mt-0.5">
+                            {new Date(r.estimatedDate).toLocaleDateString(
+                              lang === "fr" ? "fr-FR" : "en-US",
+                              { day: "numeric", month: "long", year: "numeric" },
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right: Clean, compact status message */}
+                    {isConfirmed ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0 shadow-2xs">
+                        <span className="material-symbols-outlined text-[15px] text-emerald-700">check_circle</span>
+                        <span>{lang === "fr" ? "Reçu" : "Received"}</span>
+                      </span>
+                    ) : isReleased ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-sky-100 text-sky-800 border border-sky-300 shrink-0">
+                        <span className="material-symbols-outlined text-[15px] text-sky-700">send</span>
+                        <span>{lang === "fr" ? "Virement envoyé" : "Sent"}</span>
+                      </span>
+                    ) : isDetailsSubmitted ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 shrink-0">
+                        <span className="material-symbols-outlined text-[15px] text-amber-700">schedule</span>
+                        <span>{lang === "fr" ? "En attente" : "Pending"}</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200/80 shrink-0">
+                        <span>{lang === "fr" ? "Pas encore dû" : "Not yet due"}</span>
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

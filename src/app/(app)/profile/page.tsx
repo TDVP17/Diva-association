@@ -6,6 +6,7 @@ import { getUnreadInAppNotificationCount } from "@/lib/notifications/unread";
 import { getContributionTotal, getNextDueDate } from "@/lib/tontine-engine";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { AvatarUpload } from "./avatar-upload";
+import { InlineNameField, EditableProfileHeader } from "./inline-name-field";
 import { InlineField } from "./inline-field";
 import { InlineLocationField } from "./inline-location-field";
 import { updatePhoneAction, updateEmailAction } from "./actions";
@@ -110,7 +111,7 @@ export default async function ProfilePage() {
     <main className="px-container-padding py-stack-gap-lg max-w-md mx-auto">
       <div className="flex flex-col items-center mb-stack-gap-lg">
         <AvatarUpload currentAvatarUrl={user.avatar ?? user.image} userName={user.name} lang={lang} />
-        <h1 className="font-title-md text-title-md text-primary mt-3">{user.name}</h1>
+        <EditableProfileHeader name={user.name} lang={lang} />
       </div>
 
       <div className="mb-stack-gap-lg flex flex-col gap-stack-gap-sm">
@@ -126,6 +127,7 @@ export default async function ProfilePage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant overflow-hidden mb-stack-gap-lg">
+        <InlineNameField currentName={user.name} lang={lang} />
         <InlineField
           label={t("emailLabel")}
           currentValue={user.email}

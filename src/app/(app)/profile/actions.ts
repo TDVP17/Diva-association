@@ -45,6 +45,92 @@ export async function updateProfileAction(
   }
 }
 
+/** Name is a standard identity field — low-risk, no OTP required. Allows users to correct or update their real name. */
+export async function updateNameAction(
+  _prevState: ProfileFormState,
+  formData: FormData,
+): Promise<ProfileFormState> {
+  const session = await auth();
+  const lang = await getLang();
+  if (!session?.user) {
+    return {
+      error:
+        lang === "fr"
+          ? "Vous devez être connecté pour modifier votre nom."
+          : "You must be signed in to update your name.",
+    };
+  }
+
+  const rawName = String(formData.get("name") ?? "").trim();
+  const name = rawName.replace(/\s+/g, " ");
+
+  if (!name || name.length < 2) {
+    return {
+      error:
+        lang === "fr"
+          ? "Le nom doit comporter au moins 2 caractères."
+          : "Name must be at least 2 characters.",
+    };
+  }
+
+  if (name.length > 70) {
+    return {
+      error:
+        lang === "fr"
+          ? "Le nom ne peut pas dépasser 70 caractères."
+          : "Name cannot exceed 70 characters.",
+    };
+  }
+
+  try {
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: { name },
+    });
+
+    try {
+      const supabaseAdmin = getSupabaseAdminClient();
+      const dbUser = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { authUserId: true, email: true },
+      });
+      let targetAuthId = dbUser?.authUserId ?? null;
+      if (!targetAuthId && dbUser?.email) {
+        const { data: list } = await supabaseAdmin.auth.admin.listUsers({
+          page: 1,
+          perPage: 1000,
+        });
+        const authUser = list?.users?.find(
+          (u) => u.email?.toLowerCase() === dbUser.email.toLowerCase(),
+        );
+        if (authUser) targetAuthId = authUser.id;
+      }
+      if (targetAuthId) {
+        await supabaseAdmin.auth.admin.updateUserById(targetAuthId, {
+          user_metadata: { name, full_name: name },
+        });
+      }
+    } catch (syncErr) {
+      console.warn("[updateNameAction] metadata sync notice:", syncErr);
+    }
+
+    return {
+      success:
+        lang === "fr"
+          ? "Nom mis à jour avec succès."
+          : "Name updated successfully.",
+    };
+  } catch (err) {
+    console.error("[updateNameAction] unexpected error:", err);
+    return {
+      error:
+        lang === "fr"
+          ? "Impossible d'enregistrer votre nom pour le moment. Veuillez réessayer."
+          : "Could not save your name right now. Please try again.",
+    };
+  }
+}
+
 /** Phone is a sensitive field — requires a fresh, verified PHONE_CHANGE OTP sent to the new number. */
 export async function updatePhoneAction(
   _prevState: ProfileFormState,
