@@ -24,6 +24,35 @@ function getAppBaseUrl(): string {
   return Deno.env.get("APP_URL") || "https://www.divaasso.com";
 }
 
+const ASSO_TITLE_BADGE = "Asso 🌿";
+
+const LEADING_GREETING_PREFIX_RE =
+  /^(?:salut|bonjour|bonsoir|coucou|hello|hi|hey)(?:\s*,?\s+[^\r\n!?:—]{1,40}?)?(?:\s*👋)?\s*(?:[!?:—-]+)\s*/iu;
+
+const OPENING_GREETING_RE =
+  /^\s*(?:[\p{Extended_Pictographic}\uFE0F\u200D\u20E3\s]*)(?:salut|bonjour|bonsoir|coucou|hello|hi\b|hey\b|dear\b|cher|chère|félicitations|congratulations)\b/iu;
+
+const STANDALONE_GREETING_LINE_RE =
+  /^\s*((?:salut|bonjour|bonsoir|coucou|hello|hi|hey)(?:\s*,?\s+[^\r\n!?:—]{1,40}?)?(?:\s*👋)?\s*[!.]?)\s*\r?\n\s*\r?\n\s*([\s\S]+)$/iu;
+
+function stripLeadingGreetingPrefix(text: string): string {
+  return text.trim().replace(LEADING_GREETING_PREFIX_RE, "").trim();
+}
+
+function formatBroadcastTitle(rawTitle: string): string {
+  const cleaned = stripLeadingGreetingPrefix(rawTitle);
+  if (!cleaned) return ASSO_TITLE_BADGE;
+  if (/^(?:[\p{Extended_Pictographic}\uFE0F\u200D\s]*(?:DIVA\s+)?Asso\b)/iu.test(cleaned)) {
+    return cleaned;
+  }
+  return `${ASSO_TITLE_BADGE} — ${cleaned}`;
+}
+
+function hasOpeningGreeting(text: string): boolean {
+  const headLines = text.trim().split(/\r?\n/).slice(0, 3);
+  return headLines.some((line) => OPENING_GREETING_RE.test(line));
+}
+
 function renderBrandedEmailHtml(params: BrandedEmailParams): string {
   const baseUrl = params.baseUrl || getAppBaseUrl();
   const logoUrl = `${baseUrl}/icons/icon-512.png`;
@@ -74,24 +103,36 @@ function renderBrandedEmailHtml(params: BrandedEmailParams): string {
       .replace(/\{name\}/g, firstName || "");
   };
 
+  const rawTitle = (params.title || "").trim();
+  const cleanTitle = LEADING_GREETING_PREFIX_RE.test(rawTitle)
+    ? formatBroadcastTitle(rawTitle)
+    : rawTitle || ASSO_TITLE_BADGE;
+
   let content = "";
   if (params.bodyHtml) {
     const cleanHtml = sanitizeEmailBody(params.bodyHtml);
-    const hasGreeting =
-      cleanHtml.includes("Salut") ||
-      cleanHtml.includes("Bonjour") ||
-      cleanHtml.includes("Hello");
-    content = hasGreeting ? cleanHtml : `${greetingHtml}${cleanHtml}`;
+    const htmlHeadText = cleanHtml
+      .replace(/<[^>]+>/g, "\n")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 3)
+      .join("\n");
+    content = hasOpeningGreeting(htmlHeadText) ? cleanHtml : `${greetingHtml}${cleanHtml}`;
   } else {
     const rawText = params.bodyText || "";
-    const cleanText = sanitizeEmailBody(rawText);
-    const hasGreeting =
-      cleanText.startsWith("Salut") ||
-      cleanText.startsWith("Bonjour") ||
-      cleanText.startsWith("Hello");
-    content = hasGreeting
-      ? `<p style="font-size: 15px; line-height: 1.65; color: #334155; margin: 0; white-space: pre-line;">${cleanText}</p>`
-      : `${greetingHtml}<p style="font-size: 15px; line-height: 1.65; color: #334155; margin: 0; white-space: pre-line;">${cleanText}</p>`;
+    const cleanText = sanitizeEmailBody(rawText).trim();
+    const standaloneGreetingMatch = cleanText.match(STANDALONE_GREETING_LINE_RE);
+
+    if (standaloneGreetingMatch) {
+      const existingGreeting = standaloneGreetingMatch[1].trim();
+      const restBody = standaloneGreetingMatch[2].trim();
+      content = `<p style="font-size: 16px; font-weight: 700; color: #003528; margin: 0 0 14px 0;">${existingGreeting}</p><p style="font-size: 15px; line-height: 1.65; color: #334155; margin: 0; white-space: pre-line;">${restBody}</p>`;
+    } else if (hasOpeningGreeting(cleanText)) {
+      content = `<p style="font-size: 15px; line-height: 1.65; color: #334155; margin: 0; white-space: pre-line;">${cleanText}</p>`;
+    } else {
+      content = `${greetingHtml}<p style="font-size: 15px; line-height: 1.65; color: #334155; margin: 0; white-space: pre-line;">${cleanText}</p>`;
+    }
   }
 
   return `
@@ -100,7 +141,7 @@ function renderBrandedEmailHtml(params: BrandedEmailParams): string {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${params.title}</title>
+      <title>${cleanTitle}</title>
     </head>
     <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px 12px; -webkit-font-smoothing: antialiased;">
       <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);">
@@ -114,7 +155,7 @@ function renderBrandedEmailHtml(params: BrandedEmailParams): string {
         </tr>
         <tr>
           <td style="padding: 28px 28px 20px;">
-            <h2 style="color: #0f172a; font-size: 18px; font-weight: 700; margin-top: 0; margin-bottom: 18px; line-height: 1.4;">${params.title}</h2>
+            <h2 style="color: #0f172a; font-size: 18px; font-weight: 700; margin-top: 0; margin-bottom: 18px; line-height: 1.4;">${cleanTitle}</h2>
             <div style="font-size: 15px; line-height: 1.6; color: #334155;">
               ${content}
             </div>
@@ -303,10 +344,14 @@ Deno.serve(async (req: Request) => {
       let subject = "DIVA Asso";
       let bodyText = notif.message || "";
 
-      if (notif.type === "ADMIN_BROADCAST" && bodyText.includes("\n\n")) {
-        const parts = bodyText.split("\n\n");
-        subject = parts[0].trim();
-        bodyText = parts.slice(1).join("\n\n").trim();
+      if (notif.type === "ADMIN_BROADCAST") {
+        if (bodyText.includes("\n\n")) {
+          const parts = bodyText.split("\n\n");
+          subject = formatBroadcastTitle(parts[0]);
+          bodyText = parts.slice(1).join("\n\n").trim();
+        } else {
+          subject = ASSO_TITLE_BADGE;
+        }
       }
 
       const emailHtml = renderBrandedEmailHtml({

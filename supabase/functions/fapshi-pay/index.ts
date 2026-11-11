@@ -832,11 +832,13 @@ async function insertInAppNotifications(
         ? `Hello, ${firstName} 👋`
         : `Salut, ${firstName} 👋`
       : "";
-    const hasGreeting =
-      r.message.startsWith("Salut") ||
-      r.message.startsWith("Bonjour") ||
-      r.message.startsWith("Hello") ||
-      r.message.startsWith("Hi");
+    const openingGreetingRe =
+      /^\s*(?:[\p{Extended_Pictographic}\uFE0F\u200D\u20E3\s]*)(?:salut|bonjour|bonsoir|coucou|hello|hi\b|hey\b|dear\b|cher|chère|félicitations|congratulations)\b/iu;
+    const hasGreeting = r.message
+      .trim()
+      .split(/\r?\n/)
+      .slice(0, 3)
+      .some((line) => openingGreetingRe.test(line));
     const finalMessage =
       greeting && !hasGreeting ? `${greeting} ! ${r.message}` : r.message;
     const vars = {

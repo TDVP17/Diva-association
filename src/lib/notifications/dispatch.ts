@@ -3,7 +3,11 @@ import { getUnreadInAppNotificationCount } from "@/lib/notifications/unread";
 import type { NotificationChannel, NotificationEventType } from "@/generated/prisma/enums";
 import { sendPushToUser } from "@/lib/push/send";
 import { sendEmailSafe } from "@/lib/email/resend";
-import { renderBrandedEmailHtml } from "@/lib/email/template";
+import {
+  formatBroadcastTitle,
+  hasOpeningGreeting,
+  renderBrandedEmailHtml,
+} from "@/lib/email/template";
 import { NOTIFICATION_TYPE_KEY } from "@/lib/notifications/type-labels";
 import { translate, translations, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 
@@ -93,13 +97,19 @@ export async function scheduleNotifications(params: {
       r.messageKey && r.messageKey in translations[lang]
         ? translate(lang, r.messageKey as TranslationKey, vars)
         : r.message;
-    const hasGreeting =
-      msg.startsWith("Salut") ||
-      msg.startsWith("Bonjour") ||
-      msg.startsWith("Hello") ||
-      msg.startsWith("Hi");
 
-    if (greeting && !hasGreeting) {
+    if (params.type === "ADMIN_BROADCAST" && msg.includes("\n\n")) {
+      const [rawSubject, ...rest] = msg.split("\n\n");
+      const cleanSubject = formatBroadcastTitle(rawSubject);
+      const rawBody = rest.join("\n\n").trim();
+      const bodyWithGreeting =
+        greeting && rawBody && !hasOpeningGreeting(rawBody)
+          ? `${greeting}\n\n${rawBody}`
+          : greeting && !rawBody
+            ? greeting
+            : rawBody;
+      msg = bodyWithGreeting ? `${cleanSubject}\n\n${bodyWithGreeting}` : cleanSubject;
+    } else if (greeting && !hasOpeningGreeting(msg)) {
       msg = `${greeting} ! ${msg}`;
     }
 
@@ -217,22 +227,20 @@ async function deliverInstantNotifications(params: {
               ? translate(lang, r.messageKey as TranslationKey, vars)
               : r.message;
 
-          // Ensure push/body begins with personalized greeting with emoji
-          const hasGreeting =
-            body.startsWith("Salut") ||
-            body.startsWith("Bonjour") ||
-            body.startsWith("Hello") ||
-            body.startsWith("Hi");
-
-          if (greeting && !hasGreeting) {
-            body = `${greeting} ! ${body}`;
-          }
-
-          if (params.type === "ADMIN_BROADCAST" && r.message.includes("\n\n")) {
-            const [parsedSubject, ...rest] = r.message.split("\n\n");
-            if (parsedSubject?.trim()) {
-              title = parsedSubject.trim();
-              body = rest.join("\n\n").trim() || body;
+          if (params.type === "ADMIN_BROADCAST" && body.includes("\n\n")) {
+            const [parsedSubject, ...rest] = body.split("\n\n");
+            title = formatBroadcastTitle(parsedSubject || title);
+            const rawBody = rest.join("\n\n").trim();
+            body =
+              greeting && rawBody && !hasOpeningGreeting(rawBody)
+                ? `${greeting}\n\n${rawBody}`
+                : rawBody || greeting || body;
+          } else {
+            if (params.type === "ADMIN_BROADCAST") {
+              title = formatBroadcastTitle(title);
+            }
+            if (greeting && !hasOpeningGreeting(body)) {
+              body = `${greeting} ! ${body}`;
             }
           }
 
