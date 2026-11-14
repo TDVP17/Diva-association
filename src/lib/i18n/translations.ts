@@ -1565,7 +1565,7 @@ export const translations = {
     dateAndTimeLabel: "Date et heure",
     amountCotised: "Montant cotisé",
     pureContributionAmount: "Cotisation nette",
-    feeAmountLabel: "Frais de gestion",
+    feeAmountLabel: "Frais",
     fineDetailLabel: "Amende de retard",
     transactionRefLabel: "Réf. transaction",
     payerPhoneLabel: "Téléphone payeur",

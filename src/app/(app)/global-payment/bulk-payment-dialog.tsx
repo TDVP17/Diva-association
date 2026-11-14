@@ -505,7 +505,7 @@ export function BulkPaymentDialog({
                 {feesTotal > 0 && (
                   <div className="flex justify-between items-center text-sm">
                     <span className="font-body-md text-body-md text-on-surface-variant">
-                      {lang === "fr" ? "Frais de gestion" : "Fees"}
+                      {lang === "fr" ? "Frais" : "Fees"}
                     </span>
                     <span className="font-label-md text-label-md text-on-surface">{formatXAF(feesTotal)}</span>
                   </div>
