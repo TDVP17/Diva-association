@@ -37,7 +37,7 @@ export async function TopAppBar({
   ];
 
   return (
-    <header className="w-full top-0 sticky shadow-sm bg-surface flex items-center justify-between px-container-padding h-16 z-40 shadow-[0px_4px_20px_rgba(30,41,59,0.05)]">
+    <header className="w-full top-0 sticky bg-surface flex items-center justify-between px-container-padding h-16 z-40">
       {/* Profile avatar + Logo and DIVA Asso. brand name */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         <Link href="/profile" className="flex-shrink-0" aria-label="Profil">

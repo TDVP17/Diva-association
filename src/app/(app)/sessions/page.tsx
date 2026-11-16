@@ -11,6 +11,8 @@ import { formatXAF } from "@/lib/format-currency";
 import { sessionStatusKey } from "@/lib/session-status-label";
 import { DescriptionPill } from "@/components/description-pill";
 import { FineRulePill } from "@/components/fine-rule-pill";
+import { SessionCardLink } from "./session-card-link";
+import { PotAmountBadge } from "./pot-amount-badge";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -127,7 +129,7 @@ export default async function SessionsPage() {
   return (
     <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-6xl mx-auto w-full flex flex-col gap-section-margin">
       <section>
-        <div className="sticky top-16 z-30 bg-background py-2 -mx-container-padding px-container-padding mb-stack-gap-md shadow-[0px_4px_20px_rgba(30,41,59,0.05)] flex items-center justify-between gap-2">
+        <div className="sticky top-16 z-30 bg-background py-2 -mx-container-padding px-container-padding mb-stack-gap-md flex items-center justify-between gap-2">
           <h2 className="font-title-md text-title-md text-primary">{t("mySessions")}</h2>
           {myCotisations.length > 0 && (
             <Link
@@ -147,13 +149,13 @@ export default async function SessionsPage() {
         ) : (
           <div className="flex flex-col gap-stack-gap-md lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-stack-gap-md">
             {myCotisations.map((m) => (
-              <Link
+              <SessionCardLink
                 key={m.id}
                 href={`/sessions/${m.tontineSession.id}`}
-                className="group relative bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-emerald-900/20 hover:border-emerald-700 flex items-center justify-between transition-all duration-150 cursor-pointer active:scale-[0.98] active:bg-emerald-50/80 active:border-emerald-700 active:shadow-inner"
+                className="group relative bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border-2 border-emerald-900/20 hover:border-emerald-700 flex items-center justify-between transition-all duration-150 active:scale-[0.98] active:bg-emerald-50/80 active:border-emerald-700 active:shadow-inner"
               >
                 <div>
-                  <h3 className="font-label-md text-label-md text-on-surface font-semibold group-hover:text-primary transition-colors">
+                  <h3 className="text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">
                     {m.tontineSession.title || TONTINE_LABELS[m.tontineSession.type]}
                   </h3>
                   {m.tontineSession.description && (
@@ -162,7 +164,7 @@ export default async function SessionsPage() {
                       label={t("seeDescription")}
                     />
                   )}
-                  <p className="font-label-sm text-label-sm text-on-surface-variant">
+                  <p className="text-xs text-on-surface-variant mt-0.5">
                     {m.status === "APPROVED"
                       ? m.slotCount === null
                         ? t("selectSlotsToStart")
@@ -200,7 +202,7 @@ export default async function SessionsPage() {
 
                     return (
                       <span
-                        className={`font-label-sm text-label-sm px-2 py-1 rounded pointer-events-none ${STATUS_STYLES[effectiveStatus]}`}
+                        className={`text-[11px] font-semibold px-2 py-0.5 rounded pointer-events-none ${STATUS_STYLES[effectiveStatus]}`}
                       >
                         {t(sessionStatusKey(effectiveStatus))}
                       </span>
@@ -210,7 +212,7 @@ export default async function SessionsPage() {
                     <HideClosedSessionButton membershipId={m.id} lang={lang} />
                   )}
                 </div>
-              </Link>
+              </SessionCardLink>
             ))}
           </div>
         )}
@@ -250,13 +252,13 @@ export default async function SessionsPage() {
         ) : (
           <div className="flex flex-col gap-stack-gap-md lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-stack-gap-md">
             {browsable.map((s) => (
-              <Link
+              <SessionCardLink
                 key={s.id}
                 href={`/sessions/${s.id}`}
-                className="group relative bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-emerald-900/20 hover:border-emerald-700 flex items-center justify-between transition-all duration-150 cursor-pointer active:scale-[0.98] active:bg-emerald-50/80 active:border-emerald-700 active:shadow-inner"
+                className="group relative bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border-2 border-emerald-900/20 hover:border-emerald-700 flex items-center justify-between transition-all duration-150 active:scale-[0.98] active:bg-emerald-50/80 active:border-emerald-700 active:shadow-inner"
               >
                 <div>
-                  <h3 className="font-label-md text-label-md text-on-surface font-semibold group-hover:text-primary transition-colors">
+                  <h3 className="text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">
                     {s.title || TONTINE_LABELS[s.type]}
                   </h3>
                   {s.description && (
@@ -265,7 +267,7 @@ export default async function SessionsPage() {
                       label={t("seeDescription")}
                     />
                   )}
-                  <p className="font-label-sm text-label-sm text-on-surface-variant">
+                  <p className="text-xs text-on-surface-variant mt-0.5">
                     {t("startsOn")} {s.startDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short", year: "numeric" })}
                   </p>
                   {(() => {
@@ -275,13 +277,13 @@ export default async function SessionsPage() {
                     return (
                       <>
                         {membersCount > 0 && (
-                          <p className="font-label-sm text-label-sm text-primary mt-0.5">
+                          <p className="text-xs text-primary mt-0.5">
                             {t("validatedMembersCount", {
                               count: String(membersCount),
                             })}
                           </p>
                         )}
-                        <p className="font-label-sm text-label-sm text-on-surface-variant mt-1 flex items-center gap-1 flex-wrap">
+                        <p className="text-xs text-on-surface-variant mt-1 flex items-center gap-1 flex-wrap">
                           <span className="font-numeric-data text-on-surface font-semibold">{formatXAF(Number(s.amount))}</span>
                           <span>{t("plusFeeSuffix", { fee: formatXAF(Number(s.fee)) })}</span>
                         </p>
@@ -305,8 +307,8 @@ export default async function SessionsPage() {
                     );
                   })()}
                 </div>
-                <span className="material-symbols-outlined text-outline">chevron_right</span>
-              </Link>
+                <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
+              </SessionCardLink>
             ))}
           </div>
         )}
@@ -323,13 +325,13 @@ export default async function SessionsPage() {
         ) : (
           <div className="flex flex-col gap-stack-gap-md lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-stack-gap-md">
             {activeCotisationsList.map((c) => (
-              <Link
+              <SessionCardLink
                 key={c.id}
                 href={`/sessions/${c.id}`}
-                className="group relative bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-emerald-900/20 hover:border-emerald-700 flex items-center justify-between transition-all duration-150 cursor-pointer active:scale-[0.98] active:bg-emerald-50/80 active:border-emerald-700 active:shadow-inner h-full"
+                className="group relative bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border-2 border-emerald-900/20 hover:border-emerald-700 flex items-center justify-between transition-all duration-150 active:scale-[0.98] active:bg-emerald-50/80 active:border-emerald-700 active:shadow-inner h-full"
               >
                 <div>
-                  <h3 className="font-label-md text-label-md text-on-surface font-semibold group-hover:text-primary transition-colors">
+                  <h3 className="text-sm font-semibold text-on-surface group-hover:text-primary transition-colors">
                     {c.title}
                   </h3>
                   {c.description && (
@@ -338,7 +340,7 @@ export default async function SessionsPage() {
                       label={t("seeDescription")}
                     />
                   )}
-                  <p className="font-label-sm text-label-sm text-on-surface-variant">
+                  <p className="text-xs text-on-surface-variant mt-0.5">
                     {t("startsOn")}{" "}
                     {c.startDate.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
                       day: "numeric",
@@ -346,24 +348,21 @@ export default async function SessionsPage() {
                       year: "numeric",
                     })}
                   </p>
-                  <p className="font-label-sm text-label-sm text-primary mt-0.5">
+                  <p className="text-xs text-primary mt-0.5">
                     {t("validatedMembersCount", { count: String(c.membersCount) })}
                   </p>
-                  <p className="font-label-sm text-label-sm text-on-surface-variant mt-1 flex items-center gap-1 flex-wrap">
+                  <p className="text-xs text-on-surface-variant mt-1 flex items-center gap-1 flex-wrap">
                     <span className="font-numeric-data text-on-surface font-semibold">{formatXAF(c.amount)}</span>
                     <span>{t("plusFeeSuffix", { fee: formatXAF(c.fee) })}</span>
                   </p>
                   {(() => {
                     const pot = Math.round(c.totalSlots * (c.amount + 0.25 * (c.fee ?? 0)));
                     return (
-                      <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold">
-                        <span className="material-symbols-outlined text-[14px] text-emerald-600">emoji_events</span>
-                        <span>{t("totalPotToEat")} : {formatXAF(pot)}</span>
-                      </div>
+                      <PotAmountBadge potAmount={pot} label={t("totalPotToEat")} />
                     );
                   })()}
-                  <p className="font-label-sm text-label-sm text-red-600 font-semibold mt-1.5 flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[16px]">block</span>
+                  <p className="text-xs text-red-600 font-semibold mt-1.5 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[15px]">block</span>
                     {t("newMemberNotAllowed")}
                   </p>
                   {(() => {
@@ -382,11 +381,11 @@ export default async function SessionsPage() {
                   })()}
                 </div>
                 <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                  <span className={`font-label-sm text-label-sm px-2.5 py-1 rounded font-bold tracking-wide uppercase shadow-sm ${c.isActive ? "bg-emerald-600 text-white" : "bg-red-600 text-white"}`}>
+                  <span className={`text-[11px] font-bold tracking-wide uppercase px-2 py-0.5 rounded shadow-sm ${c.isActive ? "bg-emerald-600 text-white" : "bg-red-600 text-white"}`}>
                     {c.isActive ? t("tagActiveStatus") : (c.isFull ? t("tagFullStatus") : t("tagActiveStatus"))}
                   </span>
                 </div>
-              </Link>
+              </SessionCardLink>
             ))}
           </div>
         )}

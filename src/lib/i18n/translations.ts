@@ -39,7 +39,7 @@ export const translations = {
     signupCodeResent: "A new confirmation code has been sent to your email.",
 
     // Dashboard
-    yourTontines: "Your Tontines",
+    yourTontines: "My Tontines",
     notInActiveTontine: "You're not part of any active tontine session yet.",
     unpaidFines: "Unpaid Fines",
     finesNavItem: "Fines",
@@ -1302,7 +1302,7 @@ export const translations = {
     signupCodeResent: "Un nouveau code a été envoyé à votre adresse e-mail.",
 
     // Dashboard
-    yourTontines: "Vos Tontines",
+    yourTontines: "Mes Tontines",
     notInActiveTontine: "Vous ne faites partie d'aucune session de tontine active pour le moment.",
     unpaidFines: "Amendes impayées",
     finesNavItem: "Amendes",

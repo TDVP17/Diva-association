@@ -16,6 +16,7 @@ import { processFapshiTransaction } from "@/lib/process-fapshi-transaction";
 import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { formatXAF } from "@/lib/format-currency";
 import { FinesInfoAccordion } from "./fines-info-accordion";
+import { FeesInfoAccordion } from "./fees-info-accordion";
 import { PayButton } from "./pay-button";
 import { JoinButton } from "./join-button";
 import { VerificationPollingRefresh } from "./verification-status";
@@ -248,6 +249,11 @@ export default async function SessionDetailPage({
           )}
         </section>
         <div className="mt-stack-gap-lg">
+          <FeesInfoAccordion
+            lang={lang}
+            contributionAmount={Number(tontineSession.amount)}
+            serviceFee={Number(tontineSession.fee)}
+          />
           <FinesInfoAccordion
             lang={lang}
             fineAmount={fineAmount}
@@ -282,6 +288,11 @@ export default async function SessionDetailPage({
           </p>
         </section>
         <div className="mt-stack-gap-lg">
+          <FeesInfoAccordion
+            lang={lang}
+            contributionAmount={Number(tontineSession.amount)}
+            serviceFee={Number(tontineSession.fee)}
+          />
           <FinesInfoAccordion
             lang={lang}
             fineAmount={fineAmount}
@@ -357,6 +368,11 @@ export default async function SessionDetailPage({
           return <SelectSlotsForm tontineSessionId={id} lang={lang} maxAvailableSlots={availableSlots} />;
         })()}
         <div className="mt-stack-gap-lg">
+          <FeesInfoAccordion
+            lang={lang}
+            contributionAmount={Number(tontineSession.amount)}
+            serviceFee={Number(tontineSession.fee)}
+          />
           <FinesInfoAccordion
             lang={lang}
             fineAmount={fineAmount}
@@ -780,6 +796,12 @@ export default async function SessionDetailPage({
           maxSlots={tontineSession.maxSlots ? Math.max(Number(tontineSession.maxSlots), 15) : null}
           startDate={tontineSession.startDate}
           isFinished={isSessionFinished}
+        />
+
+        <FeesInfoAccordion
+          lang={lang}
+          contributionAmount={Number(tontineSession.amount)}
+          serviceFee={Number(tontineSession.fee)}
         />
 
         <FinesInfoAccordion

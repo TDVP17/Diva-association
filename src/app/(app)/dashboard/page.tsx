@@ -7,6 +7,7 @@ import { getLang, getTranslator } from "@/lib/i18n/get-lang";
 import { formatXAF } from "@/lib/format-currency";
 import { sessionStatusKey } from "@/lib/session-status-label";
 import { DescriptionPill } from "@/components/description-pill";
+import { SessionCardLink } from "../sessions/session-card-link";
 
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
@@ -78,7 +79,7 @@ export default async function DashboardPage({
         </div>
       )}
       <section>
-        <h2 className="sticky top-16 z-30 bg-background py-2 -mx-container-padding px-container-padding font-title-md text-title-md text-primary mb-stack-gap-md shadow-[0px_4px_20px_rgba(30,41,59,0.05)]">
+        <h2 className="sticky top-16 z-30 bg-background py-2 -mx-container-padding px-container-padding font-title-md text-title-md text-primary mb-stack-gap-md">
           {t("yourTontines")}
         </h2>
         {memberships.length === 0 ? (
@@ -100,13 +101,13 @@ export default async function DashboardPage({
                 fee: Number(m.tontineSession.fee),
               });
               return (
-                <Link
+                <SessionCardLink
                   key={m.id}
                   href={`/sessions/${m.tontineSession.id}`}
-                  className="group relative bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-emerald-900/20 hover:border-emerald-700 flex items-center justify-between transition-all duration-150 cursor-pointer active:scale-[0.98] active:bg-emerald-50/80 active:border-emerald-700 active:shadow-inner"
+                  className="group relative bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border-2 border-emerald-900/20 hover:border-emerald-700 flex items-center justify-between transition-all duration-150 active:scale-[0.98] active:bg-emerald-50/80 active:border-emerald-700 active:shadow-inner"
                 >
                   <div>
-                    <h3 className="font-label-md text-label-md text-primary uppercase tracking-wide">
+                    <h3 className="text-sm font-semibold text-primary uppercase tracking-wide">
                       {m.tontineSession.title || TONTINE_LABELS[m.tontineSession.type]}
                     </h3>
                     {m.tontineSession.description && (
@@ -123,7 +124,7 @@ export default async function DashboardPage({
                       const effectiveStatus = isDrawDone ? "ACTIVE" : m.tontineSession.status;
 
                       return (
-                        <p className="font-label-sm text-label-sm text-on-surface-variant mt-1 flex items-center gap-1.5 flex-wrap">
+                        <p className="text-xs text-on-surface-variant mt-1 flex items-center gap-1.5 flex-wrap">
                           <span className="font-numeric-data text-on-surface font-semibold">{formatXAF(amount)}</span>
                           <span>({t("plusFeeSuffix", { fee: formatXAF(fee) })})</span>
                           <span>&middot;</span>
@@ -132,8 +133,8 @@ export default async function DashboardPage({
                       );
                     })()}
                   </div>
-                  <span className="material-symbols-outlined text-outline">chevron_right</span>
-                </Link>
+                  <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
+                </SessionCardLink>
               );
             })}
           </div>
