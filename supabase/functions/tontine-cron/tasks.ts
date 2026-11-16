@@ -13,6 +13,7 @@ import {
   renderAdvanceReminderMessage,
   renderFineNoticeMessage,
   renderFoodTurnMessage,
+  renderOverdueBlockingMessage,
   renderReminderEveMessage,
   renderReminderNoonMessage,
   renderReminderUrgentMessage,
@@ -870,6 +871,169 @@ export async function runProcessRefundQueueTask(
 }
 
 // ---------------------------------------------------------------------------
+// 8. TÂCHE : Relance quotidienne des retardataires bloquant la cagnotte (09:00 WAT / 08:00 UTC)
+// ---------------------------------------------------------------------------
+export async function runOverdueReminderTask(
+  supabase: SupabaseClient,
+  now = new Date(),
+): Promise<TaskResult> {
+  let remindersSent = 0;
+  const STAGGER_MS = 3 * 60 * 1000; // 3 minutes d'écart entre chaque envoi d'email
+  const twentyHoursAgo = new Date(now.getTime() - 20 * 60 * 60 * 1000).toISOString();
+
+  const { data: activeSessions } = await supabase
+    .from("tontine_sessions")
+    .select(`
+      id,
+      title,
+      type,
+      startDate,
+      amount,
+      fee,
+      memberships:memberships!inner(
+        id,
+        userId,
+        status,
+        user:users!inner(id, name, email, preferredLang),
+        slots:membership_slots(id, beneficiaryName, createdAt)
+      )
+    `)
+    .eq("status", "ACTIVE")
+    .eq("memberships.status", "APPROVED");
+
+  for (const session of activeSessions || []) {
+    if (!session.startDate) continue;
+
+    const approvedMemberships = session.memberships || [];
+    const allSlots = approvedMemberships.flatMap((m: any) => m.slots || []);
+    const totalSlots = allSlots.length || 1;
+    const sessionTitle = session.title || session.type;
+    const totalAmount = Number(session.amount) + Number(session.fee);
+
+    // Identifier les utilisateurs ayant au moins une cotisation échue et impayée
+    const overdueUsers = new Map<string, { user: any; slot: any; unpaidCount: number }>();
+
+    for (let round = 1; round <= totalSlots; round++) {
+      const roundDueDate = getCycleDateForRound(
+        session.type as TontineType,
+        new Date(session.startDate),
+        round,
+      );
+
+      if (roundDueDate > now) break; // Rondes futures, arrêt
+      const cutoff = getCutoffInstant(roundDueDate);
+      if (now < cutoff) continue; // Pas encore dépassé l'heure limite (18h31)
+
+      const roundDueDateIso = toDueDateKey(roundDueDate).toISOString();
+
+      for (const m of approvedMemberships) {
+        for (const slot of m.slots || []) {
+          if (slot.createdAt && new Date(slot.createdAt) > cutoff) continue;
+
+          const { data: contrib } = await supabase
+            .from("contributions")
+            .select("id, status")
+            .eq("membershipSlotId", slot.id)
+            .eq("dueDate", roundDueDateIso)
+            .maybeSingle();
+
+          if (contrib?.status !== "PAID") {
+            const userId = m.userId;
+            const existing = overdueUsers.get(userId);
+            if (existing) {
+              existing.unpaidCount += 1;
+            } else {
+              overdueUsers.set(userId, { user: m.user, slot, unpaidCount: 1 });
+            }
+          }
+        }
+      }
+    }
+
+    // Programmer les relances pour chaque retardataire (déduplication 20h + espacement 3 min)
+    for (const [userId, { user, slot, unpaidCount }] of overdueUsers.entries()) {
+      // Déduplication : max 1 rappel de blocage par 20h pour cette session
+      const { data: recentNotifs } = await supabase
+        .from("notifications")
+        .select("id")
+        .eq("userId", userId)
+        .eq("tontineSessionId", session.id)
+        .eq("type", "CONTRIBUTION_REMINDER")
+        .eq("messageKey", "overdueBlockingReminderMessage")
+        .gte("createdAt", twentyHoursAgo)
+        .limit(1);
+
+      if (recentNotifs && recentNotifs.length > 0) {
+        continue;
+      }
+
+      const lang = user?.preferredLang === "en" ? "en" : "fr";
+      const rawName = user?.name || "Membre";
+      const firstName = rawName.trim().split(/\s+/)[0] || rawName;
+      const effectiveAmount = totalAmount * unpaidCount;
+      const msg = renderOverdueBlockingMessage(lang, firstName, sessionTitle, effectiveAmount);
+
+      // 1. Notification In-App
+      await supabase.from("notifications").insert({
+        id: createId(),
+        userId,
+        tontineSessionId: session.id,
+        membershipSlotId: slot.id,
+        channel: "IN_APP",
+        type: "CONTRIBUTION_REMINDER",
+        status: "SENT",
+        message: msg,
+        messageKey: "overdueBlockingReminderMessage",
+        messageVars: {
+          name: firstName,
+          cotisation: sessionTitle,
+          amount: formatXAF(effectiveAmount),
+        },
+        actionUrl: `/sessions/${session.id}`,
+        createdAt: new Date().toISOString(),
+      });
+
+      // 2. Notification Email programmée avec écart anti-spam (STAGGER_MS = 3 minutes)
+      if (user?.email) {
+        const scheduledTime = new Date(Date.now() + remindersSent * STAGGER_MS).toISOString();
+        await supabase.from("notifications").insert({
+          id: createId(),
+          userId,
+          tontineSessionId: session.id,
+          membershipSlotId: slot.id,
+          channel: "EMAIL",
+          type: "CONTRIBUTION_REMINDER",
+          status: "SCHEDULED",
+          scheduledAt: scheduledTime,
+          message: msg,
+          actionUrl: `/sessions/${session.id}`,
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      // 3. Log de traçabilité
+      await supabase.from("notification_logs").insert({
+        id: createId(),
+        userId,
+        tontineSessionId: session.id,
+        dueDate: new Date().toISOString(),
+        type: "OVERDUE_BLOCKING",
+        sentAt: new Date().toISOString(),
+      });
+
+      remindersSent++;
+    }
+  }
+
+  return {
+    task: "overdue-reminder",
+    ok: true,
+    checkedAt: now.toISOString(),
+    details: { remindersSent },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // DISPATCHER AUTOMATIQUE (selon l'heure camerounaise actuelle)
 // ---------------------------------------------------------------------------
 export async function runAutoDispatcher(
@@ -884,6 +1048,11 @@ export async function runAutoDispatcher(
   // 08h00 WAT (07:00 UTC) -> Rappel tour du lendemain & cotisations anticipées
   if (hour === 8 || (hour === 7 && minute >= 55)) {
     results.push(await runTurnReminderTask(supabase, now));
+  }
+
+  // 09h00 WAT (08:00 UTC) -> Relance quotidienne des retardataires bloquant la cagnotte
+  if (hour === 9 || (hour === 8 && minute >= 55)) {
+    results.push(await runOverdueReminderTask(supabase, now));
   }
 
   // 10h00 WAT (09:00 UTC) -> Rappel J-1

@@ -3,6 +3,7 @@ import {
   runAutoDispatcher,
   runCheckPenaltiesTask,
   runFoodTurnTask,
+  runOverdueReminderTask,
   runProcessRefundQueueTask,
   runReminderEveTask,
   runReminderNoonTask,
@@ -139,6 +140,9 @@ Deno.serve(async (req: Request) => {
       case "check-penalties":
         return jsonResponse(await runCheckPenaltiesTask(supabase, now));
 
+      case "overdue-reminder":
+        return jsonResponse(await runOverdueReminderTask(supabase, now));
+
       case "process-refund-queue":
         return jsonResponse(await runProcessRefundQueueTask(supabase, now));
 
@@ -150,6 +154,7 @@ Deno.serve(async (req: Request) => {
           await runReminderUrgentTask(supabase, now),
           await runFoodTurnTask(supabase, now),
           await runCheckPenaltiesTask(supabase, now),
+          await runOverdueReminderTask(supabase, now),
           await runProcessRefundQueueTask(supabase, now),
         ];
         return jsonResponse({

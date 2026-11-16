@@ -868,6 +868,8 @@ export const translations = {
     notificationHistory: "Notification History",
     contributionReminderMessage:
       "Hello {name} 👋\nJust a friendly reminder that your contribution for the {cotisation} has not yet been recorded. Don't forget to make your contribution before the deadline. ❤️",
+    overdueBlockingReminderMessage:
+      "Hello, {name} 👋\n\n⚠️ OVERDUE CONTRIBUTION — DIVA Asso\n\nYour contribution for \"{cotisation}\" is still unpaid. The entire tontine is waiting for your contribution to release the payout to this week's beneficiary and move to the next week.\n\nPlease log in and complete your payment as soon as possible. 🙏",
     fineReminderMessage:
       "Hello {name} ❤️\nThis is a friendly reminder about your outstanding fine of {amount}. Please remember to settle it before the contribution closes so that you remain eligible to participate in future contributions. 🙏",
     foodTurnMessage:
@@ -2134,6 +2136,8 @@ export const translations = {
     notificationHistory: "Historique des notifications",
     contributionReminderMessage:
       "Salut, {name} 👋\n\nPetit rappel amical : votre contribution pour {cotisation} n'a pas encore été enregistrée. N'oubliez pas de contribuer avant l'échéance. 🌿⏰",
+    overdueBlockingReminderMessage:
+      "Salut, {name} 👋\n\n⚠️ COTISATION EN RETARD — DIVA Asso\n\nVotre contribution pour « {cotisation} » est toujours impayée. Toute la tontine attend votre cotisation pour pouvoir débloquer la cagnotte du bénéficiaire et passer à la semaine suivante.\n\nMerci de vous connecter à l'application pour régler votre part dès maintenant ! 🙏",
     fineReminderMessage:
       "Salut, {name} 👋 ❤️\n\nPetit rappel amical concernant votre amende impayée de {amount}. Merci de la régler avant la clôture de la cotisation pour rester éligible aux prochaines cotisations. 🙏",
     foodTurnMessage:

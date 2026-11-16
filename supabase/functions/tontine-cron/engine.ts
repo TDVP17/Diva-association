@@ -415,3 +415,15 @@ export function renderAdvanceReminderMessage(
   return `Salut, ${name} 👋 Rappel DIVA Asso : votre cotisation de ${formatXAF(amount)} pour « ${sessionTitle} » arrive dans ${daysBefore} jour(s). Vous pouvez cotiser dès maintenant en toute sérénité dans l'application !`;
 }
 
+export function renderOverdueBlockingMessage(
+  lang: string,
+  name: string,
+  cotisationTitle: string,
+  amount: number,
+): string {
+  if (lang === "en") {
+    return `Hello, ${name} 👋 ⚠️ OVERDUE CONTRIBUTION — DIVA Asso\n\nYour contribution of ${formatXAF(amount)} for "${cotisationTitle}" is still unpaid.\n\nThe entire tontine is waiting for your contribution to release the payout to this week's beneficiary and move to the next week.\n\nPlease log into the app and settle your contribution now!`;
+  }
+  return `Salut, ${name} 👋 ⚠️ COTISATION EN RETARD — DIVA Asso\n\nVotre contribution de ${formatXAF(amount)} pour « ${cotisationTitle} » est toujours impayée.\n\nToute la tontine attend votre cotisation pour pouvoir débloquer la cagnotte du bénéficiaire et passer à la semaine suivante.\n\nMerci de vous connecter à l'application pour régler votre part dès maintenant !`;
+}
+

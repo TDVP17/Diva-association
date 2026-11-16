@@ -43,14 +43,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const dueDate = getNextDueDate(tontineSession.type, new Date());
     const unpaid = await getUnpaidSlots(tontineSessionId, dueDate);
     const seen = new Set<string>();
+
+    const now = new Date();
+    // Vérifier si l'heure limite de 18h31 WAT (17h31 UTC) est passée pour la ronde en cours
+    const isPastCutoff = now.getUTCHours() > 17 || (now.getUTCHours() === 17 && now.getUTCMinutes() >= 31);
+    const isOverdue = now >= dueDate || isPastCutoff;
+
     for (const slot of unpaid) {
       if (parsed.data.memberIds && !parsed.data.memberIds.includes(slot.userId)) continue;
       if (seen.has(slot.userId)) continue; // one reminder per member, not per slot
       seen.add(slot.userId);
       const lang = slot.user.preferredLang === "en" ? "en" : "fr";
+      const messageKey = isOverdue ? "overdueBlockingReminderMessage" : "contributionReminderMessage";
       recipients.push({
         userId: slot.userId,
-        message: translate(lang, "contributionReminderMessage", { name: slot.user.name, cotisation: sessionLabel }),
+        message: translate(lang, messageKey, { name: slot.user.name, cotisation: sessionLabel }),
       });
     }
   } else {
