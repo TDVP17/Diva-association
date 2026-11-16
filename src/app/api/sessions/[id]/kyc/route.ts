@@ -156,6 +156,31 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const applicantFullName = (formData.get("applicantFullName") as string | null)?.trim() ?? "";
     const residenceCity = (formData.get("residenceCity") as string | null)?.trim() ?? "";
     const residenceNeighborhood = (formData.get("residenceNeighborhood") as string | null)?.trim() ?? "";
+    const latitudeRaw = (formData.get("latitude") as string | null)?.trim() ?? "";
+    const longitudeRaw = (formData.get("longitude") as string | null)?.trim() ?? "";
+
+    const uploadedImagesCount = fields.filter((f) => f.file !== null).length;
+    if (uploadedImagesCount < 2) {
+      return NextResponse.json(
+        {
+          error: "Veuillez fournir au minimum 2 photos : votre photo et votre CNI / récépissé.",
+          errorKey: "kycAtLeastTwoImagesRequired",
+        },
+        { status: 400 },
+      );
+    }
+
+    const lat = parseFloat(latitudeRaw);
+    const lon = parseFloat(longitudeRaw);
+    if (isNaN(lat) || isNaN(lon)) {
+      return NextResponse.json(
+        {
+          error: "Le partage de votre position géographique est obligatoire.",
+          errorKey: "kycLocationRequired",
+        },
+        { status: 400 },
+      );
+    }
 
     const combinedSize = (fields[0].file?.size ?? 0) + (fields[1].file?.size ?? 0) + (fields[2].file?.size ?? 0);
     if (combinedSize > MAX_COMBINED_BYTES) {
@@ -338,10 +363,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
               },
             });
 
-            const locationUpdate: { city?: string; neighborhood?: string; name?: string } = {};
+            const locationUpdate: {
+              city?: string;
+              neighborhood?: string;
+              name?: string;
+              latitude?: number;
+              longitude?: number;
+            } = {};
             if (residenceCity) locationUpdate.city = residenceCity;
             if (residenceNeighborhood) locationUpdate.neighborhood = residenceNeighborhood;
             if (applicantFullName) locationUpdate.name = applicantFullName;
+            if (!isNaN(lat) && !isNaN(lon)) {
+              locationUpdate.latitude = lat;
+              locationUpdate.longitude = lon;
+            }
 
             if (Object.keys(locationUpdate).length > 0 && typeof tx.user?.update === "function") {
               await tx.user.update({

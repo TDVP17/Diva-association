@@ -146,10 +146,10 @@ function renderReceiptBrandedEmailHtml(params: {
         <tr>
           <td style="padding: 20px 24px 28px; background-color: #f8fafc; border-top: 1px solid #f1f5f9; text-align: center;">
             <p style="font-size: 12px; color: #64748b; margin: 0 0 6px 0;">
-              <strong>DIVA Asso.</strong> — Plateforme sécurisée de gestion des tontines et cotisations
+              <strong>DIVA Asso.</strong> — Plateforme sécurisée de gestion des tontines, cotisations et prêts
             </p>
             <p style="font-size: 11px; color: #94a3b8; margin: 0;">
-              <a href="${baseUrl}" style="color: #003528; text-decoration: underline;">www.divaasso.com</a> • Bertoua, Cameroun
+              © ${new Date().getFullYear()} <a href="https://divaasso.com" style="color: #003528; text-decoration: underline;">divaasso.com</a> • Cameroun
             </p>
           </td>
         </tr>

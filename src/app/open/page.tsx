@@ -126,7 +126,7 @@ function SmartOpenContent() {
       </div>
 
       <p className="text-[11px] text-gray-400 mt-4">
-        DIVA Asso • Bertoua, Cameroun • www.divaasso.com
+        © {new Date().getFullYear()} DIVA Asso • Cameroun • divaasso.com
       </p>
     </div>
   );

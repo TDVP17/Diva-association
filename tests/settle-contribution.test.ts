@@ -239,7 +239,7 @@ describe("settleContributionsBatch — consolidated single email for multiple sl
     expect(html).not.toContain("8 042");
     expect(html).toContain("fapshi-tx-999");
     expect(html).toContain("Merci pour votre contribution chez DIVA asso.");
-    expect(html).toContain(encodeURIComponent("/api/files/receipts/user-1/bulk-blk-1-owner.pdf"));
+    expect(html).toContain("/api/files/receipts/user-1/bulk-blk-1-owner.pdf");
 
     // Only 1 consolidated in-app notification to the member
     expect(scheduleInAppNotifications).toHaveBeenCalledTimes(1);

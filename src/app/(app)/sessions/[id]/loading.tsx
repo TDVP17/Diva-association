@@ -5,3 +5,4 @@ export default async function SessionDetailsLoading() {
   const lang = await getLang();
   return <AppLoadingScreen lang={lang} />;
 }
+

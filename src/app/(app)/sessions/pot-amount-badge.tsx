@@ -46,3 +46,4 @@ export function PotAmountBadge({ potAmount, label }: PotAmountBadgeProps) {
     </button>
   );
 }
+

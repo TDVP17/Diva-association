@@ -44,3 +44,4 @@ export function SessionCardLink({ href, className = "", children }: SessionCardL
     </div>
   );
 }
+

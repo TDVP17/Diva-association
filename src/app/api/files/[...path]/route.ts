@@ -133,9 +133,11 @@ export async function GET(
           paidAt: targetContribs[0].paidAt ?? targetContribs[0].createdAt,
         });
 
+        const downloadFilename = `Recu_DIVA_Paiement_${bulkPayment.transId ?? bulkPaymentId}.pdf`;
         return new NextResponse(new Uint8Array(pdfBytes), {
           headers: {
             "Content-Type": "application/pdf",
+            "Content-Disposition": `attachment; filename="${downloadFilename}"`,
             "Cache-Control": "private, max-age=0, no-store",
           },
         });
@@ -196,9 +198,11 @@ export async function GET(
           transRef: contrib.fapshiTxRef ?? contrib.id,
           paidAt: contrib.paidAt ?? contrib.createdAt,
         });
+        const downloadFilename = `Recu_DIVA_Cotisation_${contrib.fapshiTxRef ?? contrib.id}.pdf`;
         return new NextResponse(new Uint8Array(pdfBytes), {
           headers: {
             "Content-Type": "application/pdf",
+            "Content-Disposition": `attachment; filename="${downloadFilename}"`,
             "Cache-Control": "private, max-age=0, no-store",
           },
         });
@@ -216,12 +220,15 @@ export async function GET(
 
   try {
     const data = await readStoredFile(key);
-    return new NextResponse(new Uint8Array(data), {
-      headers: {
-        "Content-Type": mimeTypeFor(key),
-        "Cache-Control": "private, max-age=0, no-store",
-      },
-    });
+    const mime = mimeTypeFor(key);
+    const headers: Record<string, string> = {
+      "Content-Type": mime,
+      "Cache-Control": "private, max-age=0, no-store",
+    };
+    if (mime === "application/pdf") {
+      headers["Content-Disposition"] = `attachment; filename="${filename || "Document_DIVA.pdf"}"`;
+    }
+    return new NextResponse(new Uint8Array(data), { headers });
   } catch {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
