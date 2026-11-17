@@ -110,6 +110,7 @@ export function PaymentConfirmDialog({
   const checkingRef = useRef(false);
   const hintRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // null while loading; [] once loaded (empty, or the fetch 401'd — the
   // public/anonymous pay-slot flow has no session, so this silently
@@ -135,9 +136,20 @@ export function PaymentConfirmDialog({
   // `phone` input state, which stays empty when a saved method (not the
   // free-text field) is what's being used.
   const [usedPhone, setUsedPhone] = useState("");
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [payingWithWallet, setPayingWithWallet] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    fetch("/api/wallet")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { user?: { walletBalance?: number } } | null) => {
+        if (!cancelled && data?.user && typeof data.user.walletBalance === "number") {
+          setWalletBalance(data.user.walletBalance);
+        }
+      })
+      .catch(() => {});
+
     fetch("/api/profile/payment-methods")
       .then((res) => (res.ok ? res.json() : null))
       .then((body: { methods: SavedMethod[] } | null) => {
@@ -266,6 +278,10 @@ export function PaymentConfirmDialog({
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
   }
 
   useEffect(() => {
@@ -286,7 +302,12 @@ export function PaymentConfirmDialog({
       stopWatching();
       playSuccessChimeSound();
       setStep("success");
-      setTimeout(() => onSettled(), 1500);
+      // Déclencher immédiatement la mise à jour des slots pour cocher les noms sans attendre
+      try {
+        onSettled();
+      } catch (err) {
+        console.error("onSettled error:", err);
+      }
       return true;
     }
     if (status === "FAILED" || status === "EXPIRED") {
@@ -317,22 +338,35 @@ export function PaymentConfirmDialog({
     }
   }
 
-  // Étape 1 (STOP CPU): remplace l'ancien polling setInterval par Supabase Realtime
   function watchPaymentStatus(id: string) {
     stopWatching();
     settledOrDoneRef.current = false;
-    hintRef.current = setTimeout(() => setShowWaitingHint(true), 45_000);
-    // Hard timeout after 70 seconds — vérifie une seule fois auprès de Fapshi avant d'expirer
+    hintRef.current = setTimeout(() => setShowWaitingHint(true), 35_000);
+
+    // Polling actif rapide toutes les 2.5 secondes : dès que le membre valide son USSD, c'est détecté immédiatement
+    pollRef.current = setInterval(() => {
+      if (!settledOrDoneRef.current) {
+        void checkStatusOnce(id);
+      }
+    }, 2500);
+
+    // Timeout de sécurité après 90 secondes avec 2 vérifications agressives
     timeoutRef.current = setTimeout(async () => {
       const resolved = await checkStatusOnce(id);
       if (!resolved && !settledOrDoneRef.current) {
-        settledOrDoneRef.current = true;
-        stopWatching();
-        setFailedReason(t("ussdTimeoutReason"));
-        setFailCount((c) => c + 1);
-        setStep("failed");
+        // Seconde vérification de sécurité
+        setTimeout(async () => {
+          const resolvedSecond = await checkStatusOnce(id);
+          if (!resolvedSecond && !settledOrDoneRef.current) {
+            settledOrDoneRef.current = true;
+            stopWatching();
+            setFailedReason(t("ussdTimeoutReason"));
+            setFailCount((c) => c + 1);
+            setStep("failed");
+          }
+        }, 3000);
       }
-    }, 70_000);
+    }, 90_000);
 
     const handleVisibility = () => {
       if (document.visibilityState === "visible" && !settledOrDoneRef.current) {
@@ -396,6 +430,40 @@ export function PaymentConfirmDialog({
         void supabase.removeChannel(channel);
       }
     };
+  }
+
+  async function handlePayWithWallet() {
+    if (!quote || payingWithWallet || submitting) return;
+    setPayError(null);
+    setPayingWithWallet(true);
+    try {
+      const res = await fetch("/api/wallet/pay-contribution", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          fineId
+            ? { fineId }
+            : { membershipSlotId, ...(dueDate ? { dueDate } : {}) },
+        ),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPayError(data.error || "Impossible de payer avec le portefeuille.");
+        return;
+      }
+      setUsedPhone("Portefeuille DIVA (0% frais)");
+      if (data.reference) setTransId(data.reference);
+      if (typeof data.newBalance === "number") setWalletBalance(data.newBalance);
+      resolveTerminalStatus("SUCCESSFUL");
+    } catch {
+      setPayError(
+        lang === "fr"
+          ? "Erreur réseau lors du paiement par portefeuille."
+          : "Network error during wallet payment.",
+      );
+    } finally {
+      setPayingWithWallet(false);
+    }
   }
 
   async function handleConfirm() {
@@ -562,6 +630,61 @@ export function PaymentConfirmDialog({
                     {formatXAF(totalCharged)}
                   </span>
                 </div>
+              </div>
+            )}
+
+            {quote && walletBalance !== null && (
+              <div className="mb-4 p-3.5 rounded-xl border-2 border-emerald-600/30 bg-emerald-50/70 flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-emerald-700 text-[20px]">
+                      account_balance_wallet
+                    </span>
+                    <div>
+                      <p className="text-xs font-extrabold text-emerald-950">
+                        {lang === "fr"
+                          ? "Payer via mon Portefeuille DIVA"
+                          : "Pay via DIVA Wallet"}
+                      </p>
+                      <p className="text-[11px] text-emerald-800">
+                        {lang === "fr" ? "Solde :" : "Balance:"}{" "}
+                        <strong>{formatXAF(walletBalance)}</strong> ·{" "}
+                        <span className="font-bold text-emerald-700">0 % frais télécom</span>
+                      </p>
+                    </div>
+                  </div>
+                  {providerFeeAmount > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-700 text-white text-[10px] font-bold flex-shrink-0">
+                      -{formatXAF(providerFeeAmount)}
+                    </span>
+                  )}
+                </div>
+
+                {walletBalance >= quote.baseTotal ? (
+                  <button
+                    type="button"
+                    onClick={handlePayWithWallet}
+                    disabled={payingWithWallet || submitting}
+                    className="w-full py-2.5 px-3 rounded-lg bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] text-white font-bold text-xs transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5 shadow-xs"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">bolt</span>
+                    <span>
+                      {payingWithWallet
+                        ? lang === "fr"
+                          ? "Paiement instantané..."
+                          : "Processing..."
+                        : lang === "fr"
+                          ? `Payer ${formatXAF(quote.baseTotal)} (Instantané · 0 % frais)`
+                          : `Pay ${formatXAF(quote.baseTotal)} (Instant · 0% fee)`}
+                    </span>
+                  </button>
+                ) : (
+                  <p className="text-[11px] text-amber-800 font-medium">
+                    {lang === "fr"
+                      ? `Solde insuffisant pour payer ${formatXAF(quote.baseTotal)}. Rechargez votre portefeuille ou utilisez Mobile Money ci-dessous.`
+                      : `Insufficient balance for ${formatXAF(quote.baseTotal)}. Top up your wallet or pay via Mobile Money below.`}
+                  </p>
+                )}
               </div>
             )}
 
@@ -781,9 +904,68 @@ export function PaymentConfirmDialog({
         )}
 
         {step === "success" && (
-          <div className="flex flex-col items-center text-center gap-3 py-4">
-            <span className="material-symbols-outlined text-primary text-5xl">check_circle</span>
-            <h2 className="font-headline-sm text-headline-sm text-on-surface">{t("paymentReceivedTitle")}</h2>
+          <div className="flex flex-col items-center text-center gap-4 py-3 animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-inner">
+              <span className="material-symbols-outlined text-4xl">check_circle</span>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <h2 className="font-headline-sm text-xl font-bold text-on-surface">
+                {lang === "fr" ? "Paiement confirmé !" : "Payment Confirmed!"}
+              </h2>
+              <p className="font-body-sm text-xs text-on-surface-variant">
+                {lang === "fr"
+                  ? "Votre versement a été validé et enregistré instantanément."
+                  : "Your payment has been successfully recorded in real time."}
+              </p>
+            </div>
+
+            <div className="w-full bg-surface-container-low rounded-xl p-4 border border-outline-variant/60 text-left flex flex-col gap-2.5 text-xs sm:text-sm">
+              <div className="flex justify-between items-center py-1 border-b border-outline-variant/40">
+                <span className="text-on-surface-variant">{lang === "fr" ? "Motif" : "Purpose"}</span>
+                <span className="font-semibold text-on-surface truncate max-w-[200px] text-right">{description}</span>
+              </div>
+              {beneficiaryName && (
+                <div className="flex justify-between items-center py-1 border-b border-outline-variant/40">
+                  <span className="text-on-surface-variant">{lang === "fr" ? "Bénéficiaire" : "Beneficiary"}</span>
+                  <span className="font-semibold text-on-surface text-right">{beneficiaryName}</span>
+                </div>
+              )}
+              {usedPhone && (
+                <div className="flex justify-between items-center py-1 border-b border-outline-variant/40">
+                  <span className="text-on-surface-variant">{lang === "fr" ? "Numéro débité" : "Debited Phone"}</span>
+                  <span className="font-mono font-semibold text-on-surface">{usedPhone}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center py-1 pt-1.5">
+                <span className="font-medium text-on-surface">{lang === "fr" ? "Total payé" : "Total Paid"}</span>
+                <span className="font-bold text-base text-emerald-700">
+                  {formatXAF(totalCharged)}
+                </span>
+              </div>
+            </div>
+
+            <div className="w-full bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 flex items-center gap-2 text-left">
+              <span className="material-symbols-outlined text-emerald-700 text-lg flex-shrink-0">verified</span>
+              <p className="text-[11px] text-emerald-900 leading-tight">
+                {lang === "fr"
+                  ? "Votre nom est désormais coché dans la cotisation et l'e-mail de confirmation a été émis."
+                  : "Your slot has been ticked in the cotisation and confirmation email sent."}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  onSettled();
+                } catch {}
+                onClose();
+              }}
+              className="w-full px-4 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-sm font-bold hover:opacity-90 active:scale-95 transition-all cursor-pointer shadow-sm mt-1"
+            >
+              {lang === "fr" ? "Terminer & Voir ma cotisation" : "Done & View Cotisation"}
+            </button>
           </div>
         )}
 

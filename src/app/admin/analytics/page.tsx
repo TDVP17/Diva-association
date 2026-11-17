@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getLang, getTranslator } from "@/lib/i18n/get-lang";
+import { getLang } from "@/lib/i18n/get-lang";
 import { requirePresident } from "@/lib/require-admin";
 import { getRevenueAnalytics } from "@/lib/analytics";
 import { formatXAF } from "@/lib/format-currency";
@@ -7,99 +7,235 @@ import { formatXAF } from "@/lib/format-currency";
 export default async function AdminAnalyticsPage() {
   const president = await requirePresident();
   if (!president) redirect("/admin");
-  const t = getTranslator(await getLang());
+  const lang = await getLang();
 
-  const { totalFees, totalFines, totalGrossReceived, totalPresidentFeeShare, totalUnpaidFines, totalSuccessfulPayments, totalPendingPayments, sessions: perSession } =
-    await getRevenueAnalytics();
+  const data = await getRevenueAnalytics();
 
   return (
-    <main className="px-container-padding pt-stack-gap-lg pb-32 max-w-4xl mx-auto w-full flex flex-col gap-section-margin">
+    <main className="px-container-padding pt-stack-gap-lg pb-32 max-w-5xl mx-auto w-full flex flex-col gap-8">
+      {/* ── Titre de la page ── */}
       <div>
         <h2 className="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary">
-          {t("revenueAnalytics")}
+          {lang === "fr" ? "Analyse financière & Revenus" : "Revenue & Financial Analytics"}
         </h2>
-        <p className="text-on-surface-variant font-body-lg mt-2">{t("revenueAnalyticsSubtitle")}</p>
+        <p className="text-on-surface-variant font-body-lg mt-1 text-sm sm:text-base">
+          {lang === "fr"
+            ? "Suivi en temps réel des flux financiers : cotisations publiques, cotisations privées et solde des portefeuilles."
+            : "Real-time tracking of financial flows: public cotisations, private cotisations, and member wallets."}
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-stack-gap-md">
-        <div className="bg-primary text-on-primary rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] p-4">
-          <p className="font-label-sm text-label-sm text-primary-fixed-dim">{t("totalMoneyReceived")}</p>
-          <p className="font-numeric-data text-numeric-data text-white mt-1">
-            {formatXAF(totalGrossReceived)}
-          </p>
+      {/* ── SECTION 1 : PORTEFEUILLE DES MEMBRES ── */}
+      <section className="bg-gradient-to-r from-emerald-900 to-[#064e3b] text-white rounded-3xl p-6 sm:p-7 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-emerald-800">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center flex-shrink-0">
+            <span className="material-symbols-outlined text-3xl text-emerald-300">account_balance_wallet</span>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-emerald-200 uppercase tracking-wider">
+              {lang === "fr" ? "Solde total portefeuilles membres" : "Total Members Wallet Balance"}
+            </p>
+            <p className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-0.5">
+              {formatXAF(data.totalMembersWalletBalance)}
+            </p>
+            <p className="text-[11px] text-emerald-300/80 mt-0.5">
+              {lang === "fr"
+                ? `Montant total actuellement disponible dans les portefeuilles (${data.totalUsersWithWallet} comptes)`
+                : `Total funds currently available in member wallets (${data.totalUsersWithWallet} accounts)`}
+            </p>
+          </div>
         </div>
-        <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
-          <p className="font-label-sm text-label-sm text-on-surface-variant">{t("totalServiceFees")}</p>
-          <p className="font-numeric-data text-numeric-data text-on-surface mt-1">
-            {formatXAF(totalFees)}
-          </p>
-        </div>
-        <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
-          <p className="font-label-sm text-label-sm text-on-surface-variant">{t("presidentFeeShareLabel")}</p>
-          <p className="font-numeric-data text-numeric-data text-on-surface mt-1">
-            {formatXAF(totalPresidentFeeShare)}
-          </p>
-        </div>
-        <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
-          <p className="font-label-sm text-label-sm text-on-surface-variant">{t("totalFinesCollected")}</p>
-          <p className="font-numeric-data text-numeric-data text-on-surface mt-1">
-            {formatXAF(totalFines)}
-          </p>
-        </div>
-        <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
-          <p className="font-label-sm text-label-sm text-on-surface-variant">{t("unpaidFines")}</p>
-          <p className="font-numeric-data text-numeric-data text-error mt-1">
-            {formatXAF(totalUnpaidFines)}
-          </p>
-        </div>
-        <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
-          <p className="font-label-sm text-label-sm text-on-surface-variant">{t("successfulPaymentsLabel")}</p>
-          <p className="font-numeric-data text-numeric-data text-on-surface mt-1">{totalSuccessfulPayments}</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
-          <p className="font-label-sm text-label-sm text-on-surface-variant">{t("pendingPaymentsLabel")}</p>
-          <p className="font-numeric-data text-numeric-data text-on-surface mt-1">{totalPendingPayments}</p>
-        </div>
-      </div>
+      </section>
 
-      <section>
-        <h3 className="font-title-md text-title-md text-primary mb-stack-gap-md">{t("perCotisationBreakdown")}</h3>
-        {perSession.length === 0 ? (
-          <p className="font-label-sm text-label-sm text-on-surface-variant">{t("noRevenueYet")}</p>
+      {/* ── SECTION 2 : COTISATIONS PUBLIQUES ── */}
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-emerald-600" />
+          <h3 className="font-bold text-lg text-slate-900">
+            {lang === "fr" ? "Cotisations Publiques (Frais opérateur 3,1%)" : "Public Cotisations (3.1% Operator Fee)"}
+          </h3>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Total argent entré */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase">
+              {lang === "fr" ? "Total argent entré" : "Total Money Received"}
+            </span>
+            <p className="text-xl sm:text-2xl font-extrabold text-emerald-800 mt-2">
+              {formatXAF(data.public.totalMoneyIn)}
+            </p>
+            <span className="text-[10px] text-slate-400 mt-1">
+              {lang === "fr" ? "Cotisations versées par les membres" : "Contributions paid by members"}
+            </span>
+          </div>
+
+          {/* Total argent sorti */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase">
+              {lang === "fr" ? "Total argent sorti" : "Total Money Paid Out"}
+            </span>
+            <p className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-2">
+              {formatXAF(data.public.totalMoneyOut)}
+            </p>
+            <span className="text-[10px] text-slate-400 mt-1">
+              {lang === "fr" ? "Cagnottes versées aux bénéficiaires" : "Pots released to beneficiaries"}
+            </span>
+          </div>
+
+          {/* Frais cotisations entrés */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase">
+              {lang === "fr" ? "Total frais entrés" : "Total Service Fees In"}
+            </span>
+            <p className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-2">
+              {formatXAF(data.public.totalFeesIn)}
+            </p>
+            <span className="text-[10px] text-slate-400 mt-1">
+              {lang === "fr" ? "Frais perçus sur les sessions publiques" : "Fees collected on public sessions"}
+            </span>
+          </div>
+
+          {/* Frais sortis (3,1% opérateur) */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase">
+              {lang === "fr" ? "Frais sortis (Fapshi 3,1%)" : "Operator Fees Out (3.1%)"}
+            </span>
+            <p className="text-xl sm:text-2xl font-extrabold text-amber-700 mt-2">
+              {formatXAF(data.public.totalFeesOut)}
+            </p>
+            <span className="text-[10px] text-slate-400 mt-1">
+              {lang === "fr" ? "Coût opérateur Orange / MTN" : "Operator processing cost"}
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── SECTION 3 : COTISATIONS PRIVÉES ── */}
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-indigo-600" />
+          <h3 className="font-bold text-lg text-slate-900">
+            {lang === "fr" ? "Cotisations Privées (Frais 5,1% · Marge DIVA Asso 2%)" : "Private Cotisations (5.1% Fee · DIVA Asso Margin 2%)"}
+          </h3>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Total argent entré */}
+          <div className="bg-white rounded-2xl shadow-sm border border-indigo-100 p-4 flex flex-col justify-between">
+            <span className="text-xs font-bold text-indigo-700 uppercase">
+              {lang === "fr" ? "Total argent entré" : "Total Money Received"}
+            </span>
+            <p className="text-xl sm:text-2xl font-extrabold text-indigo-950 mt-2">
+              {formatXAF(data.private.totalMoneyIn)}
+            </p>
+            <span className="text-[10px] text-slate-400 mt-1">
+              {lang === "fr" ? "Souscrit à 5,1% de frais" : "Subscribed with 5.1% fee"}
+            </span>
+          </div>
+
+          {/* Total argent sorti */}
+          <div className="bg-white rounded-2xl shadow-sm border border-indigo-100 p-4 flex flex-col justify-between">
+            <span className="text-xs font-bold text-indigo-700 uppercase">
+              {lang === "fr" ? "Total argent sorti" : "Total Paid to Members"}
+            </span>
+            <p className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-2">
+              {formatXAF(data.private.totalMoneyOut)}
+            </p>
+            <span className="text-[10px] text-slate-400 mt-1">
+              {lang === "fr" ? "En fonction de ce que chacun doit bouffer" : "According to member turns"}
+            </span>
+          </div>
+
+          {/* Marge DIVA Asso 2% */}
+          <div className="bg-indigo-50/70 rounded-2xl shadow-sm border border-indigo-200 p-4 flex flex-col justify-between">
+            <span className="text-xs font-extrabold text-indigo-800 uppercase flex items-center gap-1">
+              <span className="material-symbols-outlined text-[15px]">savings</span>
+              <span>{lang === "fr" ? "Marge DIVA Asso (2%)" : "DIVA Asso Margin (2%)"}</span>
+            </span>
+            <p className="text-xl sm:text-2xl font-extrabold text-indigo-900 mt-2">
+              {formatXAF(data.private.divaMargin2Percent)}
+            </p>
+            <span className="text-[10px] text-indigo-700 mt-1">
+              {lang === "fr" ? "5,1% payé - 3,1% Fapshi = 2% net DIVA Asso" : "5.1% paid - 3.1% gateway = 2% net"}
+            </span>
+          </div>
+
+          {/* Reste admin / solde disponible */}
+          <div className="bg-white rounded-2xl shadow-sm border border-indigo-100 p-4 flex flex-col justify-between">
+            <span className="text-xs font-bold text-indigo-700 uppercase">
+              {lang === "fr" ? "Reste admin" : "Admin Balance"}
+            </span>
+            <p className="text-xl sm:text-2xl font-extrabold text-emerald-800 mt-2">
+              {formatXAF(data.private.adminRest)}
+            </p>
+            <span className="text-[10px] text-slate-400 mt-1">
+              {lang === "fr" ? "Solde non encore décaissé" : "Remaining available balance"}
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── SECTION 4 : AMENDES & PAIEMENTS GLOBAUX ── */}
+      <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+          <p className="text-xs font-bold text-slate-500 uppercase">{lang === "fr" ? "Amendes collectées" : "Fines Collected"}</p>
+          <p className="text-xl font-bold text-slate-900 mt-1">{formatXAF(data.totalFines)}</p>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+          <p className="text-xs font-bold text-slate-500 uppercase">{lang === "fr" ? "Amendes impayées" : "Unpaid Fines"}</p>
+          <p className="text-xl font-bold text-red-600 mt-1">{formatXAF(data.totalUnpaidFines)}</p>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+          <p className="text-xs font-bold text-slate-500 uppercase">{lang === "fr" ? "Paiements réussis" : "Successful Payments"}</p>
+          <p className="text-xl font-bold text-emerald-700 mt-1">{data.totalSuccessfulPayments}</p>
+        </div>
+      </section>
+
+      {/* ── SECTION 5 : TABLEAU DÉTAILLÉ PAR COTISATION ── */}
+      <section className="flex flex-col gap-3">
+        <h3 className="font-bold text-lg text-slate-900">
+          {lang === "fr" ? "Détail par cotisation" : "Per-Cotisation Breakdown"}
+        </h3>
+
+        {data.sessions.length === 0 ? (
+          <p className="text-xs text-slate-500 italic">
+            {lang === "fr" ? "Aucune cotisation enregistrée pour le moment." : "No cotisations recorded yet."}
+          </p>
         ) : (
-          <div className="bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant overflow-x-auto">
-            <table className="w-full text-left min-w-[640px]">
-              <thead>
-                <tr className="border-b border-surface-variant">
-                  <th className="p-3 font-label-sm text-label-sm text-on-surface-variant">{t("title")}</th>
-                  <th className="p-3 font-label-sm text-label-sm text-on-surface-variant">{t("totalMoneyReceived")}</th>
-                  <th className="p-3 font-label-sm text-label-sm text-on-surface-variant">{t("totalServiceFees")}</th>
-                  <th className="p-3 font-label-sm text-label-sm text-on-surface-variant">{t("presidentFeeShareLabel")}</th>
-                  <th className="p-3 font-label-sm text-label-sm text-on-surface-variant">
-                    {t("totalFinesCollected")}
-                  </th>
-                  <th className="p-3 font-label-sm text-label-sm text-on-surface-variant">{t("unpaidFines")}</th>
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+            <table className="w-full text-left min-w-[760px] text-xs">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="p-3.5 font-bold text-slate-700">{lang === "fr" ? "Cotisation" : "Title"}</th>
+                  <th className="p-3.5 font-bold text-slate-700">{lang === "fr" ? "Type" : "Type"}</th>
+                  <th className="p-3.5 font-bold text-slate-700">{lang === "fr" ? "Argent entré" : "Money In"}</th>
+                  <th className="p-3.5 font-bold text-slate-700">{lang === "fr" ? "Argent sorti" : "Money Out"}</th>
+                  <th className="p-3.5 font-bold text-slate-700">{lang === "fr" ? "Frais perçus" : "Fees"}</th>
+                  <th className="p-3.5 font-bold text-slate-700">{lang === "fr" ? "Marge DIVA" : "Diva Margin"}</th>
+                  <th className="p-3.5 font-bold text-slate-700">{lang === "fr" ? "Amendes" : "Fines"}</th>
                 </tr>
               </thead>
-              <tbody>
-                {perSession.map((s) => (
-                  <tr key={s.id} className="border-b last:border-b-0 border-surface-variant">
-                    <td className="p-3 font-label-md text-label-md text-on-surface">{s.title}</td>
-                    <td className="p-3 font-numeric-data text-[14px] text-primary">
-                      {formatXAF(s.grossReceived)}
+              <tbody className="divide-y divide-slate-100">
+                {data.sessions.map((s) => (
+                  <tr key={s.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="p-3.5 font-bold text-slate-900">{s.title}</td>
+                    <td className="p-3.5">
+                      <span
+                        className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          s.isPrivate
+                            ? "bg-indigo-100 text-indigo-800 border border-indigo-200"
+                            : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                        }`}
+                      >
+                        {s.isPrivate ? (lang === "fr" ? "Privée (5,1%)" : "Private (5.1%)") : (lang === "fr" ? "Publique (3,1%)" : "Public (3.1%)")}
+                      </span>
                     </td>
-                    <td className="p-3 font-numeric-data text-[14px] text-on-surface">
-                      {formatXAF(s.fees)}
-                    </td>
-                    <td className="p-3 font-numeric-data text-[14px] text-on-surface">
-                      {formatXAF(s.presidentFeeShare)}
-                    </td>
-                    <td className="p-3 font-numeric-data text-[14px] text-on-surface">
-                      {formatXAF(s.fines)}
-                    </td>
-                    <td className="p-3 font-numeric-data text-[14px] text-error">
-                      {formatXAF(s.unpaidFines)}
-                    </td>
+                    <td className="p-3.5 font-mono font-bold text-emerald-800">{formatXAF(s.moneyIn)}</td>
+                    <td className="p-3.5 font-mono text-slate-700">{formatXAF(s.moneyOut)}</td>
+                    <td className="p-3.5 font-mono text-slate-700">{formatXAF(s.fees)}</td>
+                    <td className="p-3.5 font-mono font-bold text-indigo-700">{formatXAF(s.divaMargin)}</td>
+                    <td className="p-3.5 font-mono text-slate-700">{formatXAF(s.fines)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -161,6 +161,13 @@ enum NotificationEventType {
   /// possibly weeks earlier). Only ever sent for ACTIVE sessions with a
   /// published ranking — see /api/crons/turn-reminder.
   TURN_REMINDER_TOMORROW
+  WITHDRAWAL_PENDING_ADMIN
+  WITHDRAWAL_APPROVED
+  WITHDRAWAL_REJECTED
+  LOAN_DISBURSED
+  LOAN_OVERDUE
+  LOAN_REPAID
+  LOAN_DEDUCTED
 }
 
 enum NotificationStatus {
@@ -326,6 +333,13 @@ model User {
   /// 0 to 5 stars credit / trust score for future loan system. Starts at 0.
   /// Increments by 1 each time a member finishes a full cotisation cycle without fines.
   stars                Int       @default(0)
+  /// Solde disponible dans le portefeuille virtuel DIVA Asso.
+  walletBalance        Decimal   @default(0) @db.Decimal(12, 2)
+  /// Hash SHA-256 salé du code PIN à 4 chiffres pour sécuriser les retraits.
+  walletPinHash        String?
+  walletPinSetAt       DateTime?
+  /// Horodatage du dernier changement de numéro de téléphone (verrouillage 48h des retraits).
+  phoneChangedAt       DateTime?
   isBanned             Boolean   @default(false)
   bannedAt             DateTime?
   bannedReason         String?
@@ -350,6 +364,11 @@ model User {
   savedPaymentMethods          SavedPaymentMethod[]
   transactionArchives          TransactionArchive[]
   pushSubscriptions            PushSubscription[]
+  walletTransactions           WalletTransaction[]
+  createdTontines              TontineSession[]      @relation("CreatedTontines")
+  walletWithdrawals            WalletWithdrawal[]    @relation("UserWithdrawals")
+  approvedWithdrawals          WalletWithdrawal[]    @relation("AdminApprovedWithdrawals")
+  loans                        Loan[]
 
   @@map("users")
 }
@@ -368,6 +387,13 @@ model SavedPaymentMethod {
   /// Normalized 9-digit Cameroonian MSISDN, no country code (e.g. "677123456").
   phone     String
   isDefault Boolean             @default(false)
+  /// Nom complet du titulaire du compte MoMo / OM pour les retraits / décaissements.
+  accountName String?
+  /// Statut de vérification par DIVA Asso : "PENDING" | "APPROVED" | "REJECTED".
+  status      String            @default("PENDING")
+  verifiedAt  DateTime?
+  verifiedByAdminId String?
+  rejectionReason String?
   createdAt DateTime            @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -476,7 +502,14 @@ model TontineSession {
   /// Irreversible once set — blocks new joins only (same effect as
   /// maxSlots/startDate already have); doesn't affect payments in progress.
   lockedAt            DateTime?
+  /// Indique si la cotisation est privée (frais 5.1%, dont 2% marge Diva) ou publique (frais 3.1%).
+  isPrivate           Boolean       @default(false)
+  /// Token cryptographique unique pour les invitations aux cotisations privées (/join/[token]).
+  inviteToken         String?       @unique
+  /// Créateur / gestionnaire autonome de la cotisation privée (null = créée par DIVA Asso).
+  creatorId           String?
 
+  creator          User?                 @relation("CreatedTontines", fields: [creatorId], references: [id], onDelete: SetNull)
   memberships      Membership[]
   swapRequests     PositionSwapRequest[]
   notificationLogs NotificationLog[]
@@ -546,6 +579,7 @@ model MembershipSlot {
   payouts       Payout[]
   foodTurnLogs  FoodTurnLog[]
   turnReminderLogs TurnReminderLog[]
+  guaranteedLoans Loan[]
 
   @@map("membership_slots")
 }
@@ -1032,4 +1066,110 @@ model AppSetting {
   updatedAt  DateTime  @updatedAt @map("updated_at")
 
   @@map("app_settings")
+}
+
+enum WalletTransactionType {
+  DEPOSIT
+  CONTRIBUTION
+  FINE
+  PAYOUT
+  WITHDRAWAL
+  REFUND
+  ADMIN_ADJUST
+  LOAN_DISBURSEMENT
+  LOAN_REPAYMENT
+}
+
+model WalletTransaction {
+  id            String                @id @default(cuid())
+  userId        String
+  amount        Decimal               @db.Decimal(12, 2)
+  fee           Decimal               @default(0) @db.Decimal(12, 2)
+  balanceBefore Decimal?              @db.Decimal(12, 2)
+  balanceAfter  Decimal?              @db.Decimal(12, 2)
+  reference     String?               @unique
+  status        String                @default("COMPLETED")
+  type          WalletTransactionType
+  description   String?
+  fapshiTxRef   String?
+  metadata      Json?
+  createdAt     DateTime              @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("wallet_transactions")
+}
+
+enum WithdrawalStatus {
+  PENDING_ADMIN
+  APPROVED
+  AUTO_PROCESSED
+  COMPLETED
+  REJECTED
+  FAILED
+}
+
+/// Retrait du portefeuille virtuel vers Mobile Money (MTN / Orange).
+/// < 50 000 FCFA : traitement automatique immédiat ; >= 50 000 FCFA : validation Admin obligatoire.
+model WalletWithdrawal {
+  id                    String              @id @default(cuid())
+  userId                String
+  amount                Decimal             @db.Decimal(12, 2)
+  phone                 String
+  provider              MobileMoneyProvider
+  accountName           String
+  status                WithdrawalStatus    @default(PENDING_ADMIN)
+  requiresAdminApproval Boolean             @default(false)
+  fapshiTransId         String?             @unique
+  approvedByAdminId     String?
+  approvedAt            DateTime?
+  rejectionReason       String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  user            User  @relation("UserWithdrawals", fields: [userId], references: [id], onDelete: Cascade)
+  approvedByAdmin User? @relation("AdminApprovedWithdrawals", fields: [approvedByAdminId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@map("wallet_withdrawals")
+}
+
+enum LoanStatus {
+  ACTIVE
+  OVERDUE
+  REPAID
+  DEDUCTED_FROM_POT
+}
+
+/// Prêt d'urgence garanti pour les membres émérites (4+ étoiles) en cotisation publique.
+/// Durée : 21 jours + 2 jours de grâce, 15% d'intérêts initiaux, +5% tous les 2 jours de retard,
+/// et prélèvement automatique à la source sur le tour de bouffe en cas de non-remboursement.
+model Loan {
+  id                   String     @id @default(cuid())
+  userId               String
+  principal            Decimal    @db.Decimal(12, 2)
+  interestRate         Decimal    @default(0.15) @db.Decimal(5, 4)
+  interestAmount       Decimal    @db.Decimal(12, 2)
+  penaltyAmount        Decimal    @default(0) @db.Decimal(12, 2)
+  totalDue             Decimal    @db.Decimal(12, 2)
+  totalPaid            Decimal    @default(0) @db.Decimal(12, 2)
+  status               LoanStatus @default(ACTIVE)
+  dueDate              DateTime
+  graceEndDate         DateTime
+  lastPenaltyAt        DateTime?
+  guaranteeSlotId      String?
+  collateralSnapshot   Json?
+  repaidAt             DateTime?
+  deductedFromPayoutId String?
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guaranteeSlot MembershipSlot? @relation(fields: [guaranteeSlotId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([status, dueDate])
+  @@map("loans")
 }

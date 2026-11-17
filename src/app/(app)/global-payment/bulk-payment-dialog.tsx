@@ -89,14 +89,26 @@ export function BulkPaymentDialog({
     mtnSuspendedReason?: string;
   } | null>(null);
   const [showFallbackProof, setShowFallbackProof] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [payingWithWallet, setPayingWithWallet] = useState(false);
   const channelCleanupRef = useRef<(() => void) | null>(null);
   const settledOrDoneRef = useRef(false);
   const checkingRef = useRef(false);
   const hintRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    fetch("/api/wallet")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { user?: { walletBalance?: number } } | null) => {
+        if (!cancelled && data?.user && typeof data.user.walletBalance === "number") {
+          setWalletBalance(data.user.walletBalance);
+        }
+      })
+      .catch(() => {});
+
     fetch("/api/payments/fallback-config")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
@@ -161,6 +173,10 @@ export function BulkPaymentDialog({
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
   }
 
   useEffect(() => {
@@ -181,7 +197,11 @@ export function BulkPaymentDialog({
       stopWatching();
       playSuccessChimeSound();
       setStep("success");
-      setTimeout(() => onSettled(), 1500);
+      try {
+        onSettled();
+      } catch (err) {
+        console.error("onSettled error:", err);
+      }
       return true;
     }
     if (status === "FAILED" || status === "EXPIRED") {
@@ -212,22 +232,34 @@ export function BulkPaymentDialog({
     }
   }
 
-  // Étape 1 (STOP CPU): remplace l'ancien polling setInterval par Supabase Realtime
+  // Étape 1: surveillance active avec Realtime + polling actif 2.5s pour cocher les noms immédiatement
   function watchPaymentStatus(id: string) {
     stopWatching();
     settledOrDoneRef.current = false;
     hintRef.current = setTimeout(() => setShowWaitingHint(true), 45_000);
-    // Hard timeout after 70 seconds — vérifie une seule fois auprès de Fapshi avant d'expirer
+
+    // Polling actif toutes les 2.5s pour vérifier l'état auprès de Fapshi sans attendre
+    pollRef.current = setInterval(() => {
+      if (!settledOrDoneRef.current) {
+        void checkStatusOnce(id);
+      }
+    }, 2500);
+
+    // Hard timeout après 90 secondes — double vérification avant d'abandonner
     timeoutRef.current = setTimeout(async () => {
       const resolved = await checkStatusOnce(id);
       if (!resolved && !settledOrDoneRef.current) {
-        settledOrDoneRef.current = true;
-        stopWatching();
-        setFailedReason(t("ussdTimeoutReason"));
-        setFailCount((c) => c + 1);
-        setStep("failed");
+        await new Promise((r) => setTimeout(r, 1500));
+        const doubleCheck = await checkStatusOnce(id);
+        if (!doubleCheck && !settledOrDoneRef.current) {
+          settledOrDoneRef.current = true;
+          stopWatching();
+          setFailedReason(t("ussdTimeoutReason"));
+          setFailCount((c) => c + 1);
+          setStep("failed");
+        }
       }
-    }, 70_000);
+    }, 90_000);
 
     const handleVisibility = () => {
       if (document.visibilityState === "visible" && !settledOrDoneRef.current) {
@@ -307,6 +339,36 @@ export function BulkPaymentDialog({
       setSelectedSlotIds(allSlots.map((s) => s.membershipSlotId));
     } else {
       setSelectedSlotIds(membershipSlotIds);
+    }
+  }
+
+  async function handlePayWithWallet() {
+    if (!quote || selectedSlotIds.length === 0 || payingWithWallet || submitting) return;
+    setPayError(null);
+    setPayingWithWallet(true);
+    try {
+      const res = await fetch("/api/wallet/pay-contribution", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ membershipSlotIds: selectedSlotIds }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPayError(data.error || "Impossible de payer avec le portefeuille.");
+        return;
+      }
+      setPhone("Portefeuille DIVA (0% frais)");
+      if (data.reference) setTransId(data.reference);
+      if (typeof data.newBalance === "number") setWalletBalance(data.newBalance);
+      resolveTerminalStatus("SUCCESSFUL");
+    } catch {
+      setPayError(
+        lang === "fr"
+          ? "Erreur réseau lors du paiement par portefeuille."
+          : "Network error during wallet payment.",
+      );
+    } finally {
+      setPayingWithWallet(false);
     }
   }
 
@@ -530,6 +592,61 @@ export function BulkPaymentDialog({
               </div>
             )}
 
+            {quote && walletBalance !== null && (
+              <div className="mb-4 p-3.5 rounded-xl border-2 border-emerald-600/30 bg-emerald-50/70 flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-emerald-700 text-[20px]">
+                      account_balance_wallet
+                    </span>
+                    <div>
+                      <p className="text-xs font-extrabold text-emerald-950">
+                        {lang === "fr"
+                          ? "Payer via mon Portefeuille DIVA"
+                          : "Pay via DIVA Wallet"}
+                      </p>
+                      <p className="text-[11px] text-emerald-800">
+                        {lang === "fr" ? "Solde :" : "Balance:"}{" "}
+                        <strong>{formatXAF(walletBalance)}</strong> ·{" "}
+                        <span className="font-bold text-emerald-700">0 % frais télécom</span>
+                      </p>
+                    </div>
+                  </div>
+                  {providerFeeAmount > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-700 text-white text-[10px] font-bold flex-shrink-0">
+                      -{formatXAF(providerFeeAmount)}
+                    </span>
+                  )}
+                </div>
+
+                {walletBalance >= quote.baseTotal ? (
+                  <button
+                    type="button"
+                    onClick={handlePayWithWallet}
+                    disabled={payingWithWallet || submitting}
+                    className="w-full py-2.5 px-3 rounded-lg bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] text-white font-bold text-xs transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5 shadow-xs"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">bolt</span>
+                    <span>
+                      {payingWithWallet
+                        ? lang === "fr"
+                          ? "Paiement groupé instantané..."
+                          : "Processing..."
+                        : lang === "fr"
+                          ? `Payer ${formatXAF(quote.baseTotal)} par Portefeuille (0 % frais)`
+                          : `Pay ${formatXAF(quote.baseTotal)} via Wallet (0% fee)`}
+                    </span>
+                  </button>
+                ) : (
+                  <p className="text-[11px] text-amber-800 font-medium">
+                    {lang === "fr"
+                      ? `Solde insuffisant pour ${formatXAF(quote.baseTotal)}. Utilisez Mobile Money ci-dessous ou rechargez votre portefeuille.`
+                      : `Insufficient balance for ${formatXAF(quote.baseTotal)}. Use Mobile Money below or top up your wallet.`}
+                  </p>
+                )}
+              </div>
+            )}
+
             {quote && (
               <div className="mb-4">
                 <label htmlFor="bulk-mm-phone" className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
@@ -673,9 +790,64 @@ export function BulkPaymentDialog({
         )}
 
         {step === "success" && (
-          <div className="flex flex-col items-center text-center gap-3 py-4">
-            <span className="material-symbols-outlined text-primary text-5xl">check_circle</span>
-            <h2 className="font-headline-sm text-headline-sm text-on-surface">{t("paymentReceivedTitle")}</h2>
+          <div className="flex flex-col items-center text-center gap-4 py-3 animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-inner">
+              <span className="material-symbols-outlined text-4xl">check_circle</span>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <h2 className="font-headline-sm text-xl font-bold text-on-surface">
+                {lang === "fr" ? "Paiement groupé confirmé !" : "Bulk Payment Confirmed!"}
+              </h2>
+              <p className="font-body-sm text-xs text-on-surface-variant">
+                {lang === "fr"
+                  ? "Toutes vos cotisations sélectionnées ont été cochées avec succès."
+                  : "All your selected cotisations have been successfully recorded."}
+              </p>
+            </div>
+
+            <div className="w-full bg-surface-container-low rounded-xl p-4 border border-outline-variant/60 text-left flex flex-col gap-2.5 text-xs sm:text-sm">
+              <div className="flex justify-between items-center py-1 border-b border-outline-variant/40">
+                <span className="text-on-surface-variant">{lang === "fr" ? "Nombre de cotisations" : "Cotisations Count"}</span>
+                <span className="font-semibold text-on-surface">{selectedSlotIds.length}</span>
+              </div>
+              {phone && (
+                <div className="flex justify-between items-center py-1 border-b border-outline-variant/40">
+                  <span className="text-on-surface-variant">{lang === "fr" ? "Numéro débité" : "Debited Phone"}</span>
+                  <span className="font-mono font-semibold text-on-surface">{phone}</span>
+                </div>
+              )}
+              {quote && (
+                <div className="flex justify-between items-center py-1 pt-1.5">
+                  <span className="font-medium text-on-surface">{lang === "fr" ? "Total payé" : "Total Paid"}</span>
+                  <span className="font-bold text-base text-emerald-700">
+                    {formatXAF(quote.totalCharged)}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="w-full bg-emerald-50 border border-emerald-200 rounded-lg p-2.5 flex items-center gap-2 text-left">
+              <span className="material-symbols-outlined text-emerald-700 text-lg flex-shrink-0">verified</span>
+              <p className="text-[11px] text-emerald-900 leading-tight">
+                {lang === "fr"
+                  ? "Vos noms sont désormais cochés et les e-mails de notification ont été émis."
+                  : "Your slots are now ticked and notifications have been sent."}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  onSettled();
+                } catch {}
+                onClose();
+              }}
+              className="w-full px-4 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-sm font-bold hover:opacity-90 active:scale-95 transition-all cursor-pointer shadow-sm mt-1"
+            >
+              {lang === "fr" ? "Terminer & Voir mes cotisations" : "Done & View Cotisations"}
+            </button>
           </div>
         )}
 

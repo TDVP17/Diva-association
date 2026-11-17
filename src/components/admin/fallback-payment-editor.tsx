@@ -106,6 +106,57 @@ export function FallbackPaymentEditor({
     }
   }
 
+  async function toggleOperator(operator: "ORANGE" | "MTN") {
+    const nextOrange = operator === "ORANGE" ? !isOrangeSuspended : isOrangeSuspended;
+    const nextMtn = operator === "MTN" ? !isMtnSuspended : isMtnSuspended;
+
+    if (operator === "ORANGE") setIsOrangeSuspended(nextOrange);
+    if (operator === "MTN") setIsMtnSuspended(nextMtn);
+
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/payments/fallback-config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isEnabled,
+          orangeUssdCode,
+          orangeBeneficiaryName,
+          mtnUssdCode,
+          mtnBeneficiaryName,
+          isOrangeSuspended: nextOrange,
+          orangeSuspendedReason,
+          isMtnSuspended: nextMtn,
+          mtnSuspendedReason,
+        }),
+      });
+      if (res.ok) {
+        setSavedMsg(
+          operator === "ORANGE"
+            ? nextOrange
+              ? (lang === "fr" ? "Orange Money suspendu avec succès." : "Orange Money suspended.")
+              : (lang === "fr" ? "Orange Money réactivé avec succès !" : "Orange Money reactivated!")
+            : nextMtn
+              ? (lang === "fr" ? "MTN Mobile Money suspendu avec succès." : "MTN Mobile Money suspended.")
+              : (lang === "fr" ? "MTN Mobile Money réactivé avec succès !" : "MTN Mobile Money reactivated!")
+        );
+        setTimeout(() => setSavedMsg(null), 3500);
+      } else {
+        const d = await res.json().catch(() => null);
+        setError(d?.error || "Erreur de mise à jour");
+        if (operator === "ORANGE") setIsOrangeSuspended(!nextOrange);
+        if (operator === "MTN") setIsMtnSuspended(!nextMtn);
+      }
+    } catch {
+      setError("Erreur de connexion lors de la mise à jour de la suspension.");
+      if (operator === "ORANGE") setIsOrangeSuspended(!nextOrange);
+      if (operator === "MTN") setIsMtnSuspended(!nextMtn);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const perSlot = samplePerSlotAmount > 0 ? samplePerSlotAmount : 1550;
   const orangePreview1 = formatMerchantUssdCode(orangeUssdCode, perSlot, "ORANGE");
   const orangePreview2 = formatMerchantUssdCode(orangeUssdCode, perSlot * 2, "ORANGE");
@@ -130,6 +181,19 @@ export function FallbackPaymentEditor({
           </div>
         </div>
 
+        {savedMsg && (
+          <div className="p-2.5 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-900 font-bold text-xs flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[16px] text-emerald-700">check_circle</span>
+            <span>{savedMsg}</span>
+          </div>
+        )}
+        {error && (
+          <div className="p-2.5 rounded-xl bg-red-100 border border-red-300 text-red-900 font-bold text-xs flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[16px] text-red-700">error</span>
+            <span>{error}</span>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* SUSPENSION ORANGE MONEY */}
           <div className={`p-3.5 rounded-xl border-2 transition-all flex flex-col gap-3 ${
@@ -148,8 +212,9 @@ export function FallbackPaymentEditor({
               </div>
               <button
                 type="button"
-                onClick={() => setIsOrangeSuspended(!isOrangeSuspended)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                onClick={() => toggleOperator("ORANGE")}
+                disabled={saving}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${
                   isOrangeSuspended ? "bg-red-600" : "bg-slate-300"
                 }`}
                 role="switch"
@@ -206,8 +271,9 @@ export function FallbackPaymentEditor({
               </div>
               <button
                 type="button"
-                onClick={() => setIsMtnSuspended(!isMtnSuspended)}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                onClick={() => toggleOperator("MTN")}
+                disabled={saving}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${
                   isMtnSuspended ? "bg-red-600" : "bg-slate-300"
                 }`}
                 role="switch"

@@ -9,6 +9,8 @@ const BASE_ITEMS = [
   { href: "/admin/membership-requests", label: "cotisationMembershipRequestsCard", icon: "group_add" },
   { href: "/admin/users", label: "allUsersCard", icon: "group" },
   { href: "/admin/contributions", label: "myCotisationsCard", icon: "account_balance" },
+  { href: "/admin/withdrawals", label: "adminNavWithdrawals", icon: "payments" },
+  { href: "/admin/loans", label: "adminNavLoans", icon: "workspace_premium" },
   { href: "/admin/notifications", label: "adminNavNotifications", icon: "notifications" },
   { href: "/admin/support", label: "adminNavSupport", icon: "support_agent" },
   { href: "/admin/payment-issues", label: "paymentIssuesCard", icon: "shield_person" },
@@ -25,6 +27,8 @@ export interface AdminNavCounts {
   paymentIssues?: number;
   membershipRequests?: number;
   pendingProofs?: number;
+  pendingWithdrawals?: number;
+  overdueLoans?: number;
 }
 
 export function AdminSidebar({
@@ -55,7 +59,11 @@ export function AdminSidebar({
                   ? counts?.membershipRequests
                   : item.href === "/admin/contributions"
                     ? counts?.pendingProofs
-                    : undefined;
+                    : item.href === "/admin/withdrawals"
+                      ? counts?.pendingWithdrawals
+                      : item.href === "/admin/loans"
+                        ? counts?.overdueLoans
+                        : undefined;
 
         return (
           <Link

@@ -10,7 +10,6 @@ import { NotificationsTab } from "./notifications-tab";
 import { ActivityTab } from "./activity-tab";
 import { LoadingSpinner } from "@/components/loading-spinner";
 import { MemberArchivesToggle } from "@/components/admin/member-archives-toggle";
-import { FallbackPaymentEditor } from "@/components/admin/fallback-payment-editor";
 import { formatXAF } from "@/lib/format-currency";
 import { sessionStatusKey } from "@/lib/session-status-label";
 import { CONTRIBUTION_STATUS_KEY } from "@/lib/contribution-status-label";
@@ -2955,24 +2954,24 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
             );
           })()}
 
-          {/* Admin configuration shortcut for Fallback USSD Code & Beneficiary Name */}
-          <details className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-outline-variant/50 p-4 group">
-            <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-primary font-title-sm text-sm font-bold">
-                <span className="material-symbols-outlined text-[20px]">phonelink_setup</span>
-                <span>{t("fallbackConfigTitle")}</span>
-              </div>
-              <span className="material-symbols-outlined text-on-surface-variant group-open:rotate-180 transition-transform">
-                expand_more
+          {/* Information : Paramètres globaux de paiement et suspension opérateur */}
+          <div className="bg-surface rounded-xl border border-outline-variant/30 p-3.5 flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-on-surface-variant">
+              <span className="material-symbols-outlined text-[18px] text-primary">tune</span>
+              <span>
+                {lang === "fr"
+                  ? "Les modes de paiement et la suspension temporaire des opérateurs (Orange / MTN) s'appliquent à l'ensemble du système."
+                  : "Payment methods and operator suspensions apply system-wide."}
               </span>
-            </summary>
-            <div className="mt-4 pt-3 border-t border-outline-variant/40">
-              <FallbackPaymentEditor
-                lang={lang}
-                samplePerSlotAmount={(session.amount ?? 0) + (session.fee ?? 0)}
-              />
             </div>
-          </details>
+            <Link
+              href="/admin/settings"
+              className="text-primary hover:underline font-bold flex items-center gap-1 flex-shrink-0"
+            >
+              <span>{lang === "fr" ? "Paramètres système" : "System settings"}</span>
+              <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+            </Link>
+          </div>
 
           {lightboxImageUrl && (
             <div

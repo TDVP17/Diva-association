@@ -14,10 +14,12 @@ import { getNextDueDate } from "@/lib/tontine-engine";
 import { TONTINE_TYPE_LABELS } from "@/lib/tontine-labels";
 import { logAudit } from "@/lib/audit";
 import { formatXAF } from "@/lib/format-currency";
+import { creditWalletTx } from "@/lib/wallet-ledger";
+import { computeAccruedLoanPenalty, deductActiveLoansFromPayoutTx } from "@/lib/loans";
 
 const bodySchema = z.object({
   payoutClaimId: z.string().min(1),
-  channel: z.enum(["FAPSHI", "DIRECT"]).default("FAPSHI"),
+  channel: z.enum(["FAPSHI", "DIRECT", "WALLET"]).default("FAPSHI"),
   overrideUnpaid: z.boolean().optional(),
   selectedOperator: z.enum(["MTN", "ORANGE"]).optional(),
   selectedPhone: z.string().optional(),
@@ -114,11 +116,25 @@ export async function POST(request: Request) {
   const medium = provider ? fapshiMediumFor(provider) : undefined;
   const payoutName = (targetName || slot.beneficiaryName).trim();
 
+  // Prélèvement à la source (Garantie Ultime Prêt d'Urgence - Pilier 2 Section 3.3)
+  const openLoansPreview = await prisma.loan.findMany({
+    where: { userId: user.id, status: { in: ["ACTIVE", "OVERDUE"] } },
+  });
+  const nowForLoans = new Date();
+  const estimatedLoanDue = openLoansPreview.reduce((sum, loan) => {
+    const p = Number(loan.principal);
+    const interest = Number(loan.interestAmount);
+    const { penaltyAmount } = computeAccruedLoanPenalty(p, loan.graceEndDate, nowForLoans);
+    return sum + Math.max(0, p + interest + penaltyAmount - Number(loan.totalPaid || 0));
+  }, 0);
+  const preCalculatedLoanDeduction = Math.min(netPayout, estimatedLoanDue);
+  const payoutAfterLoan = Math.max(0, netPayout - preCalculatedLoanDeduction);
+
   let fapshiResult: { transId: string };
-  if (channel === "FAPSHI") {
+  if (channel === "FAPSHI" && payoutAfterLoan > 0) {
     try {
       fapshiResult = await sendPayout({
-        amount: Math.round(netPayout),
+        amount: Math.round(payoutAfterLoan),
         phone: normalizedPhone,
         medium,
         name: payoutName,
@@ -129,26 +145,34 @@ export async function POST(request: Request) {
       if (err instanceof FapshiPayoutError) {
         return NextResponse.json(
           {
-            error: `${err.message}. Si votre solde Fapshi Payout est à 0, utilisez le mode 'Virement via mon numéro' (Direct) pour valider le virement.`,
+            error: `${err.message}. Si votre solde Fapshi Payout est à 0, utilisez le mode 'Portefeuille DIVA' ou 'Virement via mon numéro' (Direct).`,
           },
           { status: 502 },
         );
       }
-      return NextResponse.json({ error: "Échec du virement Fapshi. Veuillez réessayer ou choisir 'Virement via mon numéro'." }, { status: 502 });
+      return NextResponse.json({ error: "Échec du virement Fapshi. Veuillez réessayer ou choisir 'Portefeuille DIVA' ou 'Virement Direct'." }, { status: 502 });
     }
+  } else if (channel === "WALLET") {
+    fapshiResult = {
+      transId: `WALLET-${claim.id.slice(-8).toUpperCase()}`,
+    };
   } else {
-    // Virement direct via le numéro de l'admin (hors Fapshi)
+    // Virement direct via le numéro de l'admin (hors Fapshi) ou pot intégralement absorbé par le prêt
     fapshiResult = {
       transId: `MANUAL-${claim.id.slice(-8).toUpperCase()}`,
     };
   }
 
-  await prisma.$transaction([
-    ...(toDeductFineIds.length > 0
-      ? [prisma.fine.updateMany({ where: { id: { in: toDeductFineIds } }, data: { status: "DEDUCTED" } })]
-      : []),
-    ...toDeductContributions.map((item) =>
-      prisma.contribution.upsert({
+  let totalLoanDeducted = 0;
+  let finalNetPayout = payoutAfterLoan;
+  let totalDeducted = deducted;
+
+  await prisma.$transaction(async (tx) => {
+    if (toDeductFineIds.length > 0) {
+      await tx.fine.updateMany({ where: { id: { in: toDeductFineIds } }, data: { status: "DEDUCTED" } });
+    }
+    for (const item of toDeductContributions) {
+      await tx.contribution.upsert({
         where: {
           membershipSlotId_dueDate: {
             membershipSlotId: item.slotId,
@@ -162,7 +186,7 @@ export async function POST(request: Request) {
           feePaid: item.fee,
           finePaid: 0,
           status: "PAID",
-          paidAt: new Date(),
+          paidAt: nowForLoans,
           failureReason: null,
         },
         update: {
@@ -170,37 +194,96 @@ export async function POST(request: Request) {
           feePaid: item.fee,
           finePaid: 0,
           status: "PAID",
-          paidAt: new Date(),
+          paidAt: nowForLoans,
           failureReason: null,
         },
-      }),
-    ),
-    prisma.payout.update({
+      });
+    }
+
+    // Prélèvement automatique des prêts en cours sur le pot (Garantie Ultime)
+    const loanRes = await deductActiveLoansFromPayoutTx(tx, {
+      userId: user.id,
+      payoutId: payoutClaimId,
+      availableNetPayout: netPayout,
+      now: nowForLoans,
+    });
+    totalLoanDeducted = loanRes.totalLoanDeducted;
+    finalNetPayout = loanRes.remainingNetPayout;
+    totalDeducted = deducted + totalLoanDeducted;
+
+    // Crédit automatique à 100 % dans le Portefeuille Virtuel si channel === "WALLET"
+    if (channel === "WALLET" && finalNetPayout > 0) {
+      await creditWalletTx(tx, {
+        userId: user.id,
+        amount: finalNetPayout,
+        fee: 0,
+        type: "PAYOUT",
+        description: `Encaissement cagnotte (${claim.tontineSession.title || claim.tontineSession.type} · ${slot.beneficiaryName})`,
+        metadata: {
+          payoutId: payoutClaimId,
+          pot,
+          totalDeducted,
+          loanDeducted: totalLoanDeducted,
+        },
+      });
+    }
+
+    await tx.payout.update({
       where: { id: payoutClaimId },
       data: {
         status: "CONFIRMED",
         pot,
-        deducted,
-        netPayout,
-        payoutPhone: normalizedPhone,
+        deducted: totalDeducted,
+        netPayout: finalNetPayout,
+        payoutPhone: channel === "WALLET" ? "DIVA_WALLET" : normalizedPhone,
         payoutAccountName: payoutName,
         fapshiTransId: fapshiResult.transId,
         releasedByAdminId: admin.user.id,
-        releasedAt: new Date(),
-        memberConfirmedAt: new Date(),
+        releasedAt: nowForLoans,
+        memberConfirmedAt: nowForLoans,
         confirmedByAdmin: true,
       },
-    }),
-  ]);
+    });
+  });
 
   const lang = user.preferredLang === "en" ? "en" : "fr";
-  const releaseMsg = payoutReleasedMessage(
+  const baseReleaseMsg = payoutReleasedMessage(
     lang,
     user.name,
     slot.beneficiaryName,
-    netPayout,
-    deducted,
+    finalNetPayout,
+    totalDeducted,
   );
+  const loanNote =
+    totalLoanDeducted > 0
+      ? lang === "fr"
+        ? `\n\n📌 Prélèvement prêt d'urgence à la source : -${formatXAF(totalLoanDeducted)} (capital + intérêts + pénalités éventuelles).`
+        : `\n\n📌 Automatic emergency loan source deduction: -${formatXAF(totalLoanDeducted)}.`
+      : "";
+  const walletNote =
+    channel === "WALLET"
+      ? lang === "fr"
+        ? `\n💼 Le montant net (${formatXAF(finalNetPayout)}) a été crédité automatiquement dans votre Portefeuille DIVA Asso (0% frais).`
+        : `\n💼 Net payout (${formatXAF(finalNetPayout)}) was automatically credited to your DIVA Asso Wallet (0% fees).`
+      : "";
+  const releaseMsg = `${baseReleaseMsg}${loanNote}${walletNote}`;
+
+  if (totalLoanDeducted > 0) {
+    await scheduleInAppNotifications({
+      tontineSessionId: claim.tontineSessionId,
+      type: "LOAN_DEDUCTED",
+      recipients: [
+        {
+          userId: user.id,
+          message:
+            lang === "fr"
+              ? `Un prélèvement automatique de ${formatXAF(totalLoanDeducted)} a été effectué sur votre cagnotte pour solder votre prêt d'urgence. Solde net versé : ${formatXAF(finalNetPayout)}.`
+              : `Automatic deduction of ${formatXAF(totalLoanDeducted)} was taken from your pot to settle your emergency loan. Net disbursed: ${formatXAF(finalNetPayout)}.`,
+          actionUrl: "/loans",
+        },
+      ],
+    }).catch(() => {});
+  }
 
   if (user.email) {
     const emailHtml = renderBrandedEmailHtml({

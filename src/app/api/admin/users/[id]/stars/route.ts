@@ -61,3 +61,4 @@ export async function PATCH(
     message: `Note de ${user.name} mise à jour à ${newStars}/5 étoiles.`,
   });
 }
+

@@ -1,0 +1,32 @@
+{
+  "appId": "com.divaasso.app",
+  "appName": "DIVA Asso",
+  "webDir": "public",
+  "server": {
+    "url": "https://divaasso.com",
+    "cleartext": false,
+    "allowNavigation": [
+      "divaasso.com",
+      "*.divaasso.com",
+      "*.supabase.co",
+      "live.fapshi.com"
+    ]
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#0b3d2e"
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "backgroundColor": "#0b3d2e",
+    "limitsNavigationsToAppBoundDomains": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "backgroundColor": "#0b3d2e",
+      "showSpinner": false
+    }
+  }
+}
+

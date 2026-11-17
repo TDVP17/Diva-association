@@ -15,6 +15,7 @@ import { PwaInstallCard } from "@/components/pwa-install-card";
 import { ManageCookiesButton } from "@/components/cookie-consent";
 import { MemberCodeCard } from "./member-code-card";
 import { SavedPaymentMethodsCard } from "./saved-payment-methods-card";
+import { DeleteAccountCard } from "./delete-account-card";
 import { ROLE_KEY } from "@/lib/role-label";
 import { formatXAF } from "@/lib/format-currency";
 
@@ -283,6 +284,31 @@ export default async function ProfilePage() {
           </span>
           <span className="material-symbols-outlined text-outline">chevron_right</span>
         </ManageCookiesButton>
+        <Link
+          href="/loans"
+          className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant hover:bg-surface-container-low transition-colors"
+        >
+          <span className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-primary">workspace_premium</span>
+            <span className="font-label-md text-label-md text-on-surface">
+              {lang === "fr" ? "Prêts d'urgence garantis (4 étoiles)" : "Guaranteed Emergency Loans (4-Star)"}
+            </span>
+          </span>
+          <span className="material-symbols-outlined text-outline">chevron_right</span>
+        </Link>
+        <Link
+          href="/private-tontines"
+          className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant hover:bg-surface-container-low transition-colors"
+        >
+          <span className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-primary">lock</span>
+            <span className="font-label-md text-label-md text-on-surface">
+              {lang === "fr" ? "Cotisations privées sur invitation" : "Private Invite-Only Tontines"}
+            </span>
+          </span>
+          <span className="material-symbols-outlined text-outline">chevron_right</span>
+        </Link>
+        <DeleteAccountCard lang={lang} />
       </section>
     </main>
   );

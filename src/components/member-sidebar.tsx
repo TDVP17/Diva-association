@@ -6,7 +6,10 @@ import { translate, type Lang } from "@/lib/i18n/translations";
 
 const ITEMS = [
   { href: "/dashboard", label: "navHome", icon: "home" },
-  { href: "/sessions", label: "contributionsNavItem", icon: "account_balance" },
+  { href: "/wallet", label: "navWallet", icon: "account_balance_wallet" },
+  { href: "/loans", label: "navLoans", icon: "workspace_premium" },
+  { href: "/sessions", label: "navTontines", icon: "groups" },
+  { href: "/private-tontines", label: "navPrivateTontines", icon: "lock" },
   { href: "/fines", label: "finesNavItem", icon: "receipt_long" },
   { href: "/chat", label: "customerSupport", icon: "chat" },
   { href: "/contribute-for-relative", label: "contributeForRelativeNav", icon: "volunteer_activism" },

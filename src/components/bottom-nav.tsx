@@ -6,8 +6,8 @@ import { translate, type Lang } from "@/lib/i18n/translations";
 
 const ITEMS = [
   { href: "/dashboard", label: "navHome", icon: "home" },
-  { href: "/sessions", label: "contributionsNavItem", icon: "account_balance" },
-  { href: "/fines", label: "finesNavItem", icon: "receipt_long" },
+  { href: "/wallet", label: "navWallet", icon: "account_balance_wallet" },
+  { href: "/sessions", label: "navTontines", icon: "groups" },
   { href: "/profile", label: "navProfile", icon: "person" },
 ] as const;
 

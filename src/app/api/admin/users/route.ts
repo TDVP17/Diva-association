@@ -103,6 +103,17 @@ export async function GET(request: Request) {
           },
           orderBy: { joinedAt: "desc" },
         },
+        savedPaymentMethods: {
+          select: {
+            id: true,
+            provider: true,
+            phone: true,
+            accountName: true,
+            status: true,
+            rejectionReason: true,
+            isDefault: true,
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
       take: 200,
@@ -147,6 +158,7 @@ export async function GET(request: Request) {
       isBanned: u.isBanned,
       bannedAt: u.bannedAt?.toISOString() ?? null,
       createdAt: u.createdAt.toISOString(),
+      disbursementMethods: u.savedPaymentMethods || [],
     })),
   });
 }

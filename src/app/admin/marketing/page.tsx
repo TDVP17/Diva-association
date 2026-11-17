@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { isAdminRole } from "@/lib/constants";
 import { getLang } from "@/lib/i18n/get-lang";
+import { PosterCustomizer } from "./poster-customizer";
 
 interface PosterItem {
   id: string;
@@ -154,6 +155,9 @@ export default async function MarketingPostersPage() {
           </a>
         </div>
       </section>
+
+      {/* Studio de Personnalisation d'Affiches (Logo, Images, Textes, Tailles, Couleurs HEX) */}
+      <PosterCustomizer lang={lang} />
 
       {/* Grid of Posters */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

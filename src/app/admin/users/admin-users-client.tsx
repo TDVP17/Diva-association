@@ -31,6 +31,16 @@ interface KycData {
   createdAt: string;
 }
 
+interface DisbursementItem {
+  id: string;
+  provider: "ORANGE" | "MTN";
+  phone: string;
+  accountName: string | null;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  rejectionReason: string | null;
+  isDefault: boolean;
+}
+
 interface AdminUserRow {
   id: string;
   name: string;
@@ -47,6 +57,7 @@ interface AdminUserRow {
   kyc?: KycData | null;
   membershipCount: number;
   memberships: UserMembershipItem[];
+  disbursementMethods?: DisbursementItem[];
   isBanned?: boolean;
   bannedAt?: string | null;
   createdAt: string;
@@ -77,6 +88,39 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
   const [starsInput, setStarsInput] = useState<number>(0);
   const [savingStars, setSavingStars] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<{ url: string; title: string } | null>(null);
+
+  // Historique complet multi-années
+  const [historyUser, setHistoryUser] = useState<AdminUserRow | null>(null);
+  const [historyData, setHistoryData] = useState<{
+    user: { walletBalance: number; formattedBalance: string };
+    totalContributed: number;
+    formattedTotalContributed: string;
+    feeInfo?: { percentage: number };
+    operations: Array<{
+      id: string;
+      type: string;
+      direction: "IN" | "OUT";
+      title: string;
+      subtitle: string;
+      formattedAmount: string;
+      date: string;
+    }>;
+  } | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  async function openFullHistoryModal(u: AdminUserRow) {
+    setHistoryUser(u);
+    setLoadingHistory(true);
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}/wallet-history`);
+      const data = await res.json();
+      setHistoryData(data);
+    } catch {
+      alert("Erreur lors du chargement de l'historique.");
+    } finally {
+      setLoadingHistory(false);
+    }
+  }
 
   // Récupération de mot de passe
   const [recoveryResult, setRecoveryResult] = useState<{
@@ -187,6 +231,52 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
     }
   }
 
+  async function handleDecideDisbursement(
+    methodId: string,
+    userId: string,
+    status: "APPROVED" | "REJECTED"
+  ) {
+    let rejectionReason: string | undefined = undefined;
+    if (status === "REJECTED") {
+      const reason = window.prompt(
+        lang === "fr"
+          ? "Motif du refus du numéro de retrait (ex: Nom du titulaire ne correspond pas au profil) :"
+          : "Reason for rejection:"
+      );
+      if (!reason) return;
+      rejectionReason = reason;
+    }
+
+    try {
+      const res = await fetch(`/api/admin/disbursement-methods/${methodId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, rejectionReason }),
+      });
+      if (res.ok) {
+        setUsers((prev) =>
+          prev
+            ? prev.map((u) => {
+              if (u.id !== userId || !u.disbursementMethods) return u;
+              return {
+                ...u,
+                disbursementMethods: u.disbursementMethods.map((m) =>
+                  m.id === methodId ? { ...m, status, rejectionReason: rejectionReason || null } : m
+                ),
+              };
+            })
+            : null
+        );
+      } else {
+        const data = await res.json().catch(() => null);
+        alert(data?.error || "Erreur lors de la mise à jour");
+      }
+    } catch (e) {
+      console.error("Disbursement decide error:", e);
+      alert("Erreur de connexion.");
+    }
+  }
+
   useEffect(() => {
     const params = new URLSearchParams();
     if (query.trim()) params.set("q", query.trim());
@@ -208,11 +298,11 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
 
   const displayedUsers = users
     ? users.filter((u) => {
-        if (filterTab === "pending") return u.memberships?.some((m) => m.status === "PENDING");
-        if (filterTab === "members") return u.memberships?.some((m) => m.status === "APPROVED");
-        if (filterTab === "none") return !u.memberships || u.memberships.length === 0;
-        return true;
-      })
+      if (filterTab === "pending") return u.memberships?.some((m) => m.status === "PENDING");
+      if (filterTab === "members") return u.memberships?.some((m) => m.status === "APPROVED");
+      if (filterTab === "none") return !u.memberships || u.memberships.length === 0;
+      return true;
+    })
     : [];
 
   return (
@@ -239,22 +329,20 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
         <button
           type="button"
           onClick={() => setFilterTab("all")}
-          className={`px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap cursor-pointer ${
-            filterTab === "all"
+          className={`px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap cursor-pointer ${filterTab === "all"
               ? "bg-primary text-on-primary shadow-xs"
               : "bg-surface-variant/40 hover:bg-surface-variant/70 text-on-surface-variant"
-          }`}
+            }`}
         >
           {lang === "fr" ? "Tous" : "All"} ({total ?? users?.length ?? 0})
         </button>
         <button
           type="button"
           onClick={() => setFilterTab("pending")}
-          className={`px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer ${
-            filterTab === "pending"
+          className={`px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer ${filterTab === "pending"
               ? "bg-amber-600 text-white shadow-xs"
               : "bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/60"
-          }`}
+            }`}
         >
           <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
           <span>{lang === "fr" ? "Veulent intégrer" : "Want to join"}</span>
@@ -263,11 +351,10 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
         <button
           type="button"
           onClick={() => setFilterTab("members")}
-          className={`px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap cursor-pointer ${
-            filterTab === "members"
+          className={`px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap cursor-pointer ${filterTab === "members"
               ? "bg-emerald-700 text-white shadow-xs"
               : "bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/60"
-          }`}
+            }`}
         >
           <span>{lang === "fr" ? "Membres actifs" : "Active members"}</span>
           <span className="font-bold ml-0.5">({membersCount})</span>
@@ -275,11 +362,10 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
         <button
           type="button"
           onClick={() => setFilterTab("none")}
-          className={`px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap cursor-pointer ${
-            filterTab === "none"
+          className={`px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap cursor-pointer ${filterTab === "none"
               ? "bg-slate-700 text-white shadow-xs"
               : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
-          }`}
+            }`}
         >
           <span>{lang === "fr" ? "Sans cotisation" : "No cotisations"}</span>
           <span className="font-bold ml-0.5">({noneCount})</span>
@@ -452,23 +538,21 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
                           return (
                             <div
                               key={m.id}
-                              className={`flex items-center justify-between gap-2 p-2 rounded-lg text-xs border ${
-                                isPending
+                              className={`flex items-center justify-between gap-2 p-2 rounded-lg text-xs border ${isPending
                                   ? "bg-amber-50/90 border-amber-300 text-amber-950 font-medium"
                                   : isApproved
                                     ? "bg-emerald-50/70 border-emerald-200 text-emerald-950"
                                     : "bg-slate-50 border-slate-200 text-slate-700"
-                              }`}
+                                }`}
                             >
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <span
-                                  className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
-                                    isPending
+                                  className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isPending
                                       ? "bg-amber-500 animate-pulse"
                                       : isApproved
                                         ? "bg-emerald-500"
                                         : "bg-slate-400"
-                                  }`}
+                                    }`}
                                 />
                                 <span className="font-bold flex-shrink-0">
                                   {isPending
@@ -509,6 +593,78 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
                         {lang === "fr" ? "Aucune demande d'intégration ni cotisation" : "No membership requests or cotisations"}
                       </p>
                     )}
+
+                    {/* Numéros de retrait (Décaissement) enregistrés par le membre */}
+                    {u.disbursementMethods && u.disbursementMethods.length > 0 && (
+                      <div className="mt-2.5 p-2 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col gap-1.5">
+                        <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[14px] text-primary">payments</span>
+                          <span>{lang === "fr" ? "Numéros de retrait (Décaissement) :" : "Payout / Disbursement Numbers:"}</span>
+                        </span>
+                        <div className="flex flex-col gap-1">
+                          {u.disbursementMethods.map((dm) => {
+                            const isPending = dm.status === "PENDING";
+                            const isApproved = dm.status === "APPROVED";
+                            return (
+                              <div
+                                key={dm.id}
+                                className="flex items-center justify-between gap-2 p-1.5 bg-white rounded-lg border border-slate-200 text-xs"
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span
+                                    className={`px-1.5 py-0.2 rounded font-bold text-[10px] uppercase flex-shrink-0 ${dm.provider === "ORANGE" ? "bg-orange-500 text-white" : "bg-yellow-400 text-slate-950"
+                                      }`}
+                                  >
+                                    {dm.provider}
+                                  </span>
+                                  <span className="font-mono font-bold text-slate-900">{dm.phone}</span>
+                                  {dm.accountName && (
+                                    <span className="text-slate-600 truncate text-[11px]">· {dm.accountName}</span>
+                                  )}
+                                  <span
+                                    className={`px-1.5 py-0.2 rounded text-[10px] font-bold flex-shrink-0 ${isApproved
+                                        ? "bg-emerald-100 text-emerald-800"
+                                        : isPending
+                                          ? "bg-amber-100 text-amber-900"
+                                          : "bg-red-100 text-red-800"
+                                      }`}
+                                  >
+                                    {isApproved
+                                      ? (lang === "fr" ? "Validé DIVA" : "Approved")
+                                      : isPending
+                                        ? (lang === "fr" ? "En attente" : "Pending")
+                                        : (lang === "fr" ? "Refusé" : "Rejected")}
+                                  </span>
+                                </div>
+
+                                {isPending && (
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDecideDisbursement(dm.id, u.id, "APPROVED")}
+                                      className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] flex items-center gap-0.5 cursor-pointer"
+                                      title={lang === "fr" ? "Valider pour décaissements" : "Approve for payouts"}
+                                    >
+                                      <span className="material-symbols-outlined text-[12px]">check</span>
+                                      <span>{lang === "fr" ? "Valider" : "Approve"}</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDecideDisbursement(dm.id, u.id, "REJECTED")}
+                                      className="px-2 py-0.5 rounded bg-red-100 hover:bg-red-200 text-red-800 font-bold text-[10px] flex items-center gap-0.5 cursor-pointer"
+                                      title={lang === "fr" ? "Refuser ce numéro" : "Reject"}
+                                    >
+                                      <span className="material-symbols-outlined text-[12px]">close</span>
+                                      <span>{lang === "fr" ? "Refuser" : "Reject"}</span>
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -520,11 +676,10 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
                       e.stopPropagation();
                       setOpenMenuUserId((prev) => (prev === u.id ? null : u.id));
                     }}
-                    className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all shadow-2xs cursor-pointer ${
-                      isMenuOpen
+                    className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all shadow-2xs cursor-pointer ${isMenuOpen
                         ? "bg-primary text-white border-primary ring-2 ring-primary/20"
                         : "bg-white hover:bg-surface-container text-on-surface border-outline-variant/60"
-                    }`}
+                      }`}
                     title={lang === "fr" ? "Options du membre" : "Member options"}
                   >
                     <span className="material-symbols-outlined text-[18px]">more_vert</span>
@@ -599,6 +754,19 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
                             </span>
                           </span>
                         </button>
+
+                        {/* 4b. Historique complet & Portefeuille (Stockage multi-années admin) */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpenMenuUserId(null);
+                            openFullHistoryModal(u);
+                          }}
+                          className="w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-on-surface hover:bg-teal-50 hover:text-teal-900 transition-colors cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[18px] text-teal-700">receipt_long</span>
+                          <span>{lang === "fr" ? "Historique complet (Multi-années)" : "Full History (Multi-year)"}</span>
+                        </button>
                       </div>
 
                       {/* Options administratives sensibles */}
@@ -629,11 +797,10 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
                               setOpenMenuUserId(null);
                               handleBanToggle(u);
                             }}
-                            className={`w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold transition-colors cursor-pointer ${
-                              u.isBanned
+                            className={`w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold transition-colors cursor-pointer ${u.isBanned
                                 ? "text-emerald-700 hover:bg-emerald-50"
                                 : "text-error hover:bg-error/10"
-                            }`}
+                              }`}
                           >
                             <span className="material-symbols-outlined text-[18px]">
                               {u.isBanned ? "how_to_reg" : "block"}
@@ -819,13 +986,12 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
                       {selectedKycUser.kyc.documentType === "RECEPISSE" ? "Récépissé de CNI" : "CNI (Carte Nationale d'Identité)"}
                     </span>
                   </span>
-                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                    selectedKycUser.kyc.status === "VERIFIED"
+                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${selectedKycUser.kyc.status === "VERIFIED"
                       ? "bg-emerald-100 text-emerald-800"
                       : selectedKycUser.kyc.status === "FAILED"
                         ? "bg-error/15 text-error"
                         : "bg-amber-100 text-amber-900"
-                  }`}>
+                    }`}>
                     {selectedKycUser.kyc.status}
                   </span>
                 </div>
@@ -1088,11 +1254,10 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
               <button
                 type="button"
                 onClick={() => setStarsInput(0)}
-                className={`text-[11px] font-semibold transition-colors mt-1 px-2.5 py-1 rounded-md cursor-pointer ${
-                  starsInput === 0
+                className={`text-[11px] font-semibold transition-colors mt-1 px-2.5 py-1 rounded-md cursor-pointer ${starsInput === 0
                     ? "bg-slate-200 text-slate-800 font-bold"
                     : "text-slate-500 hover:text-slate-800 hover:bg-slate-100"
-                }`}
+                  }`}
               >
                 {lang === "fr" ? "Remettre à 0 étoile (5 étoiles vides)" : "Reset to 0 stars (5 empty stars)"}
               </button>
@@ -1105,11 +1270,10 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
                   key={val}
                   type="button"
                   onClick={() => setStarsInput(val)}
-                  className={`flex-1 py-1 rounded-lg font-bold text-xs transition-colors cursor-pointer border ${
-                    starsInput === val
+                  className={`flex-1 py-1 rounded-lg font-bold text-xs transition-colors cursor-pointer border ${starsInput === val
                       ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
                       : "bg-surface-variant/30 text-on-surface-variant border-outline-variant/40 hover:bg-surface-variant/60"
-                  }`}
+                    }`}
                 >
                   {val}★
                 </button>
@@ -1226,6 +1390,148 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
             >
               {lang === "fr" ? "Fermer" : "Close"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL HISTORIQUE COMPLET MULTI-ANNÉES & PORTEFEUILLE (ADMIN) ── */}
+      {historyUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-surface rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-outline-variant/30 flex flex-col gap-4 max-h-[90vh] overflow-hidden">
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 border-b border-outline-variant/20 pb-3 flex-shrink-0">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-title-md text-title-md text-on-surface font-bold truncate">
+                    {historyUser.name}
+                  </h3>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800">
+                    {lang === "fr" ? "Historique Permanent Multi-années" : "Permanent Multi-year History"}
+                  </span>
+                </div>
+                <p className="text-xs text-on-surface-variant mt-0.5 truncate">
+                  {historyUser.email} {historyUser.phone ? `· ${historyUser.phone}` : ""} {historyUser.memberCode ? `· ${historyUser.memberCode}` : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setHistoryUser(null);
+                  setHistoryData(null);
+                }}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer flex-shrink-0"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            {/* Overview Badges */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-shrink-0">
+              <div className="p-3 bg-emerald-900 text-white rounded-xl shadow-xs">
+                <p className="text-[11px] text-emerald-200/90 font-medium">
+                  {lang === "fr" ? "Solde portefeuille" : "Wallet Balance"}
+                </p>
+                <p className="text-lg font-extrabold mt-0.5">
+                  {historyData?.user ? historyData.user.formattedBalance : (loadingHistory ? "..." : "0 FCFA")}
+                </p>
+              </div>
+
+              <div className="p-3 bg-slate-100 rounded-xl border border-slate-200">
+                <p className="text-[11px] text-slate-500 font-medium">
+                  {lang === "fr" ? "Total cotisé historique" : "Total Contributed"}
+                </p>
+                <p className="text-lg font-bold text-slate-800 mt-0.5">
+                  {historyData?.formattedTotalContributed ?? (loadingHistory ? "..." : "0 FCFA")}
+                </p>
+              </div>
+
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200">
+                <p className="text-[11px] text-amber-700 font-medium">
+                  {lang === "fr" ? "Taux frais recharge" : "Topup Fee Rate"}
+                </p>
+                <p className="text-lg font-bold text-amber-900 mt-0.5">
+                  {historyData?.feeInfo ? `${historyData.feeInfo.percentage}%` : (loadingHistory ? "..." : "-")}
+                </p>
+              </div>
+            </div>
+
+            {/* Notice Archivage */}
+            <div className="p-3 rounded-xl bg-teal-50 border border-teal-200/80 text-[11px] text-teal-950 flex items-start gap-2 flex-shrink-0">
+              <span className="material-symbols-outlined text-[18px] text-teal-700 flex-shrink-0 mt-0.5">
+                verified_user
+              </span>
+              <p>
+                {lang === "fr"
+                  ? "Règle de visibilité : Les membres voient uniquement leurs 3 premières opérations récentes et jusqu'à 30 jours dans leur application. Les opérations plus anciennes sont archivées pour eux, mais conservées ici de manière permanente pour l'administration sur plusieurs années."
+                  : "Visibility rule: Members see only recent operations up to 30 days. Older operations are archived for them but permanently preserved here for the admin across multiple years."}
+              </p>
+            </div>
+
+            {/* Transactions List */}
+            <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-2 min-h-[220px]">
+              {loadingHistory ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-2 text-on-surface-variant">
+                  <LoadingSpinner />
+                  <p className="text-xs">{lang === "fr" ? "Chargement de tout l'historique..." : "Loading full history..."}</p>
+                </div>
+              ) : !historyData || historyData.operations.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center text-on-surface-variant">
+                  <span className="material-symbols-outlined text-[36px] opacity-40">receipt_long</span>
+                  <p className="text-xs font-medium mt-1">
+                    {lang === "fr" ? "Aucune opération enregistrée pour ce membre." : "No operations recorded for this member."}
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-outline-variant/20 border border-outline-variant/30 rounded-xl overflow-hidden bg-white">
+                  {historyData.operations.map((tx) => {
+                    const isCredit = tx.direction === "IN";
+                    return (
+                      <div key={tx.id} className="flex items-center justify-between p-3 gap-3 hover:bg-slate-50 transition-colors">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${isCredit ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"
+                              }`}
+                          >
+                            <span className="material-symbols-outlined text-[18px]">
+                              {isCredit ? "arrow_downward" : "arrow_upward"}
+                            </span>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-on-surface truncate">{tx.title}</p>
+                            <p className="text-[11px] text-on-surface-variant truncate">
+                              {tx.subtitle} · {tx.date}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="text-right flex-shrink-0">
+                          <p className={`text-xs font-extrabold ${isCredit ? "text-emerald-700" : "text-red-600"}`}>
+                            {tx.formattedAmount}
+                          </p>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {tx.type}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="pt-2 border-t border-outline-variant/20 flex items-center justify-end flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setHistoryUser(null);
+                  setHistoryData(null);
+                }}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition-colors cursor-pointer"
+              >
+                {lang === "fr" ? "Fermer" : "Close"}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -3,6 +3,7 @@ import type { Contribution, Membership, MembershipSlot, TontineSession, User } f
 import { prisma } from "@/lib/prisma";
 import { generateReceiptPdf } from "@/lib/receipt";
 import { saveFile } from "@/lib/storage";
+import { creditLateBeneficiaryWithHalfFine } from "@/lib/settle-fine";
 import { sendEmailSafe } from "@/lib/email/resend";
 import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
@@ -52,7 +53,10 @@ export async function settleContribution(
   const { user, tontineSession } = membership;
 
   const isRelativePayer = Boolean(contribution.paidByUser && contribution.paidByUser.id !== user.id);
-  const paidByName = isRelativePayer ? contribution.paidByUser?.name : undefined;
+  const payerUser = isRelativePayer ? contribution.paidByUser! : user;
+  const payerPhone = contribution.payerPhone || payerUser.phone;
+  const paidByDisplay = `${payerUser.name}${payerPhone ? ` (${payerPhone})` : ""}`;
+  const paidByName = paidByDisplay;
 
   const totalPaid =
     Number(contribution.amountPaid) +
@@ -95,6 +99,17 @@ export async function settleContribution(
         ]
       : []),
   ]);
+
+  // 50% de l'amende revient à la personne qui bouffe en retard (crédité sur son portefeuille virtuel)
+  if (Number(contribution.finePaid) > 0) {
+    await creditLateBeneficiaryWithHalfFine({
+      tontineSessionId: membership.tontineSessionId,
+      dueDate: contribution.dueDate,
+      fineAmount: Number(contribution.finePaid),
+      finePayerName: payerUser.name,
+      sessionTitle: sessionLabel,
+    });
+  }
 
   const receiptUrl = `${options.origin}/api/files/${receiptKey}`;
   const recipientLang: Lang = user.preferredLang === "en" ? "en" : "fr";
@@ -319,14 +334,21 @@ export async function settleContributionsBatch(
     const distinctSessions = [...new Set(items.map((i) => i.sessionLabel!).filter(Boolean))];
     const sessionSummary = formatSessionSummary(distinctSessions, ownerLang);
 
-    const relativePayerNames = [
+    const relativePayerDisplays = [
       ...new Set(
         ownerContribs
           .filter((c) => c.paidByUser && c.paidByUser.id !== ownerId)
-          .map((c) => c.paidByUser!.name),
+          .map((c) => {
+            const phone = c.payerPhone || c.paidByUser!.phone;
+            return `${c.paidByUser!.name}${phone ? ` (${phone})` : ""}`;
+          }),
       ),
     ];
-    const paidByName = relativePayerNames.length > 0 ? relativePayerNames.join(", ") : undefined;
+    const ownerPhone = ownerContribs[0].payerPhone || owner.phone;
+    const paidByName =
+      relativePayerDisplays.length > 0
+        ? relativePayerDisplays.join(", ")
+        : `${owner.name}${ownerPhone ? ` (${ownerPhone})` : ""}`;
     const transRef =
       options.transRefOverride ??
       ownerContribs[0].fapshiTxRef ??
@@ -483,6 +505,9 @@ export async function settleContributionsBatch(
       payerReceiptUrl = `${options.origin}/api/files/${batchKey}`;
     }
 
+    const batchPayerPhone = payerContribs[0].payerPhone || payer.phone;
+    const batchPayerDisplay = `${payer.name}${batchPayerPhone ? ` (${batchPayerPhone})` : ""}`;
+
     await sendEmailSafe(
       payer.email,
       translate(payerLang, "paymentSentEmailSubject", { session: sessionSummary }),
@@ -490,7 +515,7 @@ export async function settleContributionsBatch(
         recipientName: payer.name,
         beneficiaryName: items[0].beneficiaryName,
         items,
-        paidByName: payer.name,
+        paidByName: batchPayerDisplay,
         sessionLabel: sessionSummary,
         amount: payerNetTotal,
         transRef,

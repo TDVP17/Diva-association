@@ -64,6 +64,7 @@ export default async function SessionsPage() {
   const candidates = await prisma.tontineSession.findMany({
     where: {
       status: { not: "CLOSED" },
+      isPrivate: false,
       id: { notIn: excludedSessionIds },
     },
     include: {
@@ -129,17 +130,26 @@ export default async function SessionsPage() {
   return (
     <main className="px-container-padding py-stack-gap-lg max-w-3xl lg:max-w-6xl mx-auto w-full flex flex-col gap-section-margin">
       <section>
-        <div className="sticky top-16 z-30 bg-background py-2 -mx-container-padding px-container-padding mb-stack-gap-md flex items-center justify-between gap-2">
+        <div className="sticky top-16 z-30 bg-background py-2 -mx-container-padding px-container-padding mb-stack-gap-md flex items-center justify-between gap-2 flex-wrap">
           <h2 className="font-title-md text-title-md text-primary">{t("mySessions")}</h2>
-          {myCotisations.length > 0 && (
+          <div className="flex items-center gap-2">
             <Link
-              href="/global-payment"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary font-label-sm text-label-sm hover:bg-primary/20 transition-colors flex-shrink-0"
+              href="/private-tontines"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-300/80 text-amber-900 font-label-sm text-label-sm font-semibold hover:bg-amber-100 transition-colors flex-shrink-0"
             >
-              <span className="material-symbols-outlined text-[16px]">account_balance_wallet</span>
-              {t("globalPaymentNavLabel")}
+              <span className="material-symbols-outlined text-[16px]">lock</span>
+              {lang === "fr" ? "Tontines privées" : "Private Tontines"}
             </Link>
-          )}
+            {myCotisations.length > 0 && (
+              <Link
+                href="/global-payment"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary font-label-sm text-label-sm hover:bg-primary/20 transition-colors flex-shrink-0"
+              >
+                <span className="material-symbols-outlined text-[16px]">account_balance_wallet</span>
+                {t("globalPaymentNavLabel")}
+              </Link>
+            )}
+          </div>
         </div>
         {myCotisations.length === 0 ? (
           <div className="bg-white rounded-xl p-8 text-center shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant flex flex-col items-center gap-stack-gap-sm">

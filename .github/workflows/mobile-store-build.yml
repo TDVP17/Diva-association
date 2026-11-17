@@ -1,0 +1,64 @@
+name: Mobile Store Build (Android & iOS Capacitor)
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "Plateforme cible (android, ios, both)"
+        required: true
+        default: "both"
+        type: choice
+        options:
+          - both
+          - android
+          - ios
+
+jobs:
+  build-android:
+    if: ${{ inputs.platform == 'android' || inputs.platform == 'both' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Initialize Capacitor Android wrapper
+        run: |
+          npm install --no-save @capacitor/core @capacitor/cli @capacitor/android
+          npx cap add android || true
+          npx cap sync android
+      - name: Build Android App Bundle (.aab)
+        working-directory: android
+        run: ./gradlew bundleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: diva-asso-android-aab
+          path: android/app/build/outputs/bundle/release/*.aab
+
+  build-ios:
+    if: ${{ inputs.platform == 'ios' || inputs.platform == 'both' }}
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Initialize Capacitor iOS wrapper
+        run: |
+          npm install --no-save @capacitor/core @capacitor/cli @capacitor/ios
+          npx cap add ios || true
+          npx cap sync ios
+      - name: Build unsigned iOS Archive (ready for App Store Connect signing)
+        working-directory: ios/App
+        run: |
+          xcodebuild -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+

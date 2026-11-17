@@ -25,6 +25,13 @@ export const NOTIFICATION_TYPE_KEY: Record<string, Parameters<typeof translate>[
   PAYMENT_REFUND_ESCALATED: "notifTypePaymentRefundEscalated",
   PAYOUT_TURN: "notifTypePayoutTurn",
   TURN_REMINDER_TOMORROW: "notifTypeTurnReminderTomorrow",
+  WITHDRAWAL_PENDING_ADMIN: "notifTypeAdminBroadcast",
+  WITHDRAWAL_APPROVED: "notifTypePaymentSuccess",
+  WITHDRAWAL_REJECTED: "notifTypePaymentFailed",
+  LOAN_DISBURSED: "notifTypePaymentSuccess",
+  LOAN_OVERDUE: "notifTypeFineReminder",
+  LOAN_REPAID: "notifTypePaymentSuccess",
+  LOAN_DEDUCTED: "notifTypePaymentSuccess",
 };
 
 /** Notification/reminder delivery status, for the admin notification center's log view. */
