@@ -343,18 +343,23 @@ export function WalletClient({
       </div>
 
       {/* ── Carte principale du solde (Vert Foncé DIVA Asso) ── */}
-      <div className="bg-[#0b3d2e] rounded-3xl p-6 sm:p-7 text-white shadow-xl relative overflow-hidden flex flex-col justify-between min-h-[185px] border border-emerald-900/40">
-        <div className="absolute -right-8 -top-8 w-36 h-36 rounded-full bg-emerald-500/10 blur-xl pointer-events-none" />
-        <div className="absolute -left-8 -bottom-8 w-32 h-32 rounded-full bg-emerald-400/10 blur-lg pointer-events-none" />
+      <div className="bg-[#0b3d2e] rounded-2xl p-4 sm:p-5 text-white shadow-lg relative overflow-hidden flex flex-col gap-3 border border-emerald-900/40">
+        <div className="absolute -right-8 -top-8 w-28 h-28 rounded-full bg-emerald-500/10 blur-xl pointer-events-none" />
+        <div className="absolute -left-8 -bottom-8 w-24 h-24 rounded-full bg-emerald-400/10 blur-lg pointer-events-none" />
 
         <div className="flex items-center justify-between relative z-10">
-          <span className="text-xs sm:text-sm font-medium text-emerald-200/90 tracking-wide">
-            {lang === "fr" ? "Solde disponible" : "Available balance"}
-          </span>
+          <div>
+            <span className="text-[11px] sm:text-xs font-medium text-emerald-200/90 tracking-wide block">
+              {lang === "fr" ? "Solde disponible" : "Available balance"}
+            </span>
+            <p className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-0.5">
+              {isBalanceHidden ? "•••••• FCFA" : formatXAF(balance)}
+            </p>
+          </div>
           <button
             type="button"
             onClick={() => setIsBalanceHidden((prev) => !prev)}
-            className="p-1.5 rounded-full hover:bg-white/10 text-emerald-200 transition-colors cursor-pointer"
+            className="p-1.5 rounded-full hover:bg-white/10 text-emerald-200 transition-colors cursor-pointer self-start"
             title={isBalanceHidden ? "Afficher le solde" : "Masquer le solde"}
           >
             <span className="material-symbols-outlined text-[20px]">
@@ -363,29 +368,23 @@ export function WalletClient({
           </button>
         </div>
 
-        <div className="my-2 relative z-10">
-          <p className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-            {isBalanceHidden ? "•••••• FCFA" : formatXAF(balance)}
-          </p>
-        </div>
-
-        {/* Actions: Recharger + Retirer (0% frais) */}
-        <div className="pt-3 relative z-10 flex items-center gap-2 flex-wrap">
+        {/* Actions: Recharger + Retirer côte à côte sur 1 seule ligne */}
+        <div className="relative z-10 grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={() => setIsTopUpOpen(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white text-emerald-950 font-bold text-xs hover:bg-emerald-50 active:scale-95 transition-all shadow-md cursor-pointer"
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white text-emerald-950 font-bold text-xs hover:bg-emerald-50 active:scale-95 transition-all shadow-sm cursor-pointer whitespace-nowrap"
           >
-            <span className="material-symbols-outlined text-[18px] text-emerald-800">add_circle</span>
+            <span className="material-symbols-outlined text-[16px] text-emerald-800">add_circle</span>
             <span>{lang === "fr" ? "Recharger" : "Top up"}</span>
           </button>
           <button
             type="button"
             onClick={() => setIsWithdrawOpen(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-600/40 hover:bg-emerald-600/60 text-white border border-emerald-300/30 font-bold text-xs active:scale-95 transition-all cursor-pointer"
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600/40 hover:bg-emerald-600/60 text-white border border-emerald-300/30 font-bold text-xs active:scale-95 transition-all cursor-pointer whitespace-nowrap"
           >
-            <span className="material-symbols-outlined text-[18px]">payments</span>
-            <span>{lang === "fr" ? "Retirer (0 % frais)" : "Withdraw (0% fee)"}</span>
+            <span className="material-symbols-outlined text-[16px]">payments</span>
+            <span>{lang === "fr" ? "Retirer (0 %)" : "Withdraw (0%)"}</span>
           </button>
         </div>
       </div>
