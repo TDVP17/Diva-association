@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
 import { logAudit } from "@/lib/audit";
 import { getSessionActiveRoundAndDueDate, getSlotNextUnpaidDueDate } from "@/lib/tontine-engine";
+import { awardStarsForCompletedSession } from "@/lib/stars";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin();
@@ -20,7 +21,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         where: { status: "APPROVED" },
         orderBy: { joinedAt: "asc" },
         include: {
-          user: { select: { id: true, name: true, avatar: true, image: true, phone: true, memberCode: true } },
+          user: { select: { id: true, name: true, avatar: true, image: true, phone: true, memberCode: true, stars: true } },
           slots: { orderBy: [{ officialPosition: "asc" }, { ballDrawn: "asc" }, { createdAt: "asc" }] },
         },
       },
@@ -118,6 +119,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
             phone: m.user.phone,
             memberCode: m.user.memberCode,
             avatar: m.user.avatar ?? m.user.image,
+            stars: m.user.stars ?? 0,
             hasPhone: !!m.user.phone,
             officialPosition: slot.officialPosition,
             ballDrawn: slot.ballDrawn,
@@ -169,6 +171,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   try {
     const before = await prisma.tontineSession.findUnique({ where: { id } });
     const after = await prisma.tontineSession.update({ where: { id }, data: parsed.data });
+
+    if (parsed.data.status === "CLOSED" && before?.status !== "CLOSED") {
+      try {
+        await awardStarsForCompletedSession(id, { id: admin.user.id, role: admin.user.role }, request);
+      } catch (starErr) {
+        console.error("[awardStarsForCompletedSession error]:", starErr);
+      }
+    }
     await logAudit({
       actorId: admin.user.id,
       actorRole: admin.user.role,

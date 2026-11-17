@@ -40,6 +40,7 @@ interface AdminSlot {
   name: string;
   memberCode: string | null;
   avatar: string | null;
+  stars?: number;
   hasPhone: boolean;
   phone?: string | null;
   officialPosition: number | null;
@@ -2436,6 +2437,23 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                         <span className="font-medium text-slate-700">{s.name}</span>
                         {s.memberCode && <span className="text-slate-500"> · {s.memberCode}</span>}
                       </Link>
+                      <div className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-50 border border-amber-200/80" title={`${s.stars ?? 0}/5 étoiles (Admissibilité aux prêts)`}>
+                        {[1, 2, 3, 4, 5].map((starIdx) => (
+                          <span
+                            key={starIdx}
+                            className="material-symbols-outlined text-[12px]"
+                            style={{
+                              color: starIdx <= (s.stars ?? 0) ? "#f59e0b" : "#cbd5e1",
+                              fontVariationSettings: starIdx <= (s.stars ?? 0) ? "'FILL' 1" : "'FILL' 0",
+                            }}
+                          >
+                            star
+                          </span>
+                        ))}
+                        <span className="text-[10px] font-bold text-amber-800 ml-0.5">
+                          {s.stars ?? 0}/5
+                        </span>
+                      </div>
                       <MemberArchivesToggle userId={s.userId} lang={lang} />
                     </div>
                   </div>

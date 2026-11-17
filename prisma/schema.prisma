@@ -323,6 +323,9 @@ model User {
   /// relative/friend look the member up via "Contribute for a Relative"
   /// without exposing email/phone. Null until their first approval.
   memberCode           String?   @unique
+  /// 0 to 5 stars credit / trust score for future loan system. Starts at 0.
+  /// Increments by 1 each time a member finishes a full cotisation cycle without fines.
+  stars                Int       @default(0)
   isBanned             Boolean   @default(false)
   bannedAt             DateTime?
   bannedReason         String?

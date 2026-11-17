@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { LoadingSpinner } from "@/components/loading-spinner";
@@ -19,6 +19,18 @@ interface UserMembershipItem {
   };
 }
 
+interface KycData {
+  id: string;
+  documentType: string;
+  status: string;
+  documentImageUrl: string | null;
+  documentBackImageUrl: string | null;
+  selfieImageUrl: string | null;
+  referrerName?: string | null;
+  referrerPhone?: string | null;
+  createdAt: string;
+}
+
 interface AdminUserRow {
   id: string;
   name: string;
@@ -29,6 +41,10 @@ interface AdminUserRow {
   memberCode: string | null;
   city: string | null;
   neighborhood: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  stars?: number;
+  kyc?: KycData | null;
   membershipCount: number;
   memberships: UserMembershipItem[];
   isBanned?: boolean;
@@ -50,6 +66,19 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
   const [total, setTotal] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [filterTab, setFilterTab] = useState<FilterTab>("all");
+
+  // Menu déroulant actif (id utilisateur)
+  const [openMenuUserId, setOpenMenuUserId] = useState<string | null>(null);
+
+  // Modales
+  const [selectedMapUser, setSelectedMapUser] = useState<AdminUserRow | null>(null);
+  const [selectedKycUser, setSelectedKycUser] = useState<AdminUserRow | null>(null);
+  const [editingStarsUser, setEditingStarsUser] = useState<AdminUserRow | null>(null);
+  const [starsInput, setStarsInput] = useState<number>(0);
+  const [savingStars, setSavingStars] = useState(false);
+  const [zoomedImage, setZoomedImage] = useState<{ url: string; title: string } | null>(null);
+
+  // Récupération de mot de passe
   const [recoveryResult, setRecoveryResult] = useState<{
     userName: string;
     email: string;
@@ -59,6 +88,18 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
   } | null>(null);
   const [resettingUserId, setResettingUserId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // Fermer le menu au clic extérieur
+  const menuContainerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuContainerRef.current && !menuContainerRef.current.contains(event.target as Node)) {
+        setOpenMenuUserId(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   async function handleResetUserPassword(u: AdminUserRow) {
     const confirmMsg =
@@ -92,6 +133,60 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
     }
   }
 
+  async function handleBanToggle(u: AdminUserRow) {
+    const nextState = !u.isBanned;
+    const confirmMsg = nextState
+      ? lang === "fr"
+        ? `Voulez-vous vraiment bannir ${u.name} ? Cette personne ne pourra plus se connecter à l'application avec son email ou son numéro de téléphone.`
+        : `Are you sure you want to ban ${u.name}? They will no longer be able to log in with their email or phone number.`
+      : lang === "fr"
+        ? `Voulez-vous réactiver / débannir le compte de ${u.name} ?`
+        : `Are you sure you want to unban ${u.name}?`;
+    if (!window.confirm(confirmMsg)) return;
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}/ban`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isBanned: nextState }),
+      });
+      if (res.ok) {
+        setUsers((prev) =>
+          prev ? prev.map((item) => (item.id === u.id ? { ...item, isBanned: nextState } : item)) : null
+        );
+      }
+    } catch (e) {
+      console.error("Ban toggle error:", e);
+    }
+  }
+
+  async function handleSaveStars() {
+    if (!editingStarsUser) return;
+    setSavingStars(true);
+    try {
+      const res = await fetch(`/api/admin/users/${editingStarsUser.id}/stars`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stars: starsInput }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Erreur lors de la mise à jour des étoiles");
+        return;
+      }
+      setUsers((prev) =>
+        prev
+          ? prev.map((u) => (u.id === editingStarsUser.id ? { ...u, stars: starsInput } : u))
+          : null
+      );
+      setEditingStarsUser(null);
+    } catch (e) {
+      console.error("Save stars error:", e);
+      alert("Erreur de connexion lors de l'enregistrement des étoiles.");
+    } finally {
+      setSavingStars(false);
+    }
+  }
+
   useEffect(() => {
     const params = new URLSearchParams();
     if (query.trim()) params.set("q", query.trim());
@@ -121,7 +216,7 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
     : [];
 
   return (
-    <div className="flex flex-col gap-stack-gap-md">
+    <div className="flex flex-col gap-stack-gap-md" ref={menuContainerRef}>
       {total != null && (
         <p className="font-label-sm text-label-sm text-on-surface-variant">
           {t("totalRegisteredUsers", { count: total.toLocaleString("fr-FR") })}
@@ -231,195 +326,824 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
             : t("noUsersFound")}
         </p>
       ) : (
-        <div className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/30">
-          {displayedUsers.map((u) => (
-            <div
-              key={u.id}
-              className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-surface-container-lowest hover:bg-surface-container-low/40 transition-colors"
-            >
-              <div className="flex items-start gap-3 min-w-0 flex-1 w-full">
-                <div className="w-10 h-10 rounded-full bg-tertiary-container text-on-tertiary flex items-center justify-center font-label-md text-label-md overflow-hidden flex-shrink-0 mt-0.5">
-                  {u.avatar ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={u.avatar} alt={u.name} className="w-full h-full object-cover" />
-                  ) : (
-                    u.name.slice(0, 2).toUpperCase()
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Link
-                      href={`/admin/support?with=${encodeURIComponent(u.id)}&name=${encodeURIComponent(u.name)}`}
-                      className="font-label-md text-label-md text-on-surface hover:text-primary hover:underline font-semibold truncate flex items-center gap-1 group"
-                      title={lang === "fr" ? `Écrire à ${u.name}` : `Message ${u.name}`}
-                    >
-                      <span>{u.name}</span>
-                      <span className="material-symbols-outlined text-[15px] text-primary opacity-60 group-hover:opacity-100 flex-shrink-0">
-                        chat
-                      </span>
-                    </Link>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md font-label-sm text-[11px] flex-shrink-0 ${ROLE_CLASS[u.role] ?? ""}`}>
-                      {t(ROLE_KEY[u.role] ?? "roleMember")}
-                    </span>
-                    {u.isBanned && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-md font-label-sm text-[11px] bg-error/15 text-error font-bold flex-shrink-0">
-                        {lang === "fr" ? "BANNI" : "BANNED"}
-                      </span>
+        <div className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-outline-variant/30 overflow-visible divide-y divide-outline-variant/30">
+          {displayedUsers.map((u) => {
+            const isMenuOpen = openMenuUserId === u.id;
+            const currentStars = u.stars ?? 0;
+
+            return (
+              <div
+                key={u.id}
+                className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-surface-container-lowest hover:bg-surface-container-low/40 transition-colors"
+              >
+                <div className="flex items-start gap-3 min-w-0 flex-1 w-full">
+                  <div className="w-10 h-10 rounded-full bg-tertiary-container text-on-tertiary flex items-center justify-center font-label-md text-label-md overflow-hidden flex-shrink-0 mt-0.5">
+                    {u.avatar ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={u.avatar} alt={u.name} className="w-full h-full object-cover" />
+                    ) : (
+                      u.name.slice(0, 2).toUpperCase()
                     )}
                   </div>
-                  <p className="font-label-sm text-xs text-on-surface-variant truncate mt-0.5">
-                    {u.email}
-                    {u.phone ? ` · ${u.phone}` : ""}
-                  </p>
-                  <p className="font-label-sm text-xs text-on-surface-variant truncate mt-0.5">
-                    {u.memberCode ? `${u.memberCode} · ` : ""}
-                    {u.city ? `${[u.city, u.neighborhood].filter(Boolean).join(", ")} · ` : ""}
-                    {t("membershipCountLabel", { count: String(u.membershipCount) })}
-                  </p>
 
-                  {/* Cotisations & Demandes d'intégration détaillées */}
-                  {u.memberships && u.memberships.length > 0 ? (
-                    <div className="mt-2 flex flex-col gap-1.5">
-                      {u.memberships.map((m) => {
-                        const isPending = m.status === "PENDING";
-                        const isApproved = m.status === "APPROVED";
-                        const isRejected = m.status === "REJECTED";
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Link
+                        href={`/admin/support?with=${encodeURIComponent(u.id)}&name=${encodeURIComponent(u.name)}`}
+                        className="font-label-md text-label-md text-on-surface hover:text-primary hover:underline font-semibold truncate flex items-center gap-1 group"
+                        title={lang === "fr" ? `Écrire à ${u.name}` : `Message ${u.name}`}
+                      >
+                        <span>{u.name}</span>
+                        <span className="material-symbols-outlined text-[15px] text-primary opacity-60 group-hover:opacity-100 flex-shrink-0">
+                          chat
+                        </span>
+                      </Link>
 
-                        return (
-                          <div
-                            key={m.id}
-                            className={`flex items-center justify-between gap-2 p-2 rounded-lg text-xs border ${
-                              isPending
-                                ? "bg-amber-50/90 border-amber-300 text-amber-950 font-medium"
-                                : isApproved
-                                  ? "bg-emerald-50/70 border-emerald-200 text-emerald-950"
-                                  : "bg-slate-50 border-slate-200 text-slate-700"
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md font-label-sm text-[11px] flex-shrink-0 ${ROLE_CLASS[u.role] ?? ""}`}>
+                        {t(ROLE_KEY[u.role] ?? "roleMember")}
+                      </span>
+
+                      {u.isBanned && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md font-label-sm text-[11px] bg-error/15 text-error font-bold flex-shrink-0">
+                          {lang === "fr" ? "BANNI" : "BANNED"}
+                        </span>
+                      )}
+
+                      {/* Indicateur 5 Étoiles (Score de réputation / Admissibilité aux prêts) */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingStarsUser(u);
+                          setStarsInput(u.stars ?? 0);
+                        }}
+                        className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-amber-50 hover:bg-amber-100 border border-amber-200/80 transition-all cursor-pointer group"
+                        title={
+                          lang === "fr"
+                            ? `${currentStars}/5 étoiles - Fiabilité & admissibilité aux prêts. Cliquez pour ajuster.`
+                            : `${currentStars}/5 stars - Credit rating for loans. Click to adjust.`
+                        }
+                      >
+                        {[1, 2, 3, 4, 5].map((starIdx) => {
+                          const isFilled = starIdx <= currentStars;
+                          return (
+                            <span
+                              key={starIdx}
+                              className="material-symbols-outlined text-[14px] transition-transform group-hover:scale-110"
+                              style={{
+                                color: isFilled ? "#f59e0b" : "#cbd5e1",
+                                fontVariationSettings: isFilled ? "'FILL' 1" : "'FILL' 0",
+                              }}
+                            >
+                              star
+                            </span>
+                          );
+                        })}
+                        <span className="text-[10px] font-bold text-amber-800 ml-0.5">
+                          {currentStars}/5
+                        </span>
+                      </button>
+                    </div>
+
+                    <p className="font-label-sm text-xs text-on-surface-variant truncate mt-0.5">
+                      {u.email}
+                      {u.phone ? ` · ${u.phone}` : ""}
+                    </p>
+
+                    <div className="flex items-center gap-2 flex-wrap font-label-sm text-xs text-on-surface-variant truncate mt-0.5">
+                      {u.memberCode ? <span>{u.memberCode} · </span> : null}
+                      {u.city ? <span>{[u.city, u.neighborhood].filter(Boolean).join(", ")} · </span> : null}
+                      <span>{t("membershipCountLabel", { count: String(u.membershipCount) })}</span>
+
+                      {/* Indicateur présence coordonnées GPS */}
+                      {u.latitude && u.longitude ? (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedMapUser(u)}
+                          className="inline-flex items-center gap-0.5 text-[11px] text-emerald-700 font-semibold hover:underline bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/70"
+                          title={lang === "fr" ? "Position GPS enregistrée. Cliquez pour voir la carte." : "GPS captured. Click to view on map."}
+                        >
+                          <span className="material-symbols-outlined text-[12px]">location_on</span>
+                          <span>GPS certifié</span>
+                        </button>
+                      ) : null}
+
+                      {/* Indicateur CNI / Selfie */}
+                      {u.kyc?.documentImageUrl || u.kyc?.selfieImageUrl ? (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedKycUser(u)}
+                          className="inline-flex items-center gap-0.5 text-[11px] text-indigo-700 font-semibold hover:underline bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200/70"
+                          title={lang === "fr" ? "Photo & CNI disponibles. Cliquez pour voir." : "Photo & ID available. Click to view."}
+                        >
+                          <span className="material-symbols-outlined text-[12px]">badge</span>
+                          <span>CNI/Photo</span>
+                        </button>
+                      ) : null}
+                    </div>
+
+                    {/* Cotisations & Demandes d'intégration détaillées */}
+                    {u.memberships && u.memberships.length > 0 ? (
+                      <div className="mt-2 flex flex-col gap-1.5">
+                        {u.memberships.map((m) => {
+                          const isPending = m.status === "PENDING";
+                          const isApproved = m.status === "APPROVED";
+                          const isRejected = m.status === "REJECTED";
+
+                          return (
+                            <div
+                              key={m.id}
+                              className={`flex items-center justify-between gap-2 p-2 rounded-lg text-xs border ${
+                                isPending
+                                  ? "bg-amber-50/90 border-amber-300 text-amber-950 font-medium"
+                                  : isApproved
+                                    ? "bg-emerald-50/70 border-emerald-200 text-emerald-950"
+                                    : "bg-slate-50 border-slate-200 text-slate-700"
+                              }`}
+                            >
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span
+                                  className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                                    isPending
+                                      ? "bg-amber-500 animate-pulse"
+                                      : isApproved
+                                        ? "bg-emerald-500"
+                                        : "bg-slate-400"
+                                  }`}
+                                />
+                                <span className="font-bold flex-shrink-0">
+                                  {isPending
+                                    ? lang === "fr" ? "Veut intégrer :" : "Wants to join:"
+                                    : isApproved
+                                      ? lang === "fr" ? "Inscrit à :" : "Member of:"
+                                      : isRejected
+                                        ? lang === "fr" ? "Refusé pour :" : "Rejected for:"
+                                        : lang === "fr" ? "Banni de :" : "Banned from:"}
+                                </span>
+                                <span className="truncate font-semibold" title={m.session.title}>
+                                  {m.session.title}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                {isPending && (
+                                  <Link
+                                    href="/admin/membership-requests"
+                                    className="px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-700 text-white font-semibold text-[11px] transition-colors"
+                                  >
+                                    {lang === "fr" ? "Traiter" : "Review"}
+                                  </Link>
+                                )}
+                                <Link
+                                  href={`/admin/contributions/${m.session.id}`}
+                                  className="px-2 py-0.5 rounded border border-current hover:bg-black/5 font-medium text-[11px] transition-colors"
+                                >
+                                  {lang === "fr" ? "Cotisation" : "View"}
+                                </Link>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="font-label-sm text-[11px] text-on-surface-variant/70 italic mt-1.5">
+                        {lang === "fr" ? "Aucune demande d'intégration ni cotisation" : "No membership requests or cotisations"}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Petit menu d'actions compact devant chaque membre ── */}
+                <div className="relative self-end sm:self-center mt-2 sm:mt-0 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenMenuUserId((prev) => (prev === u.id ? null : u.id));
+                    }}
+                    className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all shadow-2xs cursor-pointer ${
+                      isMenuOpen
+                        ? "bg-primary text-white border-primary ring-2 ring-primary/20"
+                        : "bg-white hover:bg-surface-container text-on-surface border-outline-variant/60"
+                    }`}
+                    title={lang === "fr" ? "Options du membre" : "Member options"}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">more_vert</span>
+                    <span className="hidden xs:inline">{lang === "fr" ? "Actions" : "Actions"}</span>
+                  </button>
+
+                  {/* Dropdown Menu flottant */}
+                  {isMenuOpen && (
+                    <div
+                      className="absolute right-0 top-full mt-1.5 z-40 w-64 bg-white rounded-2xl shadow-xl border border-outline-variant/40 py-2 divide-y divide-outline-variant/20 animate-in fade-in zoom-in-95 duration-150"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="px-3.5 py-2">
+                        <p className="text-xs font-bold text-on-surface truncate">{u.name}</p>
+                        <p className="text-[11px] text-on-surface-variant truncate">{u.email}</p>
+                      </div>
+
+                      <div className="py-1">
+                        {/* 1. Écrire au membre */}
+                        <Link
+                          href={`/admin/support?with=${encodeURIComponent(u.id)}&name=${encodeURIComponent(u.name)}`}
+                          onClick={() => setOpenMenuUserId(null)}
+                          className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-on-surface hover:bg-primary/10 hover:text-primary transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-[18px] text-primary">chat</span>
+                          <span>{lang === "fr" ? "Écrire au membre" : "Message member"}</span>
+                        </Link>
+
+                        {/* 2. Voir localisation sur la carte */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpenMenuUserId(null);
+                            setSelectedMapUser(u);
+                          }}
+                          className="w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-on-surface hover:bg-emerald-50 hover:text-emerald-800 transition-colors cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[18px] text-emerald-700">location_on</span>
+                          <span>{lang === "fr" ? "Voir localisation sur la carte" : "View exact location on map"}</span>
+                        </button>
+
+                        {/* 3. Voir photo et CNI */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpenMenuUserId(null);
+                            setSelectedKycUser(u);
+                          }}
+                          className="w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-on-surface hover:bg-indigo-50 hover:text-indigo-800 transition-colors cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[18px] text-indigo-600">badge</span>
+                          <span>{lang === "fr" ? "Voir photo et CNI" : "View photo & ID"}</span>
+                        </button>
+
+                        {/* 4. Modifier / attribuer les étoiles */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpenMenuUserId(null);
+                            setEditingStarsUser(u);
+                            setStarsInput(u.stars ?? 0);
+                          }}
+                          className="w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-on-surface hover:bg-amber-50 hover:text-amber-900 transition-colors cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[18px] text-amber-600" style={{ fontVariationSettings: "'FILL' 1" }}>
+                            hotel_class
+                          </span>
+                          <span className="flex items-center justify-between flex-1">
+                            <span>{lang === "fr" ? "Modifier les étoiles" : "Update stars rating"}</span>
+                            <span className="font-bold text-amber-700 bg-amber-100 px-1.5 py-0.2 rounded text-[10px]">
+                              {currentStars}/5 ★
+                            </span>
+                          </span>
+                        </button>
+                      </div>
+
+                      {/* Options administratives sensibles */}
+                      {u.role !== "ADMIN" && u.role !== "PRESIDENT" && (
+                        <div className="py-1">
+                          {/* 5. Récupérer le compte */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenMenuUserId(null);
+                              handleResetUserPassword(u);
+                            }}
+                            disabled={resettingUserId === u.id}
+                            className="w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-primary hover:bg-primary/10 transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">lock_reset</span>
+                            <span>
+                              {resettingUserId === u.id
+                                ? (lang === "fr" ? "Génération..." : "Generating...")
+                                : (lang === "fr" ? "Récupérer le compte" : "Reset account password")}
+                            </span>
+                          </button>
+
+                          {/* 6. Bannir / Débannir */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenMenuUserId(null);
+                              handleBanToggle(u);
+                            }}
+                            className={`w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold transition-colors cursor-pointer ${
+                              u.isBanned
+                                ? "text-emerald-700 hover:bg-emerald-50"
+                                : "text-error hover:bg-error/10"
                             }`}
                           >
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <span
-                                className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
-                                  isPending
-                                    ? "bg-amber-500 animate-pulse"
-                                    : isApproved
-                                      ? "bg-emerald-500"
-                                      : "bg-slate-400"
-                                }`}
-                              />
-                              <span className="font-bold flex-shrink-0">
-                                {isPending
-                                  ? lang === "fr" ? "Veut intégrer :" : "Wants to join:"
-                                  : isApproved
-                                    ? lang === "fr" ? "Inscrit à :" : "Member of:"
-                                    : isRejected
-                                      ? lang === "fr" ? "Refusé pour :" : "Rejected for:"
-                                      : lang === "fr" ? "Banni de :" : "Banned from:"}
-                              </span>
-                              <span className="truncate font-semibold" title={m.session.title}>
-                                {m.session.title}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-1.5 flex-shrink-0">
-                              {isPending && (
-                                <Link
-                                  href="/admin/membership-requests"
-                                  className="px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-700 text-white font-semibold text-[11px] transition-colors"
-                                >
-                                  {lang === "fr" ? "Traiter" : "Review"}
-                                </Link>
-                              )}
-                              <Link
-                                href={`/admin/contributions/${m.session.id}`}
-                                className="px-2 py-0.5 rounded border border-current hover:bg-black/5 font-medium text-[11px] transition-colors"
-                              >
-                                {lang === "fr" ? "Cotisation" : "View"}
-                              </Link>
-                            </div>
-                          </div>
-                        );
-                      })}
+                            <span className="material-symbols-outlined text-[18px]">
+                              {u.isBanned ? "how_to_reg" : "block"}
+                            </span>
+                            <span>
+                              {u.isBanned
+                                ? (lang === "fr" ? "Débannir le membre" : "Unban member")
+                                : (lang === "fr" ? "Bannir le membre" : "Ban member")}
+                            </span>
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <p className="font-label-sm text-[11px] text-on-surface-variant/70 italic mt-1.5">
-                      {lang === "fr" ? "Aucune demande d'intégration ni cotisation" : "No membership requests or cotisations"}
-                    </p>
                   )}
                 </div>
               </div>
+            );
+          })}
+        </div>
+      )}
 
-              <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-center mt-2 sm:mt-0">
-                <Link
-                  href={`/admin/support?with=${encodeURIComponent(u.id)}&name=${encodeURIComponent(u.name)}`}
-                  className="px-2.5 py-1.5 rounded-md border border-primary/30 text-primary hover:bg-primary/10 font-label-sm text-xs font-semibold flex items-center gap-1 transition-colors"
-                  title={lang === "fr" ? `Écrire à ${u.name}` : `Message ${u.name}`}
-                >
-                  <span className="material-symbols-outlined text-[16px]">chat</span>
-                  <span>{lang === "fr" ? "Écrire" : "Chat"}</span>
-                </Link>
+      {/* ── MODALE 1 : Localisation exacte sur la carte ── */}
+      {selectedMapUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-surface-variant flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-outline-variant/40">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-2xl">location_on</span>
+                </div>
+                <div>
+                  <h3 className="font-title-sm font-bold text-on-surface">
+                    {lang === "fr" ? `Localisation de ${selectedMapUser.name}` : `Location of ${selectedMapUser.name}`}
+                  </h3>
+                  <p className="text-[11px] text-on-surface-variant">
+                    DIVA Asso · Coordonnées de résidence certifiées
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedMapUser(null)}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-surface-container text-on-surface-variant cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </div>
 
-                {u.role !== "ADMIN" && u.role !== "PRESIDENT" && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const nextState = !u.isBanned;
-                        const confirmMsg = nextState
-                          ? lang === "fr"
-                            ? `Voulez-vous vraiment bannir ${u.name} ? Cette personne ne pourra plus se connecter à l'application avec son email ou son numéro de téléphone.`
-                            : `Are you sure you want to ban ${u.name}? They will no longer be able to log in with their email or phone number.`
-                          : lang === "fr"
-                            ? `Voulez-vous réactiver / débannir le compte de ${u.name} ?`
-                            : `Are you sure you want to unban ${u.name}?`;
-                        if (!window.confirm(confirmMsg)) return;
-                        try {
-                          const res = await fetch(`/api/admin/users/${u.id}/ban`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ isBanned: nextState }),
-                          });
-                          if (res.ok) {
-                            setUsers((prev) =>
-                              prev ? prev.map((item) => (item.id === u.id ? { ...item, isBanned: nextState } : item)) : null
-                            );
-                          }
-                        } catch (e) {
-                          console.error("Ban toggle error:", e);
-                        }
-                      }}
-                      className={`px-2.5 py-1.5 rounded-md font-label-sm text-xs font-medium border transition-colors cursor-pointer ${
-                        u.isBanned
-                          ? "border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100"
-                          : "border-error/30 text-error bg-error/5 hover:bg-error/15"
-                      }`}
-                    >
-                      {u.isBanned ? (lang === "fr" ? "Débannir" : "Unban") : (lang === "fr" ? "Bannir" : "Ban")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleResetUserPassword(u)}
-                      disabled={resettingUserId === u.id}
-                      title={
-                        lang === "fr"
-                          ? "Aider à récupérer le compte (réinitialiser le mot de passe)"
-                          : "Help recover account (reset password)"
-                      }
-                      className="px-2.5 py-1.5 rounded-md font-label-sm text-xs font-semibold border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">lock_reset</span>
-                      <span>
-                        {resettingUserId === u.id
-                          ? "..."
-                          : lang === "fr"
-                          ? "Récupérer compte"
-                          : "Reset Account"}
-                      </span>
-                    </button>
-                  </>
-                )}
+            <div className="bg-surface-container-low rounded-xl p-3 flex flex-col gap-1.5 text-xs text-on-surface">
+              <div className="flex justify-between py-1 border-b border-outline-variant/20">
+                <span className="text-on-surface-variant font-medium">{lang === "fr" ? "Ville déclarée :" : "Declared city:"}</span>
+                <span className="font-bold">{selectedMapUser.city || (lang === "fr" ? "Non spécifiée" : "Not specified")}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-outline-variant/20">
+                <span className="text-on-surface-variant font-medium">{lang === "fr" ? "Quartier de résidence :" : "Neighborhood:"}</span>
+                <span className="font-bold">{selectedMapUser.neighborhood || (lang === "fr" ? "Non spécifié" : "Not specified")}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-on-surface-variant font-medium">{lang === "fr" ? "Coordonnées GPS :" : "GPS Coordinates:"}</span>
+                <span className="font-mono font-bold text-emerald-800">
+                  {selectedMapUser.latitude && selectedMapUser.longitude
+                    ? `${selectedMapUser.latitude}, ${selectedMapUser.longitude}`
+                    : (lang === "fr" ? "Non activées en direct" : "Not captured live")}
+                </span>
               </div>
             </div>
-          ))}
+
+            {selectedMapUser.latitude && selectedMapUser.longitude ? (
+              <div className="flex flex-col gap-3">
+                <div className="w-full h-56 rounded-xl overflow-hidden border border-outline-variant/40 shadow-inner bg-slate-100 relative">
+                  <iframe
+                    title="Carte de localisation"
+                    width="100%"
+                    height="100%"
+                    frameBorder="0"
+                    scrolling="no"
+                    marginHeight={0}
+                    marginWidth={0}
+                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${selectedMapUser.longitude - 0.008}%2C${selectedMapUser.latitude - 0.008}%2C${selectedMapUser.longitude + 0.008}%2C${selectedMapUser.latitude + 0.008}&layer=mapnik&marker=${selectedMapUser.latitude}%2C${selectedMapUser.longitude}`}
+                  />
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <a
+                    href={`https://www.google.com/maps?q=${selectedMapUser.latitude},${selectedMapUser.longitude}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">map</span>
+                    <span>{lang === "fr" ? "Ouvrir sur Google Maps" : "Open in Google Maps"}</span>
+                  </a>
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${selectedMapUser.latitude},${selectedMapUser.longitude}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-emerald-300 text-emerald-800 hover:bg-emerald-50 font-bold text-xs transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">directions</span>
+                    <span>{lang === "fr" ? "Itinéraire" : "Get Directions"}</span>
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex flex-col gap-2.5 text-xs text-amber-950">
+                <div className="flex items-center gap-2 font-bold text-amber-900">
+                  <span className="material-symbols-outlined text-[18px]">info</span>
+                  <span>{lang === "fr" ? "Position GPS exacte non partagée" : "Exact GPS position not yet shared"}</span>
+                </div>
+                <p>
+                  {lang === "fr"
+                    ? `Le membre n'a pas encore cliqué sur le bouton de partage de localisation GPS automatique. Vous pouvez toutefois rechercher sa ville (${selectedMapUser.city || "Cameroun"}) sur Google Maps :`
+                    : `The member hasn't clicked the automatic GPS share button yet. You can still search their declared city (${selectedMapUser.city || "Cameroon"}) on Google Maps:`}
+                </p>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([selectedMapUser.neighborhood, selectedMapUser.city, "Cameroun"].filter(Boolean).join(", "))}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs transition-colors w-fit"
+                >
+                  <span className="material-symbols-outlined text-[16px]">search</span>
+                  <span>{lang === "fr" ? "Rechercher la zone sur Google Maps" : "Search area on Google Maps"}</span>
+                </a>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setSelectedMapUser(null)}
+              className="w-full py-2.5 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-xs font-semibold transition-colors cursor-pointer mt-1"
+            >
+              {lang === "fr" ? "Fermer" : "Close"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODALE 2 : Photo de profil & Pièces d'identité CNI ── */}
+      {selectedKycUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-surface-variant flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-outline-variant/40">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-800 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-2xl">badge</span>
+                </div>
+                <div>
+                  <h3 className="font-title-sm font-bold text-on-surface">
+                    {lang === "fr" ? `Photo & CNI de ${selectedKycUser.name}` : `Photo & ID of ${selectedKycUser.name}`}
+                  </h3>
+                  <p className="text-[11px] text-on-surface-variant">
+                    {lang === "fr"
+                      ? "Données d'identification hautement confidentielles conservées de façon permanente"
+                      : "Permanent KYC identification records"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedKycUser(null)}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-surface-container text-on-surface-variant cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </div>
+
+            {/* Note d'information obligatoire */}
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-950 flex items-center gap-2">
+              <span className="material-symbols-outlined text-emerald-700 text-[18px]">verified_user</span>
+              <span>
+                {lang === "fr"
+                  ? "Ces pièces justificatives sont protégées et archivées de façon permanente pour la sécurité de DIVA Asso et des cotisations."
+                  : "These verification documents are permanently archived and secured in DIVA Asso."}
+              </span>
+            </div>
+
+            {selectedKycUser.kyc ? (
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
+                  <span className="font-medium text-on-surface-variant">
+                    {lang === "fr" ? "Type de document :" : "Document type:"}{" "}
+                    <span className="font-bold text-on-surface">
+                      {selectedKycUser.kyc.documentType === "RECEPISSE" ? "Récépissé de CNI" : "CNI (Carte Nationale d'Identité)"}
+                    </span>
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                    selectedKycUser.kyc.status === "VERIFIED"
+                      ? "bg-emerald-100 text-emerald-800"
+                      : selectedKycUser.kyc.status === "FAILED"
+                        ? "bg-error/15 text-error"
+                        : "bg-amber-100 text-amber-900"
+                  }`}>
+                    {selectedKycUser.kyc.status}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* Photo Selfie */}
+                  <div className="flex flex-col gap-1.5 p-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest">
+                    <span className="text-xs font-bold text-on-surface flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[16px] text-primary">face</span>
+                      <span>{lang === "fr" ? "Photo Selfie visage" : "Face Selfie"}</span>
+                    </span>
+                    {selectedKycUser.kyc.selfieImageUrl || selectedKycUser.avatar ? (
+                      <div className="relative group aspect-[4/3] rounded-lg overflow-hidden border border-outline-variant bg-slate-100">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={selectedKycUser.kyc.selfieImageUrl || selectedKycUser.avatar!}
+                          alt="Selfie"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setZoomedImage({
+                            url: selectedKycUser.kyc?.selfieImageUrl || selectedKycUser.avatar!,
+                            title: `Selfie - ${selectedKycUser.name}`,
+                          })}
+                          className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold gap-1 transition-opacity cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">zoom_in</span>
+                          <span>{lang === "fr" ? "Agrandir" : "Zoom"}</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="aspect-[4/3] rounded-lg border border-dashed border-outline-variant flex items-center justify-center text-xs text-on-surface-variant italic">
+                        {lang === "fr" ? "Aucun selfie" : "No selfie"}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* CNI Recto */}
+                  <div className="flex flex-col gap-1.5 p-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest">
+                    <span className="text-xs font-bold text-on-surface flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[16px] text-primary">id_card</span>
+                      <span>{lang === "fr" ? "Pièce Recto (Avant)" : "ID Card (Front)"}</span>
+                    </span>
+                    {selectedKycUser.kyc.documentImageUrl ? (
+                      <div className="relative group aspect-[4/3] rounded-lg overflow-hidden border border-outline-variant bg-slate-100">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={selectedKycUser.kyc.documentImageUrl}
+                          alt="CNI Recto"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setZoomedImage({
+                            url: selectedKycUser.kyc!.documentImageUrl!,
+                            title: `CNI Recto - ${selectedKycUser.name}`,
+                          })}
+                          className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold gap-1 transition-opacity cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">zoom_in</span>
+                          <span>{lang === "fr" ? "Agrandir" : "Zoom"}</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="aspect-[4/3] rounded-lg border border-dashed border-outline-variant flex items-center justify-center text-xs text-on-surface-variant italic">
+                        {lang === "fr" ? "Aucun document recto" : "No front ID"}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* CNI Verso */}
+                  <div className="flex flex-col gap-1.5 p-3 rounded-xl border border-outline-variant/40 bg-surface-container-lowest">
+                    <span className="text-xs font-bold text-on-surface flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[16px] text-primary">flip</span>
+                      <span>{lang === "fr" ? "Pièce Verso (Arrière)" : "ID Card (Back)"}</span>
+                    </span>
+                    {selectedKycUser.kyc.documentBackImageUrl ? (
+                      <div className="relative group aspect-[4/3] rounded-lg overflow-hidden border border-outline-variant bg-slate-100">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={selectedKycUser.kyc.documentBackImageUrl}
+                          alt="CNI Verso"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setZoomedImage({
+                            url: selectedKycUser.kyc!.documentBackImageUrl!,
+                            title: `CNI Verso - ${selectedKycUser.name}`,
+                          })}
+                          className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold gap-1 transition-opacity cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">zoom_in</span>
+                          <span>{lang === "fr" ? "Agrandir" : "Zoom"}</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="aspect-[4/3] rounded-lg border border-dashed border-outline-variant flex items-center justify-center text-center p-2 text-[11px] text-on-surface-variant italic">
+                        {selectedKycUser.kyc.documentType === "RECEPISSE"
+                          ? (lang === "fr" ? "Récépissé : recto uniquement" : "Receipt: 1 side only")
+                          : (lang === "fr" ? "Aucun verso fourni" : "No back side")}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Parrain / Référent */}
+                {(selectedKycUser.kyc.referrerName || selectedKycUser.kyc.referrerPhone) && (
+                  <div className="p-3 bg-surface-container-low rounded-xl text-xs flex items-center justify-between flex-wrap gap-2">
+                    <span className="font-medium text-on-surface-variant flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[16px]">person_pin</span>
+                      <span>{lang === "fr" ? "Personne ayant parlé de la tontine :" : "Referred by:"}</span>
+                    </span>
+                    <span className="font-bold text-on-surface">
+                      {selectedKycUser.kyc.referrerName}
+                      {selectedKycUser.kyc.referrerPhone ? ` (${selectedKycUser.kyc.referrerPhone})` : ""}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="p-6 bg-slate-50 border border-slate-200 rounded-xl text-center flex flex-col items-center gap-2">
+                <span className="material-symbols-outlined text-slate-400 text-3xl">badge</span>
+                <p className="text-xs font-semibold text-slate-700">
+                  {lang === "fr"
+                    ? "Ce membre n'a pas encore téléversé sa CNI / récépissé ni son selfie."
+                    : "No KYC documents or selfie uploaded by this member yet."}
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  {lang === "fr"
+                    ? "Les documents sont demandés automatiquement lorsqu'il rejoint une cotisation."
+                    : "Documents are requested when the member applies to join a cotisation."}
+                </p>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setSelectedKycUser(null)}
+              className="w-full py-2.5 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-xs font-semibold transition-colors cursor-pointer mt-1"
+            >
+              {lang === "fr" ? "Fermer" : "Close"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Lightbox pour image agrandie ── */}
+      {zoomedImage && (
+        <div
+          className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={() => setZoomedImage(null)}
+        >
+          <div className="max-w-4xl max-h-[92vh] flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between text-white text-xs font-bold px-1">
+              <span>{zoomedImage.title}</span>
+              <button
+                type="button"
+                onClick={() => setZoomedImage(null)}
+                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-lg">close</span>
+              </button>
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={zoomedImage.url}
+              alt={zoomedImage.title}
+              className="max-h-[82vh] w-auto object-contain rounded-xl shadow-2xl border border-white/20"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── MODALE 3 : Modifier / Attribuer les étoiles d'un membre ── */}
+      {editingStarsUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-surface-variant flex flex-col gap-4">
+            <div className="flex items-center justify-between pb-3 border-b border-outline-variant/40">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 1" }}>
+                    hotel_class
+                  </span>
+                </div>
+                <div>
+                  <h3 className="font-title-sm font-bold text-on-surface">
+                    {lang === "fr" ? `Étoiles de ${editingStarsUser.name}` : `Stars of ${editingStarsUser.name}`}
+                  </h3>
+                  <p className="text-[11px] text-on-surface-variant">
+                    DIVA Asso · Score de confiance & crédibilité
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingStarsUser(null)}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-surface-container text-on-surface-variant cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </div>
+
+            {/* Explication du système d'étoiles pour les prêts */}
+            <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-xs text-amber-950 flex flex-col gap-1.5">
+              <p className="font-bold flex items-center gap-1 text-amber-900">
+                <span className="material-symbols-outlined text-[16px]">info</span>
+                <span>{lang === "fr" ? "Fonctionnement du système d'étoiles :" : "How stars work:"}</span>
+              </p>
+              <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-900/90">
+                <li>{lang === "fr" ? "Par défaut, les 5 étoiles sont vides (0 étoile)." : "By default, all 5 stars are empty (0 stars)."}</li>
+                <li>
+                  {lang === "fr"
+                    ? "À la fin d'un cycle complet de cotisation sans aucune amende, +1 étoile est attribuée automatiquement."
+                    : "+1 star is automatically awarded when a full cotisation cycle finishes without any fines."}
+                </li>
+                <li>
+                  {lang === "fr"
+                    ? "Ces étoiles déterminent la capacité et l'éligibilité pour le futur système de prêts."
+                    : "These stars will be used for loan eligibility in the upcoming credit system."}
+                </li>
+              </ul>
+            </div>
+
+            {/* Sélecteur interactif 5 étoiles */}
+            <div className="flex flex-col items-center justify-center py-4 bg-surface-container-lowest rounded-xl border border-outline-variant/30 gap-2">
+              <p className="text-xs font-bold text-on-surface-variant">
+                {lang === "fr" ? "Cliquez sur une étoile pour choisir la note :" : "Click on a star to select rating:"}
+              </p>
+              <div className="flex items-center gap-1.5">
+                {[1, 2, 3, 4, 5].map((starIdx) => {
+                  const isFilled = starIdx <= starsInput;
+                  return (
+                    <button
+                      key={starIdx}
+                      type="button"
+                      onClick={() => setStarsInput(starIdx)}
+                      className="p-1 hover:scale-125 transition-transform cursor-pointer"
+                      title={`${starIdx} / 5`}
+                    >
+                      <span
+                        className="material-symbols-outlined text-4xl select-none"
+                        style={{
+                          color: isFilled ? "#f59e0b" : "#cbd5e1",
+                          fontVariationSettings: isFilled ? "'FILL' 1" : "'FILL' 0",
+                        }}
+                      >
+                        star
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="font-extrabold text-base text-amber-900">
+                {starsInput} / 5 {lang === "fr" ? "étoiles" : "stars"}
+              </p>
+
+              {/* Bouton pour remettre à 0 */}
+              <button
+                type="button"
+                onClick={() => setStarsInput(0)}
+                className={`text-[11px] font-semibold transition-colors mt-1 px-2.5 py-1 rounded-md cursor-pointer ${
+                  starsInput === 0
+                    ? "bg-slate-200 text-slate-800 font-bold"
+                    : "text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+                }`}
+              >
+                {lang === "fr" ? "Remettre à 0 étoile (5 étoiles vides)" : "Reset to 0 stars (5 empty stars)"}
+              </button>
+            </div>
+
+            {/* Raccourcis de sélection rapide */}
+            <div className="flex items-center justify-between gap-1 text-xs">
+              {[0, 1, 2, 3, 4, 5].map((val) => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => setStarsInput(val)}
+                  className={`flex-1 py-1 rounded-lg font-bold text-xs transition-colors cursor-pointer border ${
+                    starsInput === val
+                      ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
+                      : "bg-surface-variant/30 text-on-surface-variant border-outline-variant/40 hover:bg-surface-variant/60"
+                  }`}
+                >
+                  {val}★
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setEditingStarsUser(null)}
+                className="flex-1 py-2.5 rounded-xl border border-outline-variant text-on-surface-variant font-label-md text-xs font-semibold hover:bg-surface-container transition-colors cursor-pointer"
+              >
+                {lang === "fr" ? "Annuler" : "Cancel"}
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveStars}
+                disabled={savingStars}
+                className="flex-1 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-on-primary font-label-md text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                {savingStars ? (
+                  <>
+                    <LoadingSpinner />
+                    <span>{lang === "fr" ? "Enregistrement..." : "Saving..."}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[16px]">check</span>
+                    <span>{lang === "fr" ? "Enregistrer les étoiles" : "Save Stars"}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -437,7 +1161,7 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
               <button
                 type="button"
                 onClick={() => setRecoveryResult(null)}
-                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-surface-container text-on-surface-variant"
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-surface-container text-on-surface-variant cursor-pointer"
               >
                 <span className="material-symbols-outlined text-xl">close</span>
               </button>
@@ -472,7 +1196,7 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
                     <button
                       type="button"
                       onClick={() => {
-                        const text = `Identifiant DIVA : ${recoveryResult.email}\nMot de passe temporaire : ${recoveryResult.tempPassword}\nLien : https://www.divaasso.com/login`;
+                        const text = `Identifiant DIVA : ${recoveryResult.email}\nMot de passe temporaire : ${recoveryResult.tempPassword}\nLien : https://divaasso.com/login`;
                         navigator.clipboard.writeText(text);
                         setCopied(true);
                         setTimeout(() => setCopied(false), 2000);

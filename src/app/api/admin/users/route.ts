@@ -64,9 +64,27 @@ export async function GET(request: Request) {
         memberCode: true,
         city: true,
         neighborhood: true,
+        latitude: true,
+        longitude: true,
+        stars: true,
         createdAt: true,
         isBanned: true,
         bannedAt: true,
+        kycVerifications: {
+          select: {
+            id: true,
+            documentType: true,
+            status: true,
+            documentImageUrl: true,
+            documentBackImageUrl: true,
+            selfieImageUrl: true,
+            referrerName: true,
+            referrerPhone: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        },
         memberships: {
           select: {
             id: true,
@@ -107,6 +125,12 @@ export async function GET(request: Request) {
       memberCode: u.memberCode,
       city: u.city,
       neighborhood: u.neighborhood,
+      latitude: u.latitude ? Number(u.latitude) : null,
+      longitude: u.longitude ? Number(u.longitude) : null,
+      stars: u.stars ?? 0,
+      kyc: u.kycVerifications?.find(
+        (k) => k.documentImageUrl || k.selfieImageUrl || k.documentBackImageUrl
+      ) ?? u.kycVerifications?.[0] ?? null,
       membershipCount: (u.memberships || []).length,
       memberships: (u.memberships || []).map((m) => ({
         id: m.id,
