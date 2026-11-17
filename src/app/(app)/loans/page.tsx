@@ -45,6 +45,8 @@ export default async function LoansPage() {
     totalPaid: Number(l.totalPaid),
     remainingDue: Math.max(0, Number(l.totalDue) - Number(l.totalPaid)),
     status: l.status,
+    requiresAdminApproval: l.requiresAdminApproval,
+    rejectionReason: l.rejectionReason,
     dueDate: l.dueDate.toISOString(),
     graceEndDate: l.graceEndDate.toISOString(),
     repaidAt: l.repaidAt?.toISOString() ?? null,
@@ -63,4 +65,3 @@ export default async function LoansPage() {
     />
   );
 }
-

@@ -7,6 +7,7 @@ import {
   computeLoanTerms,
   syncLoanPenaltiesForUser,
   LOAN_MIN_AMOUNT_XAF,
+  LOAN_AUTO_APPROVAL_LIMIT_XAF,
 } from "@/lib/loans";
 import { creditWalletTx } from "@/lib/wallet-ledger";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
@@ -26,7 +27,6 @@ export async function GET() {
   }
   const userId = session.user.id;
 
-  // Keep any overdue penalties up to date in real time
   await syncLoanPenaltiesForUser(userId);
 
   const [eligibility, loans, user] = await Promise.all([
@@ -64,6 +64,8 @@ export async function GET() {
       totalPaid: Number(l.totalPaid),
       remainingDue: Math.max(0, Number(l.totalDue) - Number(l.totalPaid)),
       status: l.status,
+      requiresAdminApproval: l.requiresAdminApproval,
+      rejectionReason: l.rejectionReason,
       dueDate: l.dueDate.toISOString(),
       graceEndDate: l.graceEndDate.toISOString(),
       repaidAt: l.repaidAt?.toISOString() ?? null,
@@ -92,7 +94,7 @@ export async function POST(request: Request) {
   }
   const { amount } = parsed.data;
 
-  // Re-evaluate all 3 cumulative conditions server-side
+  // Re-evaluate strictly server-side from actual PAID contributions & payouts
   const eligibility = await evaluateUserLoanEligibility(userId);
   if (!eligibility.eligible) {
     return NextResponse.json(
@@ -104,10 +106,20 @@ export async function POST(request: Request) {
     );
   }
 
+  // Strictly enforce system-calculated ceiling and system-approved amount tiers
   if (amount > eligibility.collateral.maxLoanAmount) {
     return NextResponse.json(
       {
-        error: `Le montant demandé (${formatXAF(amount)}) dépasse votre plafond maximal autorisé (${formatXAF(eligibility.collateral.maxLoanAmount)}).`,
+        error: `Le montant demandé (${formatXAF(amount)}) dépasse votre plafond maximal calculé par le système (${formatXAF(eligibility.collateral.maxLoanAmount)}).`,
+      },
+      { status: 400 },
+    );
+  }
+
+  if (!eligibility.allowedAmounts.includes(amount)) {
+    return NextResponse.json(
+      {
+        error: "Veuillez sélectionner l'un des montants éligibles calculés par le système.",
       },
       { status: 400 },
     );
@@ -124,8 +136,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Utilisateur introuvable." }, { status: 404 });
   }
 
-  const { loan, ledger } = await prisma.$transaction(async (tx) => {
-    const createdLoan = await tx.loan.create({
+  const lang = user.preferredLang === "en" ? "en" : "fr";
+
+  // Case A: Big Loan (> 140,000 FCFA) -> Mandatory Admin approval BEFORE wallet credit!
+  if (terms.requiresAdminApproval) {
+    const loan = await prisma.loan.create({
       data: {
         userId,
         principal: terms.principal,
@@ -134,7 +149,8 @@ export async function POST(request: Request) {
         penaltyAmount: 0,
         totalDue: terms.totalDue,
         totalPaid: 0,
-        status: "ACTIVE",
+        status: "PENDING_ADMIN",
+        requiresAdminApproval: true,
         dueDate: terms.dueDate,
         graceEndDate: terms.graceEndDate,
         guaranteeSlotId: eligibility.guaranteeSlotId,
@@ -148,7 +164,77 @@ export async function POST(request: Request) {
       },
     });
 
-    // Credit principal immediately into member's DIVA Wallet
+    const admins = await prisma.user.findMany({
+      where: { role: { in: ["ADMIN", "PRESIDENT"] }, isBanned: false },
+      select: { id: true },
+    });
+
+    if (admins.length > 0) {
+      await scheduleInAppNotifications({
+        type: "ADMIN_BROADCAST",
+        recipients: admins.map((a) => ({
+          userId: a.id,
+          message: `Demande de gros prêt (${formatXAF(terms.principal)}) soumise par ${user.name} (Plafond éligible : ${formatXAF(eligibility.collateral.maxLoanAmount)}). Validation Admin requise avant crédit du portefeuille.`,
+          actionUrl: "/admin/loans",
+        })),
+      }).catch(() => {});
+    }
+
+    await logAudit({
+      actorId: userId,
+      actorRole: session.user.role,
+      action: "emergency_loan_pending_admin",
+      targetType: "Loan",
+      targetId: loan.id,
+      metadata: {
+        principal: terms.principal,
+        maxPlafond: eligibility.collateral.maxLoanAmount,
+        autoApprovalLimit: LOAN_AUTO_APPROVAL_LIMIT_XAF,
+      },
+      request,
+    });
+
+    return NextResponse.json(
+      {
+        ok: true,
+        loanId: loan.id,
+        status: "PENDING_ADMIN",
+        requiresAdminApproval: true,
+        principal: terms.principal,
+        interestAmount: terms.interestAmount,
+        totalDue: terms.totalDue,
+        message: `Votre demande de prêt de ${formatXAF(terms.principal)} (> ${formatXAF(LOAN_AUTO_APPROVAL_LIMIT_XAF)}) a été transmise à l'administrateur DIVA Asso. Votre portefeuille sera crédité dès sa validation.`,
+      },
+      { status: 201 },
+    );
+  }
+
+  // Case B: <= 140,000 FCFA -> Automated instant disbursement into DIVA Wallet
+  const { loan, ledger } = await prisma.$transaction(async (tx) => {
+    const createdLoan = await tx.loan.create({
+      data: {
+        userId,
+        principal: terms.principal,
+        interestRate: terms.interestRate,
+        interestAmount: terms.interestAmount,
+        penaltyAmount: 0,
+        totalDue: terms.totalDue,
+        totalPaid: 0,
+        status: "ACTIVE",
+        requiresAdminApproval: false,
+        dueDate: terms.dueDate,
+        graceEndDate: terms.graceEndDate,
+        guaranteeSlotId: eligibility.guaranteeSlotId,
+        collateralSnapshot: {
+          remainingDebtD: eligibility.collateral.remainingDebtD,
+          guaranteedFutureGainG: eligibility.collateral.guaranteedFutureGainG,
+          netCollateral: eligibility.collateral.netCollateral,
+          maxLoanAmount: eligibility.collateral.maxLoanAmount,
+          stars: eligibility.stars,
+        },
+      },
+    });
+
     const credit = await creditWalletTx(tx, {
       userId,
       amount: terms.principal,
@@ -166,7 +252,6 @@ export async function POST(request: Request) {
     return { loan: createdLoan, ledger: credit };
   });
 
-  const lang = user.preferredLang === "en" ? "en" : "fr";
   const dueDateLabel = terms.dueDate.toLocaleDateString("fr-FR", {
     day: "numeric",
     month: "long",
@@ -192,7 +277,7 @@ export async function POST(request: Request) {
       title: lang === "fr" ? "Prêt d'urgence validé & versé 💳" : "Emergency Loan Disbursed 💳",
       bodyText:
         lang === "fr"
-          ? `Bonjour ${user.name},\n\nVotre prêt d'urgence garanti de ${formatXAF(terms.principal)} a été crédité instantanément dans votre Portefeuille DIVA Asso.\n\n• Capital emprunté : ${formatXAF(terms.principal)}\n• Intérêts (15 %) : ${formatXAF(terms.interestAmount)}\n• Total à rembourser : ${formatXAF(terms.totalDue)}\n• Date d'échéance (21 jours) : ${dueDateLabel}\n• Période de grâce : 2 jours (pénalité +5% tous les 2 jours dès le 23e jour).\n\nNouveau solde portefeuille : ${formatXAF(ledger.balanceAfter)}.`
+          ? `Bonjour ${user.name},\n\nVotre prêt d'urgence garanti de ${formatXAF(terms.principal)} a été crédité dans votre Portefeuille DIVA Asso.\n\n• Capital emprunté : ${formatXAF(terms.principal)}\n• Intérêts (15 %) : ${formatXAF(terms.interestAmount)}\n• Total à rembourser : ${formatXAF(terms.totalDue)}\n• Date d'échéance (21 jours) : ${dueDateLabel}\n• Période de grâce : 2 jours (pénalité +5% tous les 2 jours dès le 23e jour).\n\nNouveau solde portefeuille : ${formatXAF(ledger.balanceAfter)}.`
           : `Hello ${user.name},\n\nYour guaranteed emergency loan of ${formatXAF(terms.principal)} has been credited to your DIVA Asso Wallet.\n\n• Principal: ${formatXAF(terms.principal)}\n• Interest (15%): ${formatXAF(terms.interestAmount)}\n• Total due: ${formatXAF(terms.totalDue)}\n• Due date (21 days): ${dueDateLabel}\n\nNew wallet balance: ${formatXAF(ledger.balanceAfter)}.`,
       actionUrl: "/loans",
       actionLabel: lang === "fr" ? "Suivre mon prêt" : "Track My Loan",
@@ -226,6 +311,8 @@ export async function POST(request: Request) {
     {
       ok: true,
       loanId: loan.id,
+      status: "ACTIVE",
+      requiresAdminApproval: false,
       principal: terms.principal,
       interestAmount: terms.interestAmount,
       totalDue: terms.totalDue,

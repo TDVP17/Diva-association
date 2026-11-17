@@ -5,6 +5,12 @@ import { formatXAF } from "@/lib/format-currency";
 
 export const LOAN_MIN_STARS = 4;
 export const LOAN_RISK_TOLERANCE_XAF = 10_000;
+/**
+ * Seuil d'approbation automatique :
+ * - <= 140 000 FCFA : décaissement automatique (si éligible selon le calcul du système)
+ * - > 140 000 FCFA : demande en attente de validation manuelle par l'administrateur
+ */
+export const LOAN_AUTO_APPROVAL_LIMIT_XAF = 140_000;
 export const LOAN_INITIAL_INTEREST_RATE = 0.15; // 15%
 export const LOAN_DURATION_DAYS = 21; // 3 weeks
 export const LOAN_GRACE_DAYS = 2; // 2 days after day 21 (day 23 starts penalties)
@@ -13,11 +19,11 @@ export const LOAN_PENALTY_STEP_DAYS = 2; // every 2 days past grace
 export const LOAN_MIN_AMOUNT_XAF = 2_000;
 
 export interface CollateralCalculationInput {
-  /** Sum of future contributions owed on slots already paid out in active public tontines */
+  /** Somme des cotisations futures restant à payer sur les noms déjà bouffés (D) */
   remainingDebtD: number;
-  /** Sum of future pots guaranteed on slots not yet paid out in active public tontines */
+  /** Somme réellement déjà cotisée (épargne acquise) sur les noms non encore bouffés (G) */
   guaranteedFutureGainG: number;
-  /** Number of slots in active public tontines not yet paid out */
+  /** Nombre de noms en cotisation publique active qui n'ont pas encore été bouffés */
   unpaidOutPublicSlotsCount: number;
 }
 
@@ -25,36 +31,59 @@ export interface CollateralCalculationResult {
   remainingDebtD: number;
   guaranteedFutureGainG: number;
   netCollateral: number;
+  bonusToleranceApplied: number;
   maxLoanAmount: number;
 }
 
 /**
- * Pure mathematical formula from Cahier des Charges Section 3.2:
- *   C_net = G - D
- *   Plafond Maximal = max(0, C_net) + 10 000 FCFA
- *   (Strictly 0 FCFA if the member has already received all their pots!)
+ * Formule financière exacte et sécurisée :
+ *   C_net = G (déjà cotisé sur noms non bouffés) - D (reste à cotiser sur noms déjà bouffés)
+ *
+ * Règle stricte :
+ * - Si le membre a déjà bouffé tous ses noms (unpaidOutPublicSlotsCount <= 0) => Plafond = 0 FCFA.
+ * - Si C_net <= 0 (aucun solde positif acquis en caisse) => Plafond = 0 FCFA (PAS de +10 000 FCFA).
+ * - Si et seulement si C_net > 0 ET au moins un nom reste à bouffer => Plafond = C_net + 10 000 FCFA.
  */
 export function calculateLoanCeiling(input: CollateralCalculationInput): CollateralCalculationResult {
   const remainingDebtD = Math.max(0, Math.round(input.remainingDebtD));
   const guaranteedFutureGainG = Math.max(0, Math.round(input.guaranteedFutureGainG));
   const netCollateral = guaranteedFutureGainG - remainingDebtD;
 
-  if (input.unpaidOutPublicSlotsCount <= 0) {
+  if (input.unpaidOutPublicSlotsCount <= 0 || netCollateral <= 0) {
     return {
       remainingDebtD,
       guaranteedFutureGainG,
       netCollateral,
+      bonusToleranceApplied: 0,
       maxLoanAmount: 0,
     };
   }
 
-  const maxLoanAmount = Math.max(0, netCollateral) + LOAN_RISK_TOLERANCE_XAF;
   return {
     remainingDebtD,
     guaranteedFutureGainG,
     netCollateral,
-    maxLoanAmount,
+    bonusToleranceApplied: LOAN_RISK_TOLERANCE_XAF,
+    maxLoanAmount: netCollateral + LOAN_RISK_TOLERANCE_XAF,
   };
+}
+
+/**
+ * Generates system-defined loan amount tiers (user selects from system-calculated options,
+ * never exceeding maxLoanAmount).
+ */
+export function buildSystemLoanOptions(maxLoanAmount: number): number[] {
+  if (maxLoanAmount < LOAN_MIN_AMOUNT_XAF) return [];
+  const raw = [
+    Math.floor((maxLoanAmount * 0.25) / 500) * 500,
+    Math.floor((maxLoanAmount * 0.5) / 500) * 500,
+    Math.floor((maxLoanAmount * 0.75) / 500) * 500,
+    maxLoanAmount,
+  ];
+  const unique = Array.from(
+    new Set(raw.filter((v) => v >= LOAN_MIN_AMOUNT_XAF && v <= maxLoanAmount)),
+  ).sort((a, b) => a - b);
+  return unique;
 }
 
 /**
@@ -68,6 +97,7 @@ export function computeLoanTerms(principal: number, originDate: Date = new Date(
   const graceEndDate = new Date(
     originDate.getTime() + (LOAN_DURATION_DAYS + LOAN_GRACE_DAYS) * 24 * 60 * 60 * 1000,
   );
+  const requiresAdminApproval = cleanPrincipal > LOAN_AUTO_APPROVAL_LIMIT_XAF;
 
   return {
     principal: cleanPrincipal,
@@ -77,6 +107,7 @@ export function computeLoanTerms(principal: number, originDate: Date = new Date(
     totalDue,
     dueDate,
     graceEndDate,
+    requiresAdminApproval,
   };
 }
 
@@ -97,7 +128,6 @@ export function computeAccruedLoanPenalty(
   }
 
   const daysPastGrace = msPastGrace / (24 * 60 * 60 * 1000);
-  // Step 1 triggers immediately once past graceEndDate (day 23), step 2 at day 25, step 3 at day 27, etc.
   const penaltySteps = Math.floor(daysPastGrace / LOAN_PENALTY_STEP_DAYS) + 1;
   const penaltyPerStep = Math.round(principal * LOAN_PENALTY_RATE_PER_STEP);
   return {
@@ -117,17 +147,22 @@ export interface LoanEligibilityReport {
   hasActivePublicParticipation: boolean;
   hasUnpaidOutSlots: boolean;
   hasExistingActiveLoan: boolean;
+  paidOutSlotsCount: number;
+  unpaidOutSlotsCount: number;
   collateral: CollateralCalculationResult;
+  allowedAmounts: number[];
+  autoApprovalLimit: number;
   guaranteeSlotId: string | null;
   guaranteeSlotLabel: string | null;
 }
 
 /**
  * Evaluates full real-time loan eligibility for a member from the database.
- * Enforces all 3 cumulative conditions + isolation from private cotisations.
+ * Uses actual PAID contributions on un-eaten slots minus remaining contributions owed
+ * on already-eaten slots. Enforces strict isolation from private cotisations.
  */
 export async function evaluateUserLoanEligibility(userId: string): Promise<LoanEligibilityReport> {
-  const [user, unpaidFinesCount, publicMemberships, activeLoan] = await Promise.all([
+  const [user, unpaidFinesCount, publicMemberships, existingLoan] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, stars: true, isBanned: true },
@@ -154,14 +189,14 @@ export async function evaluateUserLoanEligibility(userId: string): Promise<LoanE
               where: { status: "APPROVED" },
               include: { slots: { select: { id: true } } },
             },
-            payouts: {
-              where: { status: { in: ["RELEASED", "CONFIRMED"] } },
-              select: { id: true, membershipSlotId: true },
-            },
           },
         },
         slots: {
           include: {
+            contributions: {
+              where: { status: "PAID" },
+              select: { amountPaid: true },
+            },
             payouts: {
               where: { status: { in: ["RELEASED", "CONFIRMED"] } },
               select: { id: true },
@@ -174,9 +209,9 @@ export async function evaluateUserLoanEligibility(userId: string): Promise<LoanE
     prisma.loan.findFirst({
       where: {
         userId,
-        status: { in: ["ACTIVE", "OVERDUE"] },
+        status: { in: ["PENDING_ADMIN", "ACTIVE", "OVERDUE"] },
       },
-      select: { id: true },
+      select: { id: true, status: true },
     }),
   ]);
 
@@ -184,34 +219,44 @@ export async function evaluateUserLoanEligibility(userId: string): Promise<LoanE
   const hasFourStars = stars >= LOAN_MIN_STARS;
   const hasNoActiveFines = unpaidFinesCount === 0;
   const hasActivePublicParticipation = publicMemberships.length > 0;
-  const hasExistingActiveLoan = Boolean(activeLoan);
+  const hasExistingActiveLoan = Boolean(existingLoan);
 
   let remainingDebtD = 0;
   let guaranteedFutureGainG = 0;
   let unpaidOutPublicSlotsCount = 0;
+  let paidOutPublicSlotsCount = 0;
   let guaranteeSlotId: string | null = null;
   let guaranteeSlotLabel: string | null = null;
 
   for (const membership of publicMemberships) {
     const sess = membership.tontineSession;
-    const totalSessionSlots = sess.memberships.reduce(
-      (sum, m) => sum + (m.slots.length > 0 ? m.slots.length : (m.slotCount ?? 1)),
-      0,
+    const totalSessionSlots = Math.max(
+      1,
+      sess.memberships.reduce(
+        (sum, m) => sum + (m.slots.length > 0 ? m.slots.length : (m.slotCount ?? 1)),
+        0,
+      ),
     );
-    const completedRounds = sess.payouts.length;
-    const remainingRounds = Math.max(0, totalSessionSlots - completedRounds);
-    const unitContribution = Number(sess.amount) + Number(sess.fee);
-    const estimatedPot = Number(sess.amount) * Math.max(1, totalSessionSlots);
+    const unitAmount = Number(sess.amount);
 
     for (const slot of membership.slots) {
       const alreadyPaidOut = slot.payouts.length > 0;
+      const paidRoundsOnSlot = slot.contributions.length;
+      const totalPaidOnSlot = slot.contributions.reduce(
+        (sum, c) => sum + Number(c.amountPaid || 0),
+        0,
+      );
+
       if (alreadyPaidOut) {
-        // Slot already received its pot -> future contributions owed are debt D
-        remainingDebtD += remainingRounds * unitContribution;
+        paidOutPublicSlotsCount += 1;
+        // Reste de noms/tours à cotiser sur ce nom déjà bouffé
+        const remainingRounds = Math.max(0, totalSessionSlots - paidRoundsOnSlot);
+        remainingDebtD += remainingRounds * unitAmount;
       } else {
-        // Slot has NOT received its pot yet -> future pot is guaranteed gain G
         unpaidOutPublicSlotsCount += 1;
-        guaranteedFutureGainG += estimatedPot;
+        // Épargne réellement déjà acquise dans la caisse sur ce nom non encore bouffé
+        // (équivalent exact à : Pot Futur - Cotisations restantes dues sur ce nom)
+        guaranteedFutureGainG += totalPaidOnSlot;
         if (!guaranteeSlotId) {
           guaranteeSlotId = slot.id;
           guaranteeSlotLabel = `${sess.title || sess.type} — ${slot.beneficiaryName}`;
@@ -226,6 +271,7 @@ export async function evaluateUserLoanEligibility(userId: string): Promise<LoanE
     unpaidOutPublicSlotsCount,
   });
 
+  const allowedAmounts = buildSystemLoanOptions(collateral.maxLoanAmount);
   const hasUnpaidOutSlots = unpaidOutPublicSlotsCount > 0;
   const reasons: string[] = [];
 
@@ -249,11 +295,20 @@ export async function evaluateUserLoanEligibility(userId: string): Promise<LoanE
   }
   if (!hasUnpaidOutSlots) {
     reasons.push(
-      "Vous avez déjà bouffé tous vos noms dans vos cotisations publiques actives (aucun collatéral résiduel disponible).",
+      "Vous avez déjà bouffé tous vos noms dans vos cotisations publiques actives (aucun nom restant en garantie).",
+    );
+  }
+  if (hasUnpaidOutSlots && collateral.netCollateral <= 0) {
+    reasons.push(
+      "Votre épargne nette acquise (cotisations déjà payées moins le reste dû sur vos noms déjà bouffés) est insuffisante pour débloquer un prêt.",
     );
   }
   if (hasExistingActiveLoan) {
-    reasons.push("Vous avez déjà un prêt d'urgence en cours. Remboursez-le avant d'en solliciter un nouveau.");
+    reasons.push(
+      existingLoan?.status === "PENDING_ADMIN"
+        ? "Vous avez déjà une demande de prêt en attente de validation par l'administrateur."
+        : "Vous avez déjà un prêt d'urgence en cours. Remboursez-le avant d'en solliciter un nouveau.",
+    );
   }
 
   const eligible =
@@ -262,6 +317,7 @@ export async function evaluateUserLoanEligibility(userId: string): Promise<LoanE
     hasNoActiveFines &&
     hasActivePublicParticipation &&
     hasUnpaidOutSlots &&
+    collateral.netCollateral > 0 &&
     !hasExistingActiveLoan &&
     collateral.maxLoanAmount >= LOAN_MIN_AMOUNT_XAF;
 
@@ -275,15 +331,18 @@ export async function evaluateUserLoanEligibility(userId: string): Promise<LoanE
     hasActivePublicParticipation,
     hasUnpaidOutSlots,
     hasExistingActiveLoan,
+    paidOutSlotsCount: paidOutPublicSlotsCount,
+    unpaidOutSlotsCount: unpaidOutPublicSlotsCount,
     collateral,
+    allowedAmounts,
+    autoApprovalLimit: LOAN_AUTO_APPROVAL_LIMIT_XAF,
     guaranteeSlotId,
     guaranteeSlotLabel,
   };
 }
 
 /**
- * Synchronizes accrued late penalties (+5% per 2 days after day 23) for a single loan
- * or all active/overdue loans. Returns updated penalty & totalDue.
+ * Synchronizes accrued late penalties (+5% per 2 days after day 23) for a single user's open loans.
  */
 export async function syncLoanPenaltiesForUser(userId: string, now: Date = new Date()) {
   const openLoans = await prisma.loan.findMany({
@@ -326,7 +385,6 @@ export async function syncLoanPenaltiesForUser(userId: string, now: Date = new D
 /**
  * Automatic source deduction (Garantie Ultime, Section 3.3):
  * Called right when a member's payout pot is being released.
- * Deducts Principal + 15% Interest + Accrued Penalties from `availableNetPayout`.
  */
 export async function deductActiveLoansFromPayoutTx(
   tx: PrismaTx,
@@ -433,8 +491,11 @@ export async function repayLoanFromWallet(userId: string, loanId: string, amount
   if (!loan) {
     throw new Error("Prêt introuvable.");
   }
-  if (loan.status === "REPAID" || loan.status === "DEDUCTED_FROM_POT") {
-    throw new Error("Ce prêt est déjà entièrement remboursé.");
+  if (loan.status === "PENDING_ADMIN") {
+    throw new Error("Ce prêt est encore en attente de validation par l'administrateur.");
+  }
+  if (loan.status === "REPAID" || loan.status === "DEDUCTED_FROM_POT" || loan.status === "REJECTED") {
+    throw new Error("Ce prêt est déjà clôturé.");
   }
 
   const remainingDue = Math.max(0, Number(loan.totalDue) - Number(loan.totalPaid));

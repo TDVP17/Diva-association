@@ -56,7 +56,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       .count({ where: { status: "PENDING_ADMIN" } })
       .catch(() => 0),
     prisma.loan
-      .count({ where: { status: "OVERDUE" } })
+      .count({ where: { status: { in: ["PENDING_ADMIN", "OVERDUE"] } } })
       .catch(() => 0),
   ]);
 

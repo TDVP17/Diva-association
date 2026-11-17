@@ -17,6 +17,8 @@ export interface LoanItem {
   totalPaid: number;
   remainingDue: number;
   status: string;
+  requiresAdminApproval?: boolean;
+  rejectionReason?: string | null;
   dueDate: string;
   graceEndDate: string;
   repaidAt: string | null;
@@ -39,19 +41,25 @@ export function LoansClient({
   const [loans, setLoans] = useState<LoanItem[]>(initialLoans);
   const [walletBalance, setWalletBalance] = useState(initialWalletBalance);
 
-  const maxAllowed = eligibility.collateral.maxLoanAmount;
-  const [requestAmount, setRequestAmount] = useState<number>(
-    maxAllowed >= 10_000 ? Math.min(25_000, maxAllowed) : Math.max(2_000, maxAllowed),
+  const allowedAmounts = eligibility.allowedAmounts;
+  const [selectedAmount, setSelectedAmount] = useState<number>(
+    allowedAmounts.length > 0 ? allowedAmounts[allowedAmounts.length - 1] : 0,
   );
   const [submitting, setSubmitting] = useState(false);
   const [repayingId, setRepayingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  const pendingLoan = loans.find((l) => l.status === "PENDING_ADMIN") || null;
   const activeLoan = loans.find((l) => l.status === "ACTIVE" || l.status === "OVERDUE") || null;
 
-  const simulatedInterest = Math.round(requestAmount * 0.15);
-  const simulatedTotal = requestAmount + simulatedInterest;
+  const effectiveAmount = allowedAmounts.includes(selectedAmount)
+    ? selectedAmount
+    : (allowedAmounts[allowedAmounts.length - 1] ?? 0);
+
+  const requiresAdmin = effectiveAmount > eligibility.autoApprovalLimit;
+  const simulatedInterest = Math.round(effectiveAmount * 0.15);
+  const simulatedTotal = effectiveAmount + simulatedInterest;
   const simulatedDueDate = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000);
 
   async function refreshAll() {
@@ -61,11 +69,14 @@ export function LoansClient({
       setEligibility(data.eligibility);
       setLoans(data.loans || []);
       setWalletBalance(data.walletBalance ?? walletBalance);
+      const nextAllowed: number[] = data.eligibility?.allowedAmounts ?? [];
+      setSelectedAmount(nextAllowed.length > 0 ? nextAllowed[nextAllowed.length - 1] : 0);
     }
   }
 
   async function handleRequestLoan(e: React.FormEvent) {
     e.preventDefault();
+    if (!effectiveAmount) return;
     setError(null);
     setSuccess(null);
     setSubmitting(true);
@@ -73,14 +84,14 @@ export function LoansClient({
       const res = await fetch("/api/loans", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: requestAmount }),
+        body: JSON.stringify({ amount: effectiveAmount }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Impossible d'accorder le prêt.");
+        setError(data.error || "Impossible d'enregistrer votre demande de prêt.");
         return;
       }
-      setSuccess(data.message || "Prêt versé dans votre Portefeuille DIVA !");
+      setSuccess(data.message || "Demande enregistrée avec succès !");
       await refreshAll();
     } catch {
       setError("Erreur réseau lors de la demande de prêt.");
@@ -114,29 +125,29 @@ export function LoansClient({
   }
 
   return (
-    <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto w-full flex flex-col gap-6 pb-24">
+    <main className="px-container-padding py-stack-gap-lg max-w-3xl mx-auto w-full flex flex-col gap-5 pb-24">
       {/* Header + Stars Badge */}
-      <div className="bg-gradient-to-br from-[#0b3d2e] to-[#0f513c] rounded-3xl p-6 text-white shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-gradient-to-br from-[#0b3d2e] to-[#0f513c] rounded-3xl p-5 sm:p-6 text-white shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-300/30 text-amber-200 text-[11px] font-bold">
             <span className="material-symbols-outlined text-[15px]">workspace_premium</span>
             <span>{lang === "fr" ? "Caisse de Secours 4 Étoiles" : "4-Star Emergency Credit"}</span>
           </span>
-          <h1 className="text-2xl font-extrabold mt-2 tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-extrabold mt-2 tracking-tight">
             {lang === "fr" ? "Prêts d'Urgence Garantis" : "Guaranteed Emergency Loans"}
           </h1>
           <p className="text-xs text-emerald-100/85 mt-1 max-w-md">
-            Durée 21 jours · 15 % d&apos;intérêts · Crédité instantanément dans votre Portefeuille DIVA Asso.
+            Plafond calculé automatiquement selon vos cotisations réelles · 21 jours · 15 % d&apos;intérêts.
           </p>
         </div>
 
-        <div className="bg-white/10 border border-white/15 rounded-2xl p-4 flex flex-col items-center min-w-[140px]">
-          <span className="text-[10px] font-bold uppercase text-emerald-200">Votre Score Confiance</span>
+        <div className="bg-white/10 border border-white/15 rounded-2xl p-3.5 flex flex-col items-center min-w-[135px]">
+          <span className="text-[10px] font-bold uppercase text-emerald-200">Votre Score</span>
           <div className="flex items-center gap-0.5 mt-1">
             {[1, 2, 3, 4, 5].map((i) => (
               <span
                 key={i}
-                className={`material-symbols-outlined text-[22px] ${
+                className={`material-symbols-outlined text-[20px] ${
                   i <= eligibility.stars ? "text-amber-400" : "text-white/25"
                 }`}
               >
@@ -144,7 +155,7 @@ export function LoansClient({
               </span>
             ))}
           </div>
-          <span className="text-xs font-extrabold mt-1">{eligibility.stars} / 5 étoiles</span>
+          <span className="text-xs font-extrabold mt-0.5">{eligibility.stars} / 5 étoiles</span>
         </div>
       </div>
 
@@ -157,6 +168,38 @@ export function LoansClient({
         <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 font-semibold flex items-center gap-2">
           <span className="material-symbols-outlined text-emerald-700 text-[18px]">check_circle</span>
           <span>{success}</span>
+        </div>
+      )}
+
+      {/* Pending Admin Approval Card (> 140 000 FCFA) */}
+      {pendingLoan && (
+        <div className="rounded-3xl p-5 sm:p-6 border-2 border-amber-300 bg-amber-50/70 shadow-sm flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-amber-700 text-[22px]">hourglass_top</span>
+            <span className="px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-950 text-[10px] font-extrabold uppercase">
+              En attente de validation Admin
+            </span>
+          </div>
+          <h2 className="text-lg font-extrabold text-slate-900">
+            Demande de prêt : {formatXAF(pendingLoan.principal)}
+          </h2>
+          <p className="text-xs text-amber-950 leading-relaxed">
+            Comme le montant demandé dépasse <strong>{formatXAF(eligibility.autoApprovalLimit)}</strong>, votre demande est en cours de vérification par l&apos;administrateur DIVA Asso. <strong>Votre portefeuille sera crédité uniquement après sa validation.</strong>
+          </p>
+          <div className="grid grid-cols-3 gap-2 text-xs bg-white/80 rounded-2xl p-3 border border-amber-200/70">
+            <div>
+              <span className="text-slate-500 block">Capital demandé</span>
+              <strong className="text-slate-900">{formatXAF(pendingLoan.principal)}</strong>
+            </div>
+            <div>
+              <span className="text-slate-500 block">Intérêts (15%)</span>
+              <strong className="text-slate-900">{formatXAF(pendingLoan.interestAmount)}</strong>
+            </div>
+            <div>
+              <span className="text-slate-500 block">Total à rembourser</span>
+              <strong className="text-emerald-900">{formatXAF(pendingLoan.totalDue)}</strong>
+            </div>
+          </div>
         </div>
       )}
 
@@ -268,12 +311,12 @@ export function LoansClient({
         );
       })()}
 
-      {/* 3 Cumulative Eligibility Conditions & Mathematical Collateral Formula */}
+      {/* Eligibility & Exact System Calculation */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Conditions Checklist */}
         <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex flex-col gap-3">
           <h3 className="text-sm font-extrabold text-slate-900">
-            Conditions d&apos;éligibilité (3 règles)
+            Vérification d&apos;éligibilité
           </h3>
 
           <div className="flex flex-col gap-2.5 text-xs">
@@ -304,9 +347,9 @@ export function LoansClient({
                 {eligibility.hasActivePublicParticipation ? "check_circle" : "cancel"}
               </span>
               <div>
-                <p className="font-bold text-slate-900">2. Membre actif en cotisation publique</p>
+                <p className="font-bold text-slate-900">2. Cotisation publique active</p>
                 <p className="text-slate-500">
-                  Réservé aux cotisations publiques DIVA Asso (privées exclues).
+                  {eligibility.unpaidOutSlotsCount} nom(s) non bouffé(s) · {eligibility.paidOutSlotsCount} nom(s) déjà bouffé(s)
                 </p>
               </div>
             </div>
@@ -314,54 +357,58 @@ export function LoansClient({
             <div className="flex items-start gap-2.5">
               <span
                 className={`material-symbols-outlined text-[20px] flex-shrink-0 ${
-                  eligibility.hasUnpaidOutSlots ? "text-emerald-600" : "text-red-500"
+                  eligibility.hasUnpaidOutSlots && eligibility.collateral.netCollateral > 0
+                    ? "text-emerald-600"
+                    : "text-red-500"
                 }`}
               >
-                {eligibility.hasUnpaidOutSlots ? "check_circle" : "cancel"}
+                {eligibility.hasUnpaidOutSlots && eligibility.collateral.netCollateral > 0
+                  ? "check_circle"
+                  : "cancel"}
               </span>
               <div>
-                <p className="font-bold text-slate-900">3. Collatéral résiduel disponible</p>
+                <p className="font-bold text-slate-900">3. Solde net acquis positif</p>
                 <p className="text-slate-500">
-                  Au moins un nom non encore bouffé dans le cycle actif.
+                  Le système vérifie vos cotisations déjà payées moins ce qu&apos;il reste à payer sur vos noms bouffés.
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Collateral Math Breakdown */}
+        {/* Exact System Calculation Card */}
         <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex flex-col gap-3">
           <h3 className="text-sm font-extrabold text-slate-900">
-            Calcul mathématique de votre plafond
+            Calcul automatique de votre plafond
           </h3>
           <div className="flex flex-col gap-2 text-xs">
-            <div className="flex justify-between">
-              <span className="text-slate-500">Gain futur garanti (G) :</span>
-              <span className="font-bold text-emerald-700">
+            <div className="flex justify-between gap-2">
+              <span className="text-slate-500">Déjà cotisé (noms non bouffés) :</span>
+              <span className="font-bold text-emerald-700 whitespace-nowrap">
                 +{formatXAF(eligibility.collateral.guaranteedFutureGainG)}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Dette restante noms bouffés (D) :</span>
-              <span className="font-bold text-red-600">
+            <div className="flex justify-between gap-2">
+              <span className="text-slate-500">Reste à cotiser (noms déjà bouffés) :</span>
+              <span className="font-bold text-red-600 whitespace-nowrap">
                 -{formatXAF(eligibility.collateral.remainingDebtD)}
               </span>
             </div>
-            <div className="flex justify-between pt-1.5 border-t border-slate-100">
-              <span className="text-slate-700 font-semibold">Collatéral Net (G − D) :</span>
-              <span className="font-bold text-slate-900">
+            <div className="flex justify-between gap-2 pt-1.5 border-t border-slate-100">
+              <span className="text-slate-700 font-semibold">Solde net garanti :</span>
+              <span className="font-bold text-slate-900 whitespace-nowrap">
                 {formatXAF(eligibility.collateral.netCollateral)}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Tolérance risque 4 étoiles :</span>
-              <span className="font-bold text-slate-700">
-                {eligibility.hasUnpaidOutSlots ? "+10 000 FCFA" : "0 FCFA"}
+            <div className="flex justify-between gap-2">
+              <span className="text-slate-500">Bonus confiance (si solde &gt; 0) :</span>
+              <span className="font-bold text-slate-700 whitespace-nowrap">
+                +{formatXAF(eligibility.collateral.bonusToleranceApplied)}
               </span>
             </div>
-            <div className="flex justify-between pt-2 border-t border-slate-200 text-sm">
-              <span className="font-extrabold text-emerald-950">Plafond Maximal :</span>
-              <span className="font-extrabold text-emerald-700">
+            <div className="flex justify-between gap-2 pt-2 border-t border-slate-200 text-sm">
+              <span className="font-extrabold text-emerald-950">Maximum autorisé :</span>
+              <span className="font-extrabold text-emerald-700 whitespace-nowrap">
                 {formatXAF(eligibility.collateral.maxLoanAmount)}
               </span>
             </div>
@@ -369,12 +416,19 @@ export function LoansClient({
         </div>
       </div>
 
-      {/* Loan Simulator & Instant Request Form */}
-      {!activeLoan && (
+      {/* System-Controlled Loan Selection (NO arbitrary user input!) */}
+      {!activeLoan && !pendingLoan && (
         <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/80 shadow-sm flex flex-col gap-4">
-          <h2 className="text-base font-extrabold text-slate-900">
-            Demander un Prêt d&apos;Urgence
-          </h2>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h2 className="text-base font-extrabold text-slate-900">
+              Montant autorisé par le système
+            </h2>
+            {eligibility.eligible && (
+              <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-900 text-xs font-extrabold">
+                Max : {formatXAF(eligibility.collateral.maxLoanAmount)}
+              </span>
+            )}
+          </div>
 
           {!eligibility.eligible ? (
             <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-950 flex flex-col gap-2">
@@ -391,38 +445,65 @@ export function LoansClient({
           ) : (
             <form onSubmit={handleRequestLoan} className="flex flex-col gap-4">
               <div className="flex flex-col gap-2">
-                <div className="flex justify-between items-center text-xs">
-                  <label className="font-bold text-slate-700">Montant souhaité :</label>
-                  <span className="font-extrabold text-base text-emerald-800">
-                    {formatXAF(requestAmount)}
-                  </span>
+                <p className="text-xs text-slate-600">
+                  Choisissez l&apos;un des paliers calculés automatiquement selon votre garantie réelle :
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {allowedAmounts.map((amt) => {
+                    const active = effectiveAmount === amt;
+                    const isMax = amt === eligibility.collateral.maxLoanAmount;
+                    return (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setSelectedAmount(amt)}
+                        className={`p-3 rounded-2xl border-2 text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
+                          active
+                            ? "border-emerald-700 bg-emerald-50 text-emerald-950 shadow-xs"
+                            : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        <span className="text-sm font-extrabold">{formatXAF(amt)}</span>
+                        {isMax && (
+                          <span className="text-[10px] font-bold text-emerald-700 uppercase mt-0.5">
+                            Maximum
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
-                <input
-                  type="range"
-                  min={2000}
-                  max={maxAllowed}
-                  step={500}
-                  value={Math.min(requestAmount, maxAllowed)}
-                  onChange={(e) => setRequestAmount(Number(e.target.value))}
-                  className="w-full accent-emerald-700 cursor-pointer"
-                />
-                <input
-                  type="number"
-                  min={2000}
-                  max={maxAllowed}
-                  step={500}
-                  value={requestAmount}
-                  onChange={(e) =>
-                    setRequestAmount(Math.min(maxAllowed, Math.max(0, Number(e.target.value) || 0)))
-                  }
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-900"
-                />
+              </div>
+
+              {/* Threshold Notice: <= 140 000 Auto vs > 140 000 Admin Approval */}
+              <div
+                className={`p-3.5 rounded-2xl border text-xs flex items-start gap-2.5 ${
+                  requiresAdmin
+                    ? "bg-amber-50 border-amber-200 text-amber-950"
+                    : "bg-emerald-50/70 border-emerald-200 text-emerald-950"
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px] flex-shrink-0">
+                  {requiresAdmin ? "admin_panel_settings" : "bolt"}
+                </span>
+                <div>
+                  <p className="font-bold">
+                    {requiresAdmin
+                      ? `Validation administrateur requise (> ${formatXAF(eligibility.autoApprovalLimit)})`
+                      : `Validation automatique (≤ ${formatXAF(eligibility.autoApprovalLimit)})`}
+                  </p>
+                  <p className="text-[11px] mt-0.5 opacity-90">
+                    {requiresAdmin
+                      ? "Les gros prêts passent obligatoirement par l'administrateur DIVA Asso. Votre portefeuille sera crédité uniquement après son approbation."
+                      : "Votre plafond étant vérifié et ≤ 140 000 FCFA, le montant est crédité automatiquement dans votre Portefeuille DIVA."}
+                  </p>
+                </div>
               </div>
 
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex flex-col gap-2 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Crédité instantanément dans votre Portefeuille :</span>
-                  <strong className="text-emerald-800">{formatXAF(requestAmount)}</strong>
+                  <span className="text-slate-600">Montant du prêt :</span>
+                  <strong className="text-emerald-800">{formatXAF(effectiveAmount)}</strong>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600">Intérêts contractuels (15 %) :</span>
@@ -433,7 +514,7 @@ export function LoansClient({
                   <strong className="font-extrabold text-emerald-900">{formatXAF(simulatedTotal)}</strong>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Échéance :{" "}
+                  Échéance estimée :{" "}
                   <strong>
                     {simulatedDueDate.toLocaleDateString("fr-FR", {
                       day: "numeric",
@@ -441,24 +522,34 @@ export function LoansClient({
                       year: "numeric",
                     })}
                   </strong>{" "}
-                  · Période de grâce : 2 jours · Passé le 23ᵉ jour : +5 % du capital tous les 2 jours + prélèvement automatique sur votre prochain pot de bouffe.
+                  · Période de grâce : 2 jours · Passé le 23ᵉ jour : +5 % du capital tous les 2 jours + prélèvement automatique sur votre prochain pot.
                 </p>
               </div>
 
               <button
                 type="submit"
-                disabled={submitting || requestAmount < 2000 || requestAmount > maxAllowed}
-                className="w-full py-3.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] text-white font-bold text-sm transition-all shadow-md cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                disabled={submitting || !effectiveAmount}
+                className={`w-full py-3.5 rounded-xl text-white font-bold text-sm transition-all shadow-md cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] ${
+                  requiresAdmin
+                    ? "bg-amber-600 hover:bg-amber-700"
+                    : "bg-emerald-700 hover:bg-emerald-800"
+                }`}
               >
                 {submitting ? (
                   <>
                     <LoadingSpinner />
-                    <span>Décaissement instantané...</span>
+                    <span>Traitement...</span>
                   </>
                 ) : (
                   <>
-                    <span className="material-symbols-outlined text-[20px]">bolt</span>
-                    <span>Recevoir {formatXAF(requestAmount)} dans mon Portefeuille</span>
+                    <span className="material-symbols-outlined text-[20px]">
+                      {requiresAdmin ? "send" : "bolt"}
+                    </span>
+                    <span>
+                      {requiresAdmin
+                        ? `Soumettre la demande de ${formatXAF(effectiveAmount)} à l'Admin`
+                        : `Recevoir ${formatXAF(effectiveAmount)} dans mon Portefeuille`}
+                    </span>
                   </>
                 )}
               </button>
@@ -479,26 +570,34 @@ export function LoansClient({
                     Prêt de {formatXAF(l.principal)} (Total dû : {formatXAF(l.totalDue)})
                   </p>
                   <p className="text-[11px] text-slate-500">
-                    Accordé le {new Date(l.createdAt).toLocaleDateString("fr-FR")} · Échéance :{" "}
-                    {new Date(l.dueDate).toLocaleDateString("fr-FR")}
+                    Demandé le {new Date(l.createdAt).toLocaleDateString("fr-FR")}
+                    {l.rejectionReason ? ` · ${l.rejectionReason}` : ""}
                   </p>
                 </div>
                 <span
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase whitespace-nowrap ${
                     l.status === "REPAID" || l.status === "DEDUCTED_FROM_POT"
                       ? "bg-emerald-100 text-emerald-800"
-                      : l.status === "OVERDUE"
-                        ? "bg-red-100 text-red-700"
-                        : "bg-amber-100 text-amber-800"
+                      : l.status === "PENDING_ADMIN"
+                        ? "bg-amber-100 text-amber-900"
+                        : l.status === "REJECTED"
+                          ? "bg-slate-100 text-slate-600"
+                          : l.status === "OVERDUE"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-blue-100 text-blue-800"
                   }`}
                 >
-                  {l.status === "REPAID"
-                    ? "Remboursé"
-                    : l.status === "DEDUCTED_FROM_POT"
-                      ? "Prélevé sur pot"
-                      : l.status === "OVERDUE"
-                        ? "En retard"
-                        : "Actif"}
+                  {l.status === "PENDING_ADMIN"
+                    ? "En attente Admin"
+                    : l.status === "REJECTED"
+                      ? "Refusé / Annulé"
+                      : l.status === "REPAID"
+                        ? "Remboursé"
+                        : l.status === "DEDUCTED_FROM_POT"
+                          ? "Prélevé sur pot"
+                          : l.status === "OVERDUE"
+                            ? "En retard"
+                            : "Actif"}
                 </span>
               </div>
             ))}
@@ -508,4 +607,3 @@ export function LoansClient({
     </main>
   );
 }
-

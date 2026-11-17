@@ -24,10 +24,13 @@ export async function GET() {
   });
 
   const stats = {
+    pendingAdminCount: loans.filter((l) => l.status === "PENDING_ADMIN").length,
     activeCount: loans.filter((l) => l.status === "ACTIVE").length,
     overdueCount: loans.filter((l) => l.status === "OVERDUE").length,
     repaidCount: loans.filter((l) => l.status === "REPAID" || l.status === "DEDUCTED_FROM_POT").length,
-    totalPrincipalLent: loans.reduce((s, l) => s + Number(l.principal), 0),
+    totalPrincipalLent: loans
+      .filter((l) => l.status !== "PENDING_ADMIN" && l.status !== "REJECTED")
+      .reduce((s, l) => s + Number(l.principal), 0),
     totalOutstanding: loans
       .filter((l) => l.status === "ACTIVE" || l.status === "OVERDUE")
       .reduce((s, l) => s + Math.max(0, Number(l.totalDue) - Number(l.totalPaid)), 0),
@@ -47,6 +50,8 @@ export async function GET() {
       totalPaid: Number(l.totalPaid),
       remainingDue: Math.max(0, Number(l.totalDue) - Number(l.totalPaid)),
       status: l.status,
+      requiresAdminApproval: l.requiresAdminApproval,
+      rejectionReason: l.rejectionReason,
       dueDate: l.dueDate.toISOString(),
       graceEndDate: l.graceEndDate.toISOString(),
       repaidAt: l.repaidAt?.toISOString() ?? null,
