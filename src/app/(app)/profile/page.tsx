@@ -57,6 +57,7 @@ export default async function ProfilePage() {
         neighborhood: true,
         memberCode: true,
         role: true,
+        stars: true,
       },
     }),
     prisma.membership.findMany({
@@ -113,6 +114,36 @@ export default async function ProfilePage() {
       <div className="flex flex-col items-center mb-stack-gap-lg">
         <AvatarUpload currentAvatarUrl={user.avatar ?? user.image} userName={user.name} lang={lang} />
         <EditableProfileHeader name={user.name} lang={lang} />
+        <Link
+          href="/loans"
+          className="mt-1.5 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50/80 border border-amber-200/70 hover:bg-amber-100/70 transition-colors"
+          title={
+            lang === "fr"
+              ? `${user.stars ?? 0}/5 étoiles de confiance`
+              : `${user.stars ?? 0}/5 trust stars`
+          }
+        >
+          {[1, 2, 3, 4, 5].map((i) => {
+            const filled = i <= (user.stars ?? 0);
+            return (
+              <svg
+                key={i}
+                viewBox="0 0 24 24"
+                className={`w-5 h-5 ${filled ? "text-amber-400" : "text-slate-300"}`}
+                fill={filled ? "currentColor" : "none"}
+                stroke="currentColor"
+                strokeWidth={1.8}
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"
+                />
+              </svg>
+            );
+          })}
+        </Link>
       </div>
 
       <div className="mb-stack-gap-lg flex flex-col gap-stack-gap-sm">

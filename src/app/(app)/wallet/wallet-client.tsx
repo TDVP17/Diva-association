@@ -367,12 +367,6 @@ export function WalletClient({
           <p className="text-3xl sm:text-4xl font-extrabold tracking-tight">
             {isBalanceHidden ? "•••••• FCFA" : formatXAF(balance)}
           </p>
-          <p className="text-xs text-emerald-200/80 mt-1 font-medium">
-            {lang === "fr" ? "Total cotisé :" : "Total contributed:"}{" "}
-            <span className="font-semibold text-white">
-              {isBalanceHidden ? "•••••• FCFA" : formatXAF(initialTotalContributed)}
-            </span>
-          </p>
         </div>
 
         {/* Actions: Recharger + Retirer (0% frais) */}
