@@ -109,7 +109,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ok: true,
-    message: "Votre compte a été clôturé et désactivé conformément aux normes Apple App Store / RGPD.",
+    message: "Votre compte a été clôturé et désactivé.",
   });
 }
 

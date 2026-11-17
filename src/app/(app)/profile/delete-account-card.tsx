@@ -49,8 +49,8 @@ export function DeleteAccountCard({ lang }: { lang: Lang }) {
             </p>
             <p className="text-[11px] text-slate-500">
               {lang === "fr"
-                ? "Clôture définitive de l'accès (norme Apple App Store / RGPD)."
-                : "Permanent account closure (Apple App Store / GDPR compliant)."}
+                ? "Clôture définitive de votre compte."
+                : "Permanent account closure."}
             </p>
           </div>
         </div>

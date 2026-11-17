@@ -123,11 +123,6 @@ export function SavedPaymentMethodsCard({ lang }: { lang: Lang }) {
               {lang === "fr" ? "Numéros de retrait (Décaissement)" : "Disbursement / Payout Numbers"}
             </h2>
           </div>
-          <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
-            {lang === "fr"
-              ? "Enregistrez vos deux numéros (un MTN Mobile Money et un Orange Money) avec le nom du titulaire. Chaque numéro doit obligatoirement être vérifié et validé par DIVA Asso avant de pouvoir recevoir des retraits automatiques."
-              : "Register your two payout numbers (MTN & Orange) with the account holder name. Each number must be verified and approved by DIVA Asso before receiving automatic payouts."}
-          </p>
         </div>
       </div>
 
