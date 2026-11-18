@@ -88,7 +88,7 @@ export async function PATCH(
           actionLabel: "Gérer ma cotisation privée",
           lang: "fr",
         });
-        await sendEmailSafe(tontine.creator.email, subject, html).catch(() => {});
+        await sendEmailSafe(tontine.creator.email, subject, html).catch(() => { });
       }
     }
 
@@ -151,7 +151,7 @@ export async function PATCH(
         actionLabel: "Voir mes cotisations privées",
         lang: "fr",
       });
-      await sendEmailSafe(tontine.creator.email, subject, html).catch(() => {});
+      await sendEmailSafe(tontine.creator.email, subject, html).catch(() => { });
     }
   }
 

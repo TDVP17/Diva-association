@@ -1562,9 +1562,9 @@ export const translations = {
     invalidOrangeNumber: "Veuillez entrer un numéro Orange valide (commence par 69x, 685-689, 655-659).",
     submitToDivaAsso: "Envoyer à DIVA Asso",
     waPayoutReleased:
-      "🎉 Compte principal rechargé — DIVA Asso\n\nFélicitations {name} ! Votre compte principal (Portefeuille DIVA Asso) a été rechargé de {amount} pour votre bouffe de {beneficiary}. Vous pouvez faire le retrait à tout moment !",
+      "Compte principal rechargé — DIVA Asso\n\nFélicitations {name} ! Votre Portefeuille DIVA Asso a été rechargé de {amount} pour votre bouffe de {beneficiary}. Vous pouvez retirer votre argent à tout moment, ou laisser une partie pour cotiser automatiquement sans payer de frais Orange ou MTN.",
     waPayoutReleasedWithDeduction:
-      "🎉 Compte principal rechargé — DIVA Asso\n\nFélicitations {name} ! Votre compte principal (Portefeuille DIVA Asso) a été rechargé de {amount} pour votre bouffe de {beneficiary} (après déduction de {deducted} d'amendes, prêts ou cotisations). Vous pouvez faire le retrait à tout moment !",
+      "Compte principal rechargé — DIVA Asso\n\nFélicitations {name} ! Votre Portefeuille DIVA Asso a été rechargé de {amount} pour votre bouffe de {beneficiary} (après déduction de {deducted} d'amendes, prêts ou cotisations). Vous pouvez retirer votre argent à tout moment, ou laisser une partie pour cotiser automatiquement sans payer de frais Orange ou MTN.",
     waTurnReminderTomorrow:
       "⏰ Rappel — DIVA Asso\n\nBonjour {name},\n\nDemain ({date}) est la date estimée de votre tour pour recevoir la cagnotte de {cotisation} (position n°{position}).\n\n💰 Montant estimé : {amount}\n\nAssurez-vous que vos coordonnées Mobile / Orange Money sont à jour dans votre profil. En cas de question, contactez le support depuis l'application.\n\nL'équipe DIVA Asso",
     turnReminderTomorrowNotifMessage: "Demain ({date}) est la date estimée de votre tour pour recevoir la cagnotte de {cotisation} — position n°{position}, environ {amount}.",

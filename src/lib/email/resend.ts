@@ -1,9 +1,13 @@
+import crypto from "crypto";
+
 // Thin Resend client — plain fetch, no SDK, mirroring the no-dependency
 // style of src/lib/whatsapp/evolution.ts for consistency.
 
 const RESEND_API_KEY = (process.env.RESEND_API_KEY ?? "").trim().replace(/^["']|["']$/g, "");
 const RESEND_FROM =
   process.env.RESEND_FROM || process.env.EMAIL_FROM || "DIVA Asso <contact@divaasso.com>";
+const RESEND_REPLY_TO =
+  process.env.RESEND_REPLY_TO || "contact@divaasso.com";
 
 export class ResendError extends Error {
   constructor(
@@ -50,10 +54,14 @@ export async function sendEmail(to: string, subject: string, html: string, text?
     },
     body: JSON.stringify({
       from: RESEND_FROM,
+      reply_to: RESEND_REPLY_TO,
       to,
       subject,
       html,
       text: plainText,
+      headers: {
+        "X-Entity-Ref-ID": crypto.randomUUID(),
+      },
     }),
   });
 

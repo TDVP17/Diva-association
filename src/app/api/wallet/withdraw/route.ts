@@ -17,9 +17,11 @@ import { fapshiMediumFor } from "@/lib/mobile-money-provider";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { formatXAF } from "@/lib/format-currency";
 import { logAudit } from "@/lib/audit";
+import { getEffectiveWithdrawalLimits } from "@/lib/withdrawal-limits";
+import { getFallbackPaymentConfig } from "@/lib/fallback-payment-config";
 
 const withdrawSchema = z.object({
-  amount: z.number().int().min(500, "Montant minimum de retrait : 500 FCFA").max(10_000_000),
+  amount: z.number().int().min(100, "Montant de retrait invalide.").max(50_000_000),
   paymentMethodId: z.string().min(1, "Veuillez choisir un numéro de retrait validé."),
   pin: z.string().regex(/^\d{4}$/, "Veuillez saisir votre code PIN à 4 chiffres."),
 });
@@ -118,13 +120,61 @@ export async function POST(request: Request) {
   if (!method) {
     return NextResponse.json({ error: "Numéro de retrait introuvable." }, { status: 404 });
   }
-  if (method.status !== "APPROVED") {
+  if (method.status !== "APPROVED" || !method.accountName?.trim()) {
     return NextResponse.json(
       {
         error:
-          "Ce numéro de retrait n'a pas encore été vérifié et validé par DIVA Asso. Tant qu'il reste en attente, aucun retrait automatique n'est possible.",
+          "Ce numéro de retrait n'a pas encore été enregistré avec un nom et validé par DIVA Asso. Aucun retrait n'est possible tant qu'il n'est pas validé.",
       },
       { status: 403 },
+    );
+  }
+
+  // 3B. Enforce Global Operator Suspension (Orange / MTN)
+  const opConfig = await getFallbackPaymentConfig();
+  if (method.provider === "ORANGE" && opConfig.isOrangeSuspended) {
+    return NextResponse.json(
+      {
+        error:
+          opConfig.orangeSuspendedReason ||
+          "Les opérations Orange Money sont temporairement suspendues par DIVA Asso. Veuillez sélectionner un numéro MTN validé.",
+      },
+      { status: 503 },
+    );
+  }
+  if (method.provider === "MTN" && opConfig.isMtnSuspended) {
+    return NextResponse.json(
+      {
+        error:
+          opConfig.mtnSuspendedReason ||
+          "Les opérations MTN Mobile Money sont temporairement suspendues par DIVA Asso. Veuillez sélectionner un numéro Orange validé.",
+      },
+      { status: 503 },
+    );
+  }
+
+  // 3C. Enforce Global Min / Per-User Max withdrawal limits + strict positive wallet balance
+  const limits = await getEffectiveWithdrawalLimits(userId);
+  if (amount < limits.minAmount) {
+    return NextResponse.json(
+      { error: `Le montant minimum de retrait est de ${formatXAF(limits.minAmount)}.` },
+      { status: 400 },
+    );
+  }
+  if (amount > limits.maxAmount) {
+    return NextResponse.json(
+      { error: `Le montant maximum autorisé pour vos retraits est de ${formatXAF(limits.maxAmount)}.` },
+      { status: 400 },
+    );
+  }
+
+  const currentWalletBal = Number(user.walletBalance || 0);
+  if (currentWalletBal <= 0 || amount > currentWalletBal) {
+    return NextResponse.json(
+      {
+        error: `Solde insuffisant dans votre Portefeuille DIVA Asso (${formatXAF(currentWalletBal)} disponible). Vous ne pouvez retirer que l'argent réellement disponible dans votre portefeuille.`,
+      },
+      { status: 400 },
     );
   }
 

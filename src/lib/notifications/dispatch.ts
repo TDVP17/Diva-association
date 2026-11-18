@@ -205,7 +205,10 @@ async function deliverInstantNotifications(params: {
 
     const userMap = new Map(users.map((u) => [u.id, u]));
     const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? "https://www.divaasso.com";
+      (process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? "https://divaasso.com").replace(
+        /^https?:\/\/www\.divaasso\.com/i,
+        "https://divaasso.com",
+      );
 
     for (let i = 0; i < params.recipients.length; i += 5) {
       const batch = params.recipients.slice(i, i + 5);

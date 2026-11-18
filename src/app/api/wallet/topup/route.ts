@@ -6,6 +6,7 @@ import { getUserWalletFeeRate } from "@/lib/wallet";
 import { creditWalletTx } from "@/lib/wallet-ledger";
 import { normalizeCameroonPhone, initiateDirectPayment, getFapshiApiUser, getFapshiApiKey } from "@/lib/fapshi";
 import { detectMobileMoneyProvider, fapshiMediumFor } from "@/lib/mobile-money-provider";
+import { getFallbackPaymentConfig } from "@/lib/fallback-payment-config";
 
 const topUpSchema = z.object({
   amount: z.number().int().min(500, "Le montant minimum de rechargement est de 500 FCFA").max(10000000),
@@ -41,6 +42,29 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "Le numéro doit être un numéro Orange Money ou MTN Mobile Money camerounais valide." },
       { status: 400 }
+    );
+  }
+
+  // Enforce global operator suspension (Orange / MTN) across the entire system
+  const opConfig = await getFallbackPaymentConfig();
+  if (provider === "ORANGE" && opConfig.isOrangeSuspended) {
+    return NextResponse.json(
+      {
+        error:
+          opConfig.orangeSuspendedReason ||
+          "Les opérations Orange Money sont temporairement suspendues par DIVA Asso. Veuillez utiliser un numéro MTN Mobile Money.",
+      },
+      { status: 503 },
+    );
+  }
+  if (provider === "MTN" && opConfig.isMtnSuspended) {
+    return NextResponse.json(
+      {
+        error:
+          opConfig.mtnSuspendedReason ||
+          "Les opérations MTN Mobile Money sont temporairement suspendues par DIVA Asso. Veuillez utiliser un numéro Orange Money.",
+      },
+      { status: 503 },
     );
   }
 

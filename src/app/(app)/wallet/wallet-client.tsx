@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { type Lang } from "@/lib/i18n/translations";
 import { formatXAF } from "@/lib/format-currency";
 import { LoadingSpinner } from "@/components/loading-spinner";
-import { getOperatorInfo } from "@/lib/mobile-money-provider";
+import { getOperatorInfo, detectMobileMoneyProvider } from "@/lib/mobile-money-provider";
 import { OperatorBadge } from "@/components/operator-badge";
 
 interface WalletOperation {
@@ -53,6 +53,19 @@ interface WalletClientProps {
   olderOperationsCount: number;
   initialHasPin: boolean;
   withdrawalLockRemainingHours: number;
+  withdrawalLimits: { minAmount: number; maxAmount: number };
+  operatorSuspension: {
+    isOrangeSuspended: boolean;
+    orangeSuspendedReason: string;
+    isMtnSuspended: boolean;
+    mtnSuspendedReason: string;
+  };
+  activeLoan: {
+    id: string;
+    remainingDue: number;
+    dueDate: string;
+    status: string;
+  } | null;
   disbursementMethods: DisbursementMethodItem[];
   initialWithdrawals: WithdrawalItem[];
 }
@@ -69,6 +82,9 @@ export function WalletClient({
   olderOperationsCount,
   initialHasPin,
   withdrawalLockRemainingHours,
+  withdrawalLimits,
+  operatorSuspension,
+  activeLoan,
   disbursementMethods,
   initialWithdrawals,
 }: WalletClientProps) {
@@ -110,11 +126,41 @@ export function WalletClient({
   const [pinError, setPinError] = useState<string | null>(null);
   const [pinSuccess, setPinSuccess] = useState<string | null>(null);
 
-  // Fee calculations & live operator detection for top-up
+  // Fee calculations & live operator detection for top-up + global operator suspension check
   const feeRate = initialFeePercentage / 100;
   const calculatedFee = Math.round(topUpAmount * feeRate);
   const totalDebit = topUpAmount + calculatedFee;
   const topUpOperatorInfo = getOperatorInfo(phone, lang);
+  const topUpProvider = detectMobileMoneyProvider(phone.replace(/\D/g, "").replace(/^237/, ""));
+  const isTopUpOperatorSuspended =
+    (topUpProvider === "ORANGE" && operatorSuspension.isOrangeSuspended) ||
+    (topUpProvider === "MTN" && operatorSuspension.isMtnSuspended);
+  const topUpSuspendedReason =
+    topUpProvider === "ORANGE"
+      ? operatorSuspension.orangeSuspendedReason ||
+        "Les opérations Orange Money sont temporairement suspendues par DIVA Asso."
+      : operatorSuspension.mtnSuspendedReason ||
+        "Les opérations MTN Mobile Money sont temporairement suspendues par DIVA Asso.";
+
+  // Selected withdrawal method suspension check
+  const selectedWithdrawMethod = approvedMethods.find((m) => m.id === selectedMethodId) || null;
+  const isWithdrawOperatorSuspended =
+    (selectedWithdrawMethod?.provider === "ORANGE" && operatorSuspension.isOrangeSuspended) ||
+    (selectedWithdrawMethod?.provider === "MTN" && operatorSuspension.isMtnSuspended);
+  const withdrawSuspendedReason =
+    selectedWithdrawMethod?.provider === "ORANGE"
+      ? operatorSuspension.orangeSuspendedReason ||
+        "Les retraits Orange Money sont temporairement suspendus par DIVA Asso. Veuillez sélectionner un autre numéro validé."
+      : operatorSuspension.mtnSuspendedReason ||
+        "Les retraits MTN Mobile Money sont temporairement suspendus par DIVA Asso. Veuillez sélectionner un autre numéro validé.";
+
+  // Live countdown ticker for active loan above Recent Operations
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    if (!activeLoan) return;
+    const id = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [activeLoan]);
 
   const formatNowDateTime = () =>
     new Date().toLocaleString("fr-FR", {
@@ -150,6 +196,11 @@ export function WalletClient({
           ? "Veuillez entrer un numéro Orange Money ou MTN Mobile Money valide."
           : "Please enter a valid Orange or MTN Mobile Money number.",
       );
+      return;
+    }
+
+    if (isTopUpOperatorSuspended) {
+      setTopUpError(topUpSuspendedReason);
       return;
     }
 
@@ -254,8 +305,20 @@ export function WalletClient({
       setWithdrawError("Veuillez choisir un numéro de retrait validé par DIVA Asso.");
       return;
     }
-    if (!withdrawAmount || withdrawAmount < 500) {
-      setWithdrawError("Le montant minimum de retrait est de 500 FCFA.");
+    if (isWithdrawOperatorSuspended) {
+      setWithdrawError(withdrawSuspendedReason);
+      return;
+    }
+    if (balance <= 0) {
+      setWithdrawError("Votre solde est à 0 FCFA. Vous ne pouvez retirer que lorsque vous avez de l'argent disponible dans votre portefeuille.");
+      return;
+    }
+    if (!withdrawAmount || withdrawAmount < withdrawalLimits.minAmount) {
+      setWithdrawError(`Le montant minimum de retrait est de ${formatXAF(withdrawalLimits.minAmount)}.`);
+      return;
+    }
+    if (withdrawAmount > withdrawalLimits.maxAmount) {
+      setWithdrawError(`Le montant maximum autorisé pour vos retraits est de ${formatXAF(withdrawalLimits.maxAmount)}.`);
       return;
     }
     if (withdrawAmount > balance) {
@@ -426,6 +489,63 @@ export function WalletClient({
             ))}
         </div>
       )}
+
+      {/* ── Compte à rebours Prêt actif (en haut des Opérations récentes) ── */}
+      {activeLoan && (() => {
+        const dueMs = new Date(activeLoan.dueDate).getTime();
+        const remainingMs = Math.max(0, dueMs - nowTick);
+        const days = Math.floor(remainingMs / (24 * 60 * 60 * 1000));
+        const hours = Math.floor((remainingMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+        const mins = Math.floor((remainingMs % (60 * 60 * 1000)) / (60 * 1000));
+        const secs = Math.floor((remainingMs % (60 * 1000)) / 1000);
+        const isOverdue = activeLoan.status === "OVERDUE" || remainingMs === 0;
+        const dueLabel = new Date(activeLoan.dueDate).toLocaleDateString("fr-FR", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          timeZone: "Africa/Douala",
+        });
+
+        return (
+          <div
+            className={`rounded-2xl p-4 border-2 shadow-xs flex flex-col gap-2.5 ${
+              isOverdue
+                ? "bg-red-50 border-red-300"
+                : "bg-amber-50/70 border-amber-300"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <span
+                  className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                    isOverdue ? "bg-red-600 text-white" : "bg-amber-200 text-amber-950"
+                  }`}
+                >
+                  {isOverdue ? "Prêt en retard" : "Prêt en cours · Compte à rebours"}
+                </span>
+                <p className="text-sm font-extrabold text-slate-900 mt-1">
+                  À rembourser : {formatXAF(activeLoan.remainingDue)}
+                </p>
+                <p className="text-[11px] text-slate-600">
+                  Date limite : <strong>{dueLabel} à 18h00</strong>
+                </p>
+              </div>
+              <div className="bg-slate-900 text-white rounded-xl px-2.5 py-1.5 text-right flex-shrink-0">
+                <span className="text-[9px] uppercase text-emerald-300 block font-bold">Reste</span>
+                <span className="font-mono text-xs font-extrabold">
+                  {days}j {String(hours).padStart(2, "0")}h {String(mins).padStart(2, "0")}m {String(secs).padStart(2, "0")}s
+                </span>
+              </div>
+            </div>
+            <Link
+              href="/loans"
+              className="w-full py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs text-center transition-colors"
+            >
+              Rembourser mon prêt (Portefeuille ou OM/MTN)
+            </Link>
+          </div>
+        );
+      })()}
 
       {/* ── Section Opérations Récentes (Historique 1 mois) ── */}
       <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/80 flex flex-col gap-4">
@@ -640,6 +760,12 @@ export function WalletClient({
                   className="w-full bg-white border-2 border-emerald-600 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-600/25 focus:outline-none rounded-xl px-3 py-2.5 text-sm font-bold text-slate-900"
                 />
                 <OperatorBadge operator={topUpOperatorInfo} lang={lang} className="mt-1" />
+                {isTopUpOperatorSuspended && (
+                  <div className="mt-1.5 p-2.5 rounded-xl bg-red-50 border-2 border-red-400 text-xs text-red-800 font-semibold flex items-start gap-2">
+                    <span className="material-symbols-outlined text-red-600 text-[18px] flex-shrink-0">warning</span>
+                    <span>{topUpSuspendedReason}</span>
+                  </div>
+                )}
               </div>
 
               <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col gap-1.5 text-xs">
@@ -672,7 +798,7 @@ export function WalletClient({
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isTopUpOperatorSuspended}
                   className="flex-1 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
                 >
                   {isSubmitting ? <LoadingSpinner /> : <span>Payer {formatXAF(totalDebit)}</span>}
@@ -765,36 +891,60 @@ export function WalletClient({
                     Numéro de retrait validé (Whitelist DIVA) :
                   </label>
                   <div className="flex flex-col gap-2">
-                    {approvedMethods.map((m) => (
-                      <label
-                        key={m.id}
-                        className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer ${
-                          selectedMethodId === m.id
-                            ? "border-emerald-600 bg-emerald-50/70"
-                            : "border-slate-200"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <input
-                            type="radio"
-                            name="withdraw-method"
-                            checked={selectedMethodId === m.id}
-                            onChange={() => setSelectedMethodId(m.id)}
-                            className="accent-emerald-700"
-                          />
-                          <div>
-                            <p className="text-xs font-bold text-slate-900">
-                              {m.provider} · {m.phone}
-                            </p>
-                            <p className="text-[11px] text-slate-500">{m.accountName}</p>
+                    {approvedMethods.map((m) => {
+                      const isMethodSuspended =
+                        (m.provider === "ORANGE" && operatorSuspension.isOrangeSuspended) ||
+                        (m.provider === "MTN" && operatorSuspension.isMtnSuspended);
+                      return (
+                        <label
+                          key={m.id}
+                          className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer ${
+                            isMethodSuspended
+                              ? "border-red-300 bg-red-50/60"
+                              : selectedMethodId === m.id
+                                ? "border-emerald-600 bg-emerald-50/70"
+                                : "border-slate-200"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <input
+                              type="radio"
+                              name="withdraw-method"
+                              checked={selectedMethodId === m.id}
+                              onChange={() => setSelectedMethodId(m.id)}
+                              className="accent-emerald-700"
+                            />
+                            <div>
+                              <p className="text-xs font-bold text-slate-900">
+                                {m.provider} · {m.phone}
+                              </p>
+                              <p className="text-[11px] text-slate-500">{m.accountName}</p>
+                            </div>
                           </div>
-                        </div>
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                          Validé
-                        </span>
-                      </label>
-                    ))}
+                          {isMethodSuspended ? (
+                            <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-bold">
+                              Suspendu
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                              Validé
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })}
                   </div>
+                  {isWithdrawOperatorSuspended && (
+                    <div className="mt-1 p-2.5 rounded-xl bg-red-50 border-2 border-red-400 text-xs text-red-800 font-semibold flex items-start gap-2">
+                      <span className="material-symbols-outlined text-red-600 text-[18px] flex-shrink-0">block</span>
+                      <span>
+                        {withdrawSuspendedReason}
+                        {approvedMethods.length > 1
+                          ? " Sélectionnez un autre numéro validé ci-dessus pour continuer."
+                          : ""}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-1.5">
@@ -812,9 +962,15 @@ export function WalletClient({
                     placeholder="Montant à retirer"
                     className="w-full bg-white border-2 border-emerald-600 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-600/25 focus:outline-none rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-900"
                   />
-                  <p className="text-[11px] font-semibold text-emerald-700">
-                    ⚡ Virement automatique immédiat vers votre numéro validé.
+                  <p className="text-[11px] font-semibold text-slate-600">
+                    Min : <strong className="text-slate-900">{formatXAF(withdrawalLimits.minAmount)}</strong> · Max autorisé :{" "}
+                    <strong className="text-emerald-800">{formatXAF(withdrawalLimits.maxAmount)}</strong>
                   </p>
+                  {balance < withdrawalLimits.minAmount && (
+                    <p className="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+                      Solde disponible insuffisant pour effectuer un retrait.
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-1.5">
@@ -840,7 +996,7 @@ export function WalletClient({
                   </button>
                   <button
                     type="submit"
-                    disabled={withdrawing}
+                    disabled={withdrawing || isWithdrawOperatorSuspended || balance < withdrawalLimits.minAmount}
                     className="flex-1 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
                   >
                     {withdrawing ? <LoadingSpinner /> : <span>Confirmer le retrait</span>}

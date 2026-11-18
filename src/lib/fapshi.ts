@@ -161,7 +161,7 @@ export async function initiateDirectPayment(params: InitiateDirectPayParams): Pr
       params.redirectUrl ||
       process.env.NEXT_PUBLIC_APP_URL ||
       process.env.NEXTAUTH_URL ||
-      "https://www.divaasso.com";
+      "https://divaasso.com";
 
     const initRes = await fetch(`${baseUrl}/initiate-pay`, {
       method: "POST",
@@ -219,7 +219,7 @@ export async function initiateHostedPayment(params: InitiateHostedPayParams): Pr
     params.redirectUrl ||
     process.env.NEXT_PUBLIC_APP_URL ||
     process.env.NEXTAUTH_URL ||
-    "https://www.divaasso.com";
+    "https://divaasso.com";
 
   const initRes = await fetch(`${baseUrl}/initiate-pay`, {
     method: "POST",

@@ -9,10 +9,14 @@ import { InlinePasswordField } from "@/app/(app)/profile/inline-password-field";
 import { updatePhoneAction, updateEmailAction } from "@/app/(app)/profile/actions";
 import { getAssociationRules } from "@/lib/association-rules";
 import { getPrivateTontineRules } from "@/lib/private-tontine-rules";
+import { getPrivateTontineConfig } from "@/lib/private-tontine-config";
+import { getGlobalWithdrawalLimits } from "@/lib/withdrawal-limits";
 import { getFallbackPaymentConfig } from "@/lib/fallback-payment-config";
 import { FallbackPaymentEditor } from "@/components/admin/fallback-payment-editor";
 import { GeneralRulesEditor } from "./general-rules-editor";
 import { PrivateRulesEditor } from "./private-rules-editor";
+import { PrivateConfigEditor } from "./private-config-editor";
+import { WithdrawalLimitsEditor } from "./withdrawal-limits-editor";
 import { ROLE_KEY } from "@/lib/role-label";
 
 export default async function AdminSettingsPage() {
@@ -27,9 +31,11 @@ export default async function AdminSettingsPage() {
   });
   if (!user) redirect("/login");
 
-  const [generalRules, privateRules, fallbackConfig] = await Promise.all([
+  const [generalRules, privateRules, privateConfig, withdrawalLimits, fallbackConfig] = await Promise.all([
     getAssociationRules(),
     getPrivateTontineRules(),
+    getPrivateTontineConfig(),
+    getGlobalWithdrawalLimits(),
     getFallbackPaymentConfig(),
   ]);
 
@@ -109,10 +115,26 @@ export default async function AdminSettingsPage() {
 
       <section className="mb-stack-gap-lg bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
         <h2 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-2">
+          <span className="material-symbols-outlined">payments</span>
+          {lang === "fr" ? "Plafonds de retrait (Min / Max)" : "Withdrawal Limits (Min / Max)"}
+        </h2>
+        <WithdrawalLimitsEditor initialLimits={withdrawalLimits} lang={lang} />
+      </section>
+
+      <section className="mb-stack-gap-lg bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
+        <h2 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-2">
           <span className="material-symbols-outlined">lock</span>
           {lang === "fr" ? "Règles des cotisations privées" : "Private Cotisation Rules"}
         </h2>
         <PrivateRulesEditor initialContent={privateRules.content} lang={lang} />
+      </section>
+
+      <section className="mb-stack-gap-lg bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
+        <h2 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-2">
+          <span className="material-symbols-outlined">tune</span>
+          {lang === "fr" ? "Options de création (Cotisations privées)" : "Private Cotisation Creation Options"}
+        </h2>
+        <PrivateConfigEditor initialConfig={privateConfig} lang={lang} />
       </section>
     </main>
   );

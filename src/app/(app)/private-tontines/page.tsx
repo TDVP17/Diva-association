@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getLang } from "@/lib/i18n/get-lang";
 import { getPrivateTontineRules } from "@/lib/private-tontine-rules";
+import { getPrivateTontineConfig } from "@/lib/private-tontine-config";
 import { PrivateTontinesClient, type PrivateTontineItem } from "./private-tontines-client";
 
 export default async function PrivateTontinesPage() {
@@ -11,7 +12,7 @@ export default async function PrivateTontinesPage() {
   const userId = session.user.id;
   const lang = await getLang();
 
-  const [tontines, privateRules] = await Promise.all([
+  const [tontines, privateRules, creationConfig] = await Promise.all([
     prisma.tontineSession.findMany({
       where: {
         isPrivate: true,
@@ -33,6 +34,7 @@ export default async function PrivateTontinesPage() {
       orderBy: { startDate: "desc" },
     }),
     getPrivateTontineRules(),
+    getPrivateTontineConfig(),
   ]);
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://divaasso.com";
@@ -51,6 +53,7 @@ export default async function PrivateTontinesPage() {
       isLocked: t.lockedAt !== null,
       privateApprovalStatus: t.privateApprovalStatus,
       privateRejectionReason: t.privateRejectionReason,
+      privateConfig: (t.privateConfig as { selectedActions?: string[] } | null) ?? null,
       startDate: t.startDate.toISOString(),
       limitTime: t.limitTime,
       maxSlots: t.maxSlots ? Number(t.maxSlots) : null,
@@ -85,6 +88,7 @@ export default async function PrivateTontinesPage() {
       lang={lang}
       initialTontines={initialTontines}
       privateRulesContent={privateRules.content}
+      creationConfig={creationConfig}
       currentUserId={userId}
     />
   );

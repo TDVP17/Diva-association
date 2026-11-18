@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
-import { LOAN_DURATION_DAYS, LOAN_GRACE_DAYS } from "@/lib/loans";
+import { computeLoanDueDateAt18h, LOAN_GRACE_DAYS } from "@/lib/loans";
 import { creditWalletTx, debitWalletTx } from "@/lib/wallet-ledger";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { sendEmailSafe } from "@/lib/email/resend";
@@ -52,9 +52,9 @@ export async function PATCH(
     }
 
     const now = new Date();
-    const dueDate = new Date(now.getTime() + LOAN_DURATION_DAYS * 24 * 60 * 60 * 1000);
+    const dueDate = computeLoanDueDateAt18h(now);
     const graceEndDate = new Date(
-      now.getTime() + (LOAN_DURATION_DAYS + LOAN_GRACE_DAYS) * 24 * 60 * 60 * 1000,
+      dueDate.getTime() + LOAN_GRACE_DAYS * 24 * 60 * 60 * 1000,
     );
 
     const ledger = await prisma.$transaction(async (tx) => {
@@ -101,11 +101,11 @@ export async function PATCH(
 
     if (loan.user.email) {
       const html = renderBrandedEmailHtml({
-        title: lang === "fr" ? "Gros prêt approuvé & crédité ✅" : "Loan Approved & Credited ✅",
+        title: lang === "fr" ? "Prêt approuvé et crédité" : "Loan Approved & Credited",
         bodyText:
           lang === "fr"
-            ? `Bonjour ${loan.user.name},\n\nVotre demande de prêt de ${formatXAF(principal)} a été approuvée par l'administrateur DIVA Asso et créditée dans votre Portefeuille.\n\n• Capital : ${formatXAF(principal)}\n• Total à rembourser (15 % inclus) : ${formatXAF(totalDue)}\n• Échéance (21 jours) : ${dueDateLabel}\n• Nouveau solde portefeuille : ${formatXAF(ledger.balanceAfter)}.`
-            : `Hello ${loan.user.name},\n\nYour loan request of ${formatXAF(principal)} was approved by DIVA Asso and credited to your wallet.\n\n• Principal: ${formatXAF(principal)}\n• Total due (15% included): ${formatXAF(totalDue)}\n• Due date (21 days): ${dueDateLabel}\n• New balance: ${formatXAF(ledger.balanceAfter)}.`,
+            ? `Bonjour ${loan.user.name},\n\nVotre demande de prêt de ${formatXAF(principal)} a été approuvée par l'administrateur DIVA Asso et créditée dans votre Portefeuille DIVA Asso.\n\n• Montant emprunté : ${formatXAF(principal)}\n• Total à rembourser : ${formatXAF(totalDue)}\n• Date limite de remboursement : ${dueDateLabel} à 18h00\n• Nouveau solde portefeuille : ${formatXAF(ledger.balanceAfter)}.`
+            : `Hello ${loan.user.name},\n\nYour loan request of ${formatXAF(principal)} was approved by DIVA Asso and credited to your DIVA Asso Wallet.\n\n• Principal: ${formatXAF(principal)}\n• Total due: ${formatXAF(totalDue)}\n• Deadline: ${dueDateLabel} at 18:00\n• New balance: ${formatXAF(ledger.balanceAfter)}.`,
         actionUrl: "/loans",
         actionLabel: lang === "fr" ? "Consulter mon prêt" : "View My Loan",
         lang,

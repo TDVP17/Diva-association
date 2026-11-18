@@ -21,7 +21,28 @@ const CORS_HEADERS = {
 };
 
 function getAppBaseUrl(): string {
-  return Deno.env.get("APP_URL") || "https://www.divaasso.com";
+  const raw = Deno.env.get("APP_URL") || "https://divaasso.com";
+  return raw.replace(/^https?:\/\/www\.divaasso\.com/i, "https://divaasso.com").replace(/\/+$/, "");
+}
+
+function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<a\s+(?:[^>]*?\s+)?href=(["'])(.*?)\1[^>]*>(.*?)<\/a>/gi, "$3 ($2)")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<\/div>/gi, "\n")
+    .replace(/<\/tr>/gi, "\n")
+    .replace(/<td[^>]*>(.*?)<\/td>/gi, "$1 ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 const ASSO_TITLE_BADGE = "Asso 🌿";
@@ -195,6 +216,9 @@ async function sendViaResend(options: {
     Deno.env.get("EMAIL_FROM") ||
     "DIVA Asso <contact@divaasso.com>";
 
+  const replyTo = Deno.env.get("RESEND_REPLY_TO") || "contact@divaasso.com";
+  const plainText = htmlToPlainText(options.html);
+
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -203,9 +227,14 @@ async function sendViaResend(options: {
     },
     body: JSON.stringify({
       from,
+      reply_to: replyTo,
       to: options.to,
       subject: options.subject,
       html: options.html,
+      text: plainText,
+      headers: {
+        "X-Entity-Ref-ID": crypto.randomUUID(),
+      },
     }),
   });
 

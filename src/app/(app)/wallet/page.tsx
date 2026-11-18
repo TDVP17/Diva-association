@@ -4,6 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { getLang } from "@/lib/i18n/get-lang";
 import { getUserWalletData } from "@/lib/wallet";
 import { getWithdrawalLockStatus } from "@/lib/wallet-pin";
+import { getEffectiveWithdrawalLimits } from "@/lib/withdrawal-limits";
+import { getFallbackPaymentConfig } from "@/lib/fallback-payment-config";
+import { syncLoanPenaltiesForUser } from "@/lib/loans";
 import { WalletClient } from "./wallet-client";
 
 export default async function WalletPage() {
@@ -14,7 +17,17 @@ export default async function WalletPage() {
   const userId = session.user.id;
   const lang = await getLang();
 
-  const [walletData, securityUser, savedMethods, recentWithdrawals] = await Promise.all([
+  await syncLoanPenaltiesForUser(userId).catch(() => {});
+
+  const [
+    walletData,
+    securityUser,
+    savedMethods,
+    recentWithdrawals,
+    withdrawalLimits,
+    operatorConfig,
+    activeLoanRow,
+  ] = await Promise.all([
     getUserWalletData(userId),
     prisma.user.findUnique({
       where: { id: userId },
@@ -28,6 +41,19 @@ export default async function WalletPage() {
       where: { userId },
       orderBy: { createdAt: "desc" },
       take: 10,
+    }),
+    getEffectiveWithdrawalLimits(userId),
+    getFallbackPaymentConfig(),
+    prisma.loan.findFirst({
+      where: { userId, status: { in: ["ACTIVE", "OVERDUE"] } },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        totalDue: true,
+        totalPaid: true,
+        dueDate: true,
+        status: true,
+      },
     }),
   ]);
 
@@ -55,6 +81,29 @@ export default async function WalletPage() {
         olderOperationsCount={walletData.olderOperationsCount}
         initialHasPin={Boolean(securityUser?.walletPinHash)}
         withdrawalLockRemainingHours={lockStatus.remainingHours}
+        withdrawalLimits={{
+          minAmount: withdrawalLimits.minAmount,
+          maxAmount: withdrawalLimits.maxAmount,
+        }}
+        operatorSuspension={{
+          isOrangeSuspended: Boolean(operatorConfig.isOrangeSuspended),
+          orangeSuspendedReason: operatorConfig.orangeSuspendedReason ?? "",
+          isMtnSuspended: Boolean(operatorConfig.isMtnSuspended),
+          mtnSuspendedReason: operatorConfig.mtnSuspendedReason ?? "",
+        }}
+        activeLoan={
+          activeLoanRow
+            ? {
+                id: activeLoanRow.id,
+                remainingDue: Math.max(
+                  0,
+                  Number(activeLoanRow.totalDue) - Number(activeLoanRow.totalPaid || 0),
+                ),
+                dueDate: activeLoanRow.dueDate.toISOString(),
+                status: activeLoanRow.status,
+              }
+            : null
+        }
         disbursementMethods={sortedMethods.map((m) => ({
           id: m.id,
           provider: m.provider,

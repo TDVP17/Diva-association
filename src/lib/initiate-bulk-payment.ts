@@ -356,7 +356,7 @@ export async function initiateBulkPayment(
     const detectedProvider = detectMobileMoneyProvider(normalizedPhone);
     const redirectUrl =
       options?.redirectUrl ||
-      `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://www.divaasso.com"}/global-payment`;
+      `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://divaasso.com"}/global-payment`;
 
     const result = options?.useCheckout
       ? await initiateHostedPayment({

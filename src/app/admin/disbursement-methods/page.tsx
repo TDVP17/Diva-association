@@ -36,3 +36,4 @@ export default async function AdminDisbursementMethodsPage() {
 
   return <AdminDisbursementClient initialMethods={initialMethods} />;
 }
+

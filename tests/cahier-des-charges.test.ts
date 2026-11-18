@@ -67,34 +67,35 @@ describe("Cahier des Charges — Pilier 2 : Prêts d'Urgence Garantis", () => {
     expect(buildSystemLoanOptions(0)).toEqual([]);
   });
 
-  it("applique le seuil Admin : <= 140 000 FCFA automatique, > 140 000 FCFA validation Admin obligatoire", () => {
-    expect(LOAN_AUTO_APPROVAL_LIMIT_XAF).toBe(140_000);
+  it("applique le seuil Admin sur le total à rembourser : <= 50 000 FCFA automatique, > 50 000 FCFA validation Admin obligatoire", () => {
+    expect(LOAN_AUTO_APPROVAL_LIMIT_XAF).toBe(50_000);
 
-    const autoOk = computeLoanTerms(140_000);
+    // 40 000 + 6 000 (15%) + 800 (2% frais DIVA Asso) = 46 800 <= 50 000 -> auto
+    const autoOk = computeLoanTerms(40_000);
+    expect(autoOk.totalDue).toBe(46_800);
     expect(autoOk.requiresAdminApproval).toBe(false);
 
-    const smallOk = computeLoanTerms(55_000);
-    expect(smallOk.requiresAdminApproval).toBe(false);
-
-    const bigLoan150 = computeLoanTerms(150_000);
-    expect(bigLoan150.requiresAdminApproval).toBe(true);
-
-    const bigLoan250 = computeLoanTerms(250_000);
-    expect(bigLoan250.requiresAdminApproval).toBe(true);
+    // 50 000 + 7 500 (15%) + 1 000 (2% frais DIVA Asso) = 58 500 > 50 000 -> validation Admin obligatoire
+    const needsAdmin = computeLoanTerms(50_000);
+    expect(needsAdmin.divaFeeAmount).toBe(1_000);
+    expect(needsAdmin.totalDue).toBe(58_500);
+    expect(needsAdmin.requiresAdminApproval).toBe(true);
   });
 
-  it("calcule 15% d'intérêts, 21 jours d'échéance et 2 jours de période de grâce (ex: 50 000 -> 57 500)", () => {
+  it("calcule 15% d'intérêts + 2% frais DIVA Asso, échéance à 18h00 Cameroun et 2 jours de grâce", () => {
     const origin = new Date("2026-11-01T12:00:00.000Z");
     const terms = computeLoanTerms(50_000, origin);
 
     expect(terms.principal).toBe(50_000);
     expect(terms.interestAmount).toBe(7_500);
-    expect(terms.totalDue).toBe(57_500);
-    expect(terms.dueDate.toISOString()).toBe("2026-11-22T12:00:00.000Z");
-    expect(terms.graceEndDate.toISOString()).toBe("2026-11-24T12:00:00.000Z");
+    expect(terms.divaFeeAmount).toBe(1_000);
+    expect(terms.totalDue).toBe(58_500);
+    // 18h00 heure du Cameroun (UTC+1) === 17h00 UTC
+    expect(terms.dueDate.toISOString()).toBe("2026-11-22T17:00:00.000Z");
+    expect(terms.graceEndDate.toISOString()).toBe("2026-11-24T17:00:00.000Z");
   });
 
-  it("n'applique aucune pénalité avant le 23e jour, puis +5% tous les 2 jours dès le 23e jour", () => {
+  it("n'applique aucune pénalité avant le 23e jour à 18h00, puis +5% tous les 2 jours ensuite", () => {
     const origin = new Date("2026-11-01T12:00:00.000Z");
     const { graceEndDate } = computeLoanTerms(50_000, origin);
 
@@ -103,11 +104,11 @@ describe("Cahier des Charges — Pilier 2 : Prêts d'Urgence Garantis", () => {
     ).toEqual({ isOverdue: false, penaltySteps: 0, penaltyAmount: 0 });
 
     expect(
-      computeAccruedLoanPenalty(50_000, graceEndDate, new Date("2026-11-23T12:00:00.000Z")),
+      computeAccruedLoanPenalty(50_000, graceEndDate, new Date("2026-11-24T16:59:00.000Z")),
     ).toEqual({ isOverdue: false, penaltySteps: 0, penaltyAmount: 0 });
 
     expect(
-      computeAccruedLoanPenalty(50_000, graceEndDate, new Date("2026-11-24T13:00:00.000Z")),
+      computeAccruedLoanPenalty(50_000, graceEndDate, new Date("2026-11-24T18:00:00.000Z")),
     ).toEqual({ isOverdue: true, penaltySteps: 1, penaltyAmount: 2_500 });
 
     expect(
@@ -115,7 +116,7 @@ describe("Cahier des Charges — Pilier 2 : Prêts d'Urgence Garantis", () => {
     ).toEqual({ isOverdue: true, penaltySteps: 2, penaltyAmount: 5_000 });
 
     expect(
-      computeAccruedLoanPenalty(50_000, graceEndDate, new Date("2026-11-28T14:00:00.000Z")),
+      computeAccruedLoanPenalty(50_000, graceEndDate, new Date("2026-11-28T18:00:00.000Z")),
     ).toEqual({ isOverdue: true, penaltySteps: 3, penaltyAmount: 7_500 });
   });
 });

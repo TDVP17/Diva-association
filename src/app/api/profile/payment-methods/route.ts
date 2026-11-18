@@ -4,6 +4,9 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { normalizeCameroonPhone } from "@/lib/fapshi";
 import { detectMobileMoneyProvider } from "@/lib/mobile-money-provider";
+import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
+import { sendEmailSafe } from "@/lib/email/resend";
+import { renderBrandedEmailHtml } from "@/lib/email/template";
 
 const MAX_SAVED_METHODS = 4;
 
@@ -114,6 +117,43 @@ export async function POST(request: Request) {
         isDefault: true,
       },
     });
+
+    // Notifier immédiatement tous les admins pour valider ou refuser ce numéro de retrait
+    try {
+      const admins = await prisma.user.findMany({
+        where: { role: { in: ["ADMIN", "PRESIDENT"] }, isBanned: false },
+        select: { id: true, email: true },
+      });
+      if (admins.length > 0) {
+        const providerLabel = provider === "ORANGE" ? "Orange Money" : "MTN MoMo";
+        const memberName = session.user.name || "Un membre";
+        await scheduleInAppNotifications({
+          type: "ADMIN_BROADCAST",
+          recipients: admins.map((a) => ({
+            userId: a.id,
+            message: `Nouveau numéro de retrait à valider : ${memberName} a enregistré ${providerLabel} ${normalizedPhone} (${accountName || "sans nom"}).`,
+            actionUrl: "/admin/disbursement-methods",
+          })),
+        }).catch(() => {});
+
+        const subject = `DIVA Asso — Nouveau numéro de retrait à valider (${memberName})`;
+        const bodyText = `Bonjour,\n\n${memberName} vient d'enregistrer un numéro de retrait ${providerLabel} (${normalizedPhone} — Titulaire : ${accountName || "Non renseigné"}).\n\nConnectez-vous à l'espace Admin pour vérifier et valider ou annuler ce numéro.`;
+        const html = renderBrandedEmailHtml({
+          title: subject,
+          bodyText,
+          actionUrl: "/admin/disbursement-methods",
+          actionLabel: "Valider les numéros de retrait",
+          lang: "fr",
+        });
+        await Promise.all(
+          admins
+            .filter((a) => Boolean(a.email))
+            .map((a) => sendEmailSafe(a.email, subject, html)),
+        );
+      }
+    } catch (notifErr) {
+      console.error("[profile/payment-methods POST] admin notify error:", notifErr);
+    }
 
     return NextResponse.json({ method });
   } catch (err) {

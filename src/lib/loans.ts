@@ -1,22 +1,37 @@
 import { prisma } from "@/lib/prisma";
 import { debitWalletTx, type PrismaTx } from "@/lib/wallet-ledger";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
+import { sendEmailSafe } from "@/lib/email/resend";
+import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { formatXAF } from "@/lib/format-currency";
 
 export const LOAN_MIN_STARS = 4;
 export const LOAN_RISK_TOLERANCE_XAF = 10_000;
 /**
- * Seuil d'approbation automatique :
- * - <= 140 000 FCFA : décaissement automatique (si éligible selon le calcul du système)
- * - > 140 000 FCFA : demande en attente de validation manuelle par l'administrateur
+ * Seuil d'approbation automatique basé sur le TOTAL À REMBOURSER (capital + intérêts + frais DIVA Asso) :
+ * - <= 50 000 FCFA : décaissement automatique (si éligible selon le calcul du système)
+ * - > 50 000 FCFA : demande en attente de validation manuelle par l'administrateur
  */
-export const LOAN_AUTO_APPROVAL_LIMIT_XAF = 140_000;
+export const LOAN_AUTO_APPROVAL_LIMIT_XAF = 50_000;
 export const LOAN_INITIAL_INTEREST_RATE = 0.15; // 15%
-export const LOAN_DURATION_DAYS = 21; // 3 weeks
-export const LOAN_GRACE_DAYS = 2; // 2 days after day 21 (day 23 starts penalties)
-export const LOAN_PENALTY_RATE_PER_STEP = 0.05; // +5% of principal
-export const LOAN_PENALTY_STEP_DAYS = 2; // every 2 days past grace
-export const LOAN_MIN_AMOUNT_XAF = 2_000;
+export const LOAN_DIVA_FEE_RATE = 0.02; // 2% Frais DIVA Asso (jamais afficher "2%" côté membre)
+export const LOAN_DURATION_DAYS = 21;
+export const LOAN_GRACE_DAYS = 2; // 2 jours après l'échéance à 18h00
+export const LOAN_PENALTY_RATE_PER_STEP = 0.05; // +5% après 2 jours de retard
+export const LOAN_PENALTY_STEP_DAYS = 2;
+export const LOAN_MIN_AMOUNT_XAF = 1_000;
+
+/**
+ * Calcule la date limite exacte à 18h00 heure du Cameroun (17h00 UTC), 21 jours après originDate.
+ */
+export function computeLoanDueDateAt18h(originDate: Date = new Date()): Date {
+  const cmrNow = new Date(originDate.getTime() + 60 * 60 * 1000);
+  const y = cmrNow.getUTCFullYear();
+  const m = cmrNow.getUTCMonth();
+  const d = cmrNow.getUTCDate() + LOAN_DURATION_DAYS;
+  // 18h00 UTC+1 === 17h00 UTC
+  return new Date(Date.UTC(y, m, d, 17, 0, 0, 0));
+}
 
 export interface CollateralCalculationInput {
   /** Somme des cotisations futures restant à payer sur les noms déjà bouffés (D) */
@@ -92,17 +107,20 @@ export function buildSystemLoanOptions(maxLoanAmount: number): number[] {
 export function computeLoanTerms(principal: number, originDate: Date = new Date()) {
   const cleanPrincipal = Math.round(principal);
   const interestAmount = Math.round(cleanPrincipal * LOAN_INITIAL_INTEREST_RATE);
-  const totalDue = cleanPrincipal + interestAmount;
-  const dueDate = new Date(originDate.getTime() + LOAN_DURATION_DAYS * 24 * 60 * 60 * 1000);
+  const divaFeeAmount = Math.round(cleanPrincipal * LOAN_DIVA_FEE_RATE);
+  const totalDue = cleanPrincipal + interestAmount + divaFeeAmount;
+  const dueDate = computeLoanDueDateAt18h(originDate);
   const graceEndDate = new Date(
-    originDate.getTime() + (LOAN_DURATION_DAYS + LOAN_GRACE_DAYS) * 24 * 60 * 60 * 1000,
+    dueDate.getTime() + LOAN_GRACE_DAYS * 24 * 60 * 60 * 1000,
   );
-  const requiresAdminApproval = cleanPrincipal > LOAN_AUTO_APPROVAL_LIMIT_XAF;
+  // Validation Admin obligatoire dès que le montant total à rembourser (capital + intérêts + frais DIVA Asso) > 50 000 FCFA
+  const requiresAdminApproval = totalDue > LOAN_AUTO_APPROVAL_LIMIT_XAF;
 
   return {
     principal: cleanPrincipal,
     interestRate: LOAN_INITIAL_INTEREST_RATE,
     interestAmount,
+    divaFeeAmount,
     penaltyAmount: 0,
     totalDue,
     dueDate,
@@ -355,13 +373,14 @@ export async function syncLoanPenaltiesForUser(userId: string, now: Date = new D
   for (const loan of openLoans) {
     const principal = Number(loan.principal);
     const interest = Number(loan.interestAmount);
+    const divaFee = Number(loan.divaFeeAmount || 0);
     const { isOverdue, penaltyAmount } = computeAccruedLoanPenalty(
       principal,
       loan.graceEndDate,
       now,
     );
 
-    const newTotalDue = principal + interest + penaltyAmount;
+    const newTotalDue = principal + interest + divaFee + penaltyAmount;
     const newStatus = isOverdue ? "OVERDUE" : loan.status;
 
     if (
@@ -425,8 +444,9 @@ export async function deductActiveLoansFromPayoutTx(
 
     const principal = Number(loan.principal);
     const interest = Number(loan.interestAmount);
+    const divaFee = Number(loan.divaFeeAmount || 0);
     const { penaltyAmount } = computeAccruedLoanPenalty(principal, loan.graceEndDate, now);
-    const totalDue = principal + interest + penaltyAmount;
+    const totalDue = principal + interest + divaFee + penaltyAmount;
     const alreadyPaid = Number(loan.totalPaid || 0);
     const remainingLoanDue = Math.max(0, totalDue - alreadyPaid);
 
@@ -549,16 +569,18 @@ export async function runLoanPenaltySweep(now: Date = new Date()) {
       status: { in: ["ACTIVE", "OVERDUE"] },
     },
     include: {
-      user: { select: { id: true, name: true, preferredLang: true } },
+      user: { select: { id: true, name: true, email: true, preferredLang: true } },
     },
   });
 
   let updatedCount = 0;
   let notifiedCount = 0;
+  let day20RemindersSent = 0;
 
   for (const loan of openLoans) {
     const principal = Number(loan.principal);
     const interest = Number(loan.interestAmount);
+    const divaFee = Number(loan.divaFeeAmount || 0);
     const prevPenalty = Number(loan.penaltyAmount || 0);
     const { isOverdue, penaltyAmount } = computeAccruedLoanPenalty(
       principal,
@@ -566,8 +588,53 @@ export async function runLoanPenaltySweep(now: Date = new Date()) {
       now,
     );
 
+    // 1. Rappel automatique au 20e jour (24h avant la date limite à 18h00)
+    const oneDayBeforeDueMs = loan.dueDate.getTime() - 24 * 60 * 60 * 1000;
+    if (
+      loan.status === "ACTIVE" &&
+      !loan.day20ReminderSentAt &&
+      now.getTime() >= oneDayBeforeDueMs
+    ) {
+      const remaining = Math.max(0, Number(loan.totalDue) - Number(loan.totalPaid || 0));
+      const dueDateLabel = loan.dueDate.toLocaleDateString("fr-FR", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        timeZone: "Africa/Douala",
+      });
+      await prisma.loan.update({
+        where: { id: loan.id },
+        data: { day20ReminderSentAt: now },
+      });
+      await scheduleInAppNotifications({
+        type: "LOAN_OVERDUE",
+        recipients: [
+          {
+            userId: loan.userId,
+            message: `Rappel important : la date limite de remboursement de votre prêt (${formatXAF(remaining)}) est le ${dueDateLabel} à 18h00. Pensez à rembourser à temps pour éviter +5 % de pénalité après 2 jours de retard.`,
+            actionUrl: "/wallet",
+          },
+        ],
+      }).catch(() => {});
+
+      if (loan.user.email) {
+        const subject = `DIVA Asso — Rappel de remboursement de votre prêt (${formatXAF(remaining)})`;
+        const bodyText = `Bonjour ${loan.user.name},\n\nLa date limite de remboursement de votre prêt d'urgence arrive demain : le ${dueDateLabel} à 18h00.\n\n• Montant restant à rembourser : ${formatXAF(remaining)}\n\nVous pouvez rembourser dès maintenant depuis votre Portefeuille DIVA Asso ou par paiement direct Orange Money / MTN Mobile Money.\nPassé ce délai à 18h00, une pénalité de +5 % sera appliquée après 2 jours de retard.`;
+        const html = renderBrandedEmailHtml({
+          title: subject,
+          bodyText,
+          actionUrl: "/wallet",
+          actionLabel: "Rembourser mon prêt",
+          lang: loan.user.preferredLang === "en" ? "en" : "fr",
+        });
+        await sendEmailSafe(loan.user.email, subject, html).catch(() => {});
+      }
+      day20RemindersSent += 1;
+    }
+
+    // 2. Pénalités de retard (+5% après 2 jours de retard)
     if (isOverdue && (penaltyAmount > prevPenalty || loan.status !== "OVERDUE")) {
-      const newTotalDue = principal + interest + penaltyAmount;
+      const newTotalDue = principal + interest + divaFee + penaltyAmount;
       await prisma.loan.update({
         where: { id: loan.id },
         data: {
@@ -585,8 +652,8 @@ export async function runLoanPenaltySweep(now: Date = new Date()) {
         recipients: [
           {
             userId: loan.userId,
-            message: `Retard sur votre prêt d'urgence : une pénalité de retard (+5%) a été appliquée. Total restant dû : ${formatXAF(remaining)}. Remboursez vite pour éviter un prélèvement sur votre cagnotte.`,
-            actionUrl: "/loans",
+            message: `Retard sur votre prêt d'urgence : une pénalité de +5 % a été appliquée. Total restant dû : ${formatXAF(remaining)}. Remboursez vite depuis votre portefeuille ou par paiement direct.`,
+            actionUrl: "/wallet",
           },
         ],
       }).catch(() => {});
@@ -594,5 +661,5 @@ export async function runLoanPenaltySweep(now: Date = new Date()) {
     }
   }
 
-  return { scanned: openLoans.length, updatedCount, notifiedCount };
+  return { scanned: openLoans.length, updatedCount, notifiedCount, day20RemindersSent };
 }

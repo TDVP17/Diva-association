@@ -1,0 +1,56 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { requireAdmin } from "@/lib/require-admin";
+import {
+  getGlobalWithdrawalLimits,
+  setGlobalWithdrawalLimits,
+} from "@/lib/withdrawal-limits";
+import { logAudit } from "@/lib/audit";
+
+const updateSchema = z
+  .object({
+    minWithdrawalAmount: z.number().int().min(100, "Minimum : 100 FCFA").max(10_000_000),
+    maxWithdrawalAmount: z.number().int().min(500, "Maximum : au moins 500 FCFA").max(50_000_000),
+  })
+  .refine((d) => d.maxWithdrawalAmount >= d.minWithdrawalAmount, {
+    message: "Le montant maximum doit être supérieur ou égal au montant minimum.",
+  });
+
+export async function GET() {
+  const limits = await getGlobalWithdrawalLimits();
+  return NextResponse.json(limits);
+}
+
+export async function PUT(request: Request) {
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const body = await request.json().catch(() => null);
+  const parsed = updateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message || "Montants invalides." },
+      { status: 400 },
+    );
+  }
+
+  const before = await getGlobalWithdrawalLimits();
+  const saved = await setGlobalWithdrawalLimits(
+    parsed.data.minWithdrawalAmount,
+    parsed.data.maxWithdrawalAmount,
+  );
+
+  await logAudit({
+    actorId: admin.user.id,
+    actorRole: admin.user.role,
+    action: "global_withdrawal_limits_updated",
+    targetType: "AppSetting",
+    targetId: "singleton",
+    payloadBefore: before as unknown as Record<string, unknown>,
+    payloadAfter: saved as unknown as Record<string, unknown>,
+    request,
+  });
+
+  return NextResponse.json({ ok: true, ...saved });
+}
+

@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getLang } from "@/lib/i18n/get-lang";
 import { evaluateUserLoanEligibility, syncLoanPenaltiesForUser } from "@/lib/loans";
+import { getFallbackPaymentConfig } from "@/lib/fallback-payment-config";
 import { LoansClient, type LoanItem } from "./loans-client";
 
 export default async function LoansPage() {
@@ -13,7 +14,7 @@ export default async function LoansPage() {
 
   await syncLoanPenaltiesForUser(userId);
 
-  const [eligibility, loans, user] = await Promise.all([
+  const [eligibility, loans, user, operatorConfig] = await Promise.all([
     evaluateUserLoanEligibility(userId),
     prisma.loan.findMany({
       where: { userId },
@@ -31,8 +32,9 @@ export default async function LoansPage() {
     }),
     prisma.user.findUnique({
       where: { id: userId },
-      select: { walletBalance: true },
+      select: { walletBalance: true, phone: true },
     }),
+    getFallbackPaymentConfig(),
   ]);
 
   const initialLoans: LoanItem[] = loans.map((l) => ({
@@ -40,6 +42,7 @@ export default async function LoansPage() {
     principal: Number(l.principal),
     interestRate: Number(l.interestRate),
     interestAmount: Number(l.interestAmount),
+    divaFeeAmount: Number(l.divaFeeAmount || 0),
     penaltyAmount: Number(l.penaltyAmount),
     totalDue: Number(l.totalDue),
     totalPaid: Number(l.totalPaid),
@@ -62,6 +65,13 @@ export default async function LoansPage() {
       initialEligibility={eligibility}
       initialLoans={initialLoans}
       initialWalletBalance={Number(user?.walletBalance || 0)}
+      userPhone={user?.phone || ""}
+      operatorSuspension={{
+        isOrangeSuspended: Boolean(operatorConfig.isOrangeSuspended),
+        orangeSuspendedReason: operatorConfig.orangeSuspendedReason ?? "",
+        isMtnSuspended: Boolean(operatorConfig.isMtnSuspended),
+        mtnSuspendedReason: operatorConfig.mtnSuspendedReason ?? "",
+      }}
     />
   );
 }

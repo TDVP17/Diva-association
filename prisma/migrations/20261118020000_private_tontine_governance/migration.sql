@@ -6,3 +6,4 @@ ALTER TABLE "tontine_sessions" ADD COLUMN IF NOT EXISTS "privateRulesAcceptedAt"
 
 CREATE INDEX IF NOT EXISTS "tontine_sessions_isPrivate_privateApprovalStatus_idx"
   ON "tontine_sessions"("isPrivate", "privateApprovalStatus");
+

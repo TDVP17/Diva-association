@@ -52,7 +52,8 @@ export function hasOpeningGreeting(text: string): boolean {
 }
 
 export function getAppBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://www.divaasso.com";
+  const raw = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://divaasso.com";
+  return raw.replace(/^https?:\/\/www\.divaasso\.com/i, "https://divaasso.com").replace(/\/+$/, "");
 }
 
 /**

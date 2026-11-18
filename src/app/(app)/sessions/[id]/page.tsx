@@ -82,7 +82,7 @@ export default async function SessionDetailPage({
   const { id } = await params;
   const { payment: paymentId, transId } = await searchParams;
   if (transId) {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://www.divaasso.com";
+    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://divaasso.com").replace(/^https?:\/\/www\.divaasso\.com/i, "https://divaasso.com");
     await processFapshiTransaction(transId, baseUrl).catch(() => {});
   }
   const session = await auth();

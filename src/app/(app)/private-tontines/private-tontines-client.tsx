@@ -5,6 +5,7 @@ import Link from "next/link";
 import { formatXAF } from "@/lib/format-currency";
 import { LoadingSpinner } from "@/components/loading-spinner";
 import type { Lang } from "@/lib/i18n/translations";
+import type { PrivateTontineCreationConfig } from "@/lib/private-tontine-config";
 
 interface PrivateSlot {
   id: string;
@@ -36,6 +37,7 @@ export interface PrivateTontineItem {
   isLocked: boolean;
   privateApprovalStatus: string;
   privateRejectionReason: string | null;
+  privateConfig?: { selectedActions?: string[] } | null;
   startDate: string;
   limitTime: string;
   maxSlots: number | null;
@@ -75,13 +77,25 @@ export function PrivateTontinesClient({
   lang,
   initialTontines,
   privateRulesContent,
+  creationConfig,
   currentUserId,
 }: {
   lang: Lang;
   initialTontines: PrivateTontineItem[];
   privateRulesContent: string;
+  creationConfig: PrivateTontineCreationConfig;
   currentUserId: string;
 }) {
+  const availableAdminActions = creationConfig.actions.filter((a) => a.enabledByAdmin);
+  const [selectedActions, setSelectedActions] = useState<string[]>(() =>
+    availableAdminActions.filter((a) => a.defaultSelected).map((a) => a.key),
+  );
+
+  function toggleSelectedAction(key: string) {
+    setSelectedActions((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+    );
+  }
   const [tontines, setTontines] = useState<PrivateTontineItem[]>(initialTontines);
   const [showCreate, setShowCreate] = useState(initialTontines.length === 0);
   const [creating, setCreating] = useState(false);
@@ -142,9 +156,24 @@ export function PrivateTontinesClient({
       return;
     }
     const parsedAmount = Number(amountInput || "0");
-    if (!Number.isFinite(parsedAmount) || parsedAmount < 1000) {
-      setCreateError("La mise unitaire doit être d'au moins 1 000 FCFA.");
+    if (
+      !Number.isFinite(parsedAmount) ||
+      parsedAmount < creationConfig.minAmount ||
+      parsedAmount > creationConfig.maxAmount
+    ) {
+      setCreateError(
+        `La mise unitaire doit être comprise entre ${formatXAF(creationConfig.minAmount)} et ${formatXAF(creationConfig.maxAmount)}.`,
+      );
       return;
+    }
+    if (maxSlots.trim()) {
+      const parsedSlots = Number(maxSlots);
+      if (parsedSlots < creationConfig.minSlots || parsedSlots > creationConfig.maxSlotsLimit) {
+        setCreateError(
+          `Le nombre de places doit être compris entre ${creationConfig.minSlots} et ${creationConfig.maxSlotsLimit}.`,
+        );
+        return;
+      }
     }
 
     setCreating(true);
@@ -158,10 +187,11 @@ export function PrivateTontinesClient({
           type,
           amount: parsedAmount,
           fee: Number(feeInput || "0"),
-          fineAmountPerPeriod: Number(fineInput || "0"),
+          fineAmountPerPeriod: selectedActions.includes("allow_fines") ? Number(fineInput || "0") : 0,
           startDate,
           limitTime,
           maxSlots: maxSlots.trim() ? Number(maxSlots) : null,
+          selectedActions,
           rulesAccepted: true,
         }),
       });
@@ -407,28 +437,32 @@ export function PrivateTontinesClient({
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-slate-700">Nombre max de places (optionnel)</label>
+              <label className="text-xs font-bold text-slate-700">
+                Nombre de places (min {creationConfig.minSlots} · max {creationConfig.maxSlotsLimit})
+              </label>
               <input
                 type="text"
                 inputMode="numeric"
                 value={maxSlots}
                 onChange={(e) => setMaxSlots(sanitizeNumericInput(e.target.value))}
-                placeholder="Illimité si vide"
+                placeholder={`Ex: ${Math.max(creationConfig.minSlots, 10)}`}
                 className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm bg-white"
               />
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-slate-700">Amende de retard (FCFA)</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={fineInput}
-                onChange={(e) => setFineInput(sanitizeNumericInput(e.target.value))}
-                placeholder="Ex: 500"
-                className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm bg-white"
-              />
-            </div>
+            {selectedActions.includes("allow_fines") && (
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-bold text-slate-700">Amende de retard (FCFA)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={fineInput}
+                  onChange={(e) => setFineInput(sanitizeNumericInput(e.target.value))}
+                  placeholder="Ex: 500"
+                  className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm bg-white"
+                />
+              </div>
+            )}
 
             <div className="flex flex-col gap-1 sm:col-span-2">
               <label className="text-xs font-bold text-slate-700">Frais internes par cotisation (FCFA, optionnel)</label>
@@ -442,6 +476,47 @@ export function PrivateTontinesClient({
               />
             </div>
           </div>
+
+          {/* Creator selectable actions/options configured by DIVA Asso Admin */}
+          {availableAdminActions.length > 0 && (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 flex flex-col gap-2.5">
+              <div className="flex items-center gap-2 text-emerald-950 font-bold text-xs uppercase">
+                <span className="material-symbols-outlined text-[18px] text-emerald-700">tune</span>
+                <span>Choisissez les fonctionnalités de votre cotisation privée</span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Cochez uniquement les actions que vous souhaitez activer dans votre cotisation et décochez celles que vous ne voulez pas.
+              </p>
+              <div className="flex flex-col gap-2">
+                {availableAdminActions.map((act) => {
+                  const checked = selectedActions.includes(act.key);
+                  return (
+                    <label
+                      key={act.key}
+                      className={`flex items-start gap-2.5 p-2.5 rounded-xl border cursor-pointer transition-colors ${
+                        checked
+                          ? "bg-white border-emerald-500"
+                          : "bg-white/60 border-slate-200"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleSelectedAction(act.key)}
+                        className="mt-0.5 w-4 h-4 accent-emerald-700 rounded cursor-pointer flex-shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-slate-900 block">{act.label}</span>
+                        {act.description && (
+                          <span className="text-[11px] text-slate-500">{act.description}</span>
+                        )}
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Mandatory DIVA Asso Private Cotisation Rules */}
           <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/50 p-4 flex flex-col gap-3">

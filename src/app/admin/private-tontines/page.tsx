@@ -46,3 +46,4 @@ export default async function AdminPrivateTontinesPage() {
 
   return <AdminPrivateTontinesClient initialTontines={rows} />;
 }
+

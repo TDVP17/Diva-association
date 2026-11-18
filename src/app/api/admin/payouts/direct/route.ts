@@ -263,7 +263,7 @@ export async function POST(request: Request) {
       recipients: [
         {
           userId: user.id,
-          message: `Félicitations ${user.name} ! Votre compte principal (Portefeuille DIVA) a été rechargé de ${formatXAF(finalNetPayout)} pour votre bouffe de ${slot.beneficiaryName} (${session.title || session.type}). Vous pouvez faire le retrait à tout moment !`,
+          message: `Félicitations ${user.name} ! Votre Portefeuille DIVA Asso a été rechargé de ${formatXAF(finalNetPayout)} pour votre bouffe de ${slot.beneficiaryName} (${session.title || session.type}). Vous pouvez retirer votre argent à tout moment, ou laisser une partie pour cotiser automatiquement sans payer de frais Orange ou MTN.`,
           actionUrl: "/wallet",
         },
       ],

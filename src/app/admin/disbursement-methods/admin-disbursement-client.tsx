@@ -40,12 +40,14 @@ export function AdminDisbursementClient({
     }
   }
 
-  async function decide(id: string, status: "APPROVED" | "REJECTED") {
+  async function decide(id: string, status: "PENDING" | "APPROVED" | "REJECTED") {
     let rejectionReason: string | undefined;
     if (status === "REJECTED") {
       const input = window.prompt("Motif du refus :", "Le nom ne correspond pas au compte Mobile Money");
       if (input === null) return;
       rejectionReason = input;
+    } else if (status === "PENDING") {
+      if (!window.confirm("Annuler la validation et remettre ce numéro en attente ?")) return;
     }
 
     setBusyId(id);
@@ -65,8 +67,33 @@ export function AdminDisbursementClient({
       setFeedback(
         status === "APPROVED"
           ? "Numéro de retrait validé ! Le membre a été notifié et peut désormais retirer."
-          : "Numéro de retrait refusé et membre notifié.",
+          : status === "PENDING"
+            ? "Validation annulée : le numéro est repassé en attente."
+            : "Numéro de retrait refusé et membre notifié.",
       );
+      await refresh();
+    } catch {
+      setError("Erreur réseau.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function removeMethod(id: string, phone: string) {
+    if (!window.confirm(`Supprimer définitivement le numéro ${phone} ? Cette action est irréversible.`)) return;
+    setBusyId(id);
+    setFeedback(null);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/disbursement-methods/${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Impossible de supprimer ce numéro.");
+        return;
+      }
+      setFeedback(`Numéro ${phone} supprimé avec succès.`);
       await refresh();
     } catch {
       setError("Erreur réseau.");
@@ -210,14 +237,25 @@ export function AdminDisbursementClient({
                       type="button"
                       disabled={busyId === m.id}
                       onClick={() => decide(m.id, "APPROVED")}
-                      className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                      className="px-3.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs cursor-pointer disabled:opacity-50 flex items-center gap-1"
                     >
                       {busyId === m.id ? (
                         <LoadingSpinner />
                       ) : (
-                        <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                        <span className="material-symbols-outlined text-[15px]">check_circle</span>
                       )}
                       <span>Valider</span>
+                    </button>
+                  )}
+                  {isApproved && (
+                    <button
+                      type="button"
+                      disabled={busyId === m.id}
+                      onClick={() => decide(m.id, "PENDING")}
+                      className="px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 font-bold text-xs hover:bg-amber-100 cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">undo</span>
+                      <span>Annuler validation</span>
                     </button>
                   )}
                   {m.status !== "REJECTED" && (
@@ -225,11 +263,20 @@ export function AdminDisbursementClient({
                       type="button"
                       disabled={busyId === m.id}
                       onClick={() => decide(m.id, "REJECTED")}
-                      className="px-3.5 py-2 rounded-xl bg-red-50 border border-red-200 text-red-700 font-bold text-xs hover:bg-red-100 cursor-pointer disabled:opacity-50"
+                      className="px-3 py-1.5 rounded-xl bg-red-50 border border-red-200 text-red-700 font-bold text-xs hover:bg-red-100 cursor-pointer disabled:opacity-50"
                     >
                       Refuser
                     </button>
                   )}
+                  <button
+                    type="button"
+                    disabled={busyId === m.id}
+                    onClick={() => removeMethod(m.id, m.phone)}
+                    className="p-1.5 rounded-xl bg-slate-100 hover:bg-red-100 text-slate-500 hover:text-red-700 cursor-pointer disabled:opacity-50"
+                    title="Supprimer ce numéro"
+                  >
+                    <span className="material-symbols-outlined text-[17px]">delete</span>
+                  </button>
                 </div>
               </div>
             );
@@ -239,3 +286,4 @@ export function AdminDisbursementClient({
     </main>
   );
 }
+

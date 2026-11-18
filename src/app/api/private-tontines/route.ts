@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
+import { getPrivateTontineConfig } from "@/lib/private-tontine-config";
 import type { TontineType } from "@/generated/prisma/client";
 
 const ALLOWED_TYPES: TontineType[] = [
@@ -42,6 +43,7 @@ const createPrivateTontineSchema = z.object({
   maxSlots: z.number().int().min(2).max(100).nullable().optional(),
   fineAmountPerPeriod: z.number().int().min(0).max(100_000).optional(),
   fineIntervalHours: z.number().int().min(1).max(168).optional(),
+  selectedActions: z.array(z.string().max(80)).max(30).optional(),
   rulesAccepted: z.literal(true, {
     error: "Vous devez lire et accepter les règles des cotisations privées DIVA Asso avant de créer votre cotisation.",
   }),
@@ -94,6 +96,7 @@ export async function GET() {
         isLocked: t.lockedAt !== null,
         privateApprovalStatus: t.privateApprovalStatus,
         privateRejectionReason: t.privateRejectionReason,
+        privateConfig: (t.privateConfig as { selectedActions?: string[] } | null) ?? null,
         startDate: t.startDate.toISOString(),
         limitTime: t.limitTime,
         maxSlots: t.maxSlots ? Number(t.maxSlots) : null,
@@ -142,6 +145,40 @@ export async function POST(request: Request) {
   }
 
   const data = parsed.data;
+  const adminConfig = await getPrivateTontineConfig();
+
+  if (data.amount < adminConfig.minAmount || data.amount > adminConfig.maxAmount) {
+    return NextResponse.json(
+      {
+        error: `La mise doit être comprise entre ${adminConfig.minAmount.toLocaleString("fr-FR")} FCFA et ${adminConfig.maxAmount.toLocaleString("fr-FR")} FCFA.`,
+      },
+      { status: 400 },
+    );
+  }
+  if (
+    data.maxSlots !== null &&
+    data.maxSlots !== undefined &&
+    (data.maxSlots < adminConfig.minSlots || data.maxSlots > adminConfig.maxSlotsLimit)
+  ) {
+    return NextResponse.json(
+      {
+        error: `Le nombre de places doit être compris entre ${adminConfig.minSlots} et ${adminConfig.maxSlotsLimit}.`,
+      },
+      { status: 400 },
+    );
+  }
+
+  const allowedKeys = new Set(
+    adminConfig.actions.filter((a) => a.enabledByAdmin).map((a) => a.key),
+  );
+  const chosenActions = Array.isArray(data.selectedActions)
+    ? data.selectedActions.filter((k) => allowedKeys.has(k))
+    : adminConfig.actions
+        .filter((a) => a.enabledByAdmin && a.defaultSelected)
+        .map((a) => a.key);
+
+  const finesEnabled = chosenActions.includes("allow_fines");
+
   const startDate = new Date(data.startDate);
   if (Number.isNaN(startDate.getTime())) {
     return NextResponse.json({ error: "Date de début invalide" }, { status: 400 });
@@ -168,13 +205,14 @@ export async function POST(request: Request) {
         startDate,
         limitTime: data.limitTime,
         maxSlots: data.maxSlots ?? null,
-        fineAmountPerPeriod: data.fineAmountPerPeriod ?? 500,
+        fineAmountPerPeriod: finesEnabled ? (data.fineAmountPerPeriod ?? 500) : 0,
         fineIntervalHours: data.fineIntervalHours ?? 24,
         isPrivate: true,
         inviteToken: null,
         creatorId: userId,
         privateApprovalStatus: "PENDING_ADMIN",
         privateRulesAcceptedAt: new Date(),
+        privateConfig: { selectedActions: chosenActions },
       },
     });
 

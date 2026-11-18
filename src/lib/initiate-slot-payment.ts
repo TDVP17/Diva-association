@@ -323,7 +323,7 @@ export async function initiateSlotPayment(
     const detectedProvider = detectMobileMoneyProvider(normalizedPhone);
     const redirectUrl =
       options?.redirectUrl ||
-      `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://www.divaasso.com"}/sessions/${slot.membership.tontineSessionId}`;
+      `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://divaasso.com"}/sessions/${slot.membership.tontineSessionId}`;
 
     const result = options?.useCheckout
       ? await initiateHostedPayment({

@@ -59,6 +59,7 @@ export async function GET() {
       principal: Number(l.principal),
       interestRate: Number(l.interestRate),
       interestAmount: Number(l.interestAmount),
+      divaFeeAmount: Number(l.divaFeeAmount || 0),
       penaltyAmount: Number(l.penaltyAmount),
       totalDue: Number(l.totalDue),
       totalPaid: Number(l.totalPaid),
@@ -106,20 +107,11 @@ export async function POST(request: Request) {
     );
   }
 
-  // Strictly enforce system-calculated ceiling and system-approved amount tiers
+  // Strictly enforce system-calculated ceiling while letting user type any amount <= ceiling
   if (amount > eligibility.collateral.maxLoanAmount) {
     return NextResponse.json(
       {
-        error: `Le montant demandé (${formatXAF(amount)}) dépasse votre plafond maximal calculé par le système (${formatXAF(eligibility.collateral.maxLoanAmount)}).`,
-      },
-      { status: 400 },
-    );
-  }
-
-  if (!eligibility.allowedAmounts.includes(amount)) {
-    return NextResponse.json(
-      {
-        error: "Veuillez sélectionner l'un des montants éligibles calculés par le système.",
+        error: `Le montant demandé (${formatXAF(amount)}) dépasse votre montant maximum autorisé (${formatXAF(eligibility.collateral.maxLoanAmount)}).`,
       },
       { status: 400 },
     );
@@ -138,7 +130,7 @@ export async function POST(request: Request) {
 
   const lang = user.preferredLang === "en" ? "en" : "fr";
 
-  // Case A: Big Loan (> 140,000 FCFA) -> Mandatory Admin approval BEFORE wallet credit!
+  // Case A: Total repayable > 50,000 FCFA -> Mandatory Admin approval BEFORE wallet credit!
   if (terms.requiresAdminApproval) {
     const loan = await prisma.loan.create({
       data: {
@@ -146,6 +138,7 @@ export async function POST(request: Request) {
         principal: terms.principal,
         interestRate: terms.interestRate,
         interestAmount: terms.interestAmount,
+        divaFeeAmount: terms.divaFeeAmount,
         penaltyAmount: 0,
         totalDue: terms.totalDue,
         totalPaid: 0,
@@ -174,10 +167,10 @@ export async function POST(request: Request) {
         type: "ADMIN_BROADCAST",
         recipients: admins.map((a) => ({
           userId: a.id,
-          message: `Demande de gros prêt (${formatXAF(terms.principal)}) soumise par ${user.name} (Plafond éligible : ${formatXAF(eligibility.collateral.maxLoanAmount)}). Validation Admin requise avant crédit du portefeuille.`,
+          message: `Demande de prêt (${formatXAF(terms.principal)} · Total à rembourser : ${formatXAF(terms.totalDue)}) soumise par ${user.name}. Validation Admin requise avant crédit du portefeuille.`,
           actionUrl: "/admin/loans",
         })),
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     await logAudit({
@@ -188,6 +181,8 @@ export async function POST(request: Request) {
       targetId: loan.id,
       metadata: {
         principal: terms.principal,
+        divaFeeAmount: terms.divaFeeAmount,
+        totalDue: terms.totalDue,
         maxPlafond: eligibility.collateral.maxLoanAmount,
         autoApprovalLimit: LOAN_AUTO_APPROVAL_LIMIT_XAF,
       },
@@ -202,14 +197,15 @@ export async function POST(request: Request) {
         requiresAdminApproval: true,
         principal: terms.principal,
         interestAmount: terms.interestAmount,
+        divaFeeAmount: terms.divaFeeAmount,
         totalDue: terms.totalDue,
-        message: `Votre demande de prêt de ${formatXAF(terms.principal)} (> ${formatXAF(LOAN_AUTO_APPROVAL_LIMIT_XAF)}) a été transmise à l'administrateur DIVA Asso. Votre portefeuille sera crédité dès sa validation.`,
+        message: `Votre demande de prêt de ${formatXAF(terms.principal)} (total à rembourser : ${formatXAF(terms.totalDue)}) a été transmise à l'administrateur DIVA Asso. Votre portefeuille sera rechargé dès sa validation.`,
       },
       { status: 201 },
     );
   }
 
-  // Case B: <= 140,000 FCFA -> Automated instant disbursement into DIVA Wallet
+  // Case B: Total repayable <= 50,000 FCFA -> Automated instant disbursement into DIVA Asso Wallet
   const { loan, ledger } = await prisma.$transaction(async (tx) => {
     const createdLoan = await tx.loan.create({
       data: {
@@ -217,6 +213,7 @@ export async function POST(request: Request) {
         principal: terms.principal,
         interestRate: terms.interestRate,
         interestAmount: terms.interestAmount,
+        divaFeeAmount: terms.divaFeeAmount,
         penaltyAmount: 0,
         totalDue: terms.totalDue,
         totalPaid: 0,
@@ -240,10 +237,11 @@ export async function POST(request: Request) {
       amount: terms.principal,
       fee: 0,
       type: "LOAN_DISBURSEMENT",
-      description: `Décaissement prêt d'urgence #${createdLoan.id.slice(-6).toUpperCase()} (échéance 21 jours)`,
+      description: `Décaissement prêt d'urgence #${createdLoan.id.slice(-6).toUpperCase()}`,
       metadata: {
         loanId: createdLoan.id,
         interestAmount: terms.interestAmount,
+        divaFeeAmount: terms.divaFeeAmount,
         totalDue: terms.totalDue,
         dueDate: terms.dueDate.toISOString(),
       },
@@ -256,6 +254,7 @@ export async function POST(request: Request) {
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: "Africa/Douala",
   });
 
   await scheduleInAppNotifications({
@@ -265,31 +264,31 @@ export async function POST(request: Request) {
         userId,
         message:
           lang === "fr"
-            ? `Prêt d'urgence de ${formatXAF(terms.principal)} versé dans votre Portefeuille DIVA ! Total à rembourser avant le ${dueDateLabel} : ${formatXAF(terms.totalDue)} (15% intérêts inclus).`
-            : `Emergency loan of ${formatXAF(terms.principal)} credited to your DIVA Wallet! Total due by ${dueDateLabel}: ${formatXAF(terms.totalDue)} (15% interest included).`,
-        actionUrl: "/loans",
+            ? `Prêt d'urgence de ${formatXAF(terms.principal)} crédité dans votre Portefeuille DIVA Asso ! Total à rembourser au plus tard le ${dueDateLabel} à 18h00 : ${formatXAF(terms.totalDue)}.`
+            : `Emergency loan of ${formatXAF(terms.principal)} credited to your DIVA Asso Wallet! Total due by ${dueDateLabel} at 18:00: ${formatXAF(terms.totalDue)}.`,
+        actionUrl: "/wallet",
       },
     ],
-  }).catch(() => {});
+  }).catch(() => { });
 
   if (user.email) {
     const html = renderBrandedEmailHtml({
-      title: lang === "fr" ? "Prêt d'urgence validé & versé 💳" : "Emergency Loan Disbursed 💳",
+      title: lang === "fr" ? "Prêt d'urgence crédité dans votre portefeuille" : "Emergency Loan Credited",
       bodyText:
         lang === "fr"
-          ? `Bonjour ${user.name},\n\nVotre prêt d'urgence garanti de ${formatXAF(terms.principal)} a été crédité dans votre Portefeuille DIVA Asso.\n\n• Capital emprunté : ${formatXAF(terms.principal)}\n• Intérêts (15 %) : ${formatXAF(terms.interestAmount)}\n• Total à rembourser : ${formatXAF(terms.totalDue)}\n• Date d'échéance (21 jours) : ${dueDateLabel}\n• Période de grâce : 2 jours (pénalité +5% tous les 2 jours dès le 23e jour).\n\nNouveau solde portefeuille : ${formatXAF(ledger.balanceAfter)}.`
-          : `Hello ${user.name},\n\nYour guaranteed emergency loan of ${formatXAF(terms.principal)} has been credited to your DIVA Asso Wallet.\n\n• Principal: ${formatXAF(terms.principal)}\n• Interest (15%): ${formatXAF(terms.interestAmount)}\n• Total due: ${formatXAF(terms.totalDue)}\n• Due date (21 days): ${dueDateLabel}\n\nNew wallet balance: ${formatXAF(ledger.balanceAfter)}.`,
-      actionUrl: "/loans",
-      actionLabel: lang === "fr" ? "Suivre mon prêt" : "Track My Loan",
+          ? `Bonjour ${user.name},\n\nVotre prêt d'urgence de ${formatXAF(terms.principal)} a été crédité dans votre Portefeuille DIVA Asso.\n\n• Montant emprunté : ${formatXAF(terms.principal)}\n• Intérêts : ${formatXAF(terms.interestAmount)}\n• Frais DIVA Asso : ${formatXAF(terms.divaFeeAmount)}\n• Total à rembourser : ${formatXAF(terms.totalDue)}\n• Date limite de remboursement : ${dueDateLabel} à 18h00\n• Retard : passé le ${dueDateLabel} à 18h00, +5 % de pénalité après 2 jours de retard.\n\nNouveau solde portefeuille : ${formatXAF(ledger.balanceAfter)}.`
+          : `Hello ${user.name},\n\nYour emergency loan of ${formatXAF(terms.principal)} has been credited to your DIVA Asso Wallet.\n\n• Principal: ${formatXAF(terms.principal)}\n• Interest: ${formatXAF(terms.interestAmount)}\n• DIVA Asso Fee: ${formatXAF(terms.divaFeeAmount)}\n• Total due: ${formatXAF(terms.totalDue)}\n• Repayment deadline: ${dueDateLabel} at 18:00\n\nNew wallet balance: ${formatXAF(ledger.balanceAfter)}.`,
+      actionUrl: "/wallet",
+      actionLabel: lang === "fr" ? "Ouvrir mon portefeuille" : "Open My Wallet",
       lang,
     });
     await sendEmailSafe(
       user.email,
       lang === "fr"
-        ? `DIVA Asso — Prêt d'urgence de ${formatXAF(terms.principal)} versé`
-        : `DIVA Asso — Emergency Loan of ${formatXAF(terms.principal)} Disbursed`,
+        ? `DIVA Asso — Prêt d'urgence de ${formatXAF(terms.principal)} crédité`
+        : `DIVA Asso — Emergency Loan of ${formatXAF(terms.principal)} Credited`,
       html,
-    ).catch(() => {});
+    ).catch(() => { });
   }
 
   await logAudit({
@@ -301,6 +300,7 @@ export async function POST(request: Request) {
     metadata: {
       principal: terms.principal,
       interestAmount: terms.interestAmount,
+      divaFeeAmount: terms.divaFeeAmount,
       totalDue: terms.totalDue,
       maxPlafond: eligibility.collateral.maxLoanAmount,
     },
@@ -315,10 +315,11 @@ export async function POST(request: Request) {
       requiresAdminApproval: false,
       principal: terms.principal,
       interestAmount: terms.interestAmount,
+      divaFeeAmount: terms.divaFeeAmount,
       totalDue: terms.totalDue,
       dueDate: terms.dueDate.toISOString(),
       newBalance: ledger.balanceAfter,
-      message: `Félicitations ! ${formatXAF(terms.principal)} ont été crédités dans votre Portefeuille DIVA.`,
+      message: `Félicitations ! ${formatXAF(terms.principal)} ont été crédités dans votre Portefeuille DIVA Asso.`,
     },
     { status: 201 },
   );

@@ -263,8 +263,8 @@ export async function POST(request: Request) {
   const walletNote =
     channel === "WALLET"
       ? lang === "fr"
-        ? `\n💼 Le montant net (${formatXAF(finalNetPayout)}) a été crédité automatiquement dans votre Portefeuille DIVA Asso (0% frais).`
-        : `\n💼 Net payout (${formatXAF(finalNetPayout)}) was automatically credited to your DIVA Asso Wallet (0% fees).`
+        ? `\nVotre Portefeuille DIVA Asso a été rechargé automatiquement de ${formatXAF(finalNetPayout)}. Vous pouvez retirer votre argent à tout moment, ou laisser une partie dans votre portefeuille pour cotiser sans payer de frais Orange ou MTN.`
+        : `\nYour DIVA Asso Wallet was automatically credited with ${formatXAF(finalNetPayout)}. You can withdraw at any time, or keep part of it to pay future contributions with 0% Orange/MTN fees.`
       : "";
   const releaseMsg = `${baseReleaseMsg}${loanNote}${walletNote}`;
 

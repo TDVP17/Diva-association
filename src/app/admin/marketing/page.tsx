@@ -227,7 +227,7 @@ export default async function MarketingPostersPage() {
                   {/* Share on WhatsApp */}
                   <a
                     href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                      `${title}\n${desc}\n\n👉 Rejoignez la tontine dès maintenant sur https://www.divaasso.com`
+                      `${title}\n${desc}\n\n👉 Rejoignez la tontine dès maintenant sur https://divaasso.com`
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"

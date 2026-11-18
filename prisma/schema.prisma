@@ -335,6 +335,8 @@ model User {
   stars                Int       @default(0)
   /// Solde disponible dans le portefeuille virtuel DIVA Asso.
   walletBalance        Decimal   @default(0) @db.Decimal(12, 2)
+  /// Plafond maximal de retrait personnalisé par l'Admin (null = utilise le plafond global du système).
+  maxWithdrawalAmount  Decimal?  @db.Decimal(12, 2)
   /// Hash SHA-256 salé du code PIN à 4 chiffres pour sécuriser les retraits.
   walletPinHash        String?
   walletPinSetAt       DateTime?
@@ -514,6 +516,8 @@ model TontineSession {
   privateApprovalStatus  String        @default("APPROVED")
   privateRejectionReason String?
   privateRulesAcceptedAt DateTime?
+  /// Options/actions choisies par le créateur parmi celles autorisées par l'Admin.
+  privateConfig          Json?
 
   creator          User?                 @relation("CreatedTontines", fields: [creatorId], references: [id], onDelete: SetNull)
   memberships      Membership[]
@@ -1073,12 +1077,14 @@ model SecurityLog {
 
 /// Global system settings, including the emergency lockdown toggle ("Bouton Panique").
 model AppSetting {
-  id         String    @id @default("singleton")
-  isLocked   Boolean   @default(false) @map("is_locked")
-  lockedAt   DateTime? @map("locked_at")
-  lockedBy   String?   @map("locked_by")
-  lockReason String?   @map("lock_reason")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
+  id                  String    @id @default("singleton")
+  isLocked            Boolean   @default(false) @map("is_locked")
+  lockedAt            DateTime? @map("locked_at")
+  lockedBy            String?   @map("locked_by")
+  lockReason          String?   @map("lock_reason")
+  minWithdrawalAmount Decimal   @default(1000) @db.Decimal(12, 2) @map("min_withdrawal_amount")
+  maxWithdrawalAmount Decimal   @default(500000) @db.Decimal(12, 2) @map("max_withdrawal_amount")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
 
   @@map("app_settings")
 }
@@ -1170,6 +1176,7 @@ model Loan {
   principal             Decimal    @db.Decimal(12, 2)
   interestRate          Decimal    @default(0.15) @db.Decimal(5, 4)
   interestAmount        Decimal    @db.Decimal(12, 2)
+  divaFeeAmount         Decimal    @default(0) @db.Decimal(12, 2)
   penaltyAmount         Decimal    @default(0) @db.Decimal(12, 2)
   totalDue              Decimal    @db.Decimal(12, 2)
   totalPaid             Decimal    @default(0) @db.Decimal(12, 2)
@@ -1181,6 +1188,8 @@ model Loan {
   dueDate               DateTime
   graceEndDate          DateTime
   lastPenaltyAt         DateTime?
+  day20ReminderSentAt   DateTime?
+  repayFapshiTransId    String?
   guaranteeSlotId       String?
   collateralSnapshot    Json?
   repaidAt              DateTime?

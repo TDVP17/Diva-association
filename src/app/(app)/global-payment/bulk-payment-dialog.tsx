@@ -92,6 +92,7 @@ export function BulkPaymentDialog({
   } | null>(null);
   const [showFallbackProof, setShowFallbackProof] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [walletSelected, setWalletSelected] = useState(false);
   const [payingWithWallet, setPayingWithWallet] = useState(false);
   const channelCleanupRef = useRef<(() => void) | null>(null);
   const settledOrDoneRef = useRef(false);
@@ -357,7 +358,7 @@ export function BulkPaymentDialog({
         setPayError(data.error || "Impossible de payer avec le portefeuille.");
         return;
       }
-      setPhone("Portefeuille DIVA (0% frais)");
+      setPhone("Portefeuille DIVA Asso (0% frais)");
       if (data.reference) setTransId(data.reference);
       if (typeof data.newBalance === "number") setWalletBalance(data.newBalance);
       resolveTerminalStatus("SUCCESSFUL");
@@ -593,56 +594,69 @@ export function BulkPaymentDialog({
             )}
 
             {quote && walletBalance !== null && (
-              <div className="mb-4 p-3.5 rounded-xl border-2 border-emerald-600/30 bg-emerald-50/70 flex flex-col gap-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-emerald-700 text-[20px]">
+              <div className="mb-3 rounded-xl border border-emerald-600/40 bg-emerald-50/70 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setWalletSelected((prev) => !prev)}
+                  className="w-full px-3 py-2 flex items-center justify-between gap-2 text-left hover:bg-emerald-100/50 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="material-symbols-outlined text-emerald-700 text-[18px] flex-shrink-0">
                       account_balance_wallet
                     </span>
-                    <div>
-                      <p className="text-xs font-extrabold text-emerald-950">
+                    <div className="min-w-0">
+                      <p className="text-xs font-extrabold text-emerald-950 truncate">
                         {lang === "fr"
-                          ? "Payer via mon Portefeuille DIVA"
-                          : "Pay via DIVA Wallet"}
+                          ? "Payer via mon Portefeuille DIVA Asso"
+                          : "Pay via DIVA Asso Wallet"}
                       </p>
-                      <p className="text-[11px] text-emerald-800">
-                        {lang === "fr" ? "Solde :" : "Balance:"}{" "}
-                        <strong>{formatXAF(walletBalance)}</strong> ·{" "}
-                        <span className="font-bold text-emerald-700">0 % frais télécom</span>
+                      <p className="text-[10px] font-semibold text-emerald-700">
+                        {lang === "fr"
+                          ? "0 % frais opérateur (sans frais Orange/MTN)"
+                          : "0% operator fee (no Orange/MTN fees)"}
                       </p>
                     </div>
                   </div>
-                  {providerFeeAmount > 0 && (
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-700 text-white text-[10px] font-bold flex-shrink-0">
-                      -{formatXAF(providerFeeAmount)}
-                    </span>
-                  )}
-                </div>
+                  <span className="material-symbols-outlined text-emerald-800 text-[18px] flex-shrink-0">
+                    {walletSelected ? "expand_less" : "chevron_right"}
+                  </span>
+                </button>
 
-                {walletBalance >= quote.baseTotal ? (
-                  <button
-                    type="button"
-                    onClick={handlePayWithWallet}
-                    disabled={payingWithWallet || submitting}
-                    className="w-full py-2.5 px-3 rounded-lg bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] text-white font-bold text-xs transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5 shadow-xs"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">bolt</span>
-                    <span>
-                      {payingWithWallet
-                        ? lang === "fr"
-                          ? "Paiement groupé instantané..."
-                          : "Processing..."
-                        : lang === "fr"
-                          ? `Payer ${formatXAF(quote.baseTotal)} par Portefeuille (0 % frais)`
-                          : `Pay ${formatXAF(quote.baseTotal)} via Wallet (0% fee)`}
-                    </span>
-                  </button>
-                ) : (
-                  <p className="text-[11px] text-amber-800 font-medium">
-                    {lang === "fr"
-                      ? `Solde insuffisant pour ${formatXAF(quote.baseTotal)}. Utilisez Mobile Money ci-dessous ou rechargez votre portefeuille.`
-                      : `Insufficient balance for ${formatXAF(quote.baseTotal)}. Use Mobile Money below or top up your wallet.`}
-                  </p>
+                {walletSelected && (
+                  <div className="px-3 pb-2.5 pt-1 border-t border-emerald-200/70 flex flex-col gap-2">
+                    {walletBalance >= quote.baseTotal ? (
+                      <>
+                        <p className="text-[11px] text-emerald-900 font-medium">
+                          {lang === "fr"
+                            ? `Vous allez cotiser via votre Portefeuille DIVA Asso pour un montant total de ${formatXAF(quote.baseTotal)} (0 % frais).`
+                            : `You will pay ${formatXAF(quote.baseTotal)} via your DIVA Asso Wallet (0% fees).`}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handlePayWithWallet}
+                          disabled={payingWithWallet || submitting}
+                          className="w-full py-2 px-3 rounded-lg bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] text-white font-bold text-xs transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">bolt</span>
+                          <span>
+                            {payingWithWallet
+                              ? lang === "fr"
+                                ? "Paiement en cours..."
+                                : "Processing..."
+                              : lang === "fr"
+                                ? `Confirmer (${formatXAF(quote.baseTotal)})`
+                                : `Confirm (${formatXAF(quote.baseTotal)})`}
+                          </span>
+                        </button>
+                      </>
+                    ) : (
+                      <p className="text-[11px] text-red-700 font-semibold">
+                        {lang === "fr"
+                          ? "Solde insuffisant dans votre Portefeuille DIVA Asso pour cotiser ce montant."
+                          : "Insufficient balance in your DIVA Asso Wallet."}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             )}

@@ -54,6 +54,8 @@ interface AdminUserRow {
   latitude?: number | null;
   longitude?: number | null;
   stars?: number;
+  walletBalance?: number;
+  maxWithdrawalAmount?: number | null;
   kyc?: KycData | null;
   membershipCount: number;
   memberships: UserMembershipItem[];
@@ -87,6 +89,9 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
   const [editingStarsUser, setEditingStarsUser] = useState<AdminUserRow | null>(null);
   const [starsInput, setStarsInput] = useState<number>(0);
   const [savingStars, setSavingStars] = useState(false);
+  const [editingLimitUser, setEditingLimitUser] = useState<AdminUserRow | null>(null);
+  const [limitInput, setLimitInput] = useState<string>("");
+  const [savingLimit, setSavingLimit] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<{ url: string; title: string } | null>(null);
 
   // Historique complet multi-années
@@ -107,6 +112,33 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
     }>;
   } | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
+
+  async function handleSaveWithdrawalLimit(customValue: number | null) {
+    if (!editingLimitUser) return;
+    setSavingLimit(true);
+    try {
+      const res = await fetch(`/api/admin/users/${editingLimitUser.id}/withdrawal-limit`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ maxWithdrawalAmount: customValue }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error || "Erreur lors de la mise à jour du plafond.");
+        return;
+      }
+      setUsers((prev) =>
+        prev
+          ? prev.map((u) =>
+              u.id === editingLimitUser.id ? { ...u, maxWithdrawalAmount: customValue } : u,
+            )
+          : null,
+      );
+      setEditingLimitUser(null);
+    } finally {
+      setSavingLimit(false);
+    }
+  }
 
   async function openFullHistoryModal(u: AdminUserRow) {
     setHistoryUser(u);
@@ -767,6 +799,27 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
                           <span className="material-symbols-outlined text-[18px] text-teal-700">receipt_long</span>
                           <span>{lang === "fr" ? "Historique complet (Multi-années)" : "Full History (Multi-year)"}</span>
                         </button>
+
+                        {/* 4c. Plafond maximal de retrait personnalisé */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpenMenuUserId(null);
+                            setEditingLimitUser(u);
+                            setLimitInput(u.maxWithdrawalAmount ? String(u.maxWithdrawalAmount) : "");
+                          }}
+                          className="w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-on-surface hover:bg-emerald-50 hover:text-emerald-900 transition-colors cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-[18px] text-emerald-700">payments</span>
+                          <span className="flex items-center justify-between flex-1 gap-1">
+                            <span>{lang === "fr" ? "Plafond retrait max" : "Max withdrawal limit"}</span>
+                            {u.maxWithdrawalAmount && (
+                              <span className="font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded text-[10px]">
+                                {u.maxWithdrawalAmount.toLocaleString("fr-FR")} F
+                              </span>
+                            )}
+                          </span>
+                        </button>
                       </div>
 
                       {/* Options administratives sensibles */}
@@ -1305,6 +1358,64 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
                     <span>{lang === "fr" ? "Enregistrer les étoiles" : "Save Stars"}</span>
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODALE 3B : Plafond maximal de retrait personnalisé ── */}
+      {editingLimitUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-surface-variant flex flex-col gap-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="font-bold text-sm text-slate-900">
+                  Plafond de retrait — {editingLimitUser.name}
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Laissez vide ou cliquez « Réinitialiser » pour appliquer le plafond global du système.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingLimitUser(null)}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 text-slate-500 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Montant maximum autorisé par retrait (FCFA)
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={limitInput}
+                onChange={(e) => setLimitInput(e.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, ""))}
+                placeholder="Ex: 1000000 (vide = plafond global)"
+                className="w-full border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm font-bold bg-white"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={savingLimit}
+                onClick={() => handleSaveWithdrawalLimit(null)}
+                className="px-3 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 cursor-pointer"
+              >
+                Réinitialiser (Global)
+              </button>
+              <button
+                type="button"
+                disabled={savingLimit || !limitInput.trim() || Number(limitInput) < 500}
+                onClick={() => handleSaveWithdrawalLimit(Number(limitInput))}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
+              >
+                {savingLimit ? "Enregistrement..." : "Enregistrer ce plafond"}
               </button>
             </div>
           </div>

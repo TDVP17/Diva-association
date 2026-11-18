@@ -6,20 +6,34 @@ import { sendEmailSafe } from "@/lib/email/resend";
 import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { formatXAF } from "@/lib/format-currency";
 
+const CMR_OFFSET_MS = 60 * 60 * 1000; // Africa/Douala UTC+1 (no DST)
+
 /**
- * Checks if the current instant is Saturday at or after 08:00 Cameroon time (UTC+1 / Africa/Douala).
- * Callers can pass `force: true` to run immediately (e.g. admin manual trigger or scheduled Saturday 08:00 cron).
+ * Checks if `now` is Cameroon time >= 08:00 on the day BEFORE `dueDate` (J-1).
+ * Works for ANY cadence (every Sunday -> Saturday 08:00, every Saturday -> Friday 08:00, Monthly 28 -> 27th 08:00, etc.).
+ */
+export function isOneDayBeforeDueDateCameroon(dueDate: Date, now: Date = new Date()): boolean {
+  const cmrNow = new Date(now.getTime() + CMR_OFFSET_MS);
+  const cmrDue = new Date(dueDate.getTime() + CMR_OFFSET_MS);
+
+  const nowDayUtc = Date.UTC(cmrNow.getUTCFullYear(), cmrNow.getUTCMonth(), cmrNow.getUTCDate());
+  const dueDayUtc = Date.UTC(cmrDue.getUTCFullYear(), cmrDue.getUTCMonth(), cmrDue.getUTCDate());
+  const diffDays = Math.round((dueDayUtc - nowDayUtc) / (24 * 60 * 60 * 1000));
+
+  return diffDays === 1 && cmrNow.getUTCHours() >= 8;
+}
+
+/**
+ * Backwards-compatible helper kept for tests/references: Saturday >= 08:00 Cameroon time.
  */
 export function isSaturdayEightAmCameroon(now: Date = new Date()): boolean {
-  // Cameroon is permanently UTC+1 (no DST)
-  const cmr = new Date(now.getTime() + 60 * 60 * 1000);
-  const dayOfWeek = cmr.getUTCDay(); // 6 = Saturday
-  const hour = cmr.getUTCHours();
-  return dayOfWeek === 6 && hour >= 8;
+  const cmr = new Date(now.getTime() + CMR_OFFSET_MS);
+  return cmr.getUTCDay() === 6 && cmr.getUTCHours() >= 8;
 }
 
 export interface AutoWalletSweepResult {
   checkedSessions: number;
+  eligibleSessionsJMinus1: number;
   paidSlotsCount: number;
   totalDebitedXAF: number;
   skippedInsufficientCount: number;
@@ -33,14 +47,18 @@ export interface AutoWalletSweepResult {
 }
 
 /**
- * Automatically pays unpaid current-cycle contributions for any member who has sufficient
- * balance in their main DIVA Wallet (0% telecom fees), then notifies them via in-app & email.
+ * Automatically pays unpaid current-cycle contributions 1 day before the cotisation due date (J-1 at 08:00 CMR):
+ * - ALL-OR-NOTHING per member per session:
+ *   - If walletBalance >= totalNeeded for ALL unpaid slots -> debits full amount & marks ALL slots PAID, notifies member.
+ *   - If 0 < walletBalance < totalNeeded -> pays ZERO slots (none!) and notifies member (in-app + email).
+ *   - If walletBalance === 0 -> pays ZERO slots and sends NO notification.
  */
 export async function runAutoWalletContributionsSweep(options?: {
   now?: Date;
   force?: boolean;
 }): Promise<AutoWalletSweepResult> {
   const now = options?.now ?? new Date();
+  const force = Boolean(options?.force);
 
   const activeSessions = await prisma.tontineSession.findMany({
     where: {
@@ -69,13 +87,30 @@ export async function runAutoWalletContributionsSweep(options?: {
     },
   });
 
+  let eligibleSessionsJMinus1 = 0;
   let paidSlotsCount = 0;
   let totalDebitedXAF = 0;
   let skippedInsufficientCount = 0;
   const paidDetails: AutoWalletSweepResult["paidDetails"] = [];
 
   for (const sess of activeSessions) {
+    // Check if private cotisation opted out of auto wallet debit
+    const privateConfig = sess.privateConfig as { selectedActions?: string[] } | null;
+    if (
+      sess.isPrivate &&
+      Array.isArray(privateConfig?.selectedActions) &&
+      !privateConfig.selectedActions.includes("allow_wallet_auto")
+    ) {
+      continue;
+    }
+
     const dueDate = getNextDueDate(sess.type, now);
+    if (!force && !isOneDayBeforeDueDateCameroon(dueDate, now)) {
+      continue;
+    }
+
+    eligibleSessionsJMinus1 += 1;
+
     const { amount, fee, total } = getContributionTotal({
       amount: Number(sess.amount),
       fee: Number(sess.fee),
@@ -102,38 +137,79 @@ export async function runAutoWalletContributionsSweep(options?: {
       const unpaidSlots = membership.slots.filter((s) => !paidSet.has(s.id));
       if (unpaidSlots.length === 0) continue;
 
-      const paidNamesForUser: string[] = [];
-      let totalUserPaidThisSession = 0;
-      let lastBalanceAfter = Number(user.walletBalance || 0);
+      const totalNeeded = unpaidSlots.length * total;
+      const freshUser = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { walletBalance: true },
+      });
+      const available = Number(freshUser?.walletBalance || 0);
+      const lang = user.preferredLang === "en" ? "en" : "fr";
+      const allNamesList = unpaidSlots.map((s) => s.beneficiaryName).join(", ");
 
-      for (const slot of unpaidSlots) {
-        // Re-check live balance before each slot
-        const freshUser = await prisma.user.findUnique({
-          where: { id: user.id },
-          select: { walletBalance: true },
-        });
-        const available = Number(freshUser?.walletBalance || 0);
-        if (available < total) {
-          skippedInsufficientCount += 1;
-          continue;
-        }
+      // Rule 1: Balance is 0 -> do NOTHING and send NO notification
+      if (available <= 0) {
+        skippedInsufficientCount += unpaidSlots.length;
+        continue;
+      }
 
-        try {
-          const ledger = await prisma.$transaction(async (tx) => {
-            const debit = await debitWalletTx(tx, {
+      // Rule 2: Balance > 0 but insufficient to cover ALL unpaid names -> ALL-OR-NOTHING (pay 0 names) + notify!
+      if (available < totalNeeded) {
+        skippedInsufficientCount += unpaidSlots.length;
+
+        await scheduleInAppNotifications({
+          tontineSessionId: sess.id,
+          type: "CONTRIBUTION_REMINDER",
+          recipients: [
+            {
               userId: user.id,
-              amount: total,
-              fee: 0,
-              type: "CONTRIBUTION",
-              description: `Prélèvement automatique Portefeuille · ${sessionTitle} (${slot.beneficiaryName})`,
-              metadata: {
-                tontineSessionId: sess.id,
-                membershipSlotId: slot.id,
-                dueDate: dueDate.toISOString(),
-                autoDebit: true,
-              },
-            });
+              message:
+                lang === "fr"
+                  ? `Solde principal insuffisant (${formatXAF(available)}) pour cotiser automatiquement l'ensemble de vos noms (${allNamesList}) dans « ${sessionTitle} » (${formatXAF(totalNeeded)} requis). Aucun nom n'a été prélevé. Rechargez votre Portefeuille DIVA Asso ou cotisez directement.`
+                  : `Insufficient main balance (${formatXAF(available)}) to auto-pay all your slots (${allNamesList}) in "${sessionTitle}" (${formatXAF(totalNeeded)} required). No slot was debited.`,
+              actionUrl: "/wallet",
+            },
+          ],
+        }).catch(() => {});
 
+        if (user.email) {
+          const subject =
+            lang === "fr"
+              ? `DIVA Asso — Solde insuffisant pour votre cotisation (${sessionTitle})`
+              : `DIVA Asso — Insufficient Wallet Balance (${sessionTitle})`;
+          const bodyText =
+            lang === "fr"
+              ? `Bonjour ${user.name},\n\nVotre cotisation dans « ${sessionTitle} » a lieu demain. Votre solde actuel dans le Portefeuille DIVA Asso (${formatXAF(available)}) est insuffisant pour régler l'ensemble de vos noms (${allNamesList}).\n\n• Montant total requis : ${formatXAF(totalNeeded)}\n• Solde disponible : ${formatXAF(available)}\n\nAucun nom n'a été cotisé automatiquement. Veuillez recharger votre Portefeuille DIVA Asso ou régler directement par Mobile Money afin d'éviter toute amende.`
+              : `Hello ${user.name},\n\nYour contribution in "${sessionTitle}" is due tomorrow. Your current DIVA Asso Wallet balance (${formatXAF(available)}) is insufficient to cover all your slots (${allNamesList}, total required: ${formatXAF(totalNeeded)}). No slot was debited. Please top up your wallet or pay directly.`;
+          const html = renderBrandedEmailHtml({
+            title: subject,
+            bodyText,
+            actionUrl: "/wallet",
+            actionLabel: lang === "fr" ? "Recharger mon portefeuille" : "Top Up Wallet",
+            lang,
+          });
+          await sendEmailSafe(user.email, subject, html).catch(() => {});
+        }
+        continue;
+      }
+
+      // Rule 3: Balance >= totalNeeded -> atomically debit ALL names in ONE transaction & mark ALL PAID!
+      try {
+        const ledger = await prisma.$transaction(async (tx) => {
+          const debit = await debitWalletTx(tx, {
+            userId: user.id,
+            amount: totalNeeded,
+            fee: 0,
+            type: "CONTRIBUTION",
+            description: `Cotisation automatique Portefeuille J-1 · ${sessionTitle} (${allNamesList})`,
+            metadata: {
+              tontineSessionId: sess.id,
+              slotIds: unpaidSlots.map((s) => s.id),
+              dueDate: dueDate.toISOString(),
+              autoDebit: true,
+            },
+          });
+
+          for (const slot of unpaidSlots) {
             await tx.contribution.upsert({
               where: {
                 membershipSlotId_dueDate: {
@@ -168,15 +244,14 @@ export async function runAutoWalletContributionsSweep(options?: {
                 failureReason: null,
               },
             });
+          }
 
-            return debit;
-          });
+          return debit;
+        });
 
-          paidSlotsCount += 1;
-          totalDebitedXAF += total;
-          totalUserPaidThisSession += total;
-          lastBalanceAfter = ledger.balanceAfter;
-          paidNamesForUser.push(slot.beneficiaryName);
+        paidSlotsCount += unpaidSlots.length;
+        totalDebitedXAF += totalNeeded;
+        for (const slot of unpaidSlots) {
           paidDetails.push({
             userId: user.id,
             userName: user.name,
@@ -184,18 +259,7 @@ export async function runAutoWalletContributionsSweep(options?: {
             beneficiaryName: slot.beneficiaryName,
             amount: total,
           });
-        } catch (err) {
-          if (err instanceof InsufficientWalletBalanceError) {
-            skippedInsufficientCount += 1;
-          } else {
-            console.error("[auto-wallet-contribution] slot debit error:", err);
-          }
         }
-      }
-
-      if (paidNamesForUser.length > 0) {
-        const lang = user.preferredLang === "en" ? "en" : "fr";
-        const namesList = paidNamesForUser.join(", ");
 
         await scheduleInAppNotifications({
           tontineSessionId: sess.id,
@@ -205,89 +269,36 @@ export async function runAutoWalletContributionsSweep(options?: {
               userId: user.id,
               message:
                 lang === "fr"
-                  ? `Cotisation automatique effectuée depuis votre compte principal (Portefeuille DIVA) : ${namesList} (${sessionTitle}) — Montant prélevé : ${formatXAF(totalUserPaidThisSession)}. Nouveau solde : ${formatXAF(lastBalanceAfter)}.`
-                  : `Automatic contribution paid from your main DIVA Wallet: ${namesList} (${sessionTitle}) — Amount: ${formatXAF(totalUserPaidThisSession)}. New balance: ${formatXAF(lastBalanceAfter)}.`,
+                  ? `Cotisation automatique effectuée depuis votre Portefeuille DIVA Asso (0 % frais) : ${allNamesList} (${sessionTitle}) — Montant prélevé : ${formatXAF(totalNeeded)}. Nouveau solde : ${formatXAF(ledger.balanceAfter)}.`
+                  : `Automatic contribution paid from your DIVA Asso Wallet (0% fee): ${allNamesList} (${sessionTitle}) — Amount: ${formatXAF(totalNeeded)}. New balance: ${formatXAF(ledger.balanceAfter)}.`,
               actionUrl: `/sessions/${sess.id}`,
             },
           ],
         }).catch(() => {});
 
         if (user.email) {
+          const subject =
+            lang === "fr"
+              ? `DIVA Asso — Cotisation automatique effectuée (${formatXAF(totalNeeded)})`
+              : `DIVA Asso — Automatic Contribution Paid (${formatXAF(totalNeeded)})`;
+          const bodyText =
+            lang === "fr"
+              ? `Bonjour ${user.name},\n\nVotre cotisation pour ${allNamesList} dans « ${sessionTitle} » a été prélevée automatiquement depuis votre Portefeuille DIVA Asso (la veille de l'échéance) sans aucun frais Orange ou MTN.\n\n• Montant prélevé : ${formatXAF(totalNeeded)} (0 % frais opérateur)\n• Nouveau solde portefeuille : ${formatXAF(ledger.balanceAfter)}\n\nTous vos noms sont désormais cochés.`
+              : `Hello ${user.name},\n\nYour contribution for ${allNamesList} in "${sessionTitle}" was automatically paid from your DIVA Asso Wallet with 0% operator fees.\n\n• Amount debited: ${formatXAF(totalNeeded)}\n• New wallet balance: ${formatXAF(ledger.balanceAfter)}`;
           const html = renderBrandedEmailHtml({
-            title:
-              lang === "fr"
-                ? "Cotisation automatique effectuée ✅"
-                : "Automatic Contribution Completed ✅",
-            bodyText:
-              lang === "fr"
-                ? `Bonjour ${user.name},\n\nVotre cotisation pour ${namesList} dans « ${sessionTitle} » a été prélevée automatiquement depuis votre compte principal (Portefeuille DIVA Asso) afin d'éviter tout retard.\n\n• Montant prélevé : ${formatXAF(totalUserPaidThisSession)} (0 % frais opérateur)\n• Nouveau solde portefeuille : ${formatXAF(lastBalanceAfter)}\n\nVos noms sont désormais cochés !`
-                : `Hello ${user.name},\n\nYour contribution for ${namesList} in "${sessionTitle}" was automatically paid from your main DIVA Asso Wallet.\n\n• Amount debited: ${formatXAF(totalUserPaidThisSession)} (0% operator fee)\n• New wallet balance: ${formatXAF(lastBalanceAfter)}`,
+            title: subject,
+            bodyText,
             actionUrl: `/sessions/${sess.id}`,
             actionLabel: lang === "fr" ? "Voir ma cotisation" : "View My Cotisation",
             lang,
           });
-          await sendEmailSafe(
-            user.email,
-            lang === "fr"
-              ? `DIVA Asso — Cotisation automatique effectuée (${formatXAF(totalUserPaidThisSession)})`
-              : `DIVA Asso — Automatic Contribution Paid (${formatXAF(totalUserPaidThisSession)})`,
-            html,
-          ).catch(() => {});
+          await sendEmailSafe(user.email, subject, html).catch(() => {});
         }
-      }
-
-      // Si des noms n'ont pas pu être cotisés ET que le solde principal est > 0 (jamais si solde === 0)
-      const stillUnpaidSlots = unpaidSlots.filter(
-        (s) => !paidNamesForUser.includes(s.beneficiaryName),
-      );
-      if (stillUnpaidSlots.length > 0) {
-        const freshAfter = await prisma.user.findUnique({
-          where: { id: user.id },
-          select: { walletBalance: true },
-        });
-        const remainingBal = Number(freshAfter?.walletBalance || 0);
-        const neededAmount = stillUnpaidSlots.length * total;
-
-        if (remainingBal > 0 && remainingBal < neededAmount) {
-          const lang = user.preferredLang === "en" ? "en" : "fr";
-          const unpaidNamesList = stillUnpaidSlots.map((s) => s.beneficiaryName).join(", ");
-          await scheduleInAppNotifications({
-            tontineSessionId: sess.id,
-            type: "CONTRIBUTION_REMINDER",
-            recipients: [
-              {
-                userId: user.id,
-                message:
-                  lang === "fr"
-                    ? `⚠️ Solde principal insuffisant (${formatXAF(remainingBal)}) pour cotiser automatiquement vos noms restants (${unpaidNamesList}) dans « ${sessionTitle} » (${formatXAF(neededAmount)} requis). Veuillez recharger votre portefeuille ou cotiser directement.`
-                    : `⚠️ Insufficient main balance (${formatXAF(remainingBal)}) to auto-pay your remaining slots (${unpaidNamesList}) in "${sessionTitle}" (${formatXAF(neededAmount)} required). Please top up your wallet or pay directly.`,
-                actionUrl: `/wallet`,
-              },
-            ],
-          }).catch(() => {});
-
-          if (user.email) {
-            const html = renderBrandedEmailHtml({
-              title:
-                lang === "fr"
-                  ? "Solde principal insuffisant pour votre cotisation ⚠️"
-                  : "Insufficient Wallet Balance for Your Contribution ⚠️",
-              bodyText:
-                lang === "fr"
-                  ? `Bonjour ${user.name},\n\nVotre solde principal (Portefeuille DIVA Asso : ${formatXAF(remainingBal)}) est insuffisant pour cotiser automatiquement vos noms restants (${unpaidNamesList}) dans « ${sessionTitle} ».\n\n• Montant requis : ${formatXAF(neededAmount)}\n• Solde actuel : ${formatXAF(remainingBal)}\n\nVeuillez recharger votre portefeuille ou payer directement par Mobile Money afin d'éviter toute amende.`
-                  : `Hello ${user.name},\n\nYour main wallet balance (${formatXAF(remainingBal)}) is insufficient to automatically pay your remaining slots (${unpaidNamesList}) in "${sessionTitle}" (${formatXAF(neededAmount)} required).`,
-              actionUrl: `/wallet`,
-              actionLabel: lang === "fr" ? "Recharger mon portefeuille" : "Top Up Wallet",
-              lang,
-            });
-            await sendEmailSafe(
-              user.email,
-              lang === "fr"
-                ? `DIVA Asso — Solde principal insuffisant pour cotiser (${sessionTitle})`
-                : `DIVA Asso — Insufficient Wallet Balance (${sessionTitle})`,
-              html,
-            ).catch(() => {});
-          }
+      } catch (err) {
+        if (err instanceof InsufficientWalletBalanceError) {
+          skippedInsufficientCount += unpaidSlots.length;
+        } else {
+          console.error("[auto-wallet-contribution] batch debit error:", err);
         }
       }
     }
@@ -295,10 +306,10 @@ export async function runAutoWalletContributionsSweep(options?: {
 
   return {
     checkedSessions: activeSessions.length,
+    eligibleSessionsJMinus1,
     paidSlotsCount,
     totalDebitedXAF,
     skippedInsufficientCount,
     paidDetails,
   };
 }
-

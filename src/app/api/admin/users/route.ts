@@ -67,6 +67,8 @@ export async function GET(request: Request) {
         latitude: true,
         longitude: true,
         stars: true,
+        walletBalance: true,
+        maxWithdrawalAmount: true,
         createdAt: true,
         isBanned: true,
         bannedAt: true,
@@ -139,6 +141,8 @@ export async function GET(request: Request) {
       latitude: u.latitude ? Number(u.latitude) : null,
       longitude: u.longitude ? Number(u.longitude) : null,
       stars: u.stars ?? 0,
+      walletBalance: Number(u.walletBalance ?? 0),
+      maxWithdrawalAmount: u.maxWithdrawalAmount !== null && u.maxWithdrawalAmount !== undefined ? Number(u.maxWithdrawalAmount) : null,
       kyc: u.kycVerifications?.find(
         (k) => k.documentImageUrl || k.selfieImageUrl || k.documentBackImageUrl
       ) ?? u.kycVerifications?.[0] ?? null,

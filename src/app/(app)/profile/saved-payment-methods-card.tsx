@@ -140,7 +140,7 @@ export function SavedPaymentMethodsCard({ lang }: { lang: Lang }) {
                 return (
                   <div
                     key={m.id}
-                    className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border rounded-xl p-3 transition-colors ${
+                    className={`flex items-center justify-between gap-2 border rounded-xl px-2.5 py-2 transition-colors ${
                       isApproved
                         ? "border-emerald-200 bg-emerald-50/30"
                         : isPending
@@ -148,80 +148,66 @@ export function SavedPaymentMethodsCard({ lang }: { lang: Lang }) {
                           : "border-red-200 bg-red-50/40"
                     }`}
                   >
-                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
                       <span
-                        className={`px-2 py-0.5 rounded font-bold text-[10px] uppercase tracking-wide flex-shrink-0 mt-0.5 ${
+                        className={`px-1.5 py-0.5 rounded font-bold text-[9px] uppercase tracking-wide flex-shrink-0 ${
                           m.provider === "ORANGE" ? "bg-orange-500 text-white" : "bg-yellow-400 text-slate-950"
                         }`}
                       >
-                        {m.provider === "ORANGE" ? "Orange Money" : "MTN MoMo"}
+                        {m.provider === "ORANGE" ? "OM" : "MTN"}
                       </span>
 
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono text-sm font-bold text-on-surface">{m.phone}</span>
-                          {m.accountName && (
-                            <span className="text-xs font-semibold text-slate-700 truncate">
-                              · {m.accountName}
-                            </span>
-                          )}
-                          {m.isDefault && (
-                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-primary/10 text-primary">
-                              {lang === "fr" ? "Par défaut" : "Default"}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Statut de vérification DIVA Asso */}
-                        <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-mono text-xs font-bold text-on-surface">{m.phone}</span>
                           {isApproved && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-full">
-                              <span className="material-symbols-outlined text-[13px]">verified</span>
-                              <span>{lang === "fr" ? "Validé par DIVA Asso (Retraits actifs)" : "Verified by DIVA Asso (Ready for payouts)"}</span>
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded-full">
+                              <span className="material-symbols-outlined text-[11px]">verified</span>
+                              <span>{lang === "fr" ? "Validé" : "Verified"}</span>
                             </span>
                           )}
                           {isPending && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-full">
-                              <span className="material-symbols-outlined text-[13px]">schedule</span>
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-900 bg-amber-100 px-1.5 py-0.2 rounded-full">
+                              <span className="material-symbols-outlined text-[11px]">schedule</span>
                               <span>{lang === "fr" ? "En attente" : "Pending"}</span>
                             </span>
                           )}
                           {isRejected && (
-                            <div className="flex flex-col gap-0.5">
-                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-800 bg-red-100 px-2 py-0.5 rounded-full">
-                                <span className="material-symbols-outlined text-[13px]">cancel</span>
-                                <span>{lang === "fr" ? "Refusé par l'administration" : "Rejected by admin"}</span>
-                              </span>
-                              {m.rejectionReason && (
-                                <p className="text-[10px] text-red-700 italic ml-1">
-                                  {m.rejectionReason}
-                                </p>
-                              )}
-                            </div>
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-red-800 bg-red-100 px-1.5 py-0.2 rounded-full">
+                              <span>{lang === "fr" ? "Refusé" : "Rejected"}</span>
+                            </span>
                           )}
                         </div>
+                        {m.accountName && (
+                          <p className="text-[11px] text-slate-600 truncate leading-tight mt-0.5">
+                            {m.accountName}
+                          </p>
+                        )}
+                        {isRejected && m.rejectionReason && (
+                          <p className="text-[10px] text-red-700 italic truncate">{m.rejectionReason}</p>
+                        )}
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-end gap-2 flex-shrink-0 self-end sm:self-center">
+                    <div className="flex items-center gap-1 flex-shrink-0">
                       {!m.isDefault && (
                         <button
                           type="button"
                           onClick={() => handleSetDefault(m.id)}
                           disabled={busyId === m.id}
-                          className="text-xs text-primary hover:underline font-medium cursor-pointer disabled:opacity-50"
+                          className="text-[10px] text-primary hover:underline font-semibold cursor-pointer disabled:opacity-50 px-1"
                         >
-                          {lang === "fr" ? "Définir par défaut" : "Set default"}
+                          {lang === "fr" ? "Défaut" : "Default"}
                         </button>
                       )}
                       <button
                         type="button"
                         onClick={() => handleDelete(m.id)}
                         disabled={busyId === m.id}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-error hover:bg-error/10 transition-colors cursor-pointer disabled:opacity-50"
+                        className="w-6 h-6 rounded-md flex items-center justify-center text-slate-400 hover:text-error hover:bg-error/10 transition-colors cursor-pointer disabled:opacity-50"
                         title={lang === "fr" ? "Supprimer" : "Delete"}
                       >
-                        <span className="material-symbols-outlined text-[18px]">
+                        <span className="material-symbols-outlined text-[16px]">
                           {busyId === m.id ? "hourglass_empty" : "delete"}
                         </span>
                       </button>
