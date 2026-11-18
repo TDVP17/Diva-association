@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
 import { logAudit } from "@/lib/audit";
 import { ALL_TONTINE_TYPES } from "@/lib/tontine-engine";
+import { isStartDateValidForCycle } from "@/lib/cycle-date-validation";
 import type { TontineType } from "@/generated/prisma/enums";
 
 export async function GET() {
@@ -87,6 +88,14 @@ export async function POST(request: Request) {
   const parsed = createSessionSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const cycleCheck = isStartDateValidForCycle(parsed.data.type, parsed.data.startDate);
+  if (!cycleCheck.valid) {
+    return NextResponse.json(
+      { error: cycleCheck.errorMessage || `La date de début doit correspondre au cycle choisi (${cycleCheck.expectedLabel}).` },
+      { status: 400 },
+    );
   }
 
   try {

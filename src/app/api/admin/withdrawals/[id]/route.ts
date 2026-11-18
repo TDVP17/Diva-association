@@ -12,7 +12,7 @@ import { formatXAF } from "@/lib/format-currency";
 import { logAudit } from "@/lib/audit";
 
 const decideSchema = z.object({
-  decision: z.enum(["APPROVE", "REJECT"]),
+  decision: z.enum(["APPROVE", "REJECT", "REVERSE"]),
   channel: z.enum(["FAPSHI", "DIRECT"]).default("FAPSHI"),
   reason: z.string().max(300).optional(),
 });
@@ -40,12 +40,107 @@ export async function PATCH(
   if (!withdrawal) {
     return NextResponse.json({ error: "Demande de retrait introuvable" }, { status: 404 });
   }
+  const amount = Number(withdrawal.amount);
+  const lang = withdrawal.user.preferredLang === "en" ? "en" : "fr";
+
+  // Safe Administrative Reversal (Section 7):
+  // Never erases completed financial records — creates a compensating REFUND transaction & full audit trail.
+  if (parsed.data.decision === "REVERSE") {
+    const reason = parsed.data.reason?.trim();
+    if (!reason || reason.length < 3) {
+      return NextResponse.json(
+        { error: "Un motif d'annulation (au moins 3 caractères) est obligatoire pour annuler une opération." },
+        { status: 400 },
+      );
+    }
+    if (withdrawal.reversedAt) {
+      return NextResponse.json(
+        { error: "Cette opération a déjà été annulée précédemment (double annulation bloquée)." },
+        { status: 409 },
+      );
+    }
+    if (withdrawal.status !== "APPROVED" && withdrawal.status !== "COMPLETED") {
+      return NextResponse.json(
+        { error: "Seule une opération approuvée/validée peut être annulée." },
+        { status: 409 },
+      );
+    }
+    const isExternalFapshi =
+      Boolean(withdrawal.fapshiTransId) &&
+      !withdrawal.fapshiTransId!.startsWith("ADMIN-DIRECT-") &&
+      !withdrawal.fapshiTransId!.startsWith("AUTO-LOCAL-");
+    if (isExternalFapshi) {
+      return NextResponse.json(
+        {
+          error:
+            "Ce virement a déjà été exécuté sur le réseau externe Fapshi/Mobile Money et ne peut pas être annulé automatiquement. Procédez à une réconciliation manuelle.",
+        },
+        { status: 409 },
+      );
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.walletWithdrawal.update({
+        where: { id: withdrawal.id },
+        data: {
+          status: "REJECTED",
+          reversedAt: new Date(),
+          reversedByAdminId: admin.user.id,
+          reversalReason: reason,
+          rejectionReason: `Annulé par l'admin : ${reason}`,
+        },
+      });
+
+      await creditWalletTx(tx, {
+        userId: withdrawal.userId,
+        amount,
+        type: "REFUND",
+        description: `Annulation administrative du retrait #${withdrawal.id.slice(-6).toUpperCase()} — ${reason}`,
+        metadata: {
+          originalWithdrawalId: withdrawal.id,
+          reversedByAdminId: admin.user.id,
+          reversalReason: reason,
+        },
+      });
+    });
+
+    await scheduleInAppNotifications({
+      type: "WITHDRAWAL_REJECTED",
+      recipients: [
+        {
+          userId: withdrawal.userId,
+          message: `Votre retrait de ${formatXAF(amount)} a été annulé par l'administration DIVA Asso (${reason}). Le montant a été recrédité dans votre Portefeuille DIVA Asso.`,
+          actionUrl: "/wallet",
+        },
+      ],
+    }).catch(() => {});
+
+    await logAudit({
+      actorId: admin.user.id,
+      actorRole: admin.user.role,
+      action: "wallet_withdrawal_reversed",
+      targetType: "WalletWithdrawal",
+      targetId: withdrawal.id,
+      metadata: {
+        originalAmount: amount,
+        approvedByAdminId: withdrawal.approvedByAdminId,
+        reversedByAdminId: admin.user.id,
+        reversalReason: reason,
+      },
+      request,
+    });
+
+    return NextResponse.json({
+      ok: true,
+      status: "REJECTED",
+      reversed: true,
+      message: `Opération annulée et ${formatXAF(amount)} recrédités sur le portefeuille du membre (journal d'audit conservé).`,
+    });
+  }
+
   if (withdrawal.status !== "PENDING_ADMIN") {
     return NextResponse.json({ error: "Cette demande de retrait a déjà été traitée." }, { status: 409 });
   }
-
-  const amount = Number(withdrawal.amount);
-  const lang = withdrawal.user.preferredLang === "en" ? "en" : "fr";
 
   if (parsed.data.decision === "REJECT") {
     const reason = parsed.data.reason?.trim() || "Refusé par l'administrateur DIVA Asso.";

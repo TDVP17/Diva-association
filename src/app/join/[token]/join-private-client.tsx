@@ -31,6 +31,7 @@ interface JoinPrivateClientProps {
 export function JoinPrivateClient({ token, tontine, isSignedIn }: JoinPrivateClientProps) {
   const router = useRouter();
   const [status, setStatus] = useState<string | null>(tontine.myMembershipStatus);
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -40,6 +41,10 @@ export function JoinPrivateClient({ token, tontine, isSignedIn }: JoinPrivateCli
       router.push(`/login?callbackUrl=${encodeURIComponent(`/join/${token}`)}`);
       return;
     }
+    if (!disclaimerAccepted) {
+      setError("Vous devez lire et cocher l'acceptation de la clause de non-responsabilité DIVA Asso avant de pouvoir demander l'intégration.");
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
@@ -47,6 +52,8 @@ export function JoinPrivateClient({ token, tontine, isSignedIn }: JoinPrivateCli
     try {
       const res = await fetch(`/api/private-tontines/join/${encodeURIComponent(token)}`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ disclaimerAccepted: true }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -122,6 +129,30 @@ export function JoinPrivateClient({ token, tontine, isSignedIn }: JoinPrivateCli
             <span>
               Cette tontine est un <strong>cercle privé confidentiel</strong> (invisible publiquement). Seul le gestionnaire peut valider votre entrée.
             </span>
+          </div>
+
+          {/* Disclaimer légal obligatoire (Section 10) */}
+          <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/60 p-3.5 flex flex-col gap-2.5">
+            <div className="flex items-center gap-1.5 text-amber-950 font-bold text-xs uppercase">
+              <span className="material-symbols-outlined text-[17px] text-amber-700">gavel</span>
+              <span>Clause de non-responsabilité DIVA Asso</span>
+            </div>
+            <p className="text-[11px] text-slate-700 leading-relaxed bg-white border border-amber-200 rounded-xl p-2.5">
+              « DIVA Asso est une plateforme qui fournit des outils de gestion de cotisations. Les accords financiers, engagements et arrangements au sein de cette cotisation privée sont établis exclusivement entre le créateur et ses participants. DIVA Asso n&apos;est pas responsable des litiges, désaccords ou arrangements privés entre participants. »
+            </p>
+            {isSignedIn && status !== "APPROVED" && status !== "PENDING" && (
+              <label className="flex items-start gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={disclaimerAccepted}
+                  onChange={(e) => setDisclaimerAccepted(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-emerald-700 rounded cursor-pointer flex-shrink-0"
+                />
+                <span className="text-xs font-bold text-slate-900">
+                  J&apos;ai lu et j&apos;accepte expressément cette clause de non-responsabilité avant de rejoindre.
+                </span>
+              </label>
+            )}
           </div>
 
           {!isSignedIn && (

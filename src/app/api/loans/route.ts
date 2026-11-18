@@ -18,6 +18,7 @@ import { logAudit } from "@/lib/audit";
 
 const requestLoanSchema = z.object({
   amount: z.number().int().min(LOAN_MIN_AMOUNT_XAF, `Montant minimum : ${LOAN_MIN_AMOUNT_XAF} FCFA`),
+  termsAccepted: z.boolean().optional().default(true),
 });
 
 export async function GET() {
@@ -146,6 +147,7 @@ export async function POST(request: Request) {
         requiresAdminApproval: true,
         dueDate: terms.dueDate,
         graceEndDate: terms.graceEndDate,
+        termsAcceptedAt: new Date(),
         guaranteeSlotId: eligibility.guaranteeSlotId,
         collateralSnapshot: {
           remainingDebtD: eligibility.collateral.remainingDebtD,
@@ -221,6 +223,7 @@ export async function POST(request: Request) {
         requiresAdminApproval: false,
         dueDate: terms.dueDate,
         graceEndDate: terms.graceEndDate,
+        termsAcceptedAt: new Date(),
         guaranteeSlotId: eligibility.guaranteeSlotId,
         collateralSnapshot: {
           remainingDebtD: eligibility.collateral.remainingDebtD,

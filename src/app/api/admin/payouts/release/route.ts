@@ -16,6 +16,7 @@ import { logAudit } from "@/lib/audit";
 import { formatXAF } from "@/lib/format-currency";
 import { creditWalletTx } from "@/lib/wallet-ledger";
 import { computeAccruedLoanPenalty, deductActiveLoansFromPayoutTx } from "@/lib/loans";
+import { calculateAdditionalFeeSplit } from "@/lib/private-tontine-finance";
 
 const bodySchema = z.object({
   payoutClaimId: z.string().min(1),
@@ -200,11 +201,24 @@ export async function POST(request: Request) {
       });
     }
 
+    // Répartition du montant additionnel déclaré en cotisation privée (Section 5.1)
+    let privateAdditionalToPayout = 0;
+    let privateAdditionalToCreator = 0;
+    if (claim.tontineSession.isPrivate && Number(claim.tontineSession.fee) > 0) {
+      const totalCycleAdditionalFee = Number(claim.tontineSession.fee) * allApprovedSlots.length;
+      const split = calculateAdditionalFeeSplit(
+        totalCycleAdditionalFee,
+        claim.tontineSession.privateAdditionalFeePayoutPct ?? 100,
+      );
+      privateAdditionalToPayout = split.toPayout;
+      privateAdditionalToCreator = split.toCreatorWallet;
+    }
+
     // Prélèvement automatique des prêts en cours sur le pot (Garantie Ultime)
     const loanRes = await deductActiveLoansFromPayoutTx(tx, {
       userId: user.id,
       payoutId: payoutClaimId,
-      availableNetPayout: netPayout,
+      availableNetPayout: netPayout + privateAdditionalToPayout,
       now: nowForLoans,
     });
     totalLoanDeducted = loanRes.totalLoanDeducted;
@@ -222,8 +236,29 @@ export async function POST(request: Request) {
         metadata: {
           payoutId: payoutClaimId,
           pot,
+          privateAdditionalToPayout,
           totalDeducted,
           loanDeducted: totalLoanDeducted,
+        },
+      });
+    }
+
+    // Crédit de la part gestionnaire (100% - payoutPct) sur le portefeuille du créateur de la cotisation privée
+    if (
+      claim.tontineSession.isPrivate &&
+      claim.tontineSession.creatorId &&
+      privateAdditionalToCreator > 0
+    ) {
+      await creditWalletTx(tx, {
+        userId: claim.tontineSession.creatorId,
+        amount: privateAdditionalToCreator,
+        fee: 0,
+        type: "PAYOUT",
+        description: `Part gestionnaire frais additionnels (${claim.tontineSession.title || "Cotisation privée"} · tour de ${slot.beneficiaryName})`,
+        metadata: {
+          payoutId: payoutClaimId,
+          tontineSessionId: claim.tontineSessionId,
+          privateAdditionalFeePayoutPct: claim.tontineSession.privateAdditionalFeePayoutPct ?? 100,
         },
       });
     }

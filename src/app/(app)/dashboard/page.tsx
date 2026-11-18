@@ -88,7 +88,7 @@ export default async function DashboardPage({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-300/80 text-amber-900 font-label-sm text-label-sm font-semibold hover:bg-amber-100 transition-colors flex-shrink-0"
           >
             <span className="material-symbols-outlined text-[16px]">lock</span>
-            <span>{lang === "fr" ? "Créer cotisation privée" : "Create Private Cotisation"}</span>
+            <span>{lang === "fr" ? "Créer ma cotisation" : "Create My Cotisation"}</span>
           </Link>
         </div>
         {memberships.length === 0 ? (

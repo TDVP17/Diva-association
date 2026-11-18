@@ -6,6 +6,10 @@ import { TONTINE_CONFIG } from "@/lib/tontine-engine";
 import { getFrequencyOptionGroups } from "@/lib/tontine-labels";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
+import {
+  getNextValidStartDates,
+  isStartDateValidForCycle,
+} from "@/lib/cycle-date-validation";
 
 type TontineTypeKey = keyof typeof TONTINE_CONFIG;
 
@@ -39,11 +43,16 @@ export function CreateSessionForm({ lang }: { lang: Lang }) {
     setFee(String(TONTINE_CONFIG[next].fee));
     setFineAmountPerPeriod(String(TONTINE_CONFIG[next].fineAmountPerPeriod));
     setFineIntervalHours(String(TONTINE_CONFIG[next].fineIntervalHours));
+    const nextValid = getNextValidStartDates(next, 1)[0]!;
+    setStartDate(nextValid);
+    const suggested = new Date(nextValid);
+    suggested.setUTCDate(suggested.getUTCDate() - 1);
+    setDrawDate(suggested.toISOString().slice(0, 10));
   }
 
   function handleStartDateChange(next: string) {
     setStartDate(next);
-    if (!drawDate && next) {
+    if (next) {
       const suggested = new Date(next);
       suggested.setUTCDate(suggested.getUTCDate() - 1);
       setDrawDate(suggested.toISOString().slice(0, 10));
@@ -54,6 +63,13 @@ export function CreateSessionForm({ lang }: { lang: Lang }) {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    const cycleCheck = isStartDateValidForCycle(type, startDate);
+    if (!cycleCheck.valid) {
+      setError(cycleCheck.errorMessage || "Date de début incompatible avec le cycle.");
+      setLoading(false);
+      return;
+    }
     try {
       const res = await fetch("/api/admin/sessions", {
         method: "POST",
@@ -226,18 +242,29 @@ export function CreateSessionForm({ lang }: { lang: Lang }) {
 
       <div>
         <label htmlFor="startDate" className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
-          {t("startDate")}
+          {t("startDate")} (Doit correspondre au cycle : {type})
         </label>
-        <input
+        <select
           id="startDate"
-          type="date"
           required
           value={startDate}
           onChange={(e) => handleStartDateChange(e.target.value)}
-          className="w-full border border-outline-variant rounded-lg px-3 py-2 font-label-md text-label-md"
-        />
+          className="w-full border-2 border-emerald-600 rounded-lg px-3 py-2 font-label-md text-label-md bg-white font-bold text-slate-900"
+        >
+          {getNextValidStartDates(type, 16).map((d) => (
+            <option key={d} value={d}>
+              {new Date(`${d}T12:00:00.000Z`).toLocaleDateString("fr-FR", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+                timeZone: "Africa/Douala",
+              })} ({d})
+            </option>
+          ))}
+        </select>
         <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">
-          {t("startDateHelperText")}
+          Seules les dates correspondant rigoureusement au jour de la semaine ou jour du mois de ce cycle sont autorisées.
         </p>
       </div>
 

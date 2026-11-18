@@ -13,6 +13,12 @@ export interface AdminPrivateTontineRow {
   amount: number;
   fee: number;
   status: string;
+  creatorParticipates: boolean;
+  privateMinParticipants: number | null;
+  privateAdditionalFeePayoutPct: number;
+  privatePenaltyBeneficiaryPct: number;
+  emergencyFundName: string | null;
+  emergencyFundMinAmount: number | null;
   startDate: string;
   limitTime: string;
   maxSlots: number | null;
@@ -82,6 +88,29 @@ export function AdminPrivateTontinesClient({
       await refresh();
     } catch {
       setError("Erreur réseau.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!window.confirm("Supprimer cette cotisation privée de l'interface active ? (Les historiques financiers resteront conservés pour audit).")) return;
+    setBusyId(id);
+    setFeedback(null);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/private-tontines/${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Impossible de supprimer la cotisation.");
+        return;
+      }
+      setFeedback(data.message || "Cotisation supprimée de l'interface active.");
+      await refresh();
+    } catch {
+      setError("Erreur réseau lors de la suppression.");
     } finally {
       setBusyId(null);
     }
@@ -208,6 +237,15 @@ export function AdminPrivateTontinesClient({
                     <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold">
                       {t.status}
                     </span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        t.creatorParticipates
+                          ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {t.creatorParticipates ? "Créateur participant" : "Gestionnaire seul"}
+                    </span>
                     {t.privateRulesAcceptedAt && (
                       <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[10px] font-semibold">
                         ✓ Règles acceptées le{" "}
@@ -226,7 +264,10 @@ export function AdminPrivateTontinesClient({
                       Mise : <strong className="text-slate-900">{formatXAF(t.amount)}</strong>
                     </span>
                     <span>
-                      Frais : <strong className="text-slate-900">{formatXAF(t.fee)}</strong>
+                      Frais plateforme (5.1%) :{" "}
+                      <strong className="text-emerald-800">
+                        {formatXAF(Math.round(t.amount * (t.maxSlots || 10) * 0.051))}
+                      </strong>
                     </span>
                     <span>
                       Démarrage :{" "}
@@ -236,10 +277,17 @@ export function AdminPrivateTontinesClient({
                       ({t.limitTime})
                     </span>
                     <span>
-                      Membres validés : <strong className="text-slate-900">{t.approvedMembersCount}</strong>
+                      Membres : <strong className="text-slate-900">{t.approvedMembersCount}</strong>
                       {t.maxSlots ? ` / ${t.maxSlots}` : ""}
+                      {t.privateMinParticipants ? ` (min ${t.privateMinParticipants})` : ""}
                     </span>
                   </div>
+
+                  {t.emergencyFundName && (
+                    <p className="text-xs text-amber-900 mt-1 font-semibold">
+                      🚑 {t.emergencyFundName} (min {formatXAF(t.emergencyFundMinAmount || 1000)})
+                    </p>
+                  )}
 
                   {t.creator && (
                     <p className="text-[11px] text-slate-500 mt-1.5">
@@ -293,6 +341,15 @@ export function AdminPrivateTontinesClient({
                       Refuser
                     </button>
                   )}
+                  <button
+                    type="button"
+                    disabled={busyId === t.id}
+                    onClick={() => handleDelete(t.id)}
+                    className="p-2 rounded-xl bg-slate-100 hover:bg-red-100 text-slate-500 hover:text-red-700 transition-colors cursor-pointer"
+                    title="Supprimer la cotisation"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">delete</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -302,4 +359,3 @@ export function AdminPrivateTontinesClient({
     </main>
   );
 }
-

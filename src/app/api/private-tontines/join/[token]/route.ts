@@ -23,7 +23,7 @@ export async function GET(
     },
   });
 
-  if (!tontine || !tontine.isPrivate || tontine.privateApprovalStatus !== "APPROVED") {
+  if (!tontine || !tontine.isPrivate || tontine.privateApprovalStatus !== "APPROVED" || tontine.softDeletedAt !== null) {
     return NextResponse.json({ error: "Cotisation privée introuvable ou non encore validée" }, { status: 404 });
   }
 
@@ -66,6 +66,17 @@ export async function POST(
   const userId = session.user.id;
   const { token } = await context.params;
 
+  const body = await request.json().catch(() => ({}));
+  if (body?.disclaimerAccepted !== true) {
+    return NextResponse.json(
+      {
+        error:
+          "Vous devez lire et accepter la clause de non-responsabilité DIVA Asso avant de pouvoir intégrer cette cotisation privée.",
+      },
+      { status: 400 },
+    );
+  }
+
   const tontine = await prisma.tontineSession.findUnique({
     where: { inviteToken: token },
     include: {
@@ -75,7 +86,7 @@ export async function POST(
     },
   });
 
-  if (!tontine || !tontine.isPrivate || tontine.privateApprovalStatus !== "APPROVED") {
+  if (!tontine || !tontine.isPrivate || tontine.privateApprovalStatus !== "APPROVED" || tontine.softDeletedAt !== null) {
     return NextResponse.json({ error: "Lien d'invitation invalide, expiré ou non encore validé par DIVA Asso." }, { status: 404 });
   }
 
@@ -112,13 +123,19 @@ export async function POST(
   const membership = existing
     ? await prisma.membership.update({
         where: { id: existing.id },
-        data: { status: "PENDING", rejectionReason: null, joinedAt: new Date() },
+        data: {
+          status: "PENDING",
+          rejectionReason: null,
+          joinedAt: new Date(),
+          disclaimerAcceptedAt: new Date(),
+        },
       })
     : await prisma.membership.create({
         data: {
           userId,
           tontineSessionId: tontine.id,
           status: "PENDING",
+          disclaimerAcceptedAt: new Date(),
         },
       });
 

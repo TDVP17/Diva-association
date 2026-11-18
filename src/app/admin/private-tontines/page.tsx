@@ -12,11 +12,12 @@ export default async function AdminPrivateTontinesPage() {
   if (!session?.user || !isAdminRole(session.user.role)) redirect("/dashboard");
 
   const tontines = await prisma.tontineSession.findMany({
-    where: { isPrivate: true },
+    where: { isPrivate: true, softDeletedAt: null },
     include: {
       creator: {
         select: { id: true, name: true, email: true, phone: true, memberCode: true },
       },
+      emergencyFund: { select: { id: true, name: true, minimumAmount: true } },
       memberships: { select: { id: true, status: true } },
     },
     orderBy: [{ privateApprovalStatus: "desc" }, { startDate: "desc" }],
@@ -33,6 +34,12 @@ export default async function AdminPrivateTontinesPage() {
     amount: Number(t.amount),
     fee: Number(t.fee),
     status: t.status,
+    creatorParticipates: t.creatorParticipates ?? true,
+    privateMinParticipants: t.privateMinParticipants ?? null,
+    privateAdditionalFeePayoutPct: t.privateAdditionalFeePayoutPct ?? 100,
+    privatePenaltyBeneficiaryPct: t.privatePenaltyBeneficiaryPct ?? 100,
+    emergencyFundName: t.emergencyFund?.name ?? null,
+    emergencyFundMinAmount: t.emergencyFund ? Number(t.emergencyFund.minimumAmount) : null,
     startDate: t.startDate.toISOString(),
     limitTime: t.limitTime,
     maxSlots: t.maxSlots ? Number(t.maxSlots) : null,
@@ -46,4 +53,3 @@ export default async function AdminPrivateTontinesPage() {
 
   return <AdminPrivateTontinesClient initialTontines={rows} />;
 }
-

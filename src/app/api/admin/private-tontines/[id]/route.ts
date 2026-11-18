@@ -171,3 +171,68 @@ export async function PATCH(
     privateApprovalStatus: updated.privateApprovalStatus,
   });
 }
+
+/**
+ * Safe administrative deletion (Section 12.1):
+ * Removes the private cotisation from active views (`softDeletedAt`) and revokes its invite link
+ * while preserving 100% of financial records and audit logs for accounting and compliance.
+ */
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const { id } = await context.params;
+  const tontine = await prisma.tontineSession.findUnique({
+    where: { id },
+    include: {
+      creator: { select: { id: true, name: true } },
+    },
+  });
+
+  if (!tontine || !tontine.isPrivate) {
+    return NextResponse.json({ error: "Cotisation privée introuvable." }, { status: 404 });
+  }
+
+  await prisma.tontineSession.update({
+    where: { id },
+    data: {
+      softDeletedAt: new Date(),
+      softDeletedByAdminId: admin.user.id,
+      inviteToken: null,
+      status: "CLOSED",
+    },
+  });
+
+  if (tontine.creator) {
+    await scheduleInAppNotifications({
+      tontineSessionId: tontine.id,
+      type: "ADMIN_BROADCAST",
+      recipients: [
+        {
+          userId: tontine.creator.id,
+          message: `Votre cotisation privée « ${tontine.title || "Cotisation privée"} » a été archivée/supprimée par l'administration DIVA Asso. Les historiques financiers restent conservés pour audit.`,
+          actionUrl: "/private-tontines",
+        },
+      ],
+    }).catch(() => {});
+  }
+
+  await logAudit({
+    actorId: admin.user.id,
+    actorRole: admin.user.role,
+    action: "private_tontine_soft_deleted_by_admin",
+    targetType: "TontineSession",
+    targetId: tontine.id,
+    tontineSessionId: tontine.id,
+    metadata: { title: tontine.title, preservedAuditRecords: true },
+    request,
+  });
+
+  return NextResponse.json({
+    ok: true,
+    message: "Cotisation privée supprimée de l'interface active (historique financier et d'audit conservé).",
+  });
+}

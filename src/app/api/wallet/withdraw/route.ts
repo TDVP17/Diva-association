@@ -80,6 +80,8 @@ export async function POST(request: Request) {
       isBanned: true,
       walletBalance: true,
       walletPinHash: true,
+      walletPinFailedAttempts: true,
+      walletPinLockedUntil: true,
       phoneChangedAt: true,
     },
   });
@@ -88,18 +90,46 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Votre compte n'est pas autorisé à effectuer un retrait." }, { status: 403 });
   }
 
-  // 1. Check 4-digit PIN (2FA Anti-piratage)
+  // 1. Check 4-digit PIN (2FA Anti-piratage + brute-force lockout after 5 wrong attempts)
   if (!user.walletPinHash) {
     return NextResponse.json(
       { error: "Veuillez d'abord configurer votre code PIN de retrait à 4 chiffres." },
       { status: 403 },
     );
   }
-  if (!verifyWalletPin(pin, user.walletPinHash)) {
+  if (user.walletPinLockedUntil && user.walletPinLockedUntil.getTime() > Date.now()) {
+    const minsLeft = Math.ceil((user.walletPinLockedUntil.getTime() - Date.now()) / 60000);
     return NextResponse.json(
-      { error: "Code PIN incorrect. Veuillez réessayer." },
+      {
+        error: `Trop de tentatives de code PIN incorrectes. Par sécurité, les retraits sont verrouillés pendant encore ${minsLeft} minute(s).`,
+      },
+      { status: 429 },
+    );
+  }
+  if (!verifyWalletPin(pin, user.walletPinHash)) {
+    const nextAttempts = (user.walletPinFailedAttempts ?? 0) + 1;
+    const shouldLock = nextAttempts >= 5;
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        walletPinFailedAttempts: shouldLock ? 0 : nextAttempts,
+        walletPinLockedUntil: shouldLock ? new Date(Date.now() + 30 * 60 * 1000) : null,
+      },
+    });
+    return NextResponse.json(
+      {
+        error: shouldLock
+          ? "Code PIN incorrect (5 tentatives). Par sécurité, votre PIN est verrouillé pendant 30 minutes."
+          : `Code PIN incorrect (${nextAttempts}/5 tentatives). Veuillez réessayer.`,
+      },
       { status: 403 },
     );
+  }
+  if ((user.walletPinFailedAttempts ?? 0) > 0 || user.walletPinLockedUntil) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { walletPinFailedAttempts: 0, walletPinLockedUntil: null },
+    });
   }
 
   // 2. Check 48-hour withdrawal lock after phone change

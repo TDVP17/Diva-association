@@ -45,12 +45,23 @@ export function AdminWithdrawalsClient({
     }
   }
 
-  async function decide(id: string, decision: "APPROVE" | "REJECT", channel: "FAPSHI" | "DIRECT" = "FAPSHI") {
+  async function decide(
+    id: string,
+    decision: "APPROVE" | "REJECT" | "REVERSE",
+    channel: "FAPSHI" | "DIRECT" = "FAPSHI",
+  ) {
     let reason: string | undefined;
     if (decision === "REJECT") {
-      const input = window.prompt("Motif du refus (optionnel) :", "Vérification de sécurité requise");
+      const input = window.prompt("Motif du refus :", "Vérification de sécurité requise");
       if (input === null) return;
       reason = input;
+    } else if (decision === "REVERSE") {
+      const input = window.prompt(
+        "Motif obligatoire d'annulation de cette opération :",
+        "Erreur de validation administrative — restitution des fonds au membre",
+      );
+      if (input === null || !input.trim()) return;
+      reason = input.trim();
     }
 
     setBusyId(id);
@@ -70,7 +81,9 @@ export function AdminWithdrawalsClient({
       setMessage(
         decision === "APPROVE"
           ? `Retrait approuvé et exécuté (${data.fapshiTransId}).`
-          : "Retrait refusé et montant recrédité automatiquement au portefeuille du membre.",
+          : decision === "REVERSE"
+            ? "Opération annulée avec succès : les fonds ont été restitués au portefeuille du membre (journal d'audit conservé)."
+            : "Retrait refusé et montant recrédité automatiquement au portefeuille du membre.",
       );
       await refresh();
     } catch {
@@ -182,35 +195,40 @@ export function AdminWithdrawalsClient({
                 )}
               </div>
 
-              {w.status === "PENDING_ADMIN" && (
-                <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                {w.status === "PENDING_ADMIN" && (
+                  <>
+                    <button
+                      type="button"
+                      disabled={busyId === w.id}
+                      onClick={() => decide(w.id, "APPROVE", "DIRECT")}
+                      className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs cursor-pointer disabled:opacity-50"
+                    >
+                      {busyId === w.id ? <LoadingSpinner /> : "Valider (Virement Direct)"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busyId === w.id}
+                      onClick={() => decide(w.id, "REJECT")}
+                      className="px-3.5 py-2 rounded-xl bg-red-50 border border-red-200 text-red-700 font-bold text-xs hover:bg-red-100 cursor-pointer disabled:opacity-50"
+                    >
+                      Refuser
+                    </button>
+                  </>
+                )}
+                {(w.status === "COMPLETED" || w.status === "APPROVED") && (
                   <button
                     type="button"
                     disabled={busyId === w.id}
-                    onClick={() => decide(w.id, "APPROVE", "FAPSHI")}
-                    className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                    onClick={() => decide(w.id, "REVERSE")}
+                    className="px-3.5 py-2 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 font-bold text-xs hover:bg-amber-100 cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                    title="Annuler cette approbation et recréditer le membre (Section 7)"
                   >
-                    {busyId === w.id ? <LoadingSpinner /> : <span className="material-symbols-outlined text-[16px]">send_money</span>}
-                    <span>Approuver (Fapshi)</span>
+                    <span className="material-symbols-outlined text-[15px]">undo</span>
+                    <span>Annuler l&apos;opération (Rembourser)</span>
                   </button>
-                  <button
-                    type="button"
-                    disabled={busyId === w.id}
-                    onClick={() => decide(w.id, "APPROVE", "DIRECT")}
-                    className="px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 font-bold text-xs hover:bg-emerald-100 cursor-pointer disabled:opacity-50"
-                  >
-                    Approuver (Direct)
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busyId === w.id}
-                    onClick={() => decide(w.id, "REJECT")}
-                    className="px-3.5 py-2 rounded-xl bg-red-50 border border-red-200 text-red-700 font-bold text-xs hover:bg-red-100 cursor-pointer disabled:opacity-50"
-                  >
-                    Refuser
-                  </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           ))}
         </div>

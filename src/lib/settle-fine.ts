@@ -5,6 +5,8 @@ import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { translate } from "@/lib/i18n/translations";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { formatXAF } from "@/lib/format-currency";
+import { creditWalletTx } from "@/lib/wallet-ledger";
+import { calculatePenaltySplit } from "@/lib/private-tontine-finance";
 
 import { TONTINE_TYPE_LABELS as TONTINE_LABELS } from "@/lib/tontine-labels";
 
@@ -15,8 +17,11 @@ type FineWithSlot = Fine & {
 };
 
 /**
- * 50% de l'amende revient à la personne qui a bouffé (ou doit bouffer) en retard pour ce cycle.
- * Entrée directement dans son solde portefeuille virtuel DIVA Asso.
+ * Distribue une amende de retard PAYÉE selon les règles :
+ * - Cotisation publique : 50 % au bénéficiaire retardé (crédité sur son Portefeuille DIVA Asso).
+ * - Cotisation privée : pourcentage configuré par le créateur (0 % à 100 %) au bénéficiaire retardé,
+ *   et le solde (100 % - pct) versé au portefeuille du créateur.
+ * Protégé par idempotence (`fine.penaltyDistributedAt`) : jamais distribué avant paiement, jamais distribué deux fois.
  */
 export async function creditLateBeneficiaryWithHalfFine(params: {
   tontineSessionId: string;
@@ -24,11 +29,41 @@ export async function creditLateBeneficiaryWithHalfFine(params: {
   fineAmount: number;
   finePayerName: string;
   sessionTitle: string;
+  fineId?: string;
 }): Promise<number> {
-  const half = Math.round(params.fineAmount * 0.5);
-  if (half <= 0) return 0;
+  if (params.fineAmount <= 0) return 0;
 
   try {
+    // 0. Idempotence & garantie "uniquement après paiement effectif" si fineId est fourni
+    if (params.fineId) {
+      const claim = await prisma.fine.updateMany({
+        where: {
+          id: params.fineId,
+          status: "PAID",
+          penaltyDistributedAt: null,
+        },
+        data: { penaltyDistributedAt: new Date() },
+      });
+      if (claim.count === 0) {
+        return 0; // Déjà distribué ou pas encore payé
+      }
+    }
+
+    const sessionRow = await prisma.tontineSession.findUnique({
+      where: { id: params.tontineSessionId },
+      select: {
+        isPrivate: true,
+        creatorId: true,
+        privatePenaltyBeneficiaryPct: true,
+      },
+    });
+
+    const beneficiaryPct = sessionRow?.isPrivate
+      ? (sessionRow.privatePenaltyBeneficiaryPct ?? 100)
+      : 50;
+
+    const split = calculatePenaltySplit(params.fineAmount, beneficiaryPct);
+
     // 1. Chercher le payout prévu ou déjà créé pour cette échéance (dueDate)
     const cyclePayout = await prisma.payout.findUnique({
       where: {
@@ -68,52 +103,85 @@ export async function creditLateBeneficiaryWithHalfFine(params: {
       targetUser = designatedSlot?.membership?.user;
     }
 
-    if (!targetUser) {
-      console.warn("[creditLateBeneficiaryWithHalfFine] Aucun bénéficiaire désigné trouvé pour le cycle", params.dueDate);
-      return 0;
-    }
-
-    // 3. Créditer le portefeuille DIVA Asso du bénéficiaire retardé
-    await prisma.$transaction([
-      prisma.user.update({
-        where: { id: targetUser.id },
-        data: {
-          walletBalance: { increment: half },
-        },
-      }),
-      prisma.walletTransaction.create({
-        data: {
+    // 3. Créditer atomiquement le bénéficiaire retardé (et le créateur pour le solde en cotisation privée)
+    await prisma.$transaction(async (tx) => {
+      if (targetUser && split.toDelayedBeneficiary > 0) {
+        await creditWalletTx(tx, {
           userId: targetUser.id,
-          amount: half,
+          amount: split.toDelayedBeneficiary,
           fee: 0,
           type: "PAYOUT",
-          description: `Part 50% amende de retard (+${formatXAF(half)}) versée suite au retard de ${params.finePayerName} · ${params.sessionTitle}`,
-        },
-      }),
-    ]);
+          description: `Part ${split.beneficiaryPercentage}% amende de retard (+${formatXAF(split.toDelayedBeneficiary)}) suite au retard de ${params.finePayerName} · ${params.sessionTitle}`,
+          metadata: {
+            fineId: params.fineId ?? null,
+            tontineSessionId: params.tontineSessionId,
+            role: "delayed_beneficiary",
+          },
+        });
+      }
 
-    // 4. Notifier le bénéficiaire
-    const benLang = targetUser.preferredLang === "en" ? "en" : "fr";
-    const notifMsg =
-      benLang === "fr"
-        ? `🎉 Bonne nouvelle ! Vous avez reçu ${formatXAF(half)} (50% de l'amende de retard) crédités directement sur votre portefeuille DIVA Asso suite au retard de cotisation dans ${params.sessionTitle}.`
-        : `🎉 You received ${formatXAF(half)} (50% late fine share) credited directly to your DIVA Asso wallet due to a late contribution in ${params.sessionTitle}.`;
-
-    await scheduleInAppNotifications({
-      tontineSessionId: params.tontineSessionId,
-      type: "PAYMENT_SUCCESS",
-      recipients: [
-        {
-          userId: targetUser.id,
-          message: notifMsg,
-          actionUrl: "/wallet",
-        },
-      ],
+      if (
+        sessionRow?.isPrivate &&
+        sessionRow.creatorId &&
+        split.toRemainingRecipient > 0
+      ) {
+        await creditWalletTx(tx, {
+          userId: sessionRow.creatorId,
+          amount: split.toRemainingRecipient,
+          fee: 0,
+          type: "PAYOUT",
+          description: `Part gestionnaire (${100 - split.beneficiaryPercentage}%) amende payée par ${params.finePayerName} · ${params.sessionTitle}`,
+          metadata: {
+            fineId: params.fineId ?? null,
+            tontineSessionId: params.tontineSessionId,
+            role: "private_creator_penalty_share",
+          },
+        });
+      }
     });
 
-    return half;
+    // 4. Notifier les bénéficiaires APRÈS crédit réussi
+    if (targetUser && split.toDelayedBeneficiary > 0) {
+      const benLang = targetUser.preferredLang === "en" ? "en" : "fr";
+      const notifMsg =
+        benLang === "fr"
+          ? `Vous avez reçu ${formatXAF(split.toDelayedBeneficiary)} (${split.beneficiaryPercentage}% de l'amende de retard payée) crédités dans votre Portefeuille DIVA Asso suite au retard de cotisation dans ${params.sessionTitle}.`
+          : `You received ${formatXAF(split.toDelayedBeneficiary)} (${split.beneficiaryPercentage}% late fine share) credited to your DIVA Asso Wallet for ${params.sessionTitle}.`;
+
+      await scheduleInAppNotifications({
+        tontineSessionId: params.tontineSessionId,
+        type: "PAYMENT_SUCCESS",
+        recipients: [
+          {
+            userId: targetUser.id,
+            message: notifMsg,
+            actionUrl: "/wallet",
+          },
+        ],
+      }).catch(() => {});
+    }
+
+    if (
+      sessionRow?.isPrivate &&
+      sessionRow.creatorId &&
+      split.toRemainingRecipient > 0
+    ) {
+      await scheduleInAppNotifications({
+        tontineSessionId: params.tontineSessionId,
+        type: "PAYMENT_SUCCESS",
+        recipients: [
+          {
+            userId: sessionRow.creatorId,
+            message: `Vous avez reçu ${formatXAF(split.toRemainingRecipient)} (${100 - split.beneficiaryPercentage}% de l'amende payée par ${params.finePayerName}) dans votre Portefeuille DIVA Asso pour « ${params.sessionTitle} ».`,
+            actionUrl: "/wallet",
+          },
+        ],
+      }).catch(() => {});
+    }
+
+    return split.toDelayedBeneficiary;
   } catch (err) {
-    console.error("[creditLateBeneficiaryWithHalfFine] Error crediting half fine:", err);
+    console.error("[creditLateBeneficiaryWithHalfFine] Error crediting fine split:", err);
     return 0;
   }
 }
@@ -138,6 +206,7 @@ export async function settleFine(fine: FineWithSlot): Promise<void> {
     fineAmount: amount,
     finePayerName: user.name,
     sessionTitle: sessionLabel,
+    fineId: fine.id,
   });
 
   const message = translate(lang, "finePaidMessage", {

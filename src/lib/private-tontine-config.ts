@@ -66,6 +66,27 @@ export const DEFAULT_PRIVATE_TONTINE_CONFIG: PrivateTontineCreationConfig = {
       enabledByAdmin: true,
       defaultSelected: false,
     },
+    {
+      key: "allow_emergency_fund",
+      label: "Caisse de secours optionnelle",
+      description: "Autoriser le créateur à activer une caisse de secours isolée pour les membres de sa cotisation.",
+      enabledByAdmin: true,
+      defaultSelected: false,
+    },
+    {
+      key: "allow_custom_penalty_split",
+      label: "Partage personnalisé des amendes",
+      description: "Autoriser le créateur à définir le pourcentage d'amende reversé au bénéficiaire retardé (0 % à 100 %).",
+      enabledByAdmin: true,
+      defaultSelected: true,
+    },
+    {
+      key: "allow_custom_payout_split",
+      label: "Répartition personnalisée des frais additionnels",
+      description: "Autoriser le créateur à choisir quel pourcentage des frais additionnels entre dans la bouffe vs son portefeuille.",
+      enabledByAdmin: true,
+      defaultSelected: true,
+    },
   ],
 };
 

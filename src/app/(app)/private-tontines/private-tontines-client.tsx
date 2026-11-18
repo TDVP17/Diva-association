@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatXAF } from "@/lib/format-currency";
 import { LoadingSpinner } from "@/components/loading-spinner";
 import type { Lang } from "@/lib/i18n/translations";
 import type { PrivateTontineCreationConfig } from "@/lib/private-tontine-config";
+import { getNextValidStartDates } from "@/lib/cycle-date-validation";
+import { calculatePrivatePlatformFee } from "@/lib/private-tontine-finance";
+import type { TontineType } from "@/generated/prisma/enums";
 
 interface PrivateSlot {
   id: string;
@@ -25,6 +28,22 @@ interface PrivateMembership {
   slots: PrivateSlot[];
 }
 
+export interface EmergencyFundData {
+  id: string;
+  name: string;
+  minimumAmount: number;
+  description: string | null;
+  rules: string | null;
+  isActive: boolean;
+  contributions: {
+    id: string;
+    amount: number;
+    userId: string;
+    user: { name: string };
+    createdAt: string;
+  }[];
+}
+
 export interface PrivateTontineItem {
   id: string;
   title: string;
@@ -37,6 +56,11 @@ export interface PrivateTontineItem {
   isLocked: boolean;
   privateApprovalStatus: string;
   privateRejectionReason: string | null;
+  creatorParticipates: boolean;
+  privateMinParticipants: number | null;
+  privateAdditionalFeePayoutPct: number;
+  privatePenaltyBeneficiaryPct: number;
+  parentSessionId: string | null;
   privateConfig?: { selectedActions?: string[] } | null;
   startDate: string;
   limitTime: string;
@@ -49,19 +73,24 @@ export interface PrivateTontineItem {
   creatorName: string;
   pendingCount: number;
   approvedCount: number;
+  emergencyFund: EmergencyFundData | null;
   memberships: PrivateMembership[];
 }
 
 const CADENCE_OPTIONS = [
   { value: "HEBDO_SUNDAY", label: "Hebdomadaire — Chaque Dimanche" },
-  { value: "EVERY_SATURDAY", label: "Hebdomadaire — Chaque Samedi" },
   { value: "EVERY_MONDAY", label: "Hebdomadaire — Chaque Lundi" },
+  { value: "EVERY_TUESDAY", label: "Hebdomadaire — Chaque Mardi" },
   { value: "EVERY_WEDNESDAY", label: "Hebdomadaire — Chaque Mercredi" },
+  { value: "EVERY_THURSDAY", label: "Hebdomadaire — Chaque Jeudi" },
   { value: "EVERY_FRIDAY", label: "Hebdomadaire — Chaque Vendredi" },
+  { value: "EVERY_SATURDAY", label: "Hebdomadaire — Chaque Samedi" },
   { value: "BIWEEKLY_SUNDAY", label: "Bimensuelle — Tous les 2 Dimanches" },
   { value: "MONTHLY_1", label: "Mensuelle — Le 1er du mois" },
   { value: "MONTHLY_5", label: "Mensuelle — Le 5 du mois" },
+  { value: "MONTHLY_10", label: "Mensuelle — Le 10 du mois" },
   { value: "MONTHLY_15", label: "Mensuelle — Le 15 du mois" },
+  { value: "MONTHLY_20", label: "Mensuelle — Le 20 du mois" },
   { value: "MONTHLY_25", label: "Mensuelle — Le 25 du mois" },
   { value: "MONTHLY_28", label: "Mensuelle — Le 28 du mois" },
   { value: "QUARTERLY_25", label: "Trimestrielle — Le 25 tous les 3 mois" },
@@ -71,6 +100,17 @@ function sanitizeNumericInput(raw: string): string {
   const digits = raw.replace(/\D/g, "");
   if (!digits) return "";
   return digits.replace(/^0+(?=\d)/, "");
+}
+
+function formatDateFr(isoOrYmd: string): string {
+  const d = new Date(isoOrYmd.includes("T") ? isoOrYmd : `${isoOrYmd}T12:00:00Z`);
+  return d.toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Africa/Douala",
+  });
 }
 
 export function PrivateTontinesClient({
@@ -96,6 +136,7 @@ export function PrivateTontinesClient({
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
     );
   }
+
   const [tontines, setTontines] = useState<PrivateTontineItem[]>(initialTontines);
   const [showCreate, setShowCreate] = useState(initialTontines.length === 0);
   const [creating, setCreating] = useState(false);
@@ -105,20 +146,59 @@ export function PrivateTontinesClient({
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
+  // Transfer ownership modal state
+  const [transferTontineId, setTransferTontineId] = useState<string | null>(null);
+  const [transferTargetUserId, setTransferTargetUserId] = useState<string>("");
+
+  // Emergency fund contribution modal state
+  const [contributeFundId, setContributeFundId] = useState<string | null>(null);
+  const [contributeAmountInput, setContributeAmountInput] = useState<string>("1000");
+
   // Create form state
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [type, setType] = useState("HEBDO_SUNDAY");
-  const [amountInput, setAmountInput] = useState("10000");
+  const [type, setType] = useState<TontineType>("HEBDO_SUNDAY");
+  const [creatorParticipates, setCreatorParticipates] = useState<boolean>(true);
+  const [amountInput, setAmountInput] = useState("2500");
   const [feeInput, setFeeInput] = useState("");
   const [fineInput, setFineInput] = useState("500");
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    return d.toISOString().slice(0, 10);
-  });
   const [limitTime, setLimitTime] = useState("18:30");
-  const [maxSlots, setMaxSlots] = useState<string>("12");
+  const [maxSlots, setMaxSlots] = useState<string>("10");
+  const [minParticipantsInput, setMinParticipantsInput] = useState<string>("10");
+  const [additionalFeePayoutPct, setAdditionalFeePayoutPct] = useState<number>(100);
+  const [penaltyBeneficiaryPct, setPenaltyBeneficiaryPct] = useState<number>(100);
   const [rulesAccepted, setRulesAccepted] = useState(false);
+
+  // Optional Emergency fund form state
+  const [emergencyFundEnabled, setEmergencyFundEnabled] = useState<boolean>(false);
+  const [emergencyFundName, setEmergencyFundName] = useState<string>("Caisse de secours");
+  const [emergencyFundMinAmount, setEmergencyFundMinAmount] = useState<string>("1000");
+  const [emergencyFundRules, setEmergencyFundRules] = useState<string>("");
+
+  // Generate valid start dates strictly adhering to chosen cycle
+  const validDatesForType = useMemo(() => {
+    return getNextValidStartDates(type, 12);
+  }, [type]);
+
+  const [startDate, setStartDate] = useState<string>(() => {
+    const list = getNextValidStartDates("HEBDO_SUNDAY", 12);
+    return list[0] || "";
+  });
+
+  // Keep startDate strictly in sync with validDatesForType
+  function handleTypeChange(newType: string) {
+    const typed = newType as TontineType;
+    setType(typed);
+    const newValidDates = getNextValidStartDates(typed, 12);
+    setStartDate(newValidDates[0] || "");
+  }
+
+  // Live platform fee calculation (5.1% of entire cycle contribution)
+  const parsedUnitAmount = parseInt(amountInput, 10) || 0;
+  const parsedSlotsCount = parseInt(maxSlots, 10) || 10;
+  const simulatedPlatformFee = useMemo(() => {
+    return calculatePrivatePlatformFee(parsedUnitAmount, parsedSlotsCount);
+  }, [parsedUnitAmount, parsedSlotsCount]);
 
   // Inline edit state per managed tontine
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -191,8 +271,19 @@ export function PrivateTontinesClient({
           startDate,
           limitTime,
           maxSlots: maxSlots.trim() ? Number(maxSlots) : null,
+          creatorParticipates,
+          privateAdditionalFeePayoutPct: additionalFeePayoutPct,
+          privatePenaltyBeneficiaryPct: penaltyBeneficiaryPct,
           selectedActions,
           rulesAccepted: true,
+          emergencyFund: emergencyFundEnabled
+            ? {
+                enabled: true,
+                name: emergencyFundName.trim() || "Caisse de secours",
+                minimumAmount: parseInt(emergencyFundMinAmount, 10) || 1000,
+                description: emergencyFundRules.trim() || undefined,
+              }
+            : undefined,
         }),
       });
       const data = await res.json();
@@ -207,7 +298,7 @@ export function PrivateTontinesClient({
       setFeedback(
         data.message ||
           (lang === "fr"
-            ? "Demande envoyée ! Votre cotisation privée est en attente de validation par DIVA Asso. Dès validation, votre lien d'invitation sécurisé apparaîtra ici."
+            ? "Demande envoyée ! Votre cotisation est en attente de validation par DIVA Asso. Dès validation, votre lien d'invitation sécurisé apparaîtra ici."
             : "Submitted! Your private cotisation is awaiting DIVA Asso admin approval."),
       );
       await refreshList();
@@ -257,6 +348,52 @@ export function PrivateTontinesClient({
         if (successMessage) setFeedback(successMessage);
         if (body.action === "update_details") setEditingId(null);
         if (body.action === "broadcast_members") setBroadcastMessage("");
+        if (body.action === "transfer_ownership") setTransferTontineId(null);
+        await refreshList();
+      }
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function handleLeaveTontine(tontineId: string) {
+    if (!window.confirm("Êtes-vous sûr de vouloir quitter cette cotisation privée ?")) return;
+    setBusyAction(`leave-${tontineId}`);
+    try {
+      const res = await fetch(`/api/private-tontines/${tontineId}/leave`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFeedback(data.error || "Impossible de quitter la cotisation.");
+      } else {
+        setFeedback(data.message || "Vous avez quitté la cotisation.");
+        await refreshList();
+      }
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function handleContributeEmergencyFund(fundId: string) {
+    const amount = parseInt(contributeAmountInput, 10);
+    if (!amount || amount < 100) {
+      alert("Montant invalide.");
+      return;
+    }
+    setBusyAction(`fund-contrib-${fundId}`);
+    try {
+      const res = await fetch(`/api/private-tontines/${fundId}/emergency-fund/contribute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount, paymentMethod: "WALLET" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFeedback(data.error || "Impossible de contribuer.");
+      } else {
+        setFeedback(data.message || "Contribution enregistrée !");
+        setContributeFundId(null);
         await refreshList();
       }
     } finally {
@@ -301,7 +438,7 @@ export function PrivateTontinesClient({
             <span>{lang === "fr" ? "Cercles fermés sur invitation" : "Invite-only Private Circles"}</span>
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            {lang === "fr" ? "Créer cotisation privée" : "Private Cotisations"}
+            {lang === "fr" ? "Créer ma cotisation" : "Create My Cotisation"}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
             {lang === "fr"
@@ -316,7 +453,7 @@ export function PrivateTontinesClient({
           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-sm hover:opacity-90 active:scale-95 transition-all shadow-sm cursor-pointer flex-shrink-0"
         >
           <span className="material-symbols-outlined text-[20px]">add_circle</span>
-          <span>{lang === "fr" ? "Créer cotisation privée" : "Create Private Cotisation"}</span>
+          <span>{lang === "fr" ? "Créer ma cotisation" : "Create My Cotisation"}</span>
         </button>
       </div>
 
@@ -346,7 +483,7 @@ export function PrivateTontinesClient({
         >
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <h2 className="font-bold text-base text-slate-900">
-              {lang === "fr" ? "Nouvelle Cotisation Privée" : "New Private Cotisation"}
+              {lang === "fr" ? "Créer ma cotisation" : "Create My Cotisation"}
             </h2>
             <button
               type="button"
@@ -365,33 +502,74 @@ export function PrivateTontinesClient({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1 sm:col-span-2">
-              <label className="text-xs font-bold text-slate-700">Nom de la cotisation privée *</label>
+              <label className="text-xs font-bold text-slate-700">Nom de la cotisation *</label>
               <input
                 type="text"
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex: Cotisation Famille / Collègues du bureau"
+                placeholder="Ex: Tontine Solidarité Famille"
                 className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/30"
               />
             </div>
 
             <div className="flex flex-col gap-1 sm:col-span-2">
-              <label className="text-xs font-bold text-slate-700">Description / Règlement interne</label>
+              <label className="text-xs font-bold text-slate-700">Description / Objectif</label>
               <textarea
                 rows={2}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Objectif, règles internes, heure limite..."
+                placeholder="Ex: Épargne hebdomadaire et entraide mutuelle"
                 className="border-2 border-emerald-600 rounded-xl px-3.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/30"
               />
             </div>
 
+            {/* Creator participation role */}
+            <div className="flex flex-col gap-1.5 sm:col-span-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <span className="text-xs font-bold text-slate-800">Votre rôle dans la cotisation :</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <label
+                  className={`flex items-center gap-2 p-2.5 rounded-lg border-2 cursor-pointer transition-colors ${
+                    creatorParticipates ? "border-emerald-600 bg-white" : "border-slate-200 bg-white/60"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="creatorRole"
+                    checked={creatorParticipates}
+                    onChange={() => setCreatorParticipates(true)}
+                    className="accent-emerald-700"
+                  />
+                  <div className="text-xs">
+                    <strong className="block text-slate-900">Gestionnaire & Membre participant</strong>
+                    <span className="text-[11px] text-slate-500">Vous cotisez et bouffez comme chaque membre</span>
+                  </div>
+                </label>
+                <label
+                  className={`flex items-center gap-2 p-2.5 rounded-lg border-2 cursor-pointer transition-colors ${
+                    !creatorParticipates ? "border-emerald-600 bg-white" : "border-slate-200 bg-white/60"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="creatorRole"
+                    checked={!creatorParticipates}
+                    onChange={() => setCreatorParticipates(false)}
+                    className="accent-emerald-700"
+                  />
+                  <div className="text-xs">
+                    <strong className="block text-slate-900">Gestionnaire uniquement</strong>
+                    <span className="text-[11px] text-slate-500">Vous pilotez sans cotiser ni bouffer</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-slate-700">Fréquence *</label>
+              <label className="text-xs font-bold text-slate-700">Fréquence du cycle *</label>
               <select
                 value={type}
-                onChange={(e) => setType(e.target.value)}
+                onChange={(e) => handleTypeChange(e.target.value)}
                 className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm bg-white"
               >
                 {CADENCE_OPTIONS.map((opt) => (
@@ -402,32 +580,41 @@ export function PrivateTontinesClient({
               </select>
             </div>
 
+            {/* Cycle-strict Start Date Dropdown */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-slate-700">Mise unitaire (FCFA) *</label>
+              <label className="text-xs font-bold text-slate-700">Date de démarrage (selon cycle) *</label>
+              <select
+                required
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm bg-white font-medium capitalize"
+              >
+                {validDatesForType.map((d) => (
+                  <option key={d} value={d}>
+                    {formatDateFr(d)}
+                  </option>
+                ))}
+              </select>
+              <span className="text-[10px] text-emerald-800 font-semibold mt-0.5">
+                ✓ Respecte strictement la fréquence choisie
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-slate-700">Mise unitaire par place (FCFA) *</label>
               <input
                 type="text"
                 inputMode="numeric"
                 required
                 value={amountInput}
                 onChange={(e) => setAmountInput(sanitizeNumericInput(e.target.value))}
-                placeholder="Ex: 10000"
+                placeholder="Ex: 2 500 FCFA"
                 className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm font-bold bg-white"
               />
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-slate-700">Date de démarrage *</label>
-              <input
-                type="date"
-                required
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm bg-white"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-slate-700">Heure limite (HH:MM)</label>
+              <label className="text-xs font-bold text-slate-700">Heure limite de versement</label>
               <input
                 type="time"
                 value={limitTime}
@@ -438,43 +625,176 @@ export function PrivateTontinesClient({
 
             <div className="flex flex-col gap-1">
               <label className="text-xs font-bold text-slate-700">
-                Nombre de places (min {creationConfig.minSlots} · max {creationConfig.maxSlotsLimit})
+                Nombre de places / tours (min {creationConfig.minSlots})
               </label>
               <input
                 type="text"
                 inputMode="numeric"
                 value={maxSlots}
                 onChange={(e) => setMaxSlots(sanitizeNumericInput(e.target.value))}
-                placeholder={`Ex: ${Math.max(creationConfig.minSlots, 10)}`}
+                placeholder="Ex: 10"
                 className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm bg-white"
               />
             </div>
 
-            {selectedActions.includes("allow_fines") && (
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-bold text-slate-700">Amende de retard (FCFA)</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={fineInput}
-                  onChange={(e) => setFineInput(sanitizeNumericInput(e.target.value))}
-                  placeholder="Ex: 500"
-                  className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm bg-white"
-                />
-              </div>
-            )}
-
-            <div className="flex flex-col gap-1 sm:col-span-2">
-              <label className="text-xs font-bold text-slate-700">Frais internes par cotisation (FCFA, optionnel)</label>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-slate-700">
+                Participants minimum requis pour lancer
+              </label>
               <input
                 type="text"
                 inputMode="numeric"
-                value={feeInput}
-                onChange={(e) => setFeeInput(sanitizeNumericInput(e.target.value))}
-                placeholder="0"
+                value={minParticipantsInput}
+                onChange={(e) => setMinParticipantsInput(sanitizeNumericInput(e.target.value))}
+                placeholder="Ex: 10"
                 className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm bg-white"
               />
             </div>
+
+            {/* Platform Fee Dynamic Display (5.1% of entire cycle) */}
+            <div className="sm:col-span-2 rounded-xl bg-emerald-50/70 border border-emerald-200 p-3 text-xs text-emerald-950 flex flex-col gap-1">
+              <div className="flex justify-between items-center font-bold">
+                <span>Frais de service plateforme DIVA Asso (5,1 % sur le cycle complet) :</span>
+                <span className="text-sm font-extrabold text-emerald-800">
+                  {formatXAF(simulatedPlatformFee.platformFeeAmount)} / participant
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Calculé sur le total des cotisations versées sur les {simulatedPlatformFee.totalCycles} cycles (soit {formatXAF(simulatedPlatformFee.totalContributionObligation)} au total par place).
+              </p>
+            </div>
+
+            {/* Additional internal fee & split */}
+            <div className="flex flex-col gap-2 sm:col-span-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <label className="text-xs font-bold text-slate-700">
+                  Frais internes additionnels par versement (FCFA, optionnel)
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={feeInput}
+                  onChange={(e) => setFeeInput(sanitizeNumericInput(e.target.value))}
+                  placeholder="Ex: 100 FCFA"
+                  className="border-2 border-emerald-600 rounded-lg px-3 py-1.5 text-xs bg-white w-36"
+                />
+              </div>
+
+              {Number(feeInput) > 0 && (
+                <div className="pt-2 border-t border-slate-200 flex flex-col gap-1 text-xs">
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-slate-700">
+                      Répartition des frais additionnels :
+                    </span>
+                    <span className="font-bold text-emerald-800">
+                      {additionalFeePayoutPct}% cagnotte · {100 - additionalFeePayoutPct}% créateur
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={10}
+                    value={additionalFeePayoutPct}
+                    onChange={(e) => setAdditionalFeePayoutPct(Number(e.target.value))}
+                    className="accent-emerald-700 cursor-pointer"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Fine & Penalty Split */}
+            {selectedActions.includes("allow_fines") && (
+              <div className="flex flex-col gap-2 sm:col-span-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <label className="text-xs font-bold text-slate-700">Amende de retard (FCFA)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={fineInput}
+                    onChange={(e) => setFineInput(sanitizeNumericInput(e.target.value))}
+                    placeholder="Ex: 500 FCFA"
+                    className="border-2 border-emerald-600 rounded-lg px-3 py-1.5 text-xs bg-white w-36"
+                  />
+                </div>
+                <div className="pt-2 border-t border-slate-200 flex flex-col gap-1 text-xs">
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-slate-700">
+                      Répartition de la pénalité payée :
+                    </span>
+                    <span className="font-bold text-emerald-800">
+                      {penaltyBeneficiaryPct}% bénéficiaire retardé · {100 - penaltyBeneficiaryPct}% créateur
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={10}
+                    value={penaltyBeneficiaryPct}
+                    onChange={(e) => setPenaltyBeneficiaryPct(Number(e.target.value))}
+                    className="accent-emerald-700 cursor-pointer"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Optional Emergency Fund Section */}
+          <div className="rounded-2xl border-2 border-amber-200 bg-amber-50/40 p-4 flex flex-col gap-3">
+            <label className="flex items-center gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={emergencyFundEnabled}
+                onChange={(e) => setEmergencyFundEnabled(e.target.checked)}
+                className="w-4 h-4 accent-emerald-700 rounded cursor-pointer"
+              />
+              <span className="text-xs font-bold text-amber-950 uppercase tracking-wide">
+                Activer une caisse de secours (optionnelle & isolée)
+              </span>
+            </label>
+
+            {emergencyFundEnabled && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-amber-200/80">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Nom de la caisse de secours
+                  </label>
+                  <input
+                    type="text"
+                    value={emergencyFundName}
+                    onChange={(e) => setEmergencyFundName(e.target.value)}
+                    placeholder="Ex: Caisse de secours"
+                    className="w-full border-2 border-emerald-600 rounded-lg px-3 py-1.5 text-xs bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Montant minimum par contribution (FCFA)
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={emergencyFundMinAmount}
+                    onChange={(e) => setEmergencyFundMinAmount(sanitizeNumericInput(e.target.value))}
+                    placeholder="Ex: 1 000 FCFA"
+                    className="w-full border-2 border-emerald-600 rounded-lg px-3 py-1.5 text-xs bg-white"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Règles d&apos;attribution de secours (optionnel)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={emergencyFundRules}
+                    onChange={(e) => setEmergencyFundRules(e.target.value)}
+                    placeholder="Ex: Décaissement en cas d'hospitalisation ou d'événement familial..."
+                    className="w-full border-2 border-emerald-600 rounded-lg px-3 py-1.5 text-xs bg-white"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Creator selectable actions/options configured by DIVA Asso Admin */}
@@ -482,7 +802,7 @@ export function PrivateTontinesClient({
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 flex flex-col gap-2.5">
               <div className="flex items-center gap-2 text-emerald-950 font-bold text-xs uppercase">
                 <span className="material-symbols-outlined text-[18px] text-emerald-700">tune</span>
-                <span>Choisissez les fonctionnalités de votre cotisation privée</span>
+                <span>Choisissez les fonctionnalités de votre cotisation</span>
               </div>
               <p className="text-[11px] text-slate-600">
                 Cochez uniquement les actions que vous souhaitez activer dans votre cotisation et décochez celles que vous ne voulez pas.
@@ -566,9 +886,9 @@ export function PrivateTontinesClient({
           <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center">
             <span className="material-symbols-outlined text-3xl">lock</span>
           </div>
-          <h3 className="font-bold text-base text-slate-900">Aucune cotisation privée pour le moment</h3>
+          <h3 className="font-bold text-base text-slate-900">Aucune cotisation pour le moment</h3>
           <p className="text-xs text-slate-500 max-w-sm">
-            Créez votre première cotisation privée, faites-la valider par DIVA Asso et invitez vos proches avec votre lien unique sécurisé.
+            Créez votre première cotisation avec le bouton &quot;Créer ma cotisation&quot;, faites-la valider par DIVA Asso et invitez vos proches avec votre lien unique sécurisé.
           </p>
         </div>
       ) : (
@@ -584,6 +904,9 @@ export function PrivateTontinesClient({
             const isPendingAdmin = t.privateApprovalStatus === "PENDING_ADMIN";
             const isRejectedAdmin = t.privateApprovalStatus === "REJECTED";
             const isApprovedAdmin = t.privateApprovalStatus === "APPROVED";
+
+            const minParticipants = t.privateMinParticipants || 10;
+            const hasReachedMinParticipants = approvedMembers.length >= minParticipants;
 
             return (
               <div
@@ -646,6 +969,19 @@ export function PrivateTontinesClient({
                     >
                       Ouvrir la cotisation
                     </Link>
+
+                    {/* Non-creator member leave button */}
+                    {!t.isCreator && (
+                      <button
+                        type="button"
+                        disabled={busyAction !== null}
+                        onClick={() => handleLeaveTontine(t.id)}
+                        className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-red-50 text-slate-700 hover:text-red-700 text-xs font-bold cursor-pointer"
+                      >
+                        Quitter
+                      </button>
+                    )}
+
                     {t.isCreator && (
                       <button
                         type="button"
@@ -664,12 +1000,35 @@ export function PrivateTontinesClient({
                   </div>
                 </div>
 
+                {/* Minimum participants tracking badge */}
+                <div className="flex items-center gap-2 text-xs">
+                  <span
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold ${
+                      hasReachedMinParticipants
+                        ? "bg-emerald-100 text-emerald-900"
+                        : "bg-amber-100 text-amber-950"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[15px]">
+                      {hasReachedMinParticipants ? "check_circle" : "group"}
+                    </span>
+                    <span>
+                      {approvedMembers.length} / {minParticipants} participants requis pour démarrer
+                    </span>
+                  </span>
+                  {!hasReachedMinParticipants && (
+                    <span className="text-[11px] text-slate-500">
+                      (Il manque {minParticipants - approvedMembers.length} participant(s))
+                    </span>
+                  )}
+                </div>
+
                 {/* Admin approval status banners */}
                 {isPendingAdmin && (
                   <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-950 flex items-start gap-2.5">
                     <span className="material-symbols-outlined text-amber-700 text-[18px] flex-shrink-0">hourglass_top</span>
                     <span>
-                      <strong>En attente de validation par l&apos;admin DIVA Asso :</strong> votre lien d&apos;invitation sécurisé sera automatiquement généré et visible ici dès que l&apos;administration aura approuvé votre cotisation privée.
+                      <strong>En attente de validation par l&apos;admin DIVA Asso :</strong> votre lien d&apos;invitation sécurisé sera automatiquement généré et visible ici dès que l&apos;administration aura approuvé votre cotisation.
                     </span>
                   </div>
                 )}
@@ -717,6 +1076,35 @@ export function PrivateTontinesClient({
                         {copiedId === t.id ? "✓ Copié" : "Copier"}
                       </button>
                     </div>
+                  </div>
+                )}
+
+                {/* Emergency Fund Dashboard & Contribution Card (Section 10) */}
+                {t.emergencyFund && (
+                  <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-50 to-emerald-50 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-amber-700 text-[18px]">emergency</span>
+                        <strong className="text-xs font-extrabold text-slate-900">{t.emergencyFund.name}</strong>
+                      </div>
+                      <p className="text-[11px] text-slate-600 mt-0.5">
+                        Minimum par versement : <strong>{formatXAF(t.emergencyFund.minimumAmount)}</strong> · Total collecté :{" "}
+                        <strong className="text-emerald-800">
+                          {formatXAF(t.emergencyFund.contributions.reduce((acc, c) => acc + c.amount, 0))}
+                        </strong>{" "}
+                        ({t.emergencyFund.contributions.length} versement(s))
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setContributeFundId(t.id);
+                        setContributeAmountInput(String(t.emergencyFund?.minimumAmount || 1000));
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs cursor-pointer flex-shrink-0"
+                    >
+                      Contribuer à la caisse
+                    </button>
                   </div>
                 )}
 
@@ -789,6 +1177,58 @@ export function PrivateTontinesClient({
                         <span className="material-symbols-outlined text-[15px]">casino</span>
                         <span>Tirage au sort</span>
                       </button>
+
+                      {/* Transfer Ownership Button (Section 11) */}
+                      <button
+                        type="button"
+                        onClick={() => setTransferTontineId(t.id)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-amber-300 text-amber-900 hover:bg-amber-50 cursor-pointer flex items-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">swap_horiz</span>
+                        <span>Transférer la gestion</span>
+                      </button>
+
+                      {/* Restart Closed Cycle Button (Section 12.2) */}
+                      {t.status === "CLOSED" && (
+                        <button
+                          type="button"
+                          disabled={busyAction !== null}
+                          onClick={() => {
+                            if (!window.confirm("Relancer un nouveau cycle pour cette cotisation fermée ?")) return;
+                            runManageAction(
+                              t.id,
+                              { action: "restart_cycle" },
+                              `${t.id}-restart`,
+                              "Nouveau cycle créé avec succès !",
+                            );
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-800 text-white hover:bg-emerald-900 cursor-pointer flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">restart_alt</span>
+                          <span>Relancer nouveau cycle</span>
+                        </button>
+                      )}
+
+                      {/* Safe Delete Session (Section 12.1) */}
+                      {t.status === "CLOSED" && (
+                        <button
+                          type="button"
+                          disabled={busyAction !== null}
+                          onClick={() => {
+                            if (!window.confirm("Supprimer définitivement cette cotisation fermée ?")) return;
+                            runManageAction(
+                              t.id,
+                              { action: "delete_session" },
+                              `${t.id}-delete`,
+                              "Cotisation supprimée.",
+                            );
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-600 text-white hover:bg-red-700 cursor-pointer flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">delete</span>
+                          <span>Supprimer</span>
+                        </button>
+                      )}
 
                       {isApprovedAdmin && (
                         <button
@@ -1068,7 +1508,7 @@ export function PrivateTontinesClient({
                                   type="button"
                                   disabled={busyAction !== null}
                                   onClick={() => {
-                                    if (!window.confirm(`Retirer ${s.membership.userName} de cette cotisation privée ?`)) return;
+                                    if (!window.confirm(`Retirer ${s.membership.userName} de cette cotisation ?`)) return;
                                     runManageAction(
                                       t.id,
                                       { action: "remove_member", membershipId: s.membership.id },
@@ -1092,6 +1532,145 @@ export function PrivateTontinesClient({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Transfer Ownership Modal */}
+      {transferTontineId && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={() => setTransferTontineId(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 flex flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-extrabold text-slate-900">Transférer la gestion</h3>
+              <button
+                type="button"
+                onClick={() => setTransferTontineId(null)}
+                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Sélectionnez un membre approuvé de cette cotisation pour lui transférer la propriété et la gestion.
+            </p>
+            {(() => {
+              const currentT = tontines.find((x) => x.id === transferTontineId);
+              const eligibleMembers = currentT?.memberships.filter(
+                (m) => m.status === "APPROVED" && m.userId !== currentUserId,
+              ) || [];
+
+              if (eligibleMembers.length === 0) {
+                return (
+                  <p className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-950 font-semibold">
+                    Aucun autre membre approuvé disponible pour recevoir la gestion.
+                  </p>
+                );
+              }
+
+              return (
+                <div className="flex flex-col gap-3">
+                  <select
+                    value={transferTargetUserId}
+                    onChange={(e) => setTransferTargetUserId(e.target.value)}
+                    className="border-2 border-emerald-600 rounded-xl p-2.5 text-xs bg-white"
+                  >
+                    <option value="">Sélectionnez le nouveau gestionnaire...</option>
+                    {eligibleMembers.map((m) => (
+                      <option key={m.userId} value={m.userId}>
+                        {m.userName} {m.userPhone ? `(${m.userPhone})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setTransferTontineId(null)}
+                      className="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 cursor-pointer"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!transferTargetUserId || busyAction !== null}
+                      onClick={() => {
+                        runManageAction(
+                          transferTontineId,
+                          { action: "transfer_ownership", targetUserId: transferTargetUserId },
+                          `transfer-${transferTontineId}`,
+                          "Gestion transférée avec succès !",
+                        );
+                      }}
+                      className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
+                    >
+                      Confirmer le transfert
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Emergency Fund Contribution Modal */}
+      {contributeFundId && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={() => setContributeFundId(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 flex flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-extrabold text-slate-900">
+                Contribuer à la caisse de secours
+              </h3>
+              <button
+                type="button"
+                onClick={() => setContributeFundId(null)}
+                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <p className="text-xs text-slate-600">
+              Votre contribution sera débitée directement de votre portefeuille DIVA Asso et reversée sur le compte de la caisse de secours.
+            </p>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Montant (FCFA)</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={contributeAmountInput}
+                onChange={(e) => setContributeAmountInput(sanitizeNumericInput(e.target.value))}
+                placeholder="Ex: 1 000 FCFA"
+                className="w-full border-2 border-emerald-600 rounded-xl p-2.5 text-sm font-bold bg-white"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setContributeFundId(null)}
+                className="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                disabled={busyAction !== null}
+                onClick={() => handleContributeEmergencyFund(contributeFundId)}
+                className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
+              >
+                Valider la contribution
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </main>

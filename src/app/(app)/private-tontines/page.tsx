@@ -16,6 +16,7 @@ export default async function PrivateTontinesPage() {
     prisma.tontineSession.findMany({
       where: {
         isPrivate: true,
+        softDeletedAt: null,
         OR: [
           { creatorId: userId },
           { memberships: { some: { userId } } },
@@ -23,6 +24,14 @@ export default async function PrivateTontinesPage() {
       },
       include: {
         creator: { select: { id: true, name: true } },
+        emergencyFund: {
+          include: {
+            contributions: {
+              include: { user: { select: { id: true, name: true } } },
+              orderBy: { createdAt: "desc" },
+            },
+          },
+        },
         memberships: {
           include: {
             user: { select: { id: true, name: true, phone: true } },
@@ -53,6 +62,11 @@ export default async function PrivateTontinesPage() {
       isLocked: t.lockedAt !== null,
       privateApprovalStatus: t.privateApprovalStatus,
       privateRejectionReason: t.privateRejectionReason,
+      creatorParticipates: t.creatorParticipates ?? true,
+      privateMinParticipants: t.privateMinParticipants ?? null,
+      privateAdditionalFeePayoutPct: t.privateAdditionalFeePayoutPct ?? 100,
+      privatePenaltyBeneficiaryPct: t.privatePenaltyBeneficiaryPct ?? 100,
+      parentSessionId: t.parentSessionId ?? null,
       privateConfig: (t.privateConfig as { selectedActions?: string[] } | null) ?? null,
       startDate: t.startDate.toISOString(),
       limitTime: t.limitTime,
@@ -65,6 +79,23 @@ export default async function PrivateTontinesPage() {
       creatorName: t.creator?.name ?? "DIVA Asso",
       pendingCount: t.memberships.filter((m) => m.status === "PENDING").length,
       approvedCount: t.memberships.filter((m) => m.status === "APPROVED").length,
+      emergencyFund: t.emergencyFund
+        ? {
+            id: t.emergencyFund.id,
+            name: t.emergencyFund.name,
+            minimumAmount: Number(t.emergencyFund.minimumAmount),
+            description: t.emergencyFund.description,
+            rules: t.emergencyFund.rules,
+            isActive: t.emergencyFund.isActive,
+            contributions: t.emergencyFund.contributions.map((c) => ({
+              id: c.id,
+              amount: Number(c.amount),
+              userId: c.userId,
+              user: { name: c.user.name },
+              createdAt: c.createdAt.toISOString(),
+            })),
+          }
+        : null,
       memberships: t.memberships.map((m) => ({
         id: m.id,
         userId: m.userId,
