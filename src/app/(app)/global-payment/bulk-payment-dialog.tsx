@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 import { formatXAF } from "@/lib/format-currency";
@@ -62,6 +63,7 @@ export function BulkPaymentDialog({
   onProofSubmitted?: () => void;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const t = (key: TranslationKey, vars?: Record<string, string>) => translate(lang, key, vars);
   const [selectedSlotIds, setSelectedSlotIds] = useState<string[]>(membershipSlotIds);
   const [allSlots, setAllSlots] = useState<QuoteItem[]>([]);
@@ -198,10 +200,8 @@ export function BulkPaymentDialog({
       playSuccessChimeSound();
       setStep("success");
       try {
-        onSettled();
-      } catch (err) {
-        console.error("onSettled error:", err);
-      }
+        router.refresh();
+      } catch {}
       return true;
     }
     if (status === "FAILED" || status === "EXPIRED") {

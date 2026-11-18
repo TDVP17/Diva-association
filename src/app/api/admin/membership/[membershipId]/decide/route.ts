@@ -48,6 +48,17 @@ export async function POST(
     }
 
     if (isApproved) {
+      // Vérifier que le garant désigné a bien lu et accepté ses engagements avant que l'admin valide
+      const kyc = existing.kycVerification;
+      if (kyc?.referrerUserId && kyc.guarantorStatus !== "ACCEPTED") {
+        const guarantorLabel = kyc.referrerName || "le garant désigné";
+        const msg =
+          kyc.guarantorStatus === "DECLINED"
+            ? `Impossible d'accepter ce membre : ${guarantorLabel} a refusé de se porter garant.`
+            : `Impossible d'accepter ce membre : ${guarantorLabel} n'a pas encore lu et accepté ses engagements de garant.`;
+        return NextResponse.json({ error: msg }, { status: 409 });
+      }
+
       const finesCheck = await checkUserFinesForJoining(existing.userId, existing.tontineSessionId);
       if (!finesCheck.canJoin) {
         return NextResponse.json(

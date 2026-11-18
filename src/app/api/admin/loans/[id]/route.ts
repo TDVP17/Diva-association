@@ -235,3 +235,60 @@ export async function PATCH(
 
   return NextResponse.json({ error: "Décision non reconnue." }, { status: 400 });
 }
+
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const { id } = await context.params;
+  const loan = await prisma.loan.findUnique({
+    where: { id },
+    include: {
+      user: { select: { id: true, name: true, walletBalance: true } },
+    },
+  });
+  if (!loan) {
+    return NextResponse.json({ error: "Prêt introuvable." }, { status: 404 });
+  }
+
+  const principal = Number(loan.principal);
+  const walletAvail = Number(loan.user.walletBalance || 0);
+  const shouldReclaim = loan.status === "ACTIVE" || loan.status === "OVERDUE";
+  const reclaimAmount = shouldReclaim ? Math.min(walletAvail, principal) : 0;
+
+  await prisma.$transaction(async (tx) => {
+    if (reclaimAmount > 0) {
+      await debitWalletTx(tx, {
+        userId: loan.userId,
+        amount: reclaimAmount,
+        fee: 0,
+        type: "ADMIN_ADJUST",
+        description: `Suppression prêt #${loan.id.slice(-6).toUpperCase()} par l'administrateur`,
+        metadata: { loanId: loan.id, adminId: admin.user.id },
+      });
+    }
+    await tx.loan.delete({ where: { id: loan.id } });
+  });
+
+  await logAudit({
+    actorId: admin.user.id,
+    actorRole: admin.user.role,
+    action: "admin_loan_deleted",
+    targetType: "Loan",
+    targetId: id,
+    metadata: { principal, previousStatus: loan.status, reclaimAmount },
+    request,
+  });
+
+  return NextResponse.json({
+    ok: true,
+    message:
+      reclaimAmount > 0
+        ? `Prêt supprimé définitivement et ${formatXAF(reclaimAmount)} retirés du portefeuille.`
+        : "Prêt supprimé définitivement.",
+  });
+}
+

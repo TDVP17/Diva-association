@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { translate, type Lang, type TranslationKey } from "@/lib/i18n/translations";
 import { parseJsonOrThrow, friendlyErrorMessage } from "@/lib/api-error";
 import { formatXAF } from "@/lib/format-currency";
@@ -92,6 +93,7 @@ export function PaymentConfirmDialog({
   /** Optional callback to discard a draft contribution. */
   onDiscardDraft?: () => void;
 }) {
+  const router = useRouter();
   const t = (key: TranslationKey, vars?: Record<string, string>) => translate(lang, key, vars);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -302,12 +304,10 @@ export function PaymentConfirmDialog({
       stopWatching();
       playSuccessChimeSound();
       setStep("success");
-      // Déclencher immédiatement la mise à jour des slots pour cocher les noms sans attendre
+      // Rafraîchir immédiatement les noms en arrière-plan SANS fermer le modal de confirmation !
       try {
-        onSettled();
-      } catch (err) {
-        console.error("onSettled error:", err);
-      }
+        router.refresh();
+      } catch {}
       return true;
     }
     if (status === "FAILED" || status === "EXPIRED") {

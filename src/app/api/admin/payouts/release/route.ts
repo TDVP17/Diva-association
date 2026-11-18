@@ -19,7 +19,7 @@ import { computeAccruedLoanPenalty, deductActiveLoansFromPayoutTx } from "@/lib/
 
 const bodySchema = z.object({
   payoutClaimId: z.string().min(1),
-  channel: z.enum(["FAPSHI", "DIRECT", "WALLET"]).default("FAPSHI"),
+  channel: z.enum(["FAPSHI", "DIRECT", "WALLET"]).default("WALLET"),
   overrideUnpaid: z.boolean().optional(),
   selectedOperator: z.enum(["MTN", "ORANGE"]).optional(),
   selectedPhone: z.string().optional(),

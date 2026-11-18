@@ -6,6 +6,8 @@ import { checkUserFinesForJoining } from "@/lib/unsettled-fines-gate";
 import { isAdminRole } from "@/lib/constants";
 import { saveFile } from "@/lib/storage";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
+import { sendEmailSafe } from "@/lib/email/resend";
+import { renderBrandedEmailHtml } from "@/lib/email/template";
 
 // No route in this project overrode Vercel's default serverless function
 // timeout (10s), including this one — a real risk here specifically:
@@ -138,11 +140,32 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     const referrerName = (formData.get("referrerName") as string | null)?.trim() ?? "";
+    const referrerUserIdRaw = (formData.get("referrerUserId") as string | null)?.trim() ?? "";
     if (!referrerName) {
       return NextResponse.json(
         { error: "Missing referrer name", errorKey: "kycMissingReferrerName" },
         { status: 400 },
       );
+    }
+
+    // Resolve and validate the designated Guarantor (must be an APPROVED member of a cotisation)
+    let verifiedGuarantor: { id: string; name: string; email: string | null; preferredLang: string | null } | null = null;
+    if (referrerUserIdRaw) {
+      verifiedGuarantor = await prisma.user.findFirst({
+        where: {
+          id: referrerUserIdRaw,
+          isBanned: false,
+          NOT: { id: session.user.id },
+          memberships: { some: { status: "APPROVED" } },
+        },
+        select: { id: true, name: true, email: true, preferredLang: true },
+      });
+      if (!verifiedGuarantor) {
+        return NextResponse.json(
+          { error: "Le garant sélectionné doit être un membre actif inscrit dans une cotisation DIVA Asso." },
+          { status: 400 },
+        );
+      }
     }
     const referrerPhoneRaw = (formData.get("referrerPhone") as string | null)?.trim() ?? "";
     const referrerPhoneDigits = referrerPhoneRaw.replace(/\D/g, "");
@@ -358,8 +381,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
                 documentImageUrl: documentFrontKey ? `/api/files/${documentFrontKey}` : null,
                 documentBackImageUrl: documentBackKey ? `/api/files/${documentBackKey}` : null,
                 selfieImageUrl: `/api/files/${selfieKey}`,
-                referrerName,
+                referrerName: verifiedGuarantor ? verifiedGuarantor.name : referrerName,
                 referrerPhone: referrerPhoneDigits || null,
+                referrerUserId: verifiedGuarantor ? verifiedGuarantor.id : null,
+                guarantorStatus: verifiedGuarantor ? "PENDING" : "NONE",
               },
             });
 
@@ -423,6 +448,46 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           actionUrl: "/admin/membership-requests",
         })),
       });
+
+      // Notify the chosen Guarantor so they read and accept the guarantor commitments
+      if (verifiedGuarantor) {
+        const applicantLabel = applicantFullName || session.user.name || "Un nouveau membre";
+        const gLang = verifiedGuarantor.preferredLang === "en" ? "en" : "fr";
+        await scheduleInAppNotifications({
+          tontineSessionId,
+          type: "ADMIN_BROADCAST",
+          recipients: [
+            {
+              userId: verifiedGuarantor.id,
+              message:
+                gLang === "fr"
+                  ? `🤝 Demande de parrainage / garant : ${applicantLabel} vous a désigné comme garant pour intégrer « ${tontineSession.title || tontineSession.type} ». Cliquez ici pour lire les conditions d'engagement et accepter ou refuser.`
+                  : `🤝 Guarantor request: ${applicantLabel} designated you as guarantor to join "${tontineSession.title || tontineSession.type}". Tap here to read the guarantor commitments and accept or decline.`,
+              actionUrl: "/guarantor-requests",
+            },
+          ],
+        }).catch(() => {});
+
+        if (verifiedGuarantor.email) {
+          const emailHtml = renderBrandedEmailHtml({
+            title: gLang === "fr" ? "Demande de garant — Action requise 🤝" : "Guarantor Request — Action Required 🤝",
+            bodyText:
+              gLang === "fr"
+                ? `Bonjour ${verifiedGuarantor.name},\n\n${applicantLabel} souhaite intégrer la cotisation « ${tontineSession.title || tontineSession.type} » et vous a désigné comme son garant.\n\nL'administrateur ne pourra valider son entrée qu'après votre lecture et acceptation officielle des engagements de garant.\n\nConnectez-vous pour consulter les conditions et répondre à cette demande.`
+                : `Hello ${verifiedGuarantor.name},\n\n${applicantLabel} requested to join "${tontineSession.title || tontineSession.type}" and selected you as guarantor.\n\nThe administrator can only approve their entry after you review and accept the guarantor commitments.`,
+            actionUrl: "/guarantor-requests",
+            actionLabel: gLang === "fr" ? "Lire les engagements & Répondre" : "Review Commitments & Respond",
+            lang: gLang,
+          });
+          await sendEmailSafe(
+            verifiedGuarantor.email,
+            gLang === "fr"
+              ? `DIVA Asso — ${applicantLabel} vous demande d'être son garant`
+              : `DIVA Asso — ${applicantLabel} asked you to be their guarantor`,
+            emailHtml,
+          ).catch(() => {});
+        }
+      }
     } catch (err) {
       console.error("[sessions/kyc] admin notification scheduling failed (submission was still saved):", err);
     }

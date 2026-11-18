@@ -182,8 +182,8 @@ export function SavedPaymentMethodsCard({ lang }: { lang: Lang }) {
                           )}
                           {isPending && (
                             <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-full">
-                              <span className="material-symbols-outlined text-[13px] animate-spin">sync</span>
-                              <span>{lang === "fr" ? "En attente de validation par DIVA Asso" : "Pending DIVA Asso verification"}</span>
+                              <span className="material-symbols-outlined text-[13px]">schedule</span>
+                              <span>{lang === "fr" ? "En attente" : "Pending"}</span>
                             </span>
                           )}
                           {isRejected && (

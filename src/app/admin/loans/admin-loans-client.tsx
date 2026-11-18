@@ -118,6 +118,31 @@ export function AdminLoansClient({
     }
   }
 
+  async function handleDelete(id: string) {
+    const confirmed = window.confirm(
+      "Supprimer définitivement ce prêt ? (S'il est actif, le capital disponible dans le portefeuille sera retiré.)",
+    );
+    if (!confirmed) return;
+
+    setBusyId(id);
+    setFeedback(null);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/loans/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Erreur lors de la suppression.");
+        return;
+      }
+      setFeedback(data.message || "Prêt supprimé définitivement.");
+      await refreshList();
+    } catch {
+      setError("Erreur réseau.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <main className="px-container-padding py-stack-gap-lg max-w-6xl mx-auto w-full flex flex-col gap-6 pb-24">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -270,16 +295,27 @@ export function AdminLoansClient({
                   </div>
                 )}
 
-                {(l.status === "ACTIVE" || l.status === "OVERDUE") && (
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  {(l.status === "ACTIVE" || l.status === "OVERDUE") && (
+                    <button
+                      type="button"
+                      disabled={busyId === l.id}
+                      onClick={() => handleDecision(l.id, "CANCEL_REVERT")}
+                      className="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 font-bold text-[11px] hover:bg-amber-100 cursor-pointer disabled:opacity-50"
+                    >
+                      Annuler & Retirer
+                    </button>
+                  )}
                   <button
                     type="button"
                     disabled={busyId === l.id}
-                    onClick={() => handleDecision(l.id, "CANCEL_REVERT")}
-                    className="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-700 font-bold text-[11px] hover:bg-red-100 cursor-pointer disabled:opacity-50"
+                    onClick={() => handleDelete(l.id)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-[11px] cursor-pointer disabled:opacity-50"
                   >
-                    Annuler & Retirer du portefeuille
+                    <span className="material-symbols-outlined text-[14px]">delete</span>
+                    <span>Supprimer</span>
                   </button>
-                )}
+                </div>
               </div>
             </div>
           ))}

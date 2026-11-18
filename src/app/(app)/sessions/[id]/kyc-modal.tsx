@@ -217,11 +217,11 @@ export function KycModal({
       setError(t("applicantFullNameRequired"));
       return;
     }
-    if (!referrerQuery.trim() || referrerSearchError) {
+    if (!selectedReferrer || referrerSearchError) {
       setError(
         isFr
-          ? "Veuillez désigner un membre référent valide enregistré sur DIVA Asso."
-          : "Please specify a valid referrer member registered on DIVA Asso."
+          ? "Veuillez sélectionner dans la liste un membre garant inscrit dans une cotisation DIVA Asso."
+          : "Please select a valid guarantor member enrolled in a DIVA Asso cotisation from the list."
       );
       return;
     }
@@ -279,7 +279,8 @@ export function KycModal({
       });
 
       formData.append("applicantFullName", applicantFullName.trim());
-      formData.append("referrerName", selectedReferrer ? selectedReferrer.name : referrerQuery.trim());
+      formData.append("referrerName", selectedReferrer.name);
+      formData.append("referrerUserId", selectedReferrer.id);
       formData.append("referrerPhone", "000000000");
       formData.append("residenceCity", residenceCity.trim());
       formData.append("residenceNeighborhood", residenceNeighborhood.trim());

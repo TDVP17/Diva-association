@@ -370,6 +370,7 @@ model User {
   approvedWithdrawals          WalletWithdrawal[]    @relation("AdminApprovedWithdrawals")
   loans                        Loan[]                @relation("UserLoans")
   approvedLoans                Loan[]                @relation("AdminApprovedLoans")
+  guarantorRequests            KycVerification[]     @relation("GuarantorKycVerifications")
 
   @@map("users")
 }
@@ -668,14 +669,23 @@ model KycVerification {
   /// created before this field existed have none.
   referrerName         String?
   referrerPhone        String?
+  /// Membre existant (dans une cotisation approuvée) choisi comme garant.
+  referrerUserId       String?
+  /// Statut d'acceptation du garant : "NONE" | "PENDING" | "ACCEPTED" | "DECLINED".
+  guarantorStatus      String                @default("NONE")
+  guarantorAcceptedAt  DateTime?
+  guarantorDeclinedAt  DateTime?
+  guarantorDeclineReason String?
   createdAt            DateTime              @default(now())
   verifiedAt           DateTime?
 
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  referrerUser   User?          @relation("GuarantorKycVerifications", fields: [referrerUserId], references: [id], onDelete: SetNull)
   tontineSession TontineSession @relation(fields: [tontineSessionId], references: [id], onDelete: Cascade)
   membership     Membership?    @relation(fields: [membershipId], references: [id], onDelete: SetNull)
 
   @@index([userId, tontineSessionId])
+  @@index([referrerUserId, guarantorStatus])
   @@map("kyc_verifications")
 }
 

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { type Lang } from "@/lib/i18n/translations";
 import { formatXAF } from "@/lib/format-currency";
 import { LoadingSpinner } from "@/components/loading-spinner";
+import { getOperatorInfo } from "@/lib/mobile-money-provider";
+import { OperatorBadge } from "@/components/operator-badge";
 
 interface WalletOperation {
   id: string;
@@ -74,7 +76,7 @@ export function WalletClient({
   const [operations, setOperations] = useState<WalletOperation[]>(initialOperations);
   const [withdrawals, setWithdrawals] = useState<WithdrawalItem[]>(initialWithdrawals);
   const [hasPin, setHasPin] = useState(initialHasPin);
-  const [isBalanceHidden, setIsBalanceHidden] = useState(false);
+  const [isBalanceHidden, setIsBalanceHidden] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Top-up modal state
@@ -106,10 +108,21 @@ export function WalletClient({
   const [pinError, setPinError] = useState<string | null>(null);
   const [pinSuccess, setPinSuccess] = useState<string | null>(null);
 
-  // Fee calculations for top-up
+  // Fee calculations & live operator detection for top-up
   const feeRate = initialFeePercentage / 100;
   const calculatedFee = Math.round(topUpAmount * feeRate);
   const totalDebit = topUpAmount + calculatedFee;
+  const topUpOperatorInfo = getOperatorInfo(phone, lang);
+
+  const formatNowDateTime = () =>
+    new Date().toLocaleString("fr-FR", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Africa/Douala",
+    });
 
   // Show 3 first operations by default
   const displayedOperations = isExpanded ? operations : operations.slice(0, 3);
@@ -165,7 +178,7 @@ export function WalletClient({
         amount: topUpAmount,
         formattedAmount: `+ ${formatXAF(topUpAmount)}`,
         fee: calculatedFee,
-        date: new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "short" }),
+        date: formatNowDateTime(),
         timestamp: Date.now(),
       };
       setOperations((prev) => [newOp, ...prev]);
@@ -301,7 +314,7 @@ export function WalletClient({
             amount: withdrawAmount,
             formattedAmount: `- ${formatXAF(withdrawAmount)}`,
             fee: 0,
-            date: new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "short" }),
+            date: formatNowDateTime(),
             timestamp: Date.now(),
           },
           ...prev,
@@ -384,35 +397,12 @@ export function WalletClient({
             className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600/40 hover:bg-emerald-600/60 text-white border border-emerald-300/30 font-bold text-xs active:scale-95 transition-all cursor-pointer whitespace-nowrap"
           >
             <span className="material-symbols-outlined text-[16px]">payments</span>
-            <span>{lang === "fr" ? "Retirer (0 %)" : "Withdraw (0%)"}</span>
+            <span>{lang === "fr" ? "Retirer" : "Withdraw"}</span>
           </button>
         </div>
       </div>
 
-      {/* ── Accès rapide Prêt d'Urgence Garanti (4 Étoiles) ── */}
-      <Link
-        href="/loans"
-        className="bg-gradient-to-r from-amber-50 to-emerald-50 rounded-2xl p-4 border border-amber-200/80 flex items-center justify-between gap-3 hover:shadow-md transition-all"
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center flex-shrink-0">
-            <span className="material-symbols-outlined text-[22px]">workspace_premium</span>
-          </div>
-          <div>
-            <p className="text-xs sm:text-sm font-extrabold text-slate-900">
-              {lang === "fr" ? "Prêt d'urgence garanti" : "Guaranteed Emergency Loan"}
-            </p>
-            <p className="text-[11px] text-slate-600">
-              {userStars >= 4
-                ? `⭐ ${userStars}/5 étoiles — Vérifiez votre plafond disponible`
-                : `⭐ ${userStars}/5 étoiles (4 étoiles requises en cotisation publique)`}
-            </p>
-          </div>
-        </div>
-        <span className="material-symbols-outlined text-slate-400">chevron_right</span>
-      </Link>
-
-      {/* ── Retraits en attente de validation Admin (>= 50 000 FCFA) ── */}
+      {/* ── Retraits en attente de validation Admin ── */}
       {withdrawals.some((w) => w.status === "PENDING_ADMIN") && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col gap-2">
           <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
@@ -539,6 +529,29 @@ export function WalletClient({
         )}
       </div>
 
+      {/* ── Accès rapide Prêt d'Urgence Garanti (en bas des opérations récentes) ── */}
+      <Link
+        href="/loans"
+        className="bg-gradient-to-r from-amber-50 to-emerald-50 rounded-2xl p-4 border border-amber-200/80 flex items-center justify-between gap-3 hover:shadow-md transition-all"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center flex-shrink-0">
+            <span className="material-symbols-outlined text-[22px]">workspace_premium</span>
+          </div>
+          <div>
+            <p className="text-xs sm:text-sm font-extrabold text-slate-900">
+              {lang === "fr" ? "Prêt d'urgence garanti" : "Guaranteed Emergency Loan"}
+            </p>
+            <p className="text-[11px] text-slate-600">
+              {userStars >= 4
+                ? `⭐ ${userStars}/5 étoiles — Vérifiez votre plafond disponible`
+                : `⭐ ${userStars}/5 étoiles (4 étoiles requises en cotisation publique)`}
+            </p>
+          </div>
+        </div>
+        <span className="material-symbols-outlined text-slate-400">chevron_right</span>
+      </Link>
+
       {/* ── MODALE 1 : Recharger mon portefeuille ── */}
       {isTopUpOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
@@ -602,9 +615,9 @@ export function WalletClient({
                     step={500}
                     value={topUpAmount}
                     onChange={(e) => setTopUpAmount(Math.max(0, parseInt(e.target.value) || 0))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-900"
+                    className="w-full bg-white border-2 border-emerald-600 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-600/25 focus:outline-none rounded-xl px-3 py-2.5 text-sm font-bold text-slate-900"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-700">
                     FCFA
                   </span>
                 </div>
@@ -614,11 +627,14 @@ export function WalletClient({
                 <label className="text-xs font-bold text-slate-700">Numéro MTN / Orange Money :</label>
                 <input
                   type="tel"
+                  inputMode="tel"
+                  maxLength={9}
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 9))}
                   placeholder="6XXXXXXXX"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-900"
+                  className="w-full bg-white border-2 border-emerald-600 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-600/25 focus:outline-none rounded-xl px-3 py-2.5 text-sm font-bold text-slate-900"
                 />
+                <OperatorBadge operator={topUpOperatorInfo} lang={lang} className="mt-1" />
               </div>
 
               <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col gap-1.5 text-xs">
@@ -787,12 +803,10 @@ export function WalletClient({
                     step={500}
                     value={withdrawAmount}
                     onChange={(e) => setWithdrawAmount(Math.max(0, parseInt(e.target.value) || 0))}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-900"
+                    className="w-full bg-white border-2 border-emerald-600 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-600/25 focus:outline-none rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-900"
                   />
-                  <p className="text-[11px] font-semibold text-slate-500">
-                    {withdrawAmount >= 50_000
-                      ? "🔒 Montant >= 50 000 FCFA : validation sécurisée par l'administrateur requise."
-                      : "⚡ Montant < 50 000 FCFA : virement automatique immédiat (0 % frais)."}
+                  <p className="text-[11px] font-semibold text-emerald-700">
+                    ⚡ Virement automatique immédiat vers votre numéro validé.
                   </p>
                 </div>
 
@@ -805,7 +819,7 @@ export function WalletClient({
                     value={withdrawPin}
                     onChange={(e) => setWithdrawPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
                     placeholder="••••"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-center text-lg font-mono tracking-[0.5em] font-extrabold text-slate-900"
+                    className="w-full bg-white border-2 border-emerald-600 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-600/25 focus:outline-none rounded-xl px-3.5 py-2.5 text-center text-lg font-mono tracking-[0.5em] font-extrabold text-slate-900"
                   />
                 </div>
 
@@ -870,7 +884,7 @@ export function WalletClient({
                     value={currentPin}
                     onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
                     placeholder="••••"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-center font-mono tracking-[0.5em] text-base font-bold"
+                    className="w-full bg-white border-2 border-emerald-600 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-600/25 focus:outline-none rounded-xl px-3 py-2 text-center font-mono tracking-[0.5em] text-base font-bold"
                   />
                 </div>
               )}
@@ -884,7 +898,7 @@ export function WalletClient({
                   value={newPin}
                   onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
                   placeholder="••••"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-center font-mono tracking-[0.5em] text-base font-bold"
+                  className="w-full bg-white border-2 border-emerald-600 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-600/25 focus:outline-none rounded-xl px-3 py-2 text-center font-mono tracking-[0.5em] text-base font-bold"
                 />
               </div>
               <div className="flex flex-col gap-1">
@@ -897,7 +911,7 @@ export function WalletClient({
                   value={confirmPin}
                   onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
                   placeholder="••••"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-center font-mono tracking-[0.5em] text-base font-bold"
+                  className="w-full bg-white border-2 border-emerald-600 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-600/25 focus:outline-none rounded-xl px-3 py-2 text-center font-mono tracking-[0.5em] text-base font-bold"
                 />
               </div>
               <button

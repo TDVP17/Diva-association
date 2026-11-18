@@ -129,7 +129,9 @@ export async function POST(request: Request) {
   }
 
   const accountName = (method.accountName || user.name).trim();
-  const requiresAdminApproval = amount >= AUTO_WITHDRAWAL_LIMIT_XAF;
+  // Tout argent déjà dans le compte principal (Portefeuille DIVA) est retiré automatiquement
+  // vers le numéro validé (protégé par PIN 4 chiffres + Whitelist + Lock 48h), sans repasser par l'Admin.
+  const requiresAdminApproval = false;
 
   // 4. Atomic debit + create WalletWithdrawal
   let withdrawal;

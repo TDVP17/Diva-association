@@ -28,6 +28,11 @@ interface MembershipRequest {
     selfieImageUrl: string | null;
     referrerName: string | null;
     referrerPhone: string | null;
+    referrerUserId?: string | null;
+    guarantorStatus?: string | null;
+    guarantorAcceptedAt?: string | null;
+    guarantorDeclinedAt?: string | null;
+    guarantorDeclineReason?: string | null;
     verifiedAt: string | null;
   } | null;
 }
@@ -208,9 +213,41 @@ export function AdminMembershipRequestsClient({ lang }: { lang: Lang }) {
                       {m.kycVerification.referrerName}
                     </span>
                   )}
-                  {m.kycVerification.referrerPhone && (
+                  {m.kycVerification.referrerPhone && m.kycVerification.referrerPhone !== "000000000" && (
                     <span className="font-label-sm text-label-sm text-on-surface-variant">
                       {m.kycVerification.referrerPhone}
+                    </span>
+                  )}
+                  {m.kycVerification.referrerUserId && (
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                        m.kycVerification.guarantorStatus === "ACCEPTED"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : m.kycVerification.guarantorStatus === "DECLINED"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-amber-100 text-amber-900"
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">
+                        {m.kycVerification.guarantorStatus === "ACCEPTED"
+                          ? "verified"
+                          : m.kycVerification.guarantorStatus === "DECLINED"
+                            ? "cancel"
+                            : "schedule"}
+                      </span>
+                      <span>
+                        {m.kycVerification.guarantorStatus === "ACCEPTED"
+                          ? lang === "fr"
+                            ? "Garant a accepté ses engagements"
+                            : "Guarantor accepted commitments"
+                          : m.kycVerification.guarantorStatus === "DECLINED"
+                            ? lang === "fr"
+                              ? "Garant a refusé"
+                              : "Guarantor declined"
+                            : lang === "fr"
+                              ? "En attente d'acceptation du garant"
+                              : "Awaiting guarantor acceptance"}
+                      </span>
                     </span>
                   )}
                 </div>
@@ -219,41 +256,61 @@ export function AdminMembershipRequestsClient({ lang }: { lang: Lang }) {
           )}
 
           {/* ── Action buttons ── */}
-          <div className="flex flex-wrap gap-2 pt-1 border-t border-outline-variant/20 mt-1">
-            <Link
-              href={`/admin/support?with=${encodeURIComponent(m.user.id)}&name=${encodeURIComponent(m.user.name)}`}
-              className="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-label-sm text-label-sm hover:bg-surface-container-low transition-colors flex items-center gap-1.5"
-            >
-              <span className="material-symbols-outlined text-[16px]">chat_bubble</span>
-              {t("messageApplicant")}
-            </Link>
-            <button
-              onClick={() => setRejectTarget(m)}
-              className="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-label-sm text-label-sm hover:bg-surface-container-low transition-colors"
-            >
-              {t("reject")}
-            </button>
-            <button
-              onClick={() => {
-                const confirmMsg =
-                  lang === "fr"
-                    ? `Voulez-vous vraiment bannir ${m.user.name} ? Cette personne sera bannie de l'application et ne pourra plus se connecter avec son email ou son numéro de téléphone.`
-                    : `Are you sure you want to ban ${m.user.name}? This user will be banned from the application and cannot log in with their email or phone number.`;
-                if (window.confirm(confirmMsg)) {
-                  decideMembership(m, "ban");
-                }
-              }}
-              className="px-3 py-1.5 rounded-lg border border-error/30 text-error bg-error-container/20 font-label-sm text-label-sm hover:bg-error-container/40 transition-colors"
-            >
-              {lang === "fr" ? "Bannir" : "Ban"}
-            </button>
-            <button
-              onClick={() => decideMembership(m, "approve")}
-              className="px-3 py-1.5 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 transition-colors ml-auto"
-            >
-              {t("approve")}
-            </button>
-          </div>
+          {(() => {
+            const waitingForGuarantor = Boolean(
+              m.kycVerification?.referrerUserId &&
+                m.kycVerification.guarantorStatus !== "ACCEPTED",
+            );
+            return (
+              <div className="flex flex-wrap gap-2 pt-1 border-t border-outline-variant/20 mt-1">
+                <Link
+                  href={`/admin/support?with=${encodeURIComponent(m.user.id)}&name=${encodeURIComponent(m.user.name)}`}
+                  className="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-label-sm text-label-sm hover:bg-surface-container-low transition-colors flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">chat_bubble</span>
+                  {t("messageApplicant")}
+                </Link>
+                <button
+                  onClick={() => setRejectTarget(m)}
+                  className="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant font-label-sm text-label-sm hover:bg-surface-container-low transition-colors"
+                >
+                  {t("reject")}
+                </button>
+                <button
+                  onClick={() => {
+                    const confirmMsg =
+                      lang === "fr"
+                        ? `Voulez-vous vraiment bannir ${m.user.name} ? Cette personne sera bannie de l'application et ne pourra plus se connecter avec son email ou son numéro de téléphone.`
+                        : `Are you sure you want to ban ${m.user.name}? This user will be banned from the application and cannot log in with their email or phone number.`;
+                    if (window.confirm(confirmMsg)) {
+                      decideMembership(m, "ban");
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-lg border border-error/30 text-error bg-error-container/20 font-label-sm text-label-sm hover:bg-error-container/40 transition-colors"
+                >
+                  {lang === "fr" ? "Bannir" : "Ban"}
+                </button>
+                <button
+                  disabled={waitingForGuarantor}
+                  onClick={() => decideMembership(m, "approve")}
+                  title={
+                    waitingForGuarantor
+                      ? lang === "fr"
+                        ? "Le garant doit d'abord lire et accepter ses engagements."
+                        : "The guarantor must first read and accept their commitments."
+                      : undefined
+                  }
+                  className="px-3 py-1.5 rounded-lg bg-primary text-on-primary font-label-sm text-label-sm hover:opacity-90 transition-colors ml-auto disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {waitingForGuarantor
+                    ? lang === "fr"
+                      ? "En attente du garant"
+                      : "Waiting for guarantor"
+                    : t("approve")}
+                </button>
+              </div>
+            );
+          })()}
         </div>
       ))}
       {rejectTarget && (

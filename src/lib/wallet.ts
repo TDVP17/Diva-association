@@ -182,6 +182,16 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
     take: options?.includeAllForAdmin ? 500 : 50,
   });
 
+  const formatDateTime = (d: Date) =>
+    d.toLocaleString("fr-FR", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Africa/Douala",
+    });
+
   // Aggregate operations
   const operations: WalletOperation[] = [];
 
@@ -214,7 +224,7 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
       amount: Number(tx.amount),
       formattedAmount: `${isCredit ? "+" : "-"} ${formatXAF(Number(tx.amount))}`,
       fee: Number(tx.fee || 0),
-      date: tx.createdAt.toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }),
+      date: formatDateTime(tx.createdAt),
       timestamp: tx.createdAt.getTime(),
       rawDate: tx.createdAt,
       status: "SUCCESSFUL",
@@ -236,7 +246,7 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
       amount: Number(c.amountPaid),
       formattedAmount: `- ${formatXAF(Number(c.amountPaid))}`,
       fee: Number(c.feePaid || 0),
-      date: dateObj.toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }),
+      date: formatDateTime(dateObj),
       timestamp: dateObj.getTime(),
       rawDate: dateObj,
       status: "PAID",
@@ -259,7 +269,7 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
       amount: netAmount,
       formattedAmount: `+ ${formatXAF(netAmount)}`,
       fee: Number(p.deducted || 0),
-      date: dateObj.toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }),
+      date: formatDateTime(dateObj),
       timestamp: dateObj.getTime(),
       rawDate: dateObj,
       status: "CONFIRMED",

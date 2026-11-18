@@ -44,7 +44,7 @@ export default async function ProfilePage() {
     BANNED: t("membershipStatusBanned"),
   };
 
-  const [user, memberships, unreadNotifications, unpaidFinesAgg] = await Promise.all([
+  const [user, memberships, unreadNotifications, unpaidFinesAgg, pendingGuarantorRequests] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
       select: {
@@ -71,6 +71,9 @@ export default async function ProfilePage() {
       _sum: { amount: true },
       _count: true,
     }),
+    prisma.kycVerification
+      .count({ where: { referrerUserId: session.user.id, guarantorStatus: "PENDING" } })
+      .catch(() => 0),
   ]);
   const unpaidFinesTotal = Number(unpaidFinesAgg._sum.amount ?? 0);
 
@@ -315,6 +318,23 @@ export default async function ProfilePage() {
           </span>
           <span className="material-symbols-outlined text-outline">chevron_right</span>
         </ManageCookiesButton>
+        <Link
+          href="/guarantor-requests"
+          className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant hover:bg-surface-container-low transition-colors"
+        >
+          <span className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-primary">handshake</span>
+            <span className="font-label-md text-label-md text-on-surface">
+              {lang === "fr" ? "Demandes de garant / parrainage" : "Guarantor Requests"}
+            </span>
+            {pendingGuarantorRequests > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-error text-on-error font-label-sm text-label-sm font-bold">
+                {pendingGuarantorRequests}
+              </span>
+            )}
+          </span>
+          <span className="material-symbols-outlined text-outline">chevron_right</span>
+        </Link>
         <Link
           href="/loans"
           className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant hover:bg-surface-container-low transition-colors"

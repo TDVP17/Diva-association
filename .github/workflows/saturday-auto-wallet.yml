@@ -1,0 +1,23 @@
+name: Saturday 08:00 Auto-Wallet Contributions & Daily Loan Penalties
+
+on:
+  schedule:
+    # Every Saturday at 07:00 UTC = 08:00 Cameroon time (Africa/Douala UTC+1)
+    - cron: "0 7 * * 6"
+    # Every day at 06:00 UTC = 07:00 Cameroon time for overdue loan penalties
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  run-crons:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Saturday 08:00 Auto-Wallet Contributions
+        run: |
+          curl -sf -X POST "https://divaasso.com/api/crons/auto-wallet-contributions" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" || true
+
+      - name: Trigger Daily Loan Penalties Check
+        run: |
+          curl -sf -X POST "https://divaasso.com/api/crons/loan-penalties" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" || true

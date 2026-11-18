@@ -15,16 +15,18 @@ import { payoutTurnMessage } from "@/lib/whatsapp/templates";
 import { scheduleInAppNotifications, scheduleNotifications } from "@/lib/notifications/dispatch";
 import { TONTINE_TYPE_LABELS } from "@/lib/tontine-labels";
 import { formatXAF } from "@/lib/format-currency";
+import { creditWalletTx } from "@/lib/wallet-ledger";
+import { deductActiveLoansFromPayoutTx } from "@/lib/loans";
 
 const directPayoutSchema = z.object({
   tontineSessionId: z.string().min(1),
   membershipSlotId: z.string().min(1),
-  payoutPhone: z.string().trim().min(9),
-  payoutAccountName: z.string().trim().min(1).max(100),
+  payoutPhone: z.string().trim().optional(),
+  payoutAccountName: z.string().trim().max(100).optional(),
   customAmount: z.coerce.number().positive().optional(),
   dueDate: z.string().optional(),
   overrideUnpaid: z.boolean().optional(),
-  channel: z.enum(["FAPSHI", "DIRECT"]).default("FAPSHI"),
+  channel: z.enum(["FAPSHI", "DIRECT", "WALLET"]).default("WALLET"),
 });
 
 function normalizePhone(raw: string): string {
@@ -125,14 +127,14 @@ export async function POST(request: Request) {
   );
 
   const netPayout = customAmount ?? computedNetPayout;
-  const normalized = normalizePhone(payoutPhone);
-  if (!/^[6-9]\d{8}$/.test(normalized)) {
+  const normalized = payoutPhone ? normalizePhone(payoutPhone) : "DIVA_WALLET";
+  if (channel !== "WALLET" && !/^[6-9]\d{8}$/.test(normalized)) {
     return NextResponse.json(
       { error: "Numéro de téléphone invalide. Il doit comporter 9 chiffres camerounais (ex: 6XXXXXXXX)." },
       { status: 400 },
     );
   }
-  const provider = detectMobileMoneyProvider(normalized);
+  const provider = channel === "WALLET" ? null : detectMobileMoneyProvider(normalized);
   if (channel === "FAPSHI" && !provider) {
     return NextResponse.json(
       { error: "Opérateur non reconnu pour ce numéro. Fapshi supporte uniquement les numéros Orange Money et MTN Mobile Money Cameroun." },
@@ -140,8 +142,8 @@ export async function POST(request: Request) {
     );
   }
   const medium = provider ? fapshiMediumFor(provider) : undefined;
-  const cleanAccountName = payoutAccountName.trim().replace(/["\\]/g, "");
-  if (!cleanAccountName || cleanAccountName.length < 2) {
+  const cleanAccountName = (payoutAccountName || slot.beneficiaryName || user.name).trim().replace(/["\\]/g, "");
+  if (channel === "FAPSHI" && (!cleanAccountName || cleanAccountName.length < 2)) {
     return NextResponse.json(
       { error: "Le nom du bénéficiaire sur le compte est requis pour le virement Fapshi." },
       { status: 400 },
@@ -164,16 +166,20 @@ export async function POST(request: Request) {
       if (err instanceof FapshiPayoutError) {
         return NextResponse.json(
           {
-            error: `${err.message}. Si votre solde Fapshi Payout est insuffisant, vous pouvez choisir 'Virement via mon numéro' (Direct) pour valider le gain.`,
+            error: `${err.message}. Si votre solde Fapshi Payout est insuffisant, vous pouvez choisir 'Portefeuille DIVA' ou 'Virement Direct'.`,
           },
           { status: 502 },
         );
       }
       return NextResponse.json(
-        { error: "Le virement Fapshi a échoué. Veuillez vérifier votre solde Fapshi Payout ou utiliser le mode 'Virement via mon numéro'." },
+        { error: "Le virement Fapshi a échoué. Veuillez vérifier votre solde Fapshi Payout ou utiliser le mode 'Portefeuille DIVA'." },
         { status: 502 },
       );
     }
+  } else if (channel === "WALLET") {
+    fapshiResult = {
+      transId: `WALLET-${slot.id.slice(-6).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`,
+    };
   } else {
     // Virement direct / manuel via le numéro de l'admin
     fapshiResult = {
@@ -181,42 +187,88 @@ export async function POST(request: Request) {
     };
   }
 
-  // Persist payout row
-  const payoutRecord = existingPayout
-    ? await prisma.payout.update({
-        where: { id: existingPayout.id },
-        data: {
-          payoutPhone: normalized,
-          payoutAccountName,
-          status: "CONFIRMED",
-          pot,
-          deducted,
-          netPayout,
-          fapshiTransId: fapshiResult.transId,
-          releasedByAdminId: admin.user.id,
-          releasedAt: new Date(),
-          memberConfirmedAt: new Date(),
-          confirmedByAdmin: true,
-        },
-      })
-    : await prisma.payout.create({
-        data: {
-          tontineSessionId,
-          membershipSlotId,
-          dueDate,
-          payoutPhone: normalized,
-          payoutAccountName,
-          status: "CONFIRMED",
-          pot,
-          deducted,
-          netPayout,
-          fapshiTransId: fapshiResult.transId,
-          releasedByAdminId: admin.user.id,
-          releasedAt: new Date(),
-          memberConfirmedAt: new Date(),
-          confirmedByAdmin: true,
-        },
+  // Persist payout row + credit main wallet + deduct any active loan atomically
+  let finalNetPayout = netPayout;
+  let finalDeducted = deducted;
+  const payoutRecord = await prisma.$transaction(async (tx) => {
+    const rec = existingPayout
+      ? await tx.payout.update({
+          where: { id: existingPayout.id },
+          data: {
+            payoutPhone: channel === "WALLET" ? "DIVA_WALLET" : normalized,
+            payoutAccountName: cleanAccountName,
+            status: "CONFIRMED",
+            pot,
+            deducted,
+            netPayout,
+            fapshiTransId: fapshiResult.transId,
+            releasedByAdminId: admin.user.id,
+            releasedAt: new Date(),
+            memberConfirmedAt: new Date(),
+            confirmedByAdmin: true,
+          },
+        })
+      : await tx.payout.create({
+          data: {
+            tontineSessionId,
+            membershipSlotId,
+            dueDate,
+            payoutPhone: channel === "WALLET" ? "DIVA_WALLET" : normalized,
+            payoutAccountName: cleanAccountName,
+            status: "CONFIRMED",
+            pot,
+            deducted,
+            netPayout,
+            fapshiTransId: fapshiResult.transId,
+            releasedByAdminId: admin.user.id,
+            releasedAt: new Date(),
+            memberConfirmedAt: new Date(),
+            confirmedByAdmin: true,
+          },
+        });
+
+    const loanRes = await deductActiveLoansFromPayoutTx(tx, {
+      userId: user.id,
+      payoutId: rec.id,
+      availableNetPayout: netPayout,
+    });
+    finalNetPayout = loanRes.remainingNetPayout;
+    finalDeducted = deducted + loanRes.totalLoanDeducted;
+
+    if (loanRes.totalLoanDeducted > 0) {
+      await tx.payout.update({
+        where: { id: rec.id },
+        data: { deducted: finalDeducted, netPayout: finalNetPayout },
       });
+    }
+
+    if (channel === "WALLET" && finalNetPayout > 0) {
+      await creditWalletTx(tx, {
+        userId: user.id,
+        amount: finalNetPayout,
+        fee: 0,
+        type: "PAYOUT",
+        description: `Bouffe créditée sur compte principal (${session.title || session.type} · ${slot.beneficiaryName})`,
+        metadata: { payoutId: rec.id, pot, deducted: finalDeducted },
+      });
+    }
+
+    return rec;
+  });
+
+  if (channel === "WALLET") {
+    await scheduleInAppNotifications({
+      tontineSessionId,
+      type: "PAYMENT_SUCCESS",
+      recipients: [
+        {
+          userId: user.id,
+          message: `Félicitations ${user.name} ! Votre compte principal (Portefeuille DIVA) a été rechargé de ${formatXAF(finalNetPayout)} pour votre bouffe de ${slot.beneficiaryName} (${session.title || session.type}). Vous pouvez faire le retrait à tout moment !`,
+          actionUrl: "/wallet",
+        },
+      ],
+    }).catch(() => {});
+  }
 
   if (toDeductFineIds.length > 0) {
     await prisma.fine.updateMany({

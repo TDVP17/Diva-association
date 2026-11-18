@@ -18,3 +18,4 @@ DO $$ BEGIN
     ADD CONSTRAINT "loans_approvedByAdminId_fkey"
     FOREIGN KEY ("approvedByAdminId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN null; END $$;
+
