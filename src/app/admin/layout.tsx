@@ -29,6 +29,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     pendingPaymentProofs,
     pendingWithdrawals,
     overdueLoans,
+    pendingDisbursements,
+    pendingPrivateTontines,
   ] = await Promise.all([
     prisma.chatMessage.count({
       where: {
@@ -58,6 +60,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     prisma.loan
       .count({ where: { status: { in: ["PENDING_ADMIN", "OVERDUE"] } } })
       .catch(() => 0),
+    prisma.savedPaymentMethod
+      .count({ where: { status: "PENDING" } })
+      .catch(() => 0),
+    prisma.tontineSession
+      .count({ where: { isPrivate: true, privateApprovalStatus: "PENDING_ADMIN" } })
+      .catch(() => 0),
   ]);
 
   const counts: AdminNavCounts = {
@@ -68,6 +76,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     pendingProofs: pendingPaymentProofs,
     pendingWithdrawals,
     overdueLoans,
+    pendingDisbursements,
+    pendingPrivateTontines,
   };
 
   return (

@@ -23,8 +23,8 @@ export async function GET(
     },
   });
 
-  if (!tontine || !tontine.isPrivate) {
-    return NextResponse.json({ error: "Cotisation privée introuvable" }, { status: 404 });
+  if (!tontine || !tontine.isPrivate || tontine.privateApprovalStatus !== "APPROVED") {
+    return NextResponse.json({ error: "Cotisation privée introuvable ou non encore validée" }, { status: 404 });
   }
 
   const session = await auth();
@@ -75,8 +75,8 @@ export async function POST(
     },
   });
 
-  if (!tontine || !tontine.isPrivate) {
-    return NextResponse.json({ error: "Lien d'invitation invalide ou expiré." }, { status: 404 });
+  if (!tontine || !tontine.isPrivate || tontine.privateApprovalStatus !== "APPROVED") {
+    return NextResponse.json({ error: "Lien d'invitation invalide, expiré ou non encore validé par DIVA Asso." }, { status: 404 });
   }
 
   if (tontine.status === "CLOSED") {

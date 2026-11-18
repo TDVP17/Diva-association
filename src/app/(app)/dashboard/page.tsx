@@ -79,9 +79,18 @@ export default async function DashboardPage({
         </div>
       )}
       <section>
-        <h2 className="sticky top-16 z-30 bg-background py-2 -mx-container-padding px-container-padding font-title-md text-title-md text-primary mb-stack-gap-md">
-          {t("yourTontines")}
-        </h2>
+        <div className="sticky top-16 z-30 bg-background py-2 -mx-container-padding px-container-padding mb-stack-gap-md flex items-center justify-between gap-2 flex-wrap">
+          <h2 className="font-title-md text-title-md text-primary">
+            {t("yourTontines")}
+          </h2>
+          <Link
+            href="/private-tontines"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-300/80 text-amber-900 font-label-sm text-label-sm font-semibold hover:bg-amber-100 transition-colors flex-shrink-0"
+          >
+            <span className="material-symbols-outlined text-[16px]">lock</span>
+            <span>{lang === "fr" ? "Créer cotisation privée" : "Create Private Cotisation"}</span>
+          </Link>
+        </div>
         {memberships.length === 0 ? (
           <div className="bg-white rounded-xl p-8 text-center shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant flex flex-col items-center gap-stack-gap-sm">
             <span className="material-symbols-outlined text-outline text-[40px]">account_balance</span>

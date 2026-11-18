@@ -138,7 +138,7 @@ export default async function SessionsPage() {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-300/80 text-amber-900 font-label-sm text-label-sm font-semibold hover:bg-amber-100 transition-colors flex-shrink-0"
             >
               <span className="material-symbols-outlined text-[16px]">lock</span>
-              {lang === "fr" ? "Tontines privées" : "Private Tontines"}
+              {lang === "fr" ? "Créer cotisation privée" : "Create Private Cotisation"}
             </Link>
             {myCotisations.length > 0 && (
               <Link

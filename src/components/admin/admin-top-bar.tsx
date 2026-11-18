@@ -20,7 +20,14 @@ export async function AdminTopBar({
   lang: Lang;
 }) {
   const t = (key: Parameters<typeof translate>[1]) => translate(lang, key);
-  const [unreadMessages, unreadNotifications, pendingMemberships, pendingFoodRequests] = await Promise.all([
+  const [
+    unreadMessages,
+    unreadNotifications,
+    pendingMemberships,
+    pendingFoodRequests,
+    pendingDisbursements,
+    pendingPrivateTontines,
+  ] = await Promise.all([
     prisma.chatMessage.count({
       where: {
         OR: [
@@ -33,13 +40,21 @@ export async function AdminTopBar({
     getUnreadInAppNotificationCount(userId),
     prisma.membership.count({ where: { status: "PENDING" } }),
     prisma.payout.count({ where: { status: { not: "CONFIRMED" } } }),
+    prisma.savedPaymentMethod.count({ where: { status: "PENDING" } }).catch(() => 0),
+    prisma.tontineSession
+      .count({ where: { isPrivate: true, privateApprovalStatus: "PENDING_ADMIN" } })
+      .catch(() => 0),
   ]);
 
   const menuItems: TopRightMenuItem[] = [
     { href: "/admin/contributions", label: t("contributionsNavItem"), icon: "account_balance" },
     { href: "/admin/sessions/new", label: t("addContributionNav"), icon: "add_circle" },
+    { href: "/admin/disbursement-methods", label: t("adminNavDisbursementMethods"), icon: "verified_user", badge: pendingDisbursements },
+    { href: "/admin/private-tontines", label: t("adminNavPrivateTontines"), icon: "lock", badge: pendingPrivateTontines },
     { href: "/admin/membership-requests", label: t("joinRequestsNav"), icon: "group_add", badge: pendingMemberships },
     { href: "/admin/food-requests", label: t("foodRequestsNav"), icon: "restaurant", badge: pendingFoodRequests },
+    { href: "/admin/loans", label: t("adminNavLoans"), icon: "workspace_premium" },
+    { href: "/admin/withdrawals", label: t("adminNavWithdrawals"), icon: "payments" },
     { href: "/admin/users", label: t("allUsersCard"), icon: "group" },
     { href: "/admin/support", label: t("customerSupport"), icon: "chat", badge: unreadMessages },
   ];

@@ -77,12 +77,19 @@ export function LandingPage({ lang }: { lang: Lang }) {
             <p className="font-body-lg text-body-lg text-on-surface-variant max-w-xl mb-section-margin text-balance">
               {t("landingHeroSubtitle")}
             </p>
-            <div className="flex flex-col sm:flex-row gap-stack-gap-md w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row gap-stack-gap-md w-full sm:w-auto flex-wrap justify-center">
               <Link
                 href="/login?mode=signup"
                 className="px-6 py-3.5 rounded-xl bg-primary text-on-primary font-title-sm text-title-sm hover:opacity-90 active:scale-[0.98] transition-all shadow-[0px_8px_30px_rgba(30,41,59,0.15)] text-center"
               >
                 {t("landingHeroCtaPrimary")}
+              </Link>
+              <Link
+                href="/private-tontines"
+                className="px-6 py-3.5 rounded-xl bg-amber-50 text-amber-950 border-2 border-amber-400 font-title-sm text-title-sm hover:bg-amber-100 active:scale-[0.98] transition-all text-center inline-flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[20px] text-amber-700">lock</span>
+                <span>{lang === "fr" ? "Créer cotisation privée" : "Create Private Cotisation"}</span>
               </Link>
               <Link
                 href="/login"

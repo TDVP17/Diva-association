@@ -124,6 +124,15 @@ export function JoinPrivateClient({ token, tontine, isSignedIn }: JoinPrivateCli
             </span>
           </div>
 
+          {!isSignedIn && (
+            <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 flex items-start gap-2.5">
+              <span className="material-symbols-outlined text-emerald-700 text-[18px] flex-shrink-0">person_check</span>
+              <span>
+                <strong>Compte DIVA Asso obligatoire :</strong> vous devez créer un compte (ou vous connecter) sur l&apos;application DIVA Asso avant de pouvoir accepter d&apos;intégrer cette cotisation privée.
+              </span>
+            </div>
+          )}
+
           {error && (
             <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 font-medium">
               {error}
@@ -142,7 +151,7 @@ export function JoinPrivateClient({ token, tontine, isSignedIn }: JoinPrivateCli
               href={`/sessions/${tontine.id}`}
               className="w-full py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm text-center transition-all shadow-md"
             >
-              Ouvrir cette tontine
+              Ouvrir cette cotisation
             </Link>
           ) : status === "PENDING" ? (
             <div className="flex flex-col gap-2">
@@ -160,6 +169,22 @@ export function JoinPrivateClient({ token, tontine, isSignedIn }: JoinPrivateCli
             <div className="w-full py-3 px-4 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm text-center">
               Les inscriptions sont actuellement fermées
             </div>
+          ) : !isSignedIn ? (
+            <div className="flex flex-col gap-2.5">
+              <Link
+                href={`/login?mode=signup&callbackUrl=${encodeURIComponent(`/join/${token}`)}`}
+                className="w-full py-3.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] text-white font-bold text-sm text-center transition-all shadow-md flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[20px]">person_add</span>
+                <span>Créer un compte pour intégrer</span>
+              </Link>
+              <Link
+                href={`/login?callbackUrl=${encodeURIComponent(`/join/${token}`)}`}
+                className="w-full py-3 rounded-xl bg-white border-2 border-emerald-600 text-emerald-800 hover:bg-emerald-50 font-bold text-sm text-center transition-all"
+              >
+                J&apos;ai déjà un compte · Se connecter
+              </Link>
+            </div>
           ) : (
             <button
               type="button"
@@ -175,11 +200,7 @@ export function JoinPrivateClient({ token, tontine, isSignedIn }: JoinPrivateCli
               ) : (
                 <>
                   <span className="material-symbols-outlined text-[20px]">group_add</span>
-                  <span>
-                    {isSignedIn
-                      ? "Demander à rejoindre cette tontine"
-                      : "Se connecter pour rejoindre"}
-                  </span>
+                  <span>Accepter et demander à intégrer cette cotisation</span>
                 </>
               )}
             </button>

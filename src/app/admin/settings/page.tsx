@@ -8,9 +8,11 @@ import { InlineField } from "@/app/(app)/profile/inline-field";
 import { InlinePasswordField } from "@/app/(app)/profile/inline-password-field";
 import { updatePhoneAction, updateEmailAction } from "@/app/(app)/profile/actions";
 import { getAssociationRules } from "@/lib/association-rules";
+import { getPrivateTontineRules } from "@/lib/private-tontine-rules";
 import { getFallbackPaymentConfig } from "@/lib/fallback-payment-config";
 import { FallbackPaymentEditor } from "@/components/admin/fallback-payment-editor";
 import { GeneralRulesEditor } from "./general-rules-editor";
+import { PrivateRulesEditor } from "./private-rules-editor";
 import { ROLE_KEY } from "@/lib/role-label";
 
 export default async function AdminSettingsPage() {
@@ -25,8 +27,9 @@ export default async function AdminSettingsPage() {
   });
   if (!user) redirect("/login");
 
-  const [generalRules, fallbackConfig] = await Promise.all([
+  const [generalRules, privateRules, fallbackConfig] = await Promise.all([
     getAssociationRules(),
+    getPrivateTontineRules(),
     getFallbackPaymentConfig(),
   ]);
 
@@ -102,6 +105,14 @@ export default async function AdminSettingsPage() {
       <section className="mb-stack-gap-lg bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
         <h2 className="font-title-md text-title-md text-on-surface mb-stack-gap-md">{t("editGeneralRules")}</h2>
         <GeneralRulesEditor initialContent={generalRules} lang={lang} />
+      </section>
+
+      <section className="mb-stack-gap-lg bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant p-4">
+        <h2 className="font-title-md text-title-md text-primary flex items-center gap-2 mb-2">
+          <span className="material-symbols-outlined">lock</span>
+          {lang === "fr" ? "Règles des cotisations privées" : "Private Cotisation Rules"}
+        </h2>
+        <PrivateRulesEditor initialContent={privateRules.content} lang={lang} />
       </section>
     </main>
   );

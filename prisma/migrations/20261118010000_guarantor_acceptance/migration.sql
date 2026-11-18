@@ -14,3 +14,4 @@ DO $$ BEGIN
     ADD CONSTRAINT "kyc_verifications_referrerUserId_fkey"
     FOREIGN KEY ("referrerUserId") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN null; END $$;
+

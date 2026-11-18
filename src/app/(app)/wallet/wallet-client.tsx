@@ -79,9 +79,10 @@ export function WalletClient({
   const [isBalanceHidden, setIsBalanceHidden] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Top-up modal state
+  // Top-up modal state (string input so deleting never leaves a sticky "0")
   const [isTopUpOpen, setIsTopUpOpen] = useState(false);
-  const [topUpAmount, setTopUpAmount] = useState<number>(10000);
+  const [topUpAmountInput, setTopUpAmountInput] = useState<string>("10000");
+  const topUpAmount = parseInt(topUpAmountInput, 10) || 0;
   const [phone, setPhone] = useState<string>(
     disbursementMethods[0]?.phone || userPhone || "",
   );
@@ -89,10 +90,11 @@ export function WalletClient({
   const [topUpMessage, setTopUpMessage] = useState<string | null>(null);
   const [topUpError, setTopUpError] = useState<string | null>(null);
 
-  // Withdraw modal state
+  // Withdraw modal state (string input so deleting never leaves a sticky "0")
   const approvedMethods = disbursementMethods.filter((m) => m.status === "APPROVED");
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
-  const [withdrawAmount, setWithdrawAmount] = useState<number>(5000);
+  const [withdrawAmountInput, setWithdrawAmountInput] = useState<string>("5000");
+  const withdrawAmount = parseInt(withdrawAmountInput, 10) || 0;
   const [selectedMethodId, setSelectedMethodId] = useState<string>(approvedMethods[0]?.id || "");
   const [withdrawPin, setWithdrawPin] = useState("");
   const [withdrawing, setWithdrawing] = useState(false);
@@ -597,7 +599,7 @@ export function WalletClient({
                     <button
                       key={amt}
                       type="button"
-                      onClick={() => setTopUpAmount(amt)}
+                      onClick={() => setTopUpAmountInput(String(amt))}
                       className={`py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
                         topUpAmount === amt
                           ? "bg-emerald-700 text-white border-emerald-700"
@@ -610,11 +612,14 @@ export function WalletClient({
                 </div>
                 <div className="relative mt-1">
                   <input
-                    type="number"
-                    min={500}
-                    step={500}
-                    value={topUpAmount}
-                    onChange={(e) => setTopUpAmount(Math.max(0, parseInt(e.target.value) || 0))}
+                    type="text"
+                    inputMode="numeric"
+                    value={topUpAmountInput}
+                    onChange={(e) => {
+                      const clean = e.target.value.replace(/\D/g, "").replace(/^0+/, "");
+                      setTopUpAmountInput(clean);
+                    }}
+                    placeholder="Montant (ex: 5000)"
                     className="w-full bg-white border-2 border-emerald-600 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-600/25 focus:outline-none rounded-xl px-3 py-2.5 text-sm font-bold text-slate-900"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-700">
@@ -797,12 +802,14 @@ export function WalletClient({
                     Montant à retirer (Solde : {formatXAF(balance)}) :
                   </label>
                   <input
-                    type="number"
-                    min={500}
-                    max={balance}
-                    step={500}
-                    value={withdrawAmount}
-                    onChange={(e) => setWithdrawAmount(Math.max(0, parseInt(e.target.value) || 0))}
+                    type="text"
+                    inputMode="numeric"
+                    value={withdrawAmountInput}
+                    onChange={(e) => {
+                      const clean = e.target.value.replace(/\D/g, "").replace(/^0+/, "");
+                      setWithdrawAmountInput(clean);
+                    }}
+                    placeholder="Montant à retirer"
                     className="w-full bg-white border-2 border-emerald-600 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-600/25 focus:outline-none rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-900"
                   />
                   <p className="text-[11px] font-semibold text-emerald-700">

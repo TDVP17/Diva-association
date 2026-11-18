@@ -121,3 +121,4 @@ export async function POST(
         : "Votre refus a bien été enregistré et transmis.",
   });
 }
+

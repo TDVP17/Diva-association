@@ -507,9 +507,13 @@ model TontineSession {
   /// Indique si la cotisation est privée (frais 5.1%, dont 2% marge Diva) ou publique (frais 3.1%).
   isPrivate           Boolean       @default(false)
   /// Token cryptographique unique pour les invitations aux cotisations privées (/join/[token]).
-  inviteToken         String?       @unique
+  inviteToken            String?       @unique
   /// Créateur / gestionnaire autonome de la cotisation privée (null = créée par DIVA Asso).
-  creatorId           String?
+  creatorId              String?
+  /// Statut de validation Admin pour les cotisations privées : "PENDING_ADMIN" | "APPROVED" | "REJECTED".
+  privateApprovalStatus  String        @default("APPROVED")
+  privateRejectionReason String?
+  privateRulesAcceptedAt DateTime?
 
   creator          User?                 @relation("CreatedTontines", fields: [creatorId], references: [id], onDelete: SetNull)
   memberships      Membership[]

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import crypto from "crypto";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
+import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import type { TontineType } from "@/generated/prisma/client";
 
 const ALLOWED_TYPES: TontineType[] = [
@@ -42,11 +42,10 @@ const createPrivateTontineSchema = z.object({
   maxSlots: z.number().int().min(2).max(100).nullable().optional(),
   fineAmountPerPeriod: z.number().int().min(0).max(100_000).optional(),
   fineIntervalHours: z.number().int().min(1).max(168).optional(),
+  rulesAccepted: z.literal(true, {
+    error: "Vous devez lire et accepter les règles des cotisations privées DIVA Asso avant de créer votre cotisation.",
+  }),
 });
-
-function generateInviteToken(): string {
-  return crypto.randomBytes(12).toString("base64url");
-}
 
 export async function GET() {
   const session = await auth();
@@ -81,41 +80,48 @@ export async function GET() {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://divaasso.com";
 
   return NextResponse.json({
-    tontines: tontines.map((t) => ({
-      id: t.id,
-      title: t.title,
-      description: t.description,
-      type: t.type,
-      amount: Number(t.amount),
-      fee: Number(t.fee),
-      status: t.status,
-      startDate: t.startDate.toISOString(),
-      limitTime: t.limitTime,
-      maxSlots: t.maxSlots ? Number(t.maxSlots) : null,
-      fineAmountPerPeriod: t.fineAmountPerPeriod ? Number(t.fineAmountPerPeriod) : null,
-      fineIntervalHours: t.fineIntervalHours,
-      inviteToken: t.inviteToken,
-      inviteUrl: t.inviteToken ? `${baseUrl}/join/${t.inviteToken}` : null,
-      isCreator: t.creatorId === userId,
-      creatorName: t.creator?.name ?? "DIVA Asso",
-      pendingCount: t.memberships.filter((m) => m.status === "PENDING").length,
-      approvedCount: t.memberships.filter((m) => m.status === "APPROVED").length,
-      memberships: t.memberships.map((m) => ({
-        id: m.id,
-        userId: m.userId,
-        userName: m.user.name,
-        userPhone: m.user.phone,
-        status: m.status,
-        slotCount: m.slotCount,
-        joinedAt: m.joinedAt.toISOString(),
-        slots: m.slots.map((s) => ({
-          id: s.id,
-          beneficiaryName: s.beneficiaryName,
-          officialPosition: s.officialPosition,
-          ballDrawn: s.ballDrawn,
+    tontines: tontines.map((t) => {
+      const isApprovedByAdmin = t.privateApprovalStatus === "APPROVED";
+      return {
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        type: t.type,
+        amount: Number(t.amount),
+        fee: Number(t.fee),
+        status: t.status,
+        isPaused: t.isPaused,
+        isLocked: t.lockedAt !== null,
+        privateApprovalStatus: t.privateApprovalStatus,
+        privateRejectionReason: t.privateRejectionReason,
+        startDate: t.startDate.toISOString(),
+        limitTime: t.limitTime,
+        maxSlots: t.maxSlots ? Number(t.maxSlots) : null,
+        fineAmountPerPeriod: t.fineAmountPerPeriod ? Number(t.fineAmountPerPeriod) : 500,
+        fineIntervalHours: t.fineIntervalHours ?? 24,
+        inviteToken: isApprovedByAdmin ? t.inviteToken : null,
+        inviteUrl: isApprovedByAdmin && t.inviteToken ? `${baseUrl}/join/${t.inviteToken}` : null,
+        isCreator: t.creatorId === userId,
+        creatorName: t.creator?.name ?? "DIVA Asso",
+        pendingCount: t.memberships.filter((m) => m.status === "PENDING").length,
+        approvedCount: t.memberships.filter((m) => m.status === "APPROVED").length,
+        memberships: t.memberships.map((m) => ({
+          id: m.id,
+          userId: m.userId,
+          userName: m.user.name,
+          userPhone: m.user.phone,
+          status: m.status,
+          slotCount: m.slotCount,
+          joinedAt: m.joinedAt.toISOString(),
+          slots: m.slots.map((s) => ({
+            id: s.id,
+            beneficiaryName: s.beneficiaryName,
+            officialPosition: s.officialPosition,
+            ballDrawn: s.ballDrawn,
+          })),
         })),
-      })),
-    })),
+      };
+    }),
   });
 }
 
@@ -149,8 +155,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Compte non autorisé" }, { status: 403 });
   }
 
-  const inviteToken = generateInviteToken();
-
+  // Create in PENDING_ADMIN with NO inviteToken yet — Admin must approve before invite link is generated!
   const created = await prisma.$transaction(async (tx) => {
     const tontine = await tx.tontineSession.create({
       data: {
@@ -166,12 +171,13 @@ export async function POST(request: Request) {
         fineAmountPerPeriod: data.fineAmountPerPeriod ?? 500,
         fineIntervalHours: data.fineIntervalHours ?? 24,
         isPrivate: true,
-        inviteToken,
+        inviteToken: null,
         creatorId: userId,
+        privateApprovalStatus: "PENDING_ADMIN",
+        privateRulesAcceptedAt: new Date(),
       },
     });
 
-    // Auto-enroll creator as APPROVED with 1 initial slot
     const membership = await tx.membership.create({
       data: {
         userId,
@@ -193,10 +199,27 @@ export async function POST(request: Request) {
     return tontine;
   });
 
+  // Immediately notify all Admins to review and approve this private cotisation
+  const admins = await prisma.user.findMany({
+    where: { role: { in: ["ADMIN", "PRESIDENT"] }, isBanned: false },
+    select: { id: true },
+  });
+  if (admins.length > 0) {
+    await scheduleInAppNotifications({
+      tontineSessionId: created.id,
+      type: "ADMIN_BROADCAST",
+      recipients: admins.map((a) => ({
+        userId: a.id,
+        message: `🔒 Nouvelle cotisation privée à valider : « ${created.title} » créée par ${user.name} (${Number(created.amount).toLocaleString("fr-FR")} FCFA). Validez pour générer son lien d'invitation.`,
+        actionUrl: "/admin/private-tontines",
+      })),
+    }).catch(() => {});
+  }
+
   await logAudit({
     actorId: userId,
     actorRole: session.user.role,
-    action: "private_tontine_created",
+    action: "private_tontine_submitted_for_admin_approval",
     targetType: "TontineSession",
     targetId: created.id,
     tontineSessionId: created.id,
@@ -204,16 +227,14 @@ export async function POST(request: Request) {
     request,
   });
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://divaasso.com";
-
   return NextResponse.json(
     {
       ok: true,
       id: created.id,
-      inviteToken: created.inviteToken,
-      inviteUrl: `${baseUrl}/join/${created.inviteToken}`,
+      privateApprovalStatus: "PENDING_ADMIN",
+      message:
+        "Votre cotisation privée a été créée et envoyée à l'administrateur DIVA Asso pour validation. Votre lien d'invitation sera généré dès son approbation !",
     },
     { status: 201 },
   );
 }
-

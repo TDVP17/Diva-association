@@ -45,3 +45,4 @@ export default async function GuarantorRequestsPage() {
 
   return <GuarantorRequestsClient lang={lang} initialRequests={initialRequests} />;
 }
+

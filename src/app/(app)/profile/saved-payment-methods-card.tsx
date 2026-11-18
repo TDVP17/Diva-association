@@ -252,7 +252,7 @@ export function SavedPaymentMethodsCard({ lang }: { lang: Lang }) {
                       value={newPhone}
                       onChange={(e) => setNewPhone(e.target.value.replace(/\D/g, "").slice(0, 9))}
                       placeholder="6XXXXXXXX"
-                      className="w-full border border-outline-variant rounded-lg px-3 py-2 font-mono text-sm bg-white"
+                      className="w-full border-2 border-emerald-600 focus:border-emerald-700 focus:outline-none rounded-lg px-3 py-2 font-mono text-sm bg-white"
                     />
                     {detectedProvider && (
                       <span
@@ -273,8 +273,8 @@ export function SavedPaymentMethodsCard({ lang }: { lang: Lang }) {
                       type="text"
                       value={newAccountName}
                       onChange={(e) => setNewAccountName(e.target.value)}
-                      placeholder={lang === "fr" ? "Ex: BOGNING VALERE" : "e.g. BOGNING VALERE"}
-                      className="w-full border border-outline-variant rounded-lg px-3 py-2 text-sm bg-white"
+                      placeholder={lang === "fr" ? "Nom complet sur le compte" : "Full name on account"}
+                      className="w-full border-2 border-emerald-600 focus:border-emerald-700 focus:outline-none rounded-lg px-3 py-2 text-sm bg-white"
                     />
                     <span className="block text-[10px] text-slate-500 mt-1">
                       {lang === "fr"

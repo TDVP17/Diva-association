@@ -32,9 +32,15 @@ export interface PrivateTontineItem {
   amount: number;
   fee: number;
   status: string;
+  isPaused: boolean;
+  isLocked: boolean;
+  privateApprovalStatus: string;
+  privateRejectionReason: string | null;
   startDate: string;
   limitTime: string;
   maxSlots: number | null;
+  fineAmountPerPeriod: number;
+  fineIntervalHours: number;
   inviteToken: string | null;
   inviteUrl: string | null;
   isCreator: boolean;
@@ -59,15 +65,25 @@ const CADENCE_OPTIONS = [
   { value: "QUARTERLY_25", label: "Trimestrielle — Le 25 tous les 3 mois" },
 ];
 
+function sanitizeNumericInput(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  return digits.replace(/^0+(?=\d)/, "");
+}
+
 export function PrivateTontinesClient({
   lang,
   initialTontines,
+  privateRulesContent,
+  currentUserId,
 }: {
   lang: Lang;
   initialTontines: PrivateTontineItem[];
+  privateRulesContent: string;
+  currentUserId: string;
 }) {
   const [tontines, setTontines] = useState<PrivateTontineItem[]>(initialTontines);
-  const [showCreate, setShowCreate] = useState(false);
+  const [showCreate, setShowCreate] = useState(initialTontines.length === 0);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -79,14 +95,27 @@ export function PrivateTontinesClient({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState("HEBDO_SUNDAY");
-  const [amount, setAmount] = useState(10000);
-  const [fee, setFee] = useState(0);
+  const [amountInput, setAmountInput] = useState("10000");
+  const [feeInput, setFeeInput] = useState("");
+  const [fineInput, setFineInput] = useState("500");
   const [startDate, setStartDate] = useState(() => {
     const d = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     return d.toISOString().slice(0, 10);
   });
   const [limitTime, setLimitTime] = useState("18:30");
   const [maxSlots, setMaxSlots] = useState<string>("12");
+  const [rulesAccepted, setRulesAccepted] = useState(false);
+
+  // Inline edit state per managed tontine
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editLimitTime, setEditLimitTime] = useState("18:30");
+  const [editFineInput, setEditFineInput] = useState("500");
+  const [editMaxSlots, setEditMaxSlots] = useState("");
+
+  // Broadcast announcement state per managed tontine
+  const [broadcastMessage, setBroadcastMessage] = useState("");
 
   async function refreshList() {
     const res = await fetch("/api/private-tontines");
@@ -96,9 +125,28 @@ export function PrivateTontinesClient({
     }
   }
 
+  function startEdit(t: PrivateTontineItem) {
+    setEditingId(t.id);
+    setEditTitle(t.title);
+    setEditDescription(t.description || "");
+    setEditLimitTime(t.limitTime);
+    setEditFineInput(String(t.fineAmountPerPeriod ?? 500));
+    setEditMaxSlots(t.maxSlots ? String(t.maxSlots) : "");
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setCreateError(null);
+    if (!rulesAccepted) {
+      setCreateError("Vous devez lire et accepter les règles des cotisations privées DIVA Asso.");
+      return;
+    }
+    const parsedAmount = Number(amountInput || "0");
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 1000) {
+      setCreateError("La mise unitaire doit être d'au moins 1 000 FCFA.");
+      return;
+    }
+
     setCreating(true);
     try {
       const res = await fetch("/api/private-tontines", {
@@ -108,11 +156,13 @@ export function PrivateTontinesClient({
           title,
           description: description.trim() || undefined,
           type,
-          amount: Number(amount),
-          fee: Number(fee),
+          amount: parsedAmount,
+          fee: Number(feeInput || "0"),
+          fineAmountPerPeriod: Number(fineInput || "0"),
           startDate,
           limitTime,
           maxSlots: maxSlots.trim() ? Number(maxSlots) : null,
+          rulesAccepted: true,
         }),
       });
       const data = await res.json();
@@ -123,10 +173,12 @@ export function PrivateTontinesClient({
       setShowCreate(false);
       setTitle("");
       setDescription("");
+      setRulesAccepted(false);
       setFeedback(
-        lang === "fr"
-          ? "Tontine privée créée ! Partagez votre lien unique d'invitation sur WhatsApp."
-          : "Private tontine created! Share your unique invite link on WhatsApp.",
+        data.message ||
+          (lang === "fr"
+            ? "Demande envoyée ! Votre cotisation privée est en attente de validation par DIVA Asso. Dès validation, votre lien d'invitation sécurisé apparaîtra ici."
+            : "Submitted! Your private cotisation is awaiting DIVA Asso admin approval."),
       );
       await refreshList();
     } catch {
@@ -144,17 +196,22 @@ export function PrivateTontinesClient({
 
   function shareOnWhatsApp(t: PrivateTontineItem) {
     if (!t.inviteUrl) return;
-    const text = `🌿 Je t'invite à rejoindre notre tontine privée "${t.title}" (${formatXAF(t.amount)}) sur DIVA Asso !\n\nClique sur ce lien sécurisé pour demander ton accès :\n${t.inviteUrl}`;
+    const text = `🌿 Je t'invite à rejoindre notre cotisation privée "${t.title}" (${formatXAF(t.amount)}) sur DIVA Asso !\n\nCrée ton compte DIVA Asso puis clique sur ce lien sécurisé pour demander ton accès :\n${t.inviteUrl}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
   }
 
   function shareBySms(t: PrivateTontineItem) {
     if (!t.inviteUrl) return;
-    const text = `Invitation tontine privée "${t.title}" (${formatXAF(t.amount)}) sur DIVA Asso : ${t.inviteUrl}`;
+    const text = `Invitation cotisation privée "${t.title}" (${formatXAF(t.amount)}) sur DIVA Asso : ${t.inviteUrl}`;
     window.location.href = `sms:?body=${encodeURIComponent(text)}`;
   }
 
-  async function runManageAction(tontineId: string, body: Record<string, unknown>, key: string) {
+  async function runManageAction(
+    tontineId: string,
+    body: Record<string, unknown>,
+    key: string,
+    successMessage?: string,
+  ) {
     setBusyAction(key);
     setFeedback(null);
     try {
@@ -167,11 +224,41 @@ export function PrivateTontinesClient({
       if (!res.ok) {
         setFeedback(data.error || "Erreur lors de l'action");
       } else {
+        if (successMessage) setFeedback(successMessage);
+        if (body.action === "update_details") setEditingId(null);
+        if (body.action === "broadcast_members") setBroadcastMessage("");
         await refreshList();
       }
     } finally {
       setBusyAction(null);
     }
+  }
+
+  function moveSlotOrder(t: PrivateTontineItem, slotId: string, direction: -1 | 1) {
+    const allSlots = t.memberships
+      .filter((m) => m.status === "APPROVED")
+      .flatMap((m) => m.slots)
+      .sort((a, b) => (a.officialPosition ?? 9999) - (b.officialPosition ?? 9999));
+
+    const idx = allSlots.findIndex((s) => s.id === slotId);
+    const targetIdx = idx + direction;
+    if (idx < 0 || targetIdx < 0 || targetIdx >= allSlots.length) return;
+
+    const reordered = [...allSlots];
+    const [moved] = reordered.splice(idx, 1);
+    reordered.splice(targetIdx, 0, moved);
+
+    const slotOrders = reordered.map((s, i) => ({
+      slotId: s.id,
+      officialPosition: i + 1,
+    }));
+
+    runManageAction(
+      t.id,
+      { action: "set_order", slotOrders },
+      `reorder-${slotId}`,
+      "Ordre de passage mis à jour !",
+    );
   }
 
   return (
@@ -184,12 +271,12 @@ export function PrivateTontinesClient({
             <span>{lang === "fr" ? "Cercles fermés sur invitation" : "Invite-only Private Circles"}</span>
           </div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            {lang === "fr" ? "Cotisations Privées" : "Private Tontines"}
+            {lang === "fr" ? "Créer cotisation privée" : "Private Cotisations"}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
             {lang === "fr"
-              ? "Créez votre propre tontine familiale, entre collègues ou amis. Invisible publiquement, accessible uniquement par votre lien sécurisé."
-              : "Create your own private tontine for family, colleagues, or friends. Hidden from public listings, accessible via invite link only."}
+              ? "Créez votre propre cotisation privée (famille, collègues, amis). Après validation par DIVA Asso, partagez votre lien sécurisé uniquement aux personnes invitées."
+              : "Create your own private cotisation for family, colleagues, or friends. Once approved by DIVA Asso, share your private invite link."}
           </p>
         </div>
 
@@ -199,18 +286,18 @@ export function PrivateTontinesClient({
           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-sm hover:opacity-90 active:scale-95 transition-all shadow-sm cursor-pointer flex-shrink-0"
         >
           <span className="material-symbols-outlined text-[20px]">add_circle</span>
-          <span>{lang === "fr" ? "Créer une tontine privée" : "Create Private Tontine"}</span>
+          <span>{lang === "fr" ? "Créer cotisation privée" : "Create Private Cotisation"}</span>
         </button>
       </div>
 
-      {/* Isolation notice (Pilier 3.4.1) */}
+      {/* Isolation notice */}
       <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600 flex items-start gap-2.5">
         <span className="material-symbols-outlined text-amber-700 text-[20px] flex-shrink-0">shield</span>
         <span>
-          <strong>{lang === "fr" ? "Confidentialité & Isolation :" : "Privacy & Isolation:"}</strong>{" "}
+          <strong>{lang === "fr" ? "Validation & Confidentialité :" : "Approval & Privacy:"}</strong>{" "}
           {lang === "fr"
-            ? "Les cotisations privées n'apparaissent jamais sur le tableau public et sont séparées de la caisse publique de prêts d'urgence DIVA Asso."
-            : "Private tontines never appear on public boards and are isolated from the public DIVA Asso emergency loan pool."}
+            ? "Chaque cotisation privée est vérifiée par l'administration DIVA Asso avant activation du lien d'invitation. Elle reste totalement invisible du public, et chaque invité doit créer un compte DIVA Asso pour l'intégrer."
+            : "Every private cotisation is reviewed by DIVA Asso before its invite link is activated. Invited members must have a DIVA Asso account to join."}
         </span>
       </div>
 
@@ -229,7 +316,7 @@ export function PrivateTontinesClient({
         >
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <h2 className="font-bold text-base text-slate-900">
-              {lang === "fr" ? "Nouvelle Tontine Privée" : "New Private Tontine"}
+              {lang === "fr" ? "Nouvelle Cotisation Privée" : "New Private Cotisation"}
             </h2>
             <button
               type="button"
@@ -248,14 +335,14 @@ export function PrivateTontinesClient({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1 sm:col-span-2">
-              <label className="text-xs font-bold text-slate-700">Nom de la tontine *</label>
+              <label className="text-xs font-bold text-slate-700">Nom de la cotisation privée *</label>
               <input
                 type="text"
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex: Tontine Famille Kamga / Collègues Bureau"
-                className="border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                placeholder="Ex: Cotisation Famille / Collègues du bureau"
+                className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/30"
               />
             </div>
 
@@ -265,8 +352,8 @@ export function PrivateTontinesClient({
                 rows={2}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Objectif, règles de bouffe, heure limite..."
-                className="border border-slate-200 rounded-xl px-3.5 py-2 text-sm bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                placeholder="Objectif, règles internes, heure limite..."
+                className="border-2 border-emerald-600 rounded-xl px-3.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/30"
               />
             </div>
 
@@ -275,7 +362,7 @@ export function PrivateTontinesClient({
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value)}
-                className="border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm bg-slate-50 focus:bg-white"
+                className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm bg-white"
               >
                 {CADENCE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -288,13 +375,13 @@ export function PrivateTontinesClient({
             <div className="flex flex-col gap-1">
               <label className="text-xs font-bold text-slate-700">Mise unitaire (FCFA) *</label>
               <input
-                type="number"
-                min={1000}
-                step={500}
+                type="text"
+                inputMode="numeric"
                 required
-                value={amount}
-                onChange={(e) => setAmount(Number(e.target.value))}
-                className="border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-bold bg-slate-50 focus:bg-white"
+                value={amountInput}
+                onChange={(e) => setAmountInput(sanitizeNumericInput(e.target.value))}
+                placeholder="Ex: 10000"
+                className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm font-bold bg-white"
               />
             </div>
 
@@ -305,7 +392,7 @@ export function PrivateTontinesClient({
                 required
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm bg-slate-50 focus:bg-white"
+                className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm bg-white"
               />
             </div>
 
@@ -315,34 +402,67 @@ export function PrivateTontinesClient({
                 type="time"
                 value={limitTime}
                 onChange={(e) => setLimitTime(e.target.value)}
-                className="border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm bg-slate-50 focus:bg-white"
+                className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm bg-white"
               />
             </div>
 
             <div className="flex flex-col gap-1">
               <label className="text-xs font-bold text-slate-700">Nombre max de places (optionnel)</label>
               <input
-                type="number"
-                min={2}
-                max={100}
+                type="text"
+                inputMode="numeric"
                 value={maxSlots}
-                onChange={(e) => setMaxSlots(e.target.value)}
+                onChange={(e) => setMaxSlots(sanitizeNumericInput(e.target.value))}
                 placeholder="Illimité si vide"
-                className="border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm bg-slate-50 focus:bg-white"
+                className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm bg-white"
               />
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-slate-700">Frais internes par cotisation (FCFA)</label>
+              <label className="text-xs font-bold text-slate-700">Amende de retard (FCFA)</label>
               <input
-                type="number"
-                min={0}
-                step={100}
-                value={fee}
-                onChange={(e) => setFee(Number(e.target.value))}
-                className="border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm bg-slate-50 focus:bg-white"
+                type="text"
+                inputMode="numeric"
+                value={fineInput}
+                onChange={(e) => setFineInput(sanitizeNumericInput(e.target.value))}
+                placeholder="Ex: 500"
+                className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm bg-white"
               />
             </div>
+
+            <div className="flex flex-col gap-1 sm:col-span-2">
+              <label className="text-xs font-bold text-slate-700">Frais internes par cotisation (FCFA, optionnel)</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={feeInput}
+                onChange={(e) => setFeeInput(sanitizeNumericInput(e.target.value))}
+                placeholder="0"
+                className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm bg-white"
+              />
+            </div>
+          </div>
+
+          {/* Mandatory DIVA Asso Private Cotisation Rules */}
+          <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/50 p-4 flex flex-col gap-3">
+            <div className="flex items-center gap-2 text-amber-950 font-bold text-xs uppercase">
+              <span className="material-symbols-outlined text-[18px] text-amber-700">gavel</span>
+              <span>Règlement officiel des cotisations privées — DIVA Asso</span>
+            </div>
+            <div className="max-h-48 overflow-y-auto rounded-xl bg-white border border-amber-200 p-3 text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
+              {privateRulesContent}
+            </div>
+            <label className="flex items-start gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rulesAccepted}
+                onChange={(e) => setRulesAccepted(e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-emerald-700 rounded cursor-pointer flex-shrink-0"
+              />
+              <span className="text-xs font-semibold text-slate-800">
+                J&apos;ai lu et j&apos;accepte intégralement les règles des cotisations privées DIVA Asso. Je comprends que ma cotisation doit être validée par DIVA Asso avant activation du lien d&apos;invitation.
+              </span>
+            </label>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
@@ -355,11 +475,11 @@ export function PrivateTontinesClient({
             </button>
             <button
               type="submit"
-              disabled={creating}
+              disabled={creating || !rulesAccepted}
               className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              {creating ? <LoadingSpinner /> : <span className="material-symbols-outlined text-[18px]">check</span>}
-              <span>Créer & Générer le lien d&apos;invitation</span>
+              {creating ? <LoadingSpinner /> : <span className="material-symbols-outlined text-[18px]">send</span>}
+              <span>Soumettre pour validation DIVA Asso</span>
             </button>
           </div>
         </form>
@@ -373,7 +493,7 @@ export function PrivateTontinesClient({
           </div>
           <h3 className="font-bold text-base text-slate-900">Aucune cotisation privée pour le moment</h3>
           <p className="text-xs text-slate-500 max-w-sm">
-            Créez votre première tontine privée en 30 secondes et invitez vos proches sur WhatsApp avec votre lien unique sécurisé.
+            Créez votre première cotisation privée, faites-la valider par DIVA Asso et invitez vos proches avec votre lien unique sécurisé.
           </p>
         </div>
       ) : (
@@ -382,6 +502,13 @@ export function PrivateTontinesClient({
             const isOpen = managingId === t.id;
             const pendingMembers = t.memberships.filter((m) => m.status === "PENDING");
             const approvedMembers = t.memberships.filter((m) => m.status === "APPROVED");
+            const orderedSlots = approvedMembers
+              .flatMap((m) => m.slots.map((s) => ({ ...s, membership: m })))
+              .sort((a, b) => (a.officialPosition ?? 9999) - (b.officialPosition ?? 9999));
+
+            const isPendingAdmin = t.privateApprovalStatus === "PENDING_ADMIN";
+            const isRejectedAdmin = t.privateApprovalStatus === "REJECTED";
+            const isApprovedAdmin = t.privateApprovalStatus === "APPROVED";
 
             return (
               <div
@@ -396,7 +523,27 @@ export function PrivateTontinesClient({
                       </span>
                       {t.isCreator && (
                         <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 text-[10px] font-bold uppercase">
-                          Gestionnaire
+                          Propriétaire
+                        </span>
+                      )}
+                      {isPendingAdmin && (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-900 text-[10px] font-bold">
+                          ⏳ En attente validation DIVA Asso
+                        </span>
+                      )}
+                      {isRejectedAdmin && (
+                        <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-800 text-[10px] font-bold">
+                          Refusée par DIVA Asso
+                        </span>
+                      )}
+                      {t.isPaused && (
+                        <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 text-[10px] font-bold">
+                          En pause
+                        </span>
+                      )}
+                      {t.isLocked && (
+                        <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold">
+                          Inscriptions verrouillées
                         </span>
                       )}
                       <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold">
@@ -406,7 +553,9 @@ export function PrivateTontinesClient({
                     <h3 className="text-lg font-extrabold text-slate-900 mt-1">{t.title}</h3>
                     <p className="text-xs text-slate-500 mt-0.5">
                       Mise : <strong className="text-slate-900">{formatXAF(t.amount)}</strong> ·{" "}
+                      Amende : <strong className="text-slate-900">{formatXAF(t.fineAmountPerPeriod)}</strong> ·{" "}
                       {t.approvedCount} membre(s) validé(s)
+                      {t.maxSlots ? ` / ${t.maxSlots}` : ""}
                       {t.pendingCount > 0 && (
                         <span className="ml-1.5 text-amber-700 font-bold">
                           · {t.pendingCount} demande(s) en attente
@@ -420,7 +569,7 @@ export function PrivateTontinesClient({
                       href={`/sessions/${t.id}`}
                       className="px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-900 border border-emerald-200 font-bold text-xs hover:bg-emerald-100 transition-colors"
                     >
-                      Ouvrir la tontine
+                      Ouvrir la cotisation
                     </Link>
                     {t.isCreator && (
                       <button
@@ -440,12 +589,32 @@ export function PrivateTontinesClient({
                   </div>
                 </div>
 
-                {/* Invite Link Box */}
-                {t.inviteUrl && (
+                {/* Admin approval status banners */}
+                {isPendingAdmin && (
+                  <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-950 flex items-start gap-2.5">
+                    <span className="material-symbols-outlined text-amber-700 text-[18px] flex-shrink-0">hourglass_top</span>
+                    <span>
+                      <strong>En attente de validation par l&apos;admin DIVA Asso :</strong> votre lien d&apos;invitation sécurisé sera automatiquement généré et visible ici dès que l&apos;administration aura approuvé votre cotisation privée.
+                    </span>
+                  </div>
+                )}
+
+                {isRejectedAdmin && (
+                  <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-xs text-red-800 flex items-start gap-2.5">
+                    <span className="material-symbols-outlined text-red-600 text-[18px] flex-shrink-0">error</span>
+                    <span>
+                      <strong>Demande refusée par DIVA Asso :</strong>{" "}
+                      {t.privateRejectionReason || "Veuillez contacter le support DIVA Asso pour plus d'informations."}
+                    </span>
+                  </div>
+                )}
+
+                {/* Invite Link Box (ONLY when approved by DIVA Asso admin) */}
+                {isApprovedAdmin && t.inviteUrl && (
                   <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="min-w-0">
                       <span className="text-[10px] font-bold uppercase text-emerald-800 tracking-wide">
-                        Lien unique d&apos;invitation sécurisé
+                        Lien unique d&apos;invitation sécurisé (compte DIVA Asso requis)
                       </span>
                       <p className="text-xs font-mono text-emerald-950 truncate mt-0.5">{t.inviteUrl}</p>
                     </div>
@@ -476,10 +645,97 @@ export function PrivateTontinesClient({
                   </div>
                 )}
 
-                {/* Creator Management Panel */}
+                {/* Rich Creator Management Panel */}
                 {t.isCreator && isOpen && (
                   <div className="pt-3 border-t border-slate-100 flex flex-col gap-4">
-                    {/* Status controls */}
+                    {/* Quick owner toolbar */}
+                    <div className="flex flex-wrap items-center gap-2 bg-slate-50 p-3 rounded-2xl">
+                      <button
+                        type="button"
+                        onClick={() => (editingId === t.id ? setEditingId(null) : startEdit(t))}
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-800 hover:bg-slate-100 cursor-pointer flex items-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">edit</span>
+                        <span>Modifier paramètres</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={busyAction !== null}
+                        onClick={() =>
+                          runManageAction(
+                            t.id,
+                            { action: "toggle_pause" },
+                            `${t.id}-pause`,
+                            t.isPaused ? "Cotisation relancée." : "Cotisation mise en pause.",
+                          )
+                        }
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-800 hover:bg-slate-100 cursor-pointer flex items-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">
+                          {t.isPaused ? "play_arrow" : "pause"}
+                        </span>
+                        <span>{t.isPaused ? "Reprendre" : "Mettre en pause"}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={busyAction !== null}
+                        onClick={() =>
+                          runManageAction(
+                            t.id,
+                            { action: "toggle_lock" },
+                            `${t.id}-lock`,
+                            t.isLocked ? "Inscriptions déverrouillées." : "Inscriptions verrouillées.",
+                          )
+                        }
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-800 hover:bg-slate-100 cursor-pointer flex items-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">
+                          {t.isLocked ? "lock_open" : "lock"}
+                        </span>
+                        <span>{t.isLocked ? "Ouvrir inscriptions" : "Fermer inscriptions"}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={busyAction !== null || orderedSlots.length < 2}
+                        onClick={() => {
+                          if (!window.confirm("Effectuer un tirage au sort aléatoire de l'ordre de bouffe ?")) return;
+                          runManageAction(
+                            t.id,
+                            { action: "shuffle_order" },
+                            `${t.id}-shuffle`,
+                            "Tirage au sort effectué et membres notifiés !",
+                          );
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-700 text-white hover:bg-emerald-800 cursor-pointer disabled:opacity-40 flex items-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">casino</span>
+                        <span>Tirage au sort</span>
+                      </button>
+
+                      {isApprovedAdmin && (
+                        <button
+                          type="button"
+                          disabled={busyAction !== null}
+                          onClick={() =>
+                            runManageAction(
+                              t.id,
+                              { action: "regenerate_token" },
+                              `${t.id}-regen`,
+                              "Nouveau lien d'invitation généré !",
+                            )
+                          }
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-50 border border-amber-300 text-amber-900 hover:bg-amber-100 cursor-pointer flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-[15px]">refresh</span>
+                          <span>Régénérer lien</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Cycle Status controls */}
                     <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 p-3 rounded-2xl">
                       <span className="text-xs font-bold text-slate-700">Statut du cycle :</span>
                       <div className="flex items-center gap-1.5 flex-wrap">
@@ -489,7 +745,12 @@ export function PrivateTontinesClient({
                             type="button"
                             disabled={busyAction !== null || t.status === st}
                             onClick={() =>
-                              runManageAction(t.id, { action: "set_status", status: st }, `${t.id}-${st}`)
+                              runManageAction(
+                                t.id,
+                                { action: "set_status", status: st },
+                                `${t.id}-${st}`,
+                                "Statut du cycle mis à jour.",
+                              )
                             }
                             className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-colors ${
                               t.status === st
@@ -506,16 +767,125 @@ export function PrivateTontinesClient({
                                   : "Clôturé"}
                           </button>
                         ))}
+                      </div>
+                    </div>
+
+                    {/* Inline Settings Editor */}
+                    {editingId === t.id && (
+                      <div className="p-4 rounded-2xl border-2 border-emerald-200 bg-emerald-50/30 flex flex-col gap-3">
+                        <h4 className="text-xs font-bold text-emerald-950 uppercase">Modifier les paramètres</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="flex flex-col gap-1 sm:col-span-2">
+                            <label className="text-[11px] font-bold text-slate-700">Titre</label>
+                            <input
+                              type="text"
+                              value={editTitle}
+                              onChange={(e) => setEditTitle(e.target.value)}
+                              className="border-2 border-emerald-600 rounded-xl px-3 py-2 text-xs bg-white"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1 sm:col-span-2">
+                            <label className="text-[11px] font-bold text-slate-700">Description / Règlement interne</label>
+                            <textarea
+                              rows={2}
+                              value={editDescription}
+                              onChange={(e) => setEditDescription(e.target.value)}
+                              className="border-2 border-emerald-600 rounded-xl px-3 py-2 text-xs bg-white"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] font-bold text-slate-700">Heure limite</label>
+                            <input
+                              type="time"
+                              value={editLimitTime}
+                              onChange={(e) => setEditLimitTime(e.target.value)}
+                              className="border-2 border-emerald-600 rounded-xl px-3 py-2 text-xs bg-white"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] font-bold text-slate-700">Amende retard (FCFA)</label>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={editFineInput}
+                              onChange={(e) => setEditFineInput(sanitizeNumericInput(e.target.value))}
+                              className="border-2 border-emerald-600 rounded-xl px-3 py-2 text-xs bg-white"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] font-bold text-slate-700">Places max</label>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={editMaxSlots}
+                              onChange={(e) => setEditMaxSlots(sanitizeNumericInput(e.target.value))}
+                              placeholder="Illimité"
+                              className="border-2 border-emerald-600 rounded-xl px-3 py-2 text-xs bg-white"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setEditingId(null)}
+                            className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 cursor-pointer"
+                          >
+                            Annuler
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busyAction !== null}
+                            onClick={() =>
+                              runManageAction(
+                                t.id,
+                                {
+                                  action: "update_details",
+                                  title: editTitle,
+                                  description: editDescription || null,
+                                  limitTime: editLimitTime,
+                                  fineAmountPerPeriod: Number(editFineInput || "0"),
+                                  maxSlots: editMaxSlots.trim() ? Number(editMaxSlots) : null,
+                                },
+                                `${t.id}-save-edit`,
+                                "Paramètres mis à jour !",
+                              )
+                            }
+                            className="px-4 py-1.5 rounded-lg bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 cursor-pointer"
+                          >
+                            Enregistrer
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Broadcast message to all members */}
+                    <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/70 flex flex-col gap-2">
+                      <h4 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[16px] text-emerald-700">campaign</span>
+                        <span>Envoyer une annonce à tous les membres</span>
+                      </h4>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="text"
+                          value={broadcastMessage}
+                          onChange={(e) => setBroadcastMessage(e.target.value)}
+                          placeholder="Ex: Rappel de cotisation avant dimanche 18h30..."
+                          className="flex-1 border-2 border-emerald-600 rounded-xl px-3 py-2 text-xs bg-white"
+                        />
                         <button
                           type="button"
-                          disabled={busyAction !== null}
+                          disabled={busyAction !== null || broadcastMessage.trim().length < 3}
                           onClick={() =>
-                            runManageAction(t.id, { action: "regenerate_token" }, `${t.id}-regen`)
+                            runManageAction(
+                              t.id,
+                              { action: "broadcast_members", message: broadcastMessage.trim() },
+                              `${t.id}-broadcast`,
+                              "Annonce envoyée à tous les membres !",
+                            )
                           }
-                          className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-50 border border-amber-300 text-amber-900 hover:bg-amber-100 cursor-pointer"
-                          title="Révoquer l'ancien lien et générer un nouveau lien d'invitation"
+                          className="px-4 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 cursor-pointer disabled:opacity-40"
                         >
-                          🔄 Régénérer lien
+                          Envoyer
                         </button>
                       </div>
                     </div>
@@ -546,6 +916,7 @@ export function PrivateTontinesClient({
                                     t.id,
                                     { action: "decide_membership", membershipId: m.id, decision: "APPROVED" },
                                     `app-${m.id}`,
+                                    `${m.userName} a été accepté(e) !`,
                                   )
                                 }
                                 className="px-3 py-1.5 rounded-lg bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 cursor-pointer"
@@ -560,6 +931,7 @@ export function PrivateTontinesClient({
                                     t.id,
                                     { action: "decide_membership", membershipId: m.id, decision: "REJECTED" },
                                     `rej-${m.id}`,
+                                    "Demande refusée.",
                                   )
                                 }
                                 className="px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs font-bold hover:bg-red-100 cursor-pointer"
@@ -572,30 +944,72 @@ export function PrivateTontinesClient({
                       </div>
                     )}
 
-                    {/* Approved members & payout positions */}
+                    {/* Approved members & payout positions with manual reorder + remove */}
                     <div className="flex flex-col gap-2">
                       <h4 className="text-xs font-bold text-slate-700 uppercase">
-                        Membres & Ordre de passage ({approvedMembers.length})
+                        Membres &amp; Ordre de bouffe ({orderedSlots.length} place(s))
                       </h4>
                       <div className="flex flex-col divide-y divide-slate-100 border border-slate-100 rounded-xl overflow-hidden">
-                        {approvedMembers.flatMap((m) =>
-                          m.slots.map((s) => (
-                            <div
-                              key={s.id}
-                              className="px-3.5 py-2.5 flex items-center justify-between bg-white text-xs"
-                            >
-                              <div className="flex items-center gap-2.5">
-                                <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-900 font-bold flex items-center justify-center text-[11px]">
-                                  {s.officialPosition ?? "—"}
-                                </span>
-                                <span className="font-semibold text-slate-900">{s.beneficiaryName}</span>
-                              </div>
-                              <span className="text-[11px] text-slate-400">
-                                {m.userPhone || m.userName}
+                        {orderedSlots.map((s, idx) => (
+                          <div
+                            key={s.id}
+                            className="px-3.5 py-2.5 flex items-center justify-between gap-2 bg-white text-xs"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-900 font-bold flex items-center justify-center text-[11px] flex-shrink-0">
+                                {s.officialPosition ?? idx + 1}
                               </span>
+                              <div className="min-w-0">
+                                <span className="font-semibold text-slate-900 block truncate">
+                                  {s.beneficiaryName}
+                                </span>
+                                <span className="text-[11px] text-slate-400">
+                                  {s.membership.userPhone || s.membership.userName}
+                                </span>
+                              </div>
                             </div>
-                          )),
-                        )}
+
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <button
+                                type="button"
+                                disabled={busyAction !== null || idx === 0}
+                                onClick={() => moveSlotOrder(t, s.id, -1)}
+                                className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
+                                title="Monter dans l'ordre"
+                              >
+                                <span className="material-symbols-outlined text-[16px]">arrow_upward</span>
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busyAction !== null || idx === orderedSlots.length - 1}
+                                onClick={() => moveSlotOrder(t, s.id, 1)}
+                                className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 disabled:opacity-30 cursor-pointer"
+                                title="Descendre dans l'ordre"
+                              >
+                                <span className="material-symbols-outlined text-[16px]">arrow_downward</span>
+                              </button>
+                              {s.membership.userId !== currentUserId && (
+                                <button
+                                  type="button"
+                                  disabled={busyAction !== null}
+                                  onClick={() => {
+                                    if (!window.confirm(`Retirer ${s.membership.userName} de cette cotisation privée ?`)) return;
+                                    runManageAction(
+                                      t.id,
+                                      { action: "remove_member", membershipId: s.membership.id },
+                                      `rem-${s.membership.id}`,
+                                      `${s.membership.userName} a été retiré(e).`,
+                                    );
+                                  }}
+                                  className="w-7 h-7 rounded-lg border border-red-200 bg-red-50 flex items-center justify-center text-red-700 hover:bg-red-100 cursor-pointer"
+                                  title="Retirer ce membre"
+                                >
+                                  <span className="material-symbols-outlined text-[15px]">person_remove</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -608,4 +1022,3 @@ export function PrivateTontinesClient({
     </main>
   );
 }
-

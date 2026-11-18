@@ -235,6 +235,61 @@ export async function runAutoWalletContributionsSweep(options?: {
           ).catch(() => {});
         }
       }
+
+      // Si des noms n'ont pas pu être cotisés ET que le solde principal est > 0 (jamais si solde === 0)
+      const stillUnpaidSlots = unpaidSlots.filter(
+        (s) => !paidNamesForUser.includes(s.beneficiaryName),
+      );
+      if (stillUnpaidSlots.length > 0) {
+        const freshAfter = await prisma.user.findUnique({
+          where: { id: user.id },
+          select: { walletBalance: true },
+        });
+        const remainingBal = Number(freshAfter?.walletBalance || 0);
+        const neededAmount = stillUnpaidSlots.length * total;
+
+        if (remainingBal > 0 && remainingBal < neededAmount) {
+          const lang = user.preferredLang === "en" ? "en" : "fr";
+          const unpaidNamesList = stillUnpaidSlots.map((s) => s.beneficiaryName).join(", ");
+          await scheduleInAppNotifications({
+            tontineSessionId: sess.id,
+            type: "CONTRIBUTION_REMINDER",
+            recipients: [
+              {
+                userId: user.id,
+                message:
+                  lang === "fr"
+                    ? `⚠️ Solde principal insuffisant (${formatXAF(remainingBal)}) pour cotiser automatiquement vos noms restants (${unpaidNamesList}) dans « ${sessionTitle} » (${formatXAF(neededAmount)} requis). Veuillez recharger votre portefeuille ou cotiser directement.`
+                    : `⚠️ Insufficient main balance (${formatXAF(remainingBal)}) to auto-pay your remaining slots (${unpaidNamesList}) in "${sessionTitle}" (${formatXAF(neededAmount)} required). Please top up your wallet or pay directly.`,
+                actionUrl: `/wallet`,
+              },
+            ],
+          }).catch(() => {});
+
+          if (user.email) {
+            const html = renderBrandedEmailHtml({
+              title:
+                lang === "fr"
+                  ? "Solde principal insuffisant pour votre cotisation ⚠️"
+                  : "Insufficient Wallet Balance for Your Contribution ⚠️",
+              bodyText:
+                lang === "fr"
+                  ? `Bonjour ${user.name},\n\nVotre solde principal (Portefeuille DIVA Asso : ${formatXAF(remainingBal)}) est insuffisant pour cotiser automatiquement vos noms restants (${unpaidNamesList}) dans « ${sessionTitle} ».\n\n• Montant requis : ${formatXAF(neededAmount)}\n• Solde actuel : ${formatXAF(remainingBal)}\n\nVeuillez recharger votre portefeuille ou payer directement par Mobile Money afin d'éviter toute amende.`
+                  : `Hello ${user.name},\n\nYour main wallet balance (${formatXAF(remainingBal)}) is insufficient to automatically pay your remaining slots (${unpaidNamesList}) in "${sessionTitle}" (${formatXAF(neededAmount)} required).`,
+              actionUrl: `/wallet`,
+              actionLabel: lang === "fr" ? "Recharger mon portefeuille" : "Top Up Wallet",
+              lang,
+            });
+            await sendEmailSafe(
+              user.email,
+              lang === "fr"
+                ? `DIVA Asso — Solde principal insuffisant pour cotiser (${sessionTitle})`
+                : `DIVA Asso — Insufficient Wallet Balance (${sessionTitle})`,
+              html,
+            ).catch(() => {});
+          }
+        }
+      }
     }
   }
 
@@ -246,3 +301,4 @@ export async function runAutoWalletContributionsSweep(options?: {
     paidDetails,
   };
 }
+

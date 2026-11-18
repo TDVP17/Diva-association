@@ -47,6 +47,8 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
   const [totalUsersCount, setTotalUsersCount] = useState<number | null>(null);
   const [supportCount, setSupportCount] = useState<number | null>(null);
   const [foodRequestCount, setFoodRequestCount] = useState<number | null>(null);
+  const [pendingDisbursementCount, setPendingDisbursementCount] = useState<number | null>(null);
+  const [pendingPrivateTontinesCount, setPendingPrivateTontinesCount] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/membership-queue")
@@ -76,6 +78,18 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
     fetch("/api/admin/payout-claims")
       .then((r) => r.json())
       .then((b) => setFoodRequestCount((b.claims ?? []).filter((c: { status: string }) => c.status !== "CONFIRMED").length))
+      .catch(() => {});
+    fetch("/api/admin/disbursement-methods")
+      .then((r) => r.json())
+      .then((b) =>
+        setPendingDisbursementCount(
+          (b.methods ?? []).filter((m: { status?: string }) => m.status === "PENDING" || !m.status).length,
+        ),
+      )
+      .catch(() => {});
+    fetch("/api/admin/private-tontines")
+      .then((r) => r.json())
+      .then((b) => setPendingPrivateTontinesCount(typeof b.pendingCount === "number" ? b.pendingCount : 0))
       .catch(() => {});
   }, []);
 
@@ -123,6 +137,28 @@ export function AdminDashboardClient({ lang }: { lang: Lang }) {
           title={t("messages")}
           body={lang === "fr" ? "Messages et questions des membres en attente de réponse." : "Member messages awaiting admin response."}
           count={supportCount}
+        />
+        <DashboardCard
+          href="/admin/disbursement-methods"
+          icon="verified_user"
+          title={t("adminNavDisbursementMethods")}
+          body={
+            lang === "fr"
+              ? "Valider ou refuser les numéros MTN et Orange Money enregistrés par les membres."
+              : "Approve or reject MTN & Orange Money payout numbers registered by members."
+          }
+          count={pendingDisbursementCount}
+        />
+        <DashboardCard
+          href="/admin/private-tontines"
+          icon="lock"
+          title={t("adminNavPrivateTontines")}
+          body={
+            lang === "fr"
+              ? "Approuver les demandes de cotisations privées pour activer leur lien d'invitation."
+              : "Approve private cotisation requests to activate their unique invite link."
+          }
+          count={pendingPrivateTontinesCount}
         />
         <DashboardCard
           href="/admin/membership-requests"

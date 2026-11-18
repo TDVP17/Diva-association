@@ -19,7 +19,7 @@ export default async function JoinPrivateTontinePage({
     },
   });
 
-  if (!tontine || !tontine.isPrivate) {
+  if (!tontine || !tontine.isPrivate || tontine.privateApprovalStatus !== "APPROVED") {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="max-w-md w-full bg-white rounded-3xl p-8 text-center shadow-lg border border-slate-200 flex flex-col items-center gap-3">

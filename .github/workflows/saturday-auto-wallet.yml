@@ -21,3 +21,4 @@ jobs:
         run: |
           curl -sf -X POST "https://divaasso.com/api/crons/loan-penalties" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" || true
+

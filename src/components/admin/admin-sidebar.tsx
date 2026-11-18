@@ -7,6 +7,8 @@ import { translate, type Lang } from "@/lib/i18n/translations";
 const BASE_ITEMS = [
   { href: "/admin", label: "adminNavDashboard", icon: "space_dashboard" },
   { href: "/admin/membership-requests", label: "cotisationMembershipRequestsCard", icon: "group_add" },
+  { href: "/admin/private-tontines", label: "adminNavPrivateTontines", icon: "lock" },
+  { href: "/admin/disbursement-methods", label: "adminNavDisbursementMethods", icon: "verified_user" },
   { href: "/admin/users", label: "allUsersCard", icon: "group" },
   { href: "/admin/contributions", label: "myCotisationsCard", icon: "account_balance" },
   { href: "/admin/withdrawals", label: "adminNavWithdrawals", icon: "payments" },
@@ -29,6 +31,8 @@ export interface AdminNavCounts {
   pendingProofs?: number;
   pendingWithdrawals?: number;
   overdueLoans?: number;
+  pendingDisbursements?: number;
+  pendingPrivateTontines?: number;
 }
 
 export function AdminSidebar({
@@ -63,7 +67,11 @@ export function AdminSidebar({
                       ? counts?.pendingWithdrawals
                       : item.href === "/admin/loans"
                         ? counts?.overdueLoans
-                        : undefined;
+                        : item.href === "/admin/disbursement-methods"
+                          ? counts?.pendingDisbursements
+                          : item.href === "/admin/private-tontines"
+                            ? counts?.pendingPrivateTontines
+                            : undefined;
 
         return (
           <Link
