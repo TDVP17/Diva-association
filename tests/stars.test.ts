@@ -137,3 +137,4 @@ describe("Stars Awarding System & Loan Eligibility Rules", () => {
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 });
+

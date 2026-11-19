@@ -69,6 +69,31 @@ export async function POST(request: Request) {
   const totalDebit = amount + feeAmount;
 
   try {
+    // Check daily deposit limit (500 000 FCFA / day limit for cash-in security, wallet balance storage remains unlimited)
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const todayDeposits = await prisma.walletTransaction.aggregate({
+      where: {
+        userId: session.user.id,
+        type: "DEPOSIT",
+        status: { in: ["SUCCESSFUL", "COMPLETED", "PENDING"] },
+        createdAt: { gte: startOfDay },
+      },
+      _sum: { amount: true },
+    });
+    const currentDailyTotal = Number(todayDeposits._sum.amount || 0);
+    const MAX_DAILY_DEPOSIT_XAF = 500_000;
+    if (currentDailyTotal + amount > MAX_DAILY_DEPOSIT_XAF) {
+      const remainingAllowed = Math.max(0, MAX_DAILY_DEPOSIT_XAF - currentDailyTotal);
+      return NextResponse.json(
+        {
+          error: `Plafond de recharge journalier atteint (500 000 FCFA/jour). Vous avez déjà rechargé ${currentDailyTotal.toLocaleString("fr-FR")} FCFA aujourd'hui. Montant restant autorisé pour aujourd'hui : ${remainingAllowed.toLocaleString("fr-FR")} FCFA.`,
+        },
+        { status: 400 },
+      );
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { id: true, name: true, email: true, walletBalance: true },
@@ -78,6 +103,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
     }
 
+    const providerLabel = provider === "ORANGE" ? "Orange Money" : "MTN Mobile Money";
     const hasFapshiConfig = Boolean(getFapshiApiUser() && getFapshiApiKey());
 
     if (hasFapshiConfig) {
@@ -102,8 +128,14 @@ export async function POST(request: Request) {
           balanceAfter: Number(user.walletBalance || 0) + amount,
           status: "PENDING",
           type: "DEPOSIT",
-          description: `Recharge Mobile Money ${provider} (${feeInfo.percentage}% de frais)`,
+          description: `Recharge ${providerLabel} (${feeInfo.percentage}% de frais)`,
           fapshiTxRef: fapshiResult.transId,
+          metadata: {
+            provider,
+            phone,
+            requestedAmount: amount,
+            feeAmount,
+          },
         },
       });
 
@@ -115,7 +147,7 @@ export async function POST(request: Request) {
         fee: feeAmount,
         totalDebit,
         feePercentage: feeInfo.percentage,
-        message: `Veuillez valider le débit de ${totalDebit} FCFA sur votre téléphone (${phone}).`,
+        message: `Veuillez valider le débit de ${totalDebit.toLocaleString("fr-FR")} FCFA sur votre téléphone (${phone}).`,
       });
     } else {
       // In development or local demo when Fapshi is not configured:
@@ -126,7 +158,13 @@ export async function POST(request: Request) {
           amount,
           fee: feeAmount,
           type: "DEPOSIT",
-          description: `Recharge portefeuille locale (+${amount} FCFA, frais ${feeInfo.percentage}%)`,
+          description: `Recharge ${providerLabel} (+${amount} FCFA, frais ${feeInfo.percentage}%)`,
+          metadata: {
+            provider,
+            phone,
+            requestedAmount: amount,
+            feeAmount,
+          },
         }),
       );
 
@@ -138,7 +176,7 @@ export async function POST(request: Request) {
         feePercentage: feeInfo.percentage,
         newBalance: ledger.balanceAfter,
         reference: ledger.reference,
-        message: `Portefeuille rechargé avec succès de ${amount} FCFA !`,
+        message: `Portefeuille rechargé avec succès de ${amount.toLocaleString("fr-FR")} FCFA !`,
       });
     }
   } catch (err) {

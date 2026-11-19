@@ -120,10 +120,17 @@ export function WalletClient({
 
   // Withdraw modal state (string input so deleting never leaves a sticky "0")
   const approvedMethods = disbursementMethods.filter((m) => m.status === "APPROVED");
+  const isMethodSuspendedFn = (m: DisbursementMethodItem) =>
+    m.provider === "ORANGE"
+      ? Boolean(operatorSuspension.isOrangeSuspended || operatorSuspension.orangeCashOutEnabled === false)
+      : m.provider === "MTN"
+        ? Boolean(operatorSuspension.isMtnSuspended || operatorSuspension.mtnCashOutEnabled === false)
+        : false;
+  const initialAvailableMethod = approvedMethods.find((m) => !isMethodSuspendedFn(m)) || approvedMethods[0];
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
   const [withdrawAmountInput, setWithdrawAmountInput] = useState<string>("5000");
   const withdrawAmount = parseInt(withdrawAmountInput, 10) || 0;
-  const [selectedMethodId, setSelectedMethodId] = useState<string>(approvedMethods[0]?.id || "");
+  const [selectedMethodId, setSelectedMethodId] = useState<string>(initialAvailableMethod?.id || "");
   const [withdrawPin, setWithdrawPin] = useState("");
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
@@ -834,9 +841,20 @@ export function WalletClient({
                   </h4>
                   <p className="text-xs text-slate-600 mt-1 max-w-xs leading-relaxed">
                     {lang === "fr"
-                      ? `Veuillez composer votre code secret Mobile Money sur votre téléphone (${phone}) pour valider le débit de ${formatXAF(totalDebit)}.`
-                      : `Please enter your Mobile Money PIN on your phone (${phone}) to approve ${formatXAF(totalDebit)}.`}
+                      ? `Veuillez composer votre code secret sur votre téléphone (${phone}) pour valider le débit de ${formatXAF(totalDebit)}.`
+                      : `Please enter your PIN on your phone (${phone}) to approve ${formatXAF(totalDebit)}.`}
                   </p>
+                  <div className="mt-2.5 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 text-left">
+                    <p className="font-bold flex items-center gap-1 mb-0.5">
+                      <span className="material-symbols-outlined text-[15px] text-amber-700">info</span>
+                      <span>Invite automatique non reçue sur votre mobile ?</span>
+                    </p>
+                    <p>
+                      {topUpProvider === "ORANGE"
+                        ? "Composez le #150*50# sur votre téléphone Orange Money pour valider manuellement la transaction."
+                        : "Composez le *126# sur votre téléphone MTN Mobile Money pour valider manuellement la transaction."}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold">
@@ -905,6 +923,9 @@ export function WalletClient({
                       FCFA
                     </span>
                   </div>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    Min : 500 FCFA · Max journalier : 500 000 FCFA · Stockage portefeuille : Illimité
+                  </p>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
@@ -942,8 +963,8 @@ export function WalletClient({
                   </div>
                   <p className="text-[10px] text-slate-500 mt-0.5">
                     {isPrivateMember
-                      ? "Frais de 5,1% appliqués pour les membres de cotisations privées."
-                      : "Frais opérateur Orange / MTN de 3,1% (cotisation publique)."}
+                      ? "Frais de 5,1% appliqués uniquement sur tout argent qui entre (dépôts/cotisations). 0% de frais sur les retraits."
+                      : "Frais de 3,1% appliqués uniquement sur tout argent qui entre (dépôts/cotisations). 0% de frais sur les retraits."}
                   </p>
                 </div>
 
@@ -957,10 +978,18 @@ export function WalletClient({
                   </button>
                   <button
                     type="submit"
-                    disabled={isSubmitting || isTopUpOperatorSuspended}
-                    className="flex-1 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    disabled={isSubmitting || isTopUpOperatorSuspended || topUpAmount < 500 || phone.length < 9}
+                    className="flex-1 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-slate-400 flex items-center justify-center gap-1.5"
                   >
-                    {isSubmitting ? <LoadingSpinner /> : <span>Payer {formatXAF(totalDebit)}</span>}
+                    {isSubmitting ? (
+                      <LoadingSpinner />
+                    ) : isTopUpOperatorSuspended ? (
+                      <span>Dépôts {topUpProvider === "ORANGE" ? "Orange" : "MTN"} suspendus</span>
+                    ) : topUpAmount < 500 ? (
+                      <span>Montant min. 500 FCFA</span>
+                    ) : (
+                      <span>Payer {formatXAF(totalDebit)}</span>
+                    )}
                   </button>
                 </div>
               </form>
@@ -980,7 +1009,7 @@ export function WalletClient({
                 </div>
                 <div>
                   <h3 className="font-bold text-sm text-slate-900">Retirer vers Mobile Money</h3>
-                  <p className="text-[11px] text-emerald-700 font-semibold">0 % de frais pour le membre</p>
+                  <p className="text-[11px] text-emerald-700 font-semibold">0% de frais sur les retraits</p>
                 </div>
               </div>
               <button
@@ -1158,9 +1187,17 @@ export function WalletClient({
                   <button
                     type="submit"
                     disabled={withdrawing || isWithdrawOperatorSuspended || balance < withdrawalLimits.minAmount}
-                    className="flex-1 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    className="flex-1 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-slate-400 flex items-center justify-center gap-1.5"
                   >
-                    {withdrawing ? <LoadingSpinner /> : <span>Confirmer le retrait</span>}
+                    {withdrawing ? (
+                      <LoadingSpinner />
+                    ) : isWithdrawOperatorSuspended ? (
+                      <span>Retraits {selectedWithdrawMethod?.provider === "ORANGE" ? "Orange" : "MTN"} indisponibles</span>
+                    ) : balance < withdrawalLimits.minAmount ? (
+                      <span>Solde insuffisant</span>
+                    ) : (
+                      <span>Confirmer le retrait</span>
+                    )}
                   </button>
                 </div>
               </form>

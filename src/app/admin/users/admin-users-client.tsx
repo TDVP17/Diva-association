@@ -16,6 +16,7 @@ interface UserMembershipItem {
     title: string;
     status: string;
     amount: number;
+    isPrivate?: boolean;
   };
 }
 
@@ -71,7 +72,7 @@ const ROLE_CLASS: Record<string, string> = {
   PRESIDENT: "bg-[#d1fae5] text-[#065f46]",
 };
 
-type FilterTab = "all" | "pending" | "members" | "none";
+type FilterTab = "all" | "pending" | "members" | "public_only" | "private_only" | "mixed" | "none";
 
 export function AdminUsersClient({ lang }: { lang: Lang }) {
   const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string>) => translate(lang, key, vars);
@@ -326,12 +327,24 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
 
   const pendingCount = users ? users.filter((u) => u.memberships?.some((m) => m.status === "PENDING")).length : 0;
   const membersCount = users ? users.filter((u) => u.memberships?.some((m) => m.status === "APPROVED")).length : 0;
+  const publicCount = users ? users.filter((u) => u.memberships?.some((m) => m.status === "APPROVED" && !m.session.isPrivate)).length : 0;
+  const privateCount = users ? users.filter((u) => u.memberships?.some((m) => m.status === "APPROVED" && m.session.isPrivate)).length : 0;
+  const mixedCount = users ? users.filter((u) => {
+    const approved = u.memberships?.filter((m) => m.status === "APPROVED") || [];
+    return approved.some((m) => !m.session.isPrivate) && approved.some((m) => m.session.isPrivate);
+  }).length : 0;
   const noneCount = users ? users.filter((u) => !u.memberships || u.memberships.length === 0).length : 0;
 
   const displayedUsers = users
     ? users.filter((u) => {
       if (filterTab === "pending") return u.memberships?.some((m) => m.status === "PENDING");
       if (filterTab === "members") return u.memberships?.some((m) => m.status === "APPROVED");
+      if (filterTab === "public_only") return u.memberships?.some((m) => m.status === "APPROVED" && !m.session.isPrivate);
+      if (filterTab === "private_only") return u.memberships?.some((m) => m.status === "APPROVED" && m.session.isPrivate);
+      if (filterTab === "mixed") {
+        const approved = u.memberships?.filter((m) => m.status === "APPROVED") || [];
+        return approved.some((m) => !m.session.isPrivate) && approved.some((m) => m.session.isPrivate);
+      }
       if (filterTab === "none") return !u.memberships || u.memberships.length === 0;
       return true;
     })
@@ -390,6 +403,39 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
         >
           <span>{lang === "fr" ? "Membres actifs" : "Active members"}</span>
           <span className="font-bold ml-0.5">({membersCount})</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilterTab("public_only")}
+          className={`px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap cursor-pointer ${filterTab === "public_only"
+              ? "bg-emerald-800 text-white shadow-xs"
+              : "bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200"
+            }`}
+        >
+          <span>{lang === "fr" ? "Cotisation Publique" : "Public only"}</span>
+          <span className="font-bold ml-0.5">({publicCount})</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilterTab("private_only")}
+          className={`px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap cursor-pointer ${filterTab === "private_only"
+              ? "bg-amber-700 text-white shadow-xs"
+              : "bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200"
+            }`}
+        >
+          <span>{lang === "fr" ? "Cotisation Privée" : "Private only"}</span>
+          <span className="font-bold ml-0.5">({privateCount})</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilterTab("mixed")}
+          className={`px-3 py-1.5 rounded-lg font-medium transition-colors whitespace-nowrap cursor-pointer ${filterTab === "mixed"
+              ? "bg-purple-700 text-white shadow-xs"
+              : "bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200"
+            }`}
+        >
+          <span>{lang === "fr" ? "Mixte (Publique & Privée)" : "Mixed (Public & Private)"}</span>
+          <span className="font-bold ml-0.5">({mixedCount})</span>
         </button>
         <button
           type="button"
@@ -486,6 +532,36 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
                           {lang === "fr" ? "BANNI" : "BANNED"}
                         </span>
                       )}
+
+                      {/* Cotisation category badge: Publique, Privée, Mixte */}
+                      {(() => {
+                        const approved = (u.memberships || []).filter((m) => m.status === "APPROVED");
+                        if (approved.length === 0) return null;
+                        const hasPub = approved.some((m) => !m.session.isPrivate);
+                        const hasPriv = approved.some((m) => m.session.isPrivate);
+                        if (hasPub && hasPriv) {
+                          return (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-label-sm text-[10px] font-extrabold bg-purple-100 text-purple-900 border border-purple-200 flex-shrink-0">
+                              <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+                              Mixte (Publique & Privée)
+                            </span>
+                          );
+                        }
+                        if (hasPriv) {
+                          return (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-label-sm text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-200 flex-shrink-0">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                              Cotisation Privée
+                            </span>
+                          );
+                        }
+                        return (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-label-sm text-[10px] font-extrabold bg-emerald-100 text-emerald-900 border border-emerald-200 flex-shrink-0">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                            Cotisation Publique
+                          </span>
+                        );
+                      })()}
 
                       {/* Indicateur 5 Étoiles (Score de réputation / Admissibilité aux prêts) */}
                       <button

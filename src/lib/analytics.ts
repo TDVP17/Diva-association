@@ -32,6 +32,7 @@ export interface RevenueAnalytics {
     totalMoneyOut: number;
     totalFeesIn: number;
     totalFeesOut: number;
+    resteFraisAdmin: number;
     balance: number;
   };
   // Cotisations Privées
@@ -40,6 +41,7 @@ export interface RevenueAnalytics {
     totalMoneyOut: number;
     totalFeesIn: number;
     divaMargin2Percent: number;
+    creatorRest: number;
     adminRest: number;
   };
   // Portefeuilles des membres
@@ -170,12 +172,15 @@ export async function getRevenueAnalytics(): Promise<RevenueAnalytics> {
   const privateDivaMargin = Math.round(privateMoneyIn * 0.02); // 2% net Diva Asso
   const privateAdminRest = Math.max(0, privateMoneyIn - privateMoneyOut);
 
+  const publicResteFraisAdmin = Math.max(0, publicFeesIn - publicFeesOut);
+
   return {
     public: {
       totalMoneyIn: publicMoneyIn,
       totalMoneyOut: publicMoneyOut,
       totalFeesIn: publicFeesIn,
       totalFeesOut: publicFeesOut,
+      resteFraisAdmin: publicResteFraisAdmin,
       balance: publicMoneyIn - publicMoneyOut,
     },
     private: {
@@ -183,6 +188,7 @@ export async function getRevenueAnalytics(): Promise<RevenueAnalytics> {
       totalMoneyOut: privateMoneyOut,
       totalFeesIn: privateFeesIn,
       divaMargin2Percent: privateDivaMargin,
+      creatorRest: privateAdminRest,
       adminRest: privateAdminRest,
     },
     totalMembersWalletBalance,

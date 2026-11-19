@@ -13,7 +13,7 @@ export interface BrandedEmailParams {
   recipientName?: string;
 }
 
-export const ASSO_TITLE_BADGE = "Asso 🌿";
+export const ASSO_TITLE_BADGE = "Mon Asso 🌿";
 
 const LEADING_GREETING_PREFIX_RE =
   /^(?:salut|bonjour|bonsoir|coucou|hello|hi|hey)(?:\s*,?\s+[^\r\n!?:—]{1,40}?)?(?:\s*👋)?\s*(?:[!?:—-]+)\s*/iu;
@@ -30,14 +30,14 @@ export function stripLeadingGreetingPrefix(text: string): string {
 }
 
 /**
- * Formats an announcement/email title with "Asso 🌿 — " (no personal greeting
+ * Formats an announcement/email title with "Mon Asso 🌿 — " (no personal greeting
  * and no member name), replacing any leading greeting prefix cleanly.
  */
 export function formatBroadcastTitle(rawTitle: string): string {
   const cleaned = stripLeadingGreetingPrefix(rawTitle);
   if (!cleaned) return ASSO_TITLE_BADGE;
-  if (/^(?:[\p{Extended_Pictographic}\uFE0F\u200D\s]*(?:DIVA\s+)?Asso\b)/iu.test(cleaned)) {
-    return cleaned;
+  if (/^(?:[\p{Extended_Pictographic}\uFE0F\u200D\s]*(?:DIVA\s+)?Asso\.?\b)/iu.test(cleaned)) {
+    return cleaned.replace(/^(?:[\p{Extended_Pictographic}\uFE0F\u200D\s]*(?:DIVA\s+)?Asso\.?\s*)/iu, "Mon Asso 🌿 ");
   }
   return `${ASSO_TITLE_BADGE} — ${cleaned}`;
 }
@@ -123,9 +123,17 @@ export function renderBrandedEmailHtml(params: BrandedEmailParams): string {
   };
 
   const rawTitle = (params.title || "").trim();
-  const cleanTitle = LEADING_GREETING_PREFIX_RE.test(rawTitle)
+  let cleanTitle = LEADING_GREETING_PREFIX_RE.test(rawTitle)
     ? formatBroadcastTitle(rawTitle)
     : rawTitle || ASSO_TITLE_BADGE;
+
+  if (
+    !cleanTitle ||
+    cleanTitle.toLowerCase() === "diva asso" ||
+    cleanTitle.toLowerCase() === "diva asso."
+  ) {
+    cleanTitle = ASSO_TITLE_BADGE;
+  }
 
   let content = "";
   if (params.bodyHtml) {

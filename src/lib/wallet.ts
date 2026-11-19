@@ -144,15 +144,20 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
     take: 5,
   });
 
-  const formatDateTime = (d: Date) =>
-    d.toLocaleString("fr-FR", {
+  const formatDateTime = (d: Date) => {
+    const dateStr = d.toLocaleDateString("fr-FR", {
       day: "numeric",
       month: "short",
       year: "numeric",
+      timeZone: "Africa/Douala",
+    });
+    const timeStr = d.toLocaleTimeString("fr-FR", {
       hour: "2-digit",
       minute: "2-digit",
       timeZone: "Africa/Douala",
     });
+    return `${dateStr} à ${timeStr}`;
+  };
 
   // Aggregate operations from confirmed wallet ledger records only
   const operations: WalletOperation[] = [];

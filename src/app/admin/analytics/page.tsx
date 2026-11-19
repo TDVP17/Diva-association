@@ -56,7 +56,7 @@ export default async function AdminAnalyticsPage() {
           </h3>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Total argent entré */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between">
             <span className="text-xs font-bold text-slate-500 uppercase">
@@ -106,6 +106,19 @@ export default async function AdminAnalyticsPage() {
             </p>
             <span className="text-[10px] text-slate-400 mt-1">
               {lang === "fr" ? "Coût opérateur Orange / MTN" : "Operator processing cost"}
+            </span>
+          </div>
+
+          {/* Reste Frais Admin */}
+          <div className="bg-emerald-50/80 rounded-2xl shadow-sm border border-emerald-200 p-4 flex flex-col justify-between">
+            <span className="text-xs font-bold text-emerald-800 uppercase">
+              {lang === "fr" ? "Reste Frais Admin" : "Admin Net Fees Rest"}
+            </span>
+            <p className="text-xl sm:text-2xl font-extrabold text-emerald-900 mt-2">
+              {formatXAF(data.public.resteFraisAdmin)}
+            </p>
+            <span className="text-[10px] text-emerald-700 mt-1">
+              {lang === "fr" ? "Marge nette conservée par l'association" : "Net margin retained by DIVA Asso"}
             </span>
           </div>
         </div>
@@ -161,16 +174,16 @@ export default async function AdminAnalyticsPage() {
             </span>
           </div>
 
-          {/* Reste admin / solde disponible */}
+          {/* Reste créateur / solde disponible */}
           <div className="bg-white rounded-2xl shadow-sm border border-indigo-100 p-4 flex flex-col justify-between">
             <span className="text-xs font-bold text-indigo-700 uppercase">
-              {lang === "fr" ? "Reste admin" : "Admin Balance"}
+              {lang === "fr" ? "Reste créateur" : "Creator Balance"}
             </span>
             <p className="text-xl sm:text-2xl font-extrabold text-emerald-800 mt-2">
               {formatXAF(data.private.adminRest)}
             </p>
             <span className="text-[10px] text-slate-400 mt-1">
-              {lang === "fr" ? "Solde non encore décaissé" : "Remaining available balance"}
+              {lang === "fr" ? "Solde non encore décaissé revenant au créateur" : "Remaining available balance due to creator"}
             </span>
           </div>
         </div>

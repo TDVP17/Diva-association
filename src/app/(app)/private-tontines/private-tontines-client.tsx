@@ -637,30 +637,17 @@ export function PrivateTontinesClient({
               />
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-slate-700">
-                Participants minimum requis pour lancer
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={minParticipantsInput}
-                onChange={(e) => setMinParticipantsInput(sanitizeNumericInput(e.target.value))}
-                placeholder="Ex: 10"
-                className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm bg-white"
-              />
-            </div>
-
-            {/* Platform Fee Dynamic Display (5.1% of entire cycle) */}
-            <div className="sm:col-span-2 rounded-xl bg-emerald-50/70 border border-emerald-200 p-3 text-xs text-emerald-950 flex flex-col gap-1">
-              <div className="flex justify-between items-center font-bold">
-                <span>Frais de service plateforme DIVA Asso (5,1 % sur le cycle complet) :</span>
-                <span className="text-sm font-extrabold text-emerald-800">
-                  {formatXAF(simulatedPlatformFee.platformFeeAmount)} / participant
-                </span>
+            {/* Platform Fee Notice */}
+            <div className="sm:col-span-2 rounded-xl bg-emerald-50/70 border border-emerald-200 p-3.5 text-xs text-emerald-950 flex flex-col gap-1.5">
+              <div className="flex items-center gap-2 font-extrabold text-emerald-900 text-sm">
+                <span className="material-symbols-outlined text-emerald-700 text-[18px]">verified</span>
+                <span>Frais clairs et transparents DIVA Asso</span>
               </div>
-              <p className="text-[11px] text-slate-600">
-                Calculé sur le total des cotisations versées sur les {simulatedPlatformFee.totalCycles} cycles (soit {formatXAF(simulatedPlatformFee.totalContributionObligation)} au total par place).
+              <p className="text-xs font-bold text-emerald-800">
+                Frais sur tout argent qui entre : 5,1% · Frais sur tout ce qui sort : 0%
+              </p>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                Les frais sont appliqués uniquement lors des dépôts et des cotisations. Tous les retraits et décaissements de gains vers Mobile Money sont strictement sans frais (0%).
               </p>
             </div>
 

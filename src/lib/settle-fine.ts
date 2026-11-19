@@ -159,6 +159,22 @@ export async function creditLateBeneficiaryWithHalfFine(params: {
           },
         ],
       }).catch(() => {});
+
+      if (targetUser.email) {
+        const emailTitle =
+          benLang === "fr"
+            ? "Indemnité de retard reçue sur votre Portefeuille ! 🌿💰"
+            : "Late fine compensation credited to your Wallet! 🌿💰";
+        const emailHtml = renderBrandedEmailHtml({
+          title: emailTitle,
+          bodyText: notifMsg,
+          actionUrl: "/wallet",
+          actionLabel: benLang === "fr" ? "Voir mon portefeuille" : "View my wallet",
+          recipientName: targetUser.name,
+          lang: benLang,
+        });
+        await sendEmailSafe(targetUser.email, emailTitle, emailHtml).catch(() => {});
+      }
     }
 
     if (
@@ -166,17 +182,39 @@ export async function creditLateBeneficiaryWithHalfFine(params: {
       sessionRow.creatorId &&
       split.toRemainingRecipient > 0
     ) {
+      const creatorMsg = `Vous avez reçu ${formatXAF(split.toRemainingRecipient)} (${100 - split.beneficiaryPercentage}% de l'amende payée par ${params.finePayerName}) dans votre Portefeuille DIVA Asso pour « ${params.sessionTitle} ».`;
       await scheduleInAppNotifications({
         tontineSessionId: params.tontineSessionId,
         type: "PAYMENT_SUCCESS",
         recipients: [
           {
             userId: sessionRow.creatorId,
-            message: `Vous avez reçu ${formatXAF(split.toRemainingRecipient)} (${100 - split.beneficiaryPercentage}% de l'amende payée par ${params.finePayerName}) dans votre Portefeuille DIVA Asso pour « ${params.sessionTitle} ».`,
+            message: creatorMsg,
             actionUrl: "/wallet",
           },
         ],
       }).catch(() => {});
+
+      const creator = await prisma.user.findUnique({
+        where: { id: sessionRow.creatorId },
+        select: { email: true, name: true, preferredLang: true },
+      });
+      if (creator?.email) {
+        const cLang = creator.preferredLang === "en" ? "en" : "fr";
+        const cTitle =
+          cLang === "fr"
+            ? "Part gestionnaire d'amende reçue ! 🌿💰"
+            : "Creator penalty share credited! 🌿💰";
+        const emailHtml = renderBrandedEmailHtml({
+          title: cTitle,
+          bodyText: creatorMsg,
+          actionUrl: "/wallet",
+          actionLabel: cLang === "fr" ? "Consulter mon portefeuille" : "View my wallet",
+          recipientName: creator.name,
+          lang: cLang,
+        });
+        await sendEmailSafe(creator.email, cTitle, emailHtml).catch(() => {});
+      }
     }
 
     return split.toDelayedBeneficiary;

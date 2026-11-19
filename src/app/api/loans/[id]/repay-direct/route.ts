@@ -20,6 +20,7 @@ const DIRECT_LOAN_REPAY_FEE_RATE = 0.031; // 3.1% Orange Money / MTN MoMo operat
 
 const initiateSchema = z.object({
   phone: z.string().trim().min(9, "Veuillez entrer un numéro Orange Money ou MTN valide."),
+  amount: z.number().int().min(1000, "Le montant minimum de remboursement partiel est de 1 000 FCFA.").optional(),
 });
 
 async function settleLoanDirectPayment(loanId: string, userId: string, paidAmount: number, feeAmount: number, phone: string, transId: string) {
@@ -138,8 +139,10 @@ export async function POST(
     return NextResponse.json({ error: "Ce prêt est déjà entièrement soldé." }, { status: 400 });
   }
 
-  const operatorFee = Math.round(remainingDue * DIRECT_LOAN_REPAY_FEE_RATE);
-  const totalDebit = remainingDue + operatorFee;
+  const requestedAmount = parsed.data.amount ? Math.min(remainingDue, parsed.data.amount) : remainingDue;
+  const payAmount = Math.max(1000, requestedAmount);
+  const operatorFee = Math.round(payAmount * DIRECT_LOAN_REPAY_FEE_RATE);
+  const totalDebit = payAmount + operatorFee;
 
   const hasFapshi = Boolean(getFapshiApiUser() && getFapshiApiKey());
   if (hasFapshi) {
@@ -152,7 +155,7 @@ export async function POST(
         email: loan.user.email || undefined,
         userId,
         externalId: `LOAN_REPAY_${loan.id}_${Date.now()}`,
-        message: `Remboursement prêt DIVA Asso (${formatXAF(remainingDue)} + frais ${formatXAF(operatorFee)})`,
+        message: `Remboursement prêt DIVA Asso (${formatXAF(payAmount)} + frais ${formatXAF(operatorFee)})`,
       });
 
       await prisma.loan.update({

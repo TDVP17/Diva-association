@@ -176,7 +176,11 @@ export function AdminLoansClient({
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/80">
+          <span className="text-[11px] font-bold text-slate-500 uppercase">Capital prêté</span>
+          <p className="text-xl font-extrabold text-slate-900 mt-1">{formatXAF(stats.totalPrincipalLent)}</p>
+        </div>
         <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200">
           <span className="text-[11px] font-bold text-amber-800 uppercase">En attente Admin</span>
           <p className="text-2xl font-extrabold text-amber-900 mt-1">{stats.pendingAdminCount}</p>
@@ -190,7 +194,7 @@ export function AdminLoansClient({
           <p className="text-2xl font-extrabold text-red-600 mt-1">{stats.overdueCount}</p>
         </div>
         <div className="bg-white rounded-2xl p-4 border border-slate-200/80">
-          <span className="text-[11px] font-bold text-slate-500 uppercase">Encours total dû</span>
+          <span className="text-[11px] font-bold text-slate-500 uppercase">Encours restant</span>
           <p className="text-xl font-extrabold text-slate-900 mt-1">{formatXAF(stats.totalOutstanding)}</p>
         </div>
         <div className="bg-[#0b3d2e] rounded-2xl p-4 text-white">

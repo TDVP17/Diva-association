@@ -94,6 +94,8 @@ export function LoansClient({
 
   // Repayment state (wallet OR direct mobile money +3.1%)
   const [repayMode, setRepayMode] = useState<"WALLET" | "DIRECT">("WALLET");
+  const [repayChoice, setRepayChoice] = useState<"FULL" | "PARTIAL">("FULL");
+  const [partialRepayInput, setPartialRepayInput] = useState<string>("");
   const [repayPhone, setRepayPhone] = useState(userPhone);
   const [repayingId, setRepayingId] = useState<string | null>(null);
   const [directPendingMsg, setDirectPendingMsg] = useState<string | null>(null);
@@ -180,7 +182,7 @@ export function LoansClient({
     }
   }
 
-  async function handleRepayWallet(loan: LoanItem) {
+  async function handleRepayWallet(loan: LoanItem, amountToPay?: number) {
     setError(null);
     setSuccess(null);
     setRepayingId(loan.id);
@@ -188,7 +190,7 @@ export function LoansClient({
       const res = await fetch(`/api/loans/${loan.id}/repay`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify(amountToPay ? { amount: amountToPay } : {}),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -196,6 +198,7 @@ export function LoansClient({
         return;
       }
       setSuccess(data.message || "Prêt remboursé avec succès !");
+      setPartialRepayInput("");
       await refreshAll();
     } catch {
       setError("Erreur réseau lors du remboursement.");
@@ -204,7 +207,7 @@ export function LoansClient({
     }
   }
 
-  async function handleRepayDirect(loan: LoanItem) {
+  async function handleRepayDirect(loan: LoanItem, amountToPay?: number) {
     setError(null);
     setSuccess(null);
     setDirectPendingMsg(null);
@@ -217,7 +220,10 @@ export function LoansClient({
       const res = await fetch(`/api/loans/${loan.id}/repay-direct`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: repayPhone.trim() }),
+        body: JSON.stringify({
+          phone: repayPhone.trim(),
+          ...(amountToPay ? { amount: amountToPay } : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -405,100 +411,195 @@ export function LoansClient({
               </div>
             </div>
 
-            {/* Repayment Mode Tabs */}
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setRepayMode("WALLET")}
-                className={`py-2 px-3 rounded-xl text-xs font-bold border-2 cursor-pointer transition-colors ${
-                  repayMode === "WALLET"
-                    ? "border-emerald-600 bg-emerald-50 text-emerald-950"
-                    : "border-slate-200 bg-white text-slate-600"
-                }`}
-              >
-                Portefeuille DIVA Asso (0 % frais)
-              </button>
-              <button
-                type="button"
-                onClick={() => setRepayMode("DIRECT")}
-                className={`py-2 px-3 rounded-xl text-xs font-bold border-2 cursor-pointer transition-colors ${
-                  repayMode === "DIRECT"
-                    ? "border-emerald-600 bg-emerald-50 text-emerald-950"
-                    : "border-slate-200 bg-white text-slate-600"
-                }`}
-              >
-                Paiement direct OM / MTN (+3,1 %)
-              </button>
-            </div>
-
-            {repayMode === "WALLET" ? (
-              <div className="flex flex-col gap-2">
-                {walletBalance >= activeLoan.remainingDue ? (
-                  <button
-                    type="button"
-                    disabled={repayingId === activeLoan.id}
-                    onClick={() => handleRepayWallet(activeLoan)}
-                    className="w-full py-2.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {repayingId === activeLoan.id && <LoadingSpinner />}
-                    <span>Rembourser {formatXAF(activeLoan.remainingDue)} via mon Portefeuille</span>
-                  </button>
-                ) : (
-                  <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-2.5 font-medium">
-                    Solde portefeuille insuffisant pour rembourser intégralement. Utilisez le paiement direct ci-contre ou rechargez votre portefeuille.
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Numéro Orange Money / MTN MoMo
-                  </label>
-                  <input
-                    type="tel"
-                    inputMode="tel"
-                    maxLength={9}
-                    value={repayPhone}
-                    onChange={(e) => setRepayPhone(e.target.value.replace(/\D/g, "").slice(0, 9))}
-                    placeholder="6XXXXXXXX"
-                    className="w-full border-2 border-emerald-600 rounded-xl px-3 py-2 text-sm font-mono bg-white"
-                  />
-                  <OperatorBadge operator={repayOperatorInfo} lang={lang} className="mt-1.5" />
-                </div>
-
-                {isRepayOperatorSuspended && (
-                  <div className="p-2.5 rounded-xl bg-red-50 border border-red-300 text-xs text-red-800 font-semibold">
-                    {repaySuspendedReason}
-                  </div>
-                )}
-
-                <div className="text-xs flex flex-col gap-1 bg-white p-2.5 rounded-lg border border-slate-200">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Montant du remboursement</span>
-                    <span className="font-bold">{formatXAF(activeLoan.remainingDue)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Frais opérateur (3,1 %)</span>
-                    <span className="font-bold text-amber-800">+{formatXAF(directFee)}</span>
-                  </div>
-                  <div className="flex justify-between border-t border-slate-100 pt-1 font-extrabold text-emerald-900">
-                    <span>Total débité</span>
-                    <span>{formatXAF(directTotal)}</span>
-                  </div>
-                </div>
-
+            {/* Repayment Choice (Full vs Partial) */}
+            <div className="flex flex-col gap-2 pt-2 border-t border-slate-200">
+              <span className="text-xs font-bold text-slate-700">Option de remboursement :</span>
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  disabled={repayingId === activeLoan.id || isRepayOperatorSuspended || repayPhone.length < 9}
-                  onClick={() => handleRepayDirect(activeLoan)}
-                  className="w-full py-2.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                  onClick={() => setRepayChoice("FULL")}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold border-2 cursor-pointer transition-colors ${
+                    repayChoice === "FULL"
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-950"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
                 >
-                  {repayingId === activeLoan.id && <LoadingSpinner />}
-                  <span>Payer {formatXAF(directTotal)} maintenant</span>
+                  Totalité ({formatXAF(activeLoan.remainingDue)})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRepayChoice("PARTIAL")}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold border-2 cursor-pointer transition-colors ${
+                    repayChoice === "PARTIAL"
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-950"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  Montant partiel personnalisé
                 </button>
               </div>
-            )}
+
+              {repayChoice === "PARTIAL" && (
+                <div className="flex flex-col gap-1.5 mt-1 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                  <label className="text-xs font-bold text-slate-700">
+                    Montant à verser sur ce prêt (FCFA) :
+                  </label>
+                  <div className="grid grid-cols-4 gap-1.5 mb-1">
+                    {[5000, 10000, 25000, 50000].map((chip) => (
+                      <button
+                        key={chip}
+                        type="button"
+                        onClick={() => setPartialRepayInput(String(Math.min(activeLoan.remainingDue, chip)))}
+                        className="py-1 px-1.5 rounded-lg text-[11px] font-bold bg-white border border-slate-200 hover:border-emerald-500 text-slate-700 cursor-pointer text-center"
+                      >
+                        {chip.toLocaleString("fr-FR")} F
+                      </button>
+                    ))}
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={partialRepayInput}
+                      onChange={(e) => {
+                        const clean = e.target.value.replace(/\D/g, "").replace(/^0+/, "");
+                        setPartialRepayInput(clean);
+                      }}
+                      placeholder={`Entre 1 000 et ${activeLoan.remainingDue.toLocaleString("fr-FR")}`}
+                      className="w-full bg-white border-2 border-emerald-600 rounded-xl px-3 py-2 text-sm font-bold text-slate-900"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-700">
+                      FCFA
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Repayment Mode Tabs */}
+            {(() => {
+              const typedPartialVal = parseInt(partialRepayInput, 10) || 0;
+              const effectiveAmount =
+                repayChoice === "FULL"
+                  ? activeLoan.remainingDue
+                  : Math.min(activeLoan.remainingDue, Math.max(0, typedPartialVal));
+              const isPartialInvalid = repayChoice === "PARTIAL" && (typedPartialVal < 1000 || typedPartialVal > activeLoan.remainingDue);
+              const directOpFee = Math.round(effectiveAmount * 0.031);
+              const directOpTotal = effectiveAmount + directOpFee;
+
+              return (
+                <div className="flex flex-col gap-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setRepayMode("WALLET")}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold border-2 cursor-pointer transition-colors ${
+                        repayMode === "WALLET"
+                          ? "border-emerald-600 bg-emerald-50 text-emerald-950"
+                          : "border-slate-200 bg-white text-slate-600"
+                      }`}
+                    >
+                      Portefeuille ({formatXAF(walletBalance)})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRepayMode("DIRECT")}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold border-2 cursor-pointer transition-colors ${
+                        repayMode === "DIRECT"
+                          ? "border-emerald-600 bg-emerald-50 text-emerald-950"
+                          : "border-slate-200 bg-white text-slate-600"
+                      }`}
+                    >
+                      Direct OM / MTN (+3,1 %)
+                    </button>
+                  </div>
+
+                  {repayMode === "WALLET" ? (
+                    <div className="flex flex-col gap-2">
+                      {isPartialInvalid ? (
+                        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-2.5 font-medium">
+                          Veuillez saisir un montant compris entre 1 000 FCFA et {formatXAF(activeLoan.remainingDue)}.
+                        </p>
+                      ) : walletBalance >= effectiveAmount && effectiveAmount >= 1000 ? (
+                        <button
+                          type="button"
+                          disabled={repayingId === activeLoan.id}
+                          onClick={() => handleRepayWallet(activeLoan, effectiveAmount)}
+                          className="w-full py-2.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                          {repayingId === activeLoan.id && <LoadingSpinner />}
+                          <span>Rembourser {formatXAF(effectiveAmount)} via mon Portefeuille</span>
+                        </button>
+                      ) : (
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex flex-col gap-1.5">
+                          <p className="font-semibold">
+                            Solde portefeuille insuffisant ({formatXAF(walletBalance)} disponibles) pour verser {formatXAF(effectiveAmount)}.
+                          </p>
+                          <p className="text-[11px] text-amber-800">
+                            Rechargez votre portefeuille ou utilisez le paiement direct par Mobile Money ci-dessus.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Numéro Orange Money / MTN MoMo
+                        </label>
+                        <input
+                          type="tel"
+                          inputMode="tel"
+                          maxLength={9}
+                          value={repayPhone}
+                          onChange={(e) => setRepayPhone(e.target.value.replace(/\D/g, "").slice(0, 9))}
+                          placeholder="6XXXXXXXX"
+                          className="w-full border-2 border-emerald-600 rounded-xl px-3 py-2 text-sm font-mono bg-white"
+                        />
+                        <OperatorBadge operator={repayOperatorInfo} lang={lang} className="mt-1.5" />
+                      </div>
+
+                      {isRepayOperatorSuspended && (
+                        <div className="p-2.5 rounded-xl bg-red-50 border border-red-300 text-xs text-red-800 font-semibold">
+                          {repaySuspendedReason}
+                        </div>
+                      )}
+
+                      <div className="text-xs flex flex-col gap-1 bg-white p-2.5 rounded-lg border border-slate-200">
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Montant du versement</span>
+                          <span className="font-bold">{formatXAF(effectiveAmount)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Frais opérateur (3,1 %)</span>
+                          <span className="font-bold text-amber-800">+{formatXAF(directOpFee)}</span>
+                        </div>
+                        <div className="flex justify-between border-t border-slate-100 pt-1 font-extrabold text-emerald-900">
+                          <span>Total débité</span>
+                          <span>{formatXAF(directOpTotal)}</span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={
+                          repayingId === activeLoan.id ||
+                          isRepayOperatorSuspended ||
+                          repayPhone.length < 9 ||
+                          isPartialInvalid ||
+                          effectiveAmount < 1000
+                        }
+                        onClick={() => handleRepayDirect(activeLoan, effectiveAmount)}
+                        className="w-full py-2.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {repayingId === activeLoan.id && <LoadingSpinner />}
+                        <span>Payer {formatXAF(directOpTotal)} maintenant</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         );
       })()}
@@ -513,13 +614,13 @@ export function LoansClient({
                 <span>
                   {eligibility.stars < 4
                     ? `4 étoiles minimum requises (${eligibility.stars}/5 actuelles)`
-                    : "Prêt d'urgence non disponible"}
+                    : "Plafond d'emprunt en attente d'épargne acquise"}
                 </span>
               </div>
               <p className="text-xs text-amber-900 leading-relaxed font-medium">
                 {eligibility.stars < 4
                   ? "Pour avoir la possibilité de demander un prêt, vous devez avoir au moins 4 étoiles minimum. Chaque étoile s'obtient en terminant un cycle complet dans une cotisation publique sans jamais avoir eu d'amende."
-                  : (eligibility.reasons[0] || "Vous devez participer à une cotisation publique active avec une épargne acquise suffisante pour débloquer un prêt.")}
+                  : "Félicitations pour votre Score Confiance de 4/5 étoiles ⭐ ! Pour débloquer un plafond d'emprunt actif, vous devez avoir cotisé sur des noms non encore bouffés dans une cotisation publique en cours (ce montant sert de garantie financière automatique)."}
               </p>
             </div>
           ) : (

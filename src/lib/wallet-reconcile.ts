@@ -219,6 +219,38 @@ export async function settlePendingFapshiDeposit(transId: string): Promise<Settl
       data: { status: "FAILED" },
     });
 
+    // Detect operator accurately from transaction description, metadata or user phone
+    const desc = (existingTx.description || "").toUpperCase();
+    const meta = (existingTx.metadata as Record<string, unknown> | null) || {};
+    const metaPhone = typeof meta.phone === "string" ? meta.phone : "";
+    const phoneToCheck = (metaPhone || existingTx.user.phone || "").replace(/\D/g, "").replace(/^237/, "");
+    const isOrange =
+      desc.includes("ORANGE") ||
+      meta.provider === "ORANGE" ||
+      /^6(5[5-9]|9)/.test(phoneToCheck);
+    const operatorName = isOrange ? "Orange Money" : "MTN Mobile Money";
+    const ussdHint = isOrange
+      ? "Si l'invite automatique n'est pas apparue, composez le #150*50# sur votre téléphone."
+      : "Si l'invite automatique n'est pas apparue, composez le *126# sur votre téléphone.";
+
+    // Detect if reason relates to user's mobile balance / funds
+    const rawReason = (fapshiStatus.reason || "").toLowerCase();
+    let failureMessage = "";
+    if (
+      rawReason.includes("balance") ||
+      rawReason.includes("solde") ||
+      rawReason.includes("fund") ||
+      rawReason.includes("fonds") ||
+      rawReason.includes("insufficient") ||
+      rawReason.includes("insuffisant")
+    ) {
+      failureMessage = `Solde de votre compte ${operatorName} insuffisant pour effectuer cette recharge. Veuillez approvisionner votre compte ${operatorName} et réessayer.`;
+    } else if (fapshiStatus.reason && !rawReason.includes("mobile money")) {
+      failureMessage = fapshiStatus.reason;
+    } else {
+      failureMessage = `Le paiement ${operatorName} a été annulé, expiré ou n'a pas pu aboutir. ${ussdHint}`;
+    }
+
     return {
       found: true,
       transId: cleanTransId,
@@ -228,9 +260,7 @@ export async function settlePendingFapshiDeposit(transId: string): Promise<Settl
       isFailed: true,
       amount: Number(existingTx.amount),
       newBalance: Number(existingTx.user.walletBalance || 0),
-      message:
-        fapshiStatus.reason ||
-        "Le paiement Mobile Money a été annulé, expiré ou n'a pas pu aboutir.",
+      message: failureMessage,
     };
   }
 
