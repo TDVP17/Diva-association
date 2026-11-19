@@ -18,7 +18,7 @@ import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { formatXAF } from "@/lib/format-currency";
 import { logAudit } from "@/lib/audit";
 import { getEffectiveWithdrawalLimits } from "@/lib/withdrawal-limits";
-import { getFallbackPaymentConfig } from "@/lib/fallback-payment-config";
+import { checkFinancialServiceAvailability } from "@/lib/financial-service-control";
 
 const withdrawSchema = z.object({
   amount: z.number().int().min(100, "Montant de retrait invalide.").max(50_000_000),
@@ -160,24 +160,17 @@ export async function POST(request: Request) {
     );
   }
 
-  // 3B. Enforce Global Operator Suspension (Orange / MTN)
-  const opConfig = await getFallbackPaymentConfig();
-  if (method.provider === "ORANGE" && opConfig.isOrangeSuspended) {
+  // 3B. Enforce Centralized Financial Service Availability Control (Cash-Out)
+  const serviceCheck = await checkFinancialServiceAvailability({
+    provider: method.provider,
+    direction: "OUT",
+  });
+  if (!serviceCheck.allowed) {
     return NextResponse.json(
       {
         error:
-          opConfig.orangeSuspendedReason ||
-          "Les opérations Orange Money sont temporairement suspendues par DIVA Asso. Veuillez sélectionner un numéro MTN validé.",
-      },
-      { status: 503 },
-    );
-  }
-  if (method.provider === "MTN" && opConfig.isMtnSuspended) {
-    return NextResponse.json(
-      {
-        error:
-          opConfig.mtnSuspendedReason ||
-          "Les opérations MTN Mobile Money sont temporairement suspendues par DIVA Asso. Veuillez sélectionner un numéro Orange validé.",
+          serviceCheck.message ||
+          "Ce service est momentanément indisponible. Veuillez choisir un autre moyen de paiement ou réessayer ultérieurement.",
       },
       { status: 503 },
     );

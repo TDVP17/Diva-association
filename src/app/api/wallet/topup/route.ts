@@ -6,7 +6,7 @@ import { getUserWalletFeeRate } from "@/lib/wallet";
 import { creditWalletTx } from "@/lib/wallet-ledger";
 import { normalizeCameroonPhone, initiateDirectPayment, getFapshiApiUser, getFapshiApiKey } from "@/lib/fapshi";
 import { detectMobileMoneyProvider, fapshiMediumFor } from "@/lib/mobile-money-provider";
-import { getFallbackPaymentConfig } from "@/lib/fallback-payment-config";
+import { checkFinancialServiceAvailability } from "@/lib/financial-service-control";
 
 const topUpSchema = z.object({
   amount: z.number().int().min(500, "Le montant minimum de rechargement est de 500 FCFA").max(10000000),
@@ -45,24 +45,17 @@ export async function POST(request: Request) {
     );
   }
 
-  // Enforce global operator suspension (Orange / MTN) across the entire system
-  const opConfig = await getFallbackPaymentConfig();
-  if (provider === "ORANGE" && opConfig.isOrangeSuspended) {
+  // Enforce centralized financial availability control (Cash-In)
+  const serviceCheck = await checkFinancialServiceAvailability({
+    provider,
+    direction: "IN",
+  });
+  if (!serviceCheck.allowed) {
     return NextResponse.json(
       {
         error:
-          opConfig.orangeSuspendedReason ||
-          "Les opérations Orange Money sont temporairement suspendues par DIVA Asso. Veuillez utiliser un numéro MTN Mobile Money.",
-      },
-      { status: 503 },
-    );
-  }
-  if (provider === "MTN" && opConfig.isMtnSuspended) {
-    return NextResponse.json(
-      {
-        error:
-          opConfig.mtnSuspendedReason ||
-          "Les opérations MTN Mobile Money sont temporairement suspendues par DIVA Asso. Veuillez utiliser un numéro Orange Money.",
+          serviceCheck.message ||
+          "Ce service est momentanément indisponible. Veuillez choisir un autre moyen de paiement ou réessayer ultérieurement.",
       },
       { status: 503 },
     );

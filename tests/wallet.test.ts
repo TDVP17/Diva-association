@@ -11,6 +11,7 @@ vi.mock("@/lib/prisma", () => {
       },
       walletTransaction: {
         findMany: vi.fn(),
+        count: vi.fn(),
       },
       contribution: {
         aggregate: vi.fn(),
@@ -104,6 +105,7 @@ describe("User Wallet Data (30-day window for member vs permanent for admin)", (
     ]);
     vi.mocked(prisma.payout.findMany).mockResolvedValue([]);
     vi.mocked(prisma.contribution.count).mockResolvedValue(0);
+    vi.mocked(prisma.walletTransaction.count).mockResolvedValue(0);
 
     const result = await getUserWalletData("u1");
     expect(result.user.walletBalance).toBe(25000);

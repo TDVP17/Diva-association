@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/require-admin";
 import { creditWalletTx } from "@/lib/wallet-ledger";
 import { sendPayout, FapshiPayoutError } from "@/lib/fapshi-payout";
+import { checkFinancialServiceAvailability } from "@/lib/financial-service-control";
 import { fapshiMediumFor } from "@/lib/mobile-money-provider";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { sendEmailSafe } from "@/lib/email/resend";
@@ -200,6 +201,21 @@ export async function PATCH(
     process.env.FAPSHI_PAYOUT_API_USER &&
     process.env.FAPSHI_PAYOUT_API_KEY
   ) {
+    const serviceCheck = await checkFinancialServiceAvailability({
+      provider: withdrawal.provider,
+      direction: "OUT",
+    });
+    if (!serviceCheck.allowed) {
+      return NextResponse.json(
+        {
+          error:
+            serviceCheck.message ||
+            "Les retraits via cet opérateur sont momentanément indisponibles.",
+        },
+        { status: 503 },
+      );
+    }
+
     try {
       const res = await sendPayout({
         amount: Math.round(amount),

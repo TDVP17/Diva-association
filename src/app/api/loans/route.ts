@@ -281,8 +281,8 @@ export async function POST(request: Request) {
         lang === "fr"
           ? `Bonjour ${user.name},\n\nVotre prêt d'urgence de ${formatXAF(terms.principal)} a été crédité dans votre Portefeuille DIVA Asso.\n\n• Montant emprunté : ${formatXAF(terms.principal)}\n• Intérêts : ${formatXAF(terms.interestAmount)}\n• Frais DIVA Asso : ${formatXAF(terms.divaFeeAmount)}\n• Total à rembourser : ${formatXAF(terms.totalDue)}\n• Date limite de remboursement : ${dueDateLabel} à 18h00\n• Retard : passé le ${dueDateLabel} à 18h00, +5 % de pénalité après 2 jours de retard.\n\nNouveau solde portefeuille : ${formatXAF(ledger.balanceAfter)}.`
           : `Hello ${user.name},\n\nYour emergency loan of ${formatXAF(terms.principal)} has been credited to your DIVA Asso Wallet.\n\n• Principal: ${formatXAF(terms.principal)}\n• Interest: ${formatXAF(terms.interestAmount)}\n• DIVA Asso Fee: ${formatXAF(terms.divaFeeAmount)}\n• Total due: ${formatXAF(terms.totalDue)}\n• Repayment deadline: ${dueDateLabel} at 18:00\n\nNew wallet balance: ${formatXAF(ledger.balanceAfter)}.`,
-      actionUrl: "/wallet",
-      actionLabel: lang === "fr" ? "Ouvrir mon portefeuille" : "Open My Wallet",
+      actionUrl: "/loans",
+      actionLabel: lang === "fr" ? "Consulter mon prêt" : "View My Loan",
       lang,
     });
     await sendEmailSafe(

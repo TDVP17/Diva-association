@@ -8,6 +8,14 @@ export interface FallbackPaymentConfigData {
   orangeSuspendedReason?: string;
   isMtnSuspended?: boolean;
   mtnSuspendedReason?: string;
+  orangeCashInEnabled?: boolean;
+  orangeCashOutEnabled?: boolean;
+  orangeCashInDisabledReason?: string;
+  orangeCashOutDisabledReason?: string;
+  mtnCashInEnabled?: boolean;
+  mtnCashOutEnabled?: boolean;
+  mtnCashInDisabledReason?: string;
+  mtnCashOutDisabledReason?: string;
 }
 
 export const EMPTY_FALLBACK_PAYMENT_CONFIG: FallbackPaymentConfigData = {
@@ -20,6 +28,14 @@ export const EMPTY_FALLBACK_PAYMENT_CONFIG: FallbackPaymentConfigData = {
   orangeSuspendedReason: "",
   isMtnSuspended: false,
   mtnSuspendedReason: "",
+  orangeCashInEnabled: true,
+  orangeCashOutEnabled: true,
+  orangeCashInDisabledReason: "",
+  orangeCashOutDisabledReason: "",
+  mtnCashInEnabled: true,
+  mtnCashOutEnabled: true,
+  mtnCashInDisabledReason: "",
+  mtnCashOutDisabledReason: "",
 };
 
 /**

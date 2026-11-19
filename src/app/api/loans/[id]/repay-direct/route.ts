@@ -11,7 +11,7 @@ import {
   getFapshiApiKey,
 } from "@/lib/fapshi";
 import { detectMobileMoneyProvider, fapshiMediumFor } from "@/lib/mobile-money-provider";
-import { getFallbackPaymentConfig } from "@/lib/fallback-payment-config";
+import { checkFinancialServiceAvailability } from "@/lib/financial-service-control";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { formatXAF } from "@/lib/format-currency";
 import { logAudit } from "@/lib/audit";
@@ -104,24 +104,17 @@ export async function POST(
     );
   }
 
-  // Enforce Global Operator Suspension
-  const opConfig = await getFallbackPaymentConfig();
-  if (provider === "ORANGE" && opConfig.isOrangeSuspended) {
+  // Enforce centralized financial availability control (Cash-In)
+  const serviceCheck = await checkFinancialServiceAvailability({
+    provider,
+    direction: "IN",
+  });
+  if (!serviceCheck.allowed) {
     return NextResponse.json(
       {
         error:
-          opConfig.orangeSuspendedReason ||
-          "Les paiements Orange Money sont temporairement suspendus par DIVA Asso. Veuillez utiliser MTN Mobile Money.",
-      },
-      { status: 503 },
-    );
-  }
-  if (provider === "MTN" && opConfig.isMtnSuspended) {
-    return NextResponse.json(
-      {
-        error:
-          opConfig.mtnSuspendedReason ||
-          "Les paiements MTN Mobile Money sont temporairement suspendus par DIVA Asso. Veuillez utiliser Orange Money.",
+          serviceCheck.message ||
+          "Ce service est momentanément indisponible. Veuillez choisir un autre moyen de paiement ou réessayer ultérieurement.",
       },
       { status: 503 },
     );

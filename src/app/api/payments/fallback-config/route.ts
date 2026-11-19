@@ -18,6 +18,14 @@ const updateSchema = z.object({
   orangeSuspendedReason: z.string().max(300).optional().default(""),
   isMtnSuspended: z.boolean().optional().default(false),
   mtnSuspendedReason: z.string().max(300).optional().default(""),
+  orangeCashInEnabled: z.boolean().optional().default(true),
+  orangeCashOutEnabled: z.boolean().optional().default(true),
+  orangeCashInDisabledReason: z.string().max(300).optional().default(""),
+  orangeCashOutDisabledReason: z.string().max(300).optional().default(""),
+  mtnCashInEnabled: z.boolean().optional().default(true),
+  mtnCashOutEnabled: z.boolean().optional().default(true),
+  mtnCashInDisabledReason: z.string().max(300).optional().default(""),
+  mtnCashOutDisabledReason: z.string().max(300).optional().default(""),
 });
 
 export async function GET() {

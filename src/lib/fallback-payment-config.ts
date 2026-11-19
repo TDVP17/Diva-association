@@ -21,6 +21,14 @@ export async function getFallbackPaymentConfig(): Promise<FallbackPaymentConfigD
     orangeSuspendedReason: row.orangeSuspendedReason ?? "",
     isMtnSuspended: row.isMtnSuspended ?? false,
     mtnSuspendedReason: row.mtnSuspendedReason ?? "",
+    orangeCashInEnabled: row.orangeCashInEnabled ?? true,
+    orangeCashOutEnabled: row.orangeCashOutEnabled ?? true,
+    orangeCashInDisabledReason: row.orangeCashInDisabledReason ?? "",
+    orangeCashOutDisabledReason: row.orangeCashOutDisabledReason ?? "",
+    mtnCashInEnabled: row.mtnCashInEnabled ?? true,
+    mtnCashOutEnabled: row.mtnCashOutEnabled ?? true,
+    mtnCashInDisabledReason: row.mtnCashInDisabledReason ?? "",
+    mtnCashOutDisabledReason: row.mtnCashOutDisabledReason ?? "",
   };
 }
 
@@ -39,6 +47,14 @@ export async function setFallbackPaymentConfig(
     orangeSuspendedReason: (data.orangeSuspendedReason ?? "").trim(),
     isMtnSuspended: Boolean(data.isMtnSuspended),
     mtnSuspendedReason: (data.mtnSuspendedReason ?? "").trim(),
+    orangeCashInEnabled: data.orangeCashInEnabled !== undefined ? Boolean(data.orangeCashInEnabled) : true,
+    orangeCashOutEnabled: data.orangeCashOutEnabled !== undefined ? Boolean(data.orangeCashOutEnabled) : true,
+    orangeCashInDisabledReason: (data.orangeCashInDisabledReason ?? "").trim(),
+    orangeCashOutDisabledReason: (data.orangeCashOutDisabledReason ?? "").trim(),
+    mtnCashInEnabled: data.mtnCashInEnabled !== undefined ? Boolean(data.mtnCashInEnabled) : true,
+    mtnCashOutEnabled: data.mtnCashOutEnabled !== undefined ? Boolean(data.mtnCashOutEnabled) : true,
+    mtnCashInDisabledReason: (data.mtnCashInDisabledReason ?? "").trim(),
+    mtnCashOutDisabledReason: (data.mtnCashOutDisabledReason ?? "").trim(),
   };
 
   const saved = await prisma.fallbackPaymentConfig.upsert({
@@ -64,5 +80,13 @@ export async function setFallbackPaymentConfig(
     orangeSuspendedReason: saved.orangeSuspendedReason,
     isMtnSuspended: saved.isMtnSuspended,
     mtnSuspendedReason: saved.mtnSuspendedReason,
+    orangeCashInEnabled: saved.orangeCashInEnabled,
+    orangeCashOutEnabled: saved.orangeCashOutEnabled,
+    orangeCashInDisabledReason: saved.orangeCashInDisabledReason,
+    orangeCashOutDisabledReason: saved.orangeCashOutDisabledReason,
+    mtnCashInEnabled: saved.mtnCashInEnabled,
+    mtnCashOutEnabled: saved.mtnCashOutEnabled,
+    mtnCashInDisabledReason: saved.mtnCashInDisabledReason,
+    mtnCashOutDisabledReason: saved.mtnCashOutDisabledReason,
   };
 }

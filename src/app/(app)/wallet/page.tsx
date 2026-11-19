@@ -90,6 +90,14 @@ export default async function WalletPage() {
           orangeSuspendedReason: operatorConfig.orangeSuspendedReason ?? "",
           isMtnSuspended: Boolean(operatorConfig.isMtnSuspended),
           mtnSuspendedReason: operatorConfig.mtnSuspendedReason ?? "",
+          orangeCashInEnabled: operatorConfig.orangeCashInEnabled ?? true,
+          orangeCashOutEnabled: operatorConfig.orangeCashOutEnabled ?? true,
+          orangeCashInDisabledReason: operatorConfig.orangeCashInDisabledReason ?? "",
+          orangeCashOutDisabledReason: operatorConfig.orangeCashOutDisabledReason ?? "",
+          mtnCashInEnabled: operatorConfig.mtnCashInEnabled ?? true,
+          mtnCashOutEnabled: operatorConfig.mtnCashOutEnabled ?? true,
+          mtnCashInDisabledReason: operatorConfig.mtnCashInDisabledReason ?? "",
+          mtnCashOutDisabledReason: operatorConfig.mtnCashOutDisabledReason ?? "",
         }}
         activeLoan={
           activeLoanRow

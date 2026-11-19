@@ -922,6 +922,22 @@ model Notification {
   @@map("notifications")
 }
 
+/// Tracks smart deep-link clicks from email notifications for deliverability & engagement analytics.
+model NotificationClick {
+  id             String    @id @default(cuid())
+  notificationId String?   @map("notification_id")
+  userId         String?   @map("user_id")
+  destination    String    @map("destination")
+  ip             String?   @map("ip")
+  userAgent      String?   @map("user_agent")
+  clickedAt      DateTime  @default(now()) @map("clicked_at")
+
+  @@index([notificationId])
+  @@index([userId])
+  @@index([clickedAt])
+  @@map("notification_clicks")
+}
+
 /// One row per browser/device the user has granted Web Push permission on
 /// (a user can have several — phone + desktop, or after reinstalling the
 /// PWA). `endpoint` is the push service URL the browser vendor assigns that
@@ -1065,18 +1081,26 @@ model AssociationRules {
 /// fallback USSD merchant payment codes and beneficiary names shown when
 /// Mobile Money / Orange Money USSD push fails due to operator/network issues.
 model FallbackPaymentConfig {
-  id                    String   @id @default("singleton")
-  isEnabled             Boolean  @default(true)
-  orangeUssdCode        String   @default("")
-  orangeBeneficiaryName String   @default("")
-  mtnUssdCode           String   @default("")
-  mtnBeneficiaryName    String   @default("")
-  isOrangeSuspended     Boolean  @default(false)
-  orangeSuspendedReason String   @default("")
-  isMtnSuspended        Boolean  @default(false)
-  mtnSuspendedReason    String   @default("")
-  updatedAt             DateTime @updatedAt
-  updatedByAdminId      String?
+  id                          String   @id @default("singleton")
+  isEnabled                   Boolean  @default(true)
+  orangeUssdCode              String   @default("")
+  orangeBeneficiaryName       String   @default("")
+  mtnUssdCode                 String   @default("")
+  mtnBeneficiaryName          String   @default("")
+  isOrangeSuspended           Boolean  @default(false)
+  orangeSuspendedReason       String   @default("")
+  isMtnSuspended              Boolean  @default(false)
+  mtnSuspendedReason          String   @default("")
+  orangeCashInEnabled         Boolean  @default(true)
+  orangeCashOutEnabled        Boolean  @default(true)
+  orangeCashInDisabledReason  String   @default("")
+  orangeCashOutDisabledReason String   @default("")
+  mtnCashInEnabled            Boolean  @default(true)
+  mtnCashOutEnabled           Boolean  @default(true)
+  mtnCashInDisabledReason     String   @default("")
+  mtnCashOutDisabledReason    String   @default("")
+  updatedAt                   DateTime @updatedAt
+  updatedByAdminId            String?
 
   @@map("fallback_payment_configs")
 }

@@ -116,70 +116,32 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
   // Date boundary: 1 month (30 days ago) for member view
   const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-  // 1. Direct wallet transactions (deposits, wallet payouts, etc.)
+  // 1. Direct wallet transactions (deposits, withdrawals, wallet-paid contributions, payouts, loans)
+  // Strictly filter for confirmed/successful transactions for the wallet operations list.
   const walletTxWhere = options?.includeAllForAdmin
     ? { userId }
-    : { userId, createdAt: { gte: oneMonthAgo } };
+    : {
+        userId,
+        createdAt: { gte: oneMonthAgo },
+        status: { in: ["SUCCESSFUL", "COMPLETED", "PAID"] },
+      };
 
   const walletTx = await prisma.walletTransaction.findMany({
     where: walletTxWhere,
     orderBy: { createdAt: "desc" },
-  });
-
-  // 2. Contributions history (payments made)
-  const ownContributions = await prisma.contribution.findMany({
-    where: {
-      status: "PAID",
-      membershipSlot: {
-        membership: {
-          userId,
-        },
-      },
-      ...(options?.includeAllForAdmin ? {} : { dueDate: { gte: oneMonthAgo } }),
-    },
-    include: {
-      membershipSlot: {
-        include: {
-          membership: {
-            include: {
-              tontineSession: {
-                select: { title: true, type: true },
-              },
-            },
-          },
-        },
-      },
-    },
-    orderBy: { dueDate: "desc" },
     take: options?.includeAllForAdmin ? 500 : 50,
   });
 
-  // 3. Payouts received (cagnottes versées)
-  const userPayouts = await prisma.payout.findMany({
+  // Pending deposits within the last 24 hours (waiting for PIN / confirmation)
+  const pendingDeposits = await prisma.walletTransaction.findMany({
     where: {
-      status: { in: ["RELEASED", "CONFIRMED"] },
-      membershipSlot: {
-        membership: {
-          userId,
-        },
-      },
-      ...(options?.includeAllForAdmin ? {} : { releasedAt: { gte: oneMonthAgo } }),
+      userId,
+      status: "PENDING",
+      type: "DEPOSIT",
+      createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
     },
-    include: {
-      membershipSlot: {
-        include: {
-          membership: {
-            include: {
-              tontineSession: {
-                select: { title: true, type: true },
-              },
-            },
-          },
-        },
-      },
-    },
-    orderBy: { releasedAt: "desc" },
-    take: options?.includeAllForAdmin ? 500 : 50,
+    orderBy: { createdAt: "desc" },
+    take: 5,
   });
 
   const formatDateTime = (d: Date) =>
@@ -192,10 +154,9 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
       timeZone: "Africa/Douala",
     });
 
-  // Aggregate operations
+  // Aggregate operations from confirmed wallet ledger records only
   const operations: WalletOperation[] = [];
 
-  // Add wallet direct transactions
   for (const tx of walletTx) {
     const isCredit =
       tx.type === "DEPOSIT" ||
@@ -219,78 +180,28 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
                   ? "Prêt d'urgence reçu"
                   : tx.type === "LOAN_REPAYMENT"
                     ? "Remboursement prêt"
-                    : "Opération portefeuille",
-      subtitle: tx.description || "Recharge Mobile Money (Orange / MTN)",
+                    : tx.type === "CONTRIBUTION"
+                      ? "Cotisation versée via portefeuille"
+                      : "Opération portefeuille",
+      subtitle: tx.description || "Opération Portefeuille DIVA",
       amount: Number(tx.amount),
       formattedAmount: `${isCredit ? "+" : "-"} ${formatXAF(Number(tx.amount))}`,
       fee: Number(tx.fee || 0),
       date: formatDateTime(tx.createdAt),
       timestamp: tx.createdAt.getTime(),
       rawDate: tx.createdAt,
-      status: "SUCCESSFUL",
+      status: tx.status,
     });
   }
 
-  // Add contributions
-  for (const c of ownContributions) {
-    const sessionTitle =
-      c.membershipSlot.membership.tontineSession.title ||
-      c.membershipSlot.membership.tontineSession.type;
-    const dateObj = c.paidAt || c.dueDate;
-    operations.push({
-      id: `contrib-${c.id}`,
-      type: "CONTRIBUTION",
-      direction: "OUT",
-      title: "Cotisation versée",
-      subtitle: `${sessionTitle} · ${c.membershipSlot.beneficiaryName}`,
-      amount: Number(c.amountPaid),
-      formattedAmount: `- ${formatXAF(Number(c.amountPaid))}`,
-      fee: Number(c.feePaid || 0),
-      date: formatDateTime(dateObj),
-      timestamp: dateObj.getTime(),
-      rawDate: dateObj,
-      status: "PAID",
-    });
-  }
-
-  // Add payouts
-  for (const p of userPayouts) {
-    const sessionTitle =
-      p.membershipSlot.membership.tontineSession.title ||
-      p.membershipSlot.membership.tontineSession.type;
-    const dateObj = p.releasedAt || p.dueDate;
-    const netAmount = Number(p.netPayout || p.pot || 0);
-    operations.push({
-      id: `payout-${p.id}`,
-      type: "PAYOUT",
-      direction: "IN",
-      title: "Cagnotte reçue (Bouffe)",
-      subtitle: `${sessionTitle} · Tour ${p.membershipSlot.beneficiaryName}`,
-      amount: netAmount,
-      formattedAmount: `+ ${formatXAF(netAmount)}`,
-      fee: Number(p.deducted || 0),
-      date: formatDateTime(dateObj),
-      timestamp: dateObj.getTime(),
-      rawDate: dateObj,
-      status: "CONFIRMED",
-    });
-  }
-
-  // Sort chronologically (newest first)
-  operations.sort((a, b) => b.timestamp - a.timestamp);
-
-  // Count how many older operations exist
+  // Count how many older wallet transactions exist
   const olderOperationsCount = options?.includeAllForAdmin
     ? 0
-    : await prisma.contribution.count({
+    : await prisma.walletTransaction.count({
         where: {
-          status: "PAID",
-          membershipSlot: {
-            membership: {
-              userId,
-            },
-          },
-          dueDate: { lt: oneMonthAgo },
+          userId,
+          status: { in: ["SUCCESSFUL", "COMPLETED", "PAID"] },
+          createdAt: { lt: oneMonthAgo },
         },
       });
 
@@ -307,6 +218,14 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
     formattedTotalContributed: formatXAF(totalContributed),
     feeInfo,
     operations,
+    pendingDeposits: pendingDeposits.map((tx) => ({
+      id: tx.id,
+      amount: Number(tx.amount),
+      fee: Number(tx.fee || 0),
+      transId: tx.fapshiTxRef || "",
+      date: formatDateTime(tx.createdAt),
+      description: tx.description,
+    })),
     olderOperationsCount,
   };
 }

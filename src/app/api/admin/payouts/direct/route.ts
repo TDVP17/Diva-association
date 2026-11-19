@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/require-admin";
 import { computePayoutPreview } from "@/lib/payout-preview";
 import { sendPayout, FapshiPayoutError } from "@/lib/fapshi-payout";
 import { detectMobileMoneyProvider, fapshiMediumFor } from "@/lib/mobile-money-provider";
+import { checkFinancialServiceAvailability } from "@/lib/financial-service-control";
 import { sendEmailSafe } from "@/lib/email/resend";
 import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { payoutReleasedMessage } from "@/lib/whatsapp/templates";
@@ -152,6 +153,22 @@ export async function POST(request: Request) {
 
   let fapshiResult: { transId: string };
   if (channel === "FAPSHI") {
+    if (provider) {
+      const serviceCheck = await checkFinancialServiceAvailability({
+        provider,
+        direction: "OUT",
+      });
+      if (!serviceCheck.allowed) {
+        return NextResponse.json(
+          {
+            error:
+              serviceCheck.message ||
+              "Les décaissements via cet opérateur sont momentanément indisponibles. Vous pouvez utiliser le mode 'Portefeuille DIVA'.",
+          },
+          { status: 503 },
+        );
+      }
+    }
     try {
       fapshiResult = await sendPayout({
         amount: Math.round(netPayout),

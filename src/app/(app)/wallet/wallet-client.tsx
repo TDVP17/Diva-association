@@ -19,6 +19,7 @@ interface WalletOperation {
   fee: number;
   date: string;
   timestamp: number;
+  status?: string;
 }
 
 interface DisbursementMethodItem {
@@ -59,6 +60,14 @@ interface WalletClientProps {
     orangeSuspendedReason: string;
     isMtnSuspended: boolean;
     mtnSuspendedReason: string;
+    orangeCashInEnabled?: boolean;
+    orangeCashOutEnabled?: boolean;
+    orangeCashInDisabledReason?: string;
+    orangeCashOutDisabledReason?: string;
+    mtnCashInEnabled?: boolean;
+    mtnCashOutEnabled?: boolean;
+    mtnCashInDisabledReason?: string;
+    mtnCashOutDisabledReason?: string;
   };
   activeLoan: {
     id: string;
@@ -105,6 +114,9 @@ export function WalletClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [topUpMessage, setTopUpMessage] = useState<string | null>(null);
   const [topUpError, setTopUpError] = useState<string | null>(null);
+  const [pollingTransId, setPollingTransId] = useState<string | null>(null);
+  const [pollingSecondsLeft, setPollingSecondsLeft] = useState<number>(90);
+  const [pollingState, setPollingState] = useState<"IDLE" | "POLLING" | "SUCCESS" | "FAILED">("IDLE");
 
   // Withdraw modal state (string input so deleting never leaves a sticky "0")
   const approvedMethods = disbursementMethods.filter((m) => m.status === "APPROVED");
@@ -133,25 +145,37 @@ export function WalletClient({
   const topUpOperatorInfo = getOperatorInfo(phone, lang);
   const topUpProvider = detectMobileMoneyProvider(phone.replace(/\D/g, "").replace(/^237/, ""));
   const isTopUpOperatorSuspended =
-    (topUpProvider === "ORANGE" && operatorSuspension.isOrangeSuspended) ||
-    (topUpProvider === "MTN" && operatorSuspension.isMtnSuspended);
+    topUpProvider === "ORANGE"
+      ? Boolean(operatorSuspension.isOrangeSuspended || operatorSuspension.orangeCashInEnabled === false)
+      : topUpProvider === "MTN"
+        ? Boolean(operatorSuspension.isMtnSuspended || operatorSuspension.mtnCashInEnabled === false)
+        : false;
+
   const topUpSuspendedReason =
     topUpProvider === "ORANGE"
-      ? operatorSuspension.orangeSuspendedReason ||
-        "Les opérations Orange Money sont temporairement suspendues par DIVA Asso."
-      : operatorSuspension.mtnSuspendedReason ||
-        "Les opérations MTN Mobile Money sont temporairement suspendues par DIVA Asso.";
+      ? operatorSuspension.orangeCashInDisabledReason ||
+        operatorSuspension.orangeSuspendedReason ||
+        "Les dépôts et recharges Orange Money sont temporairement indisponibles."
+      : operatorSuspension.mtnCashInDisabledReason ||
+        operatorSuspension.mtnSuspendedReason ||
+        "Les dépôts et recharges MTN Mobile Money sont temporairement indisponibles.";
 
-  // Selected withdrawal method suspension check
+  // Selected withdrawal method suspension check (Cash-Out)
   const selectedWithdrawMethod = approvedMethods.find((m) => m.id === selectedMethodId) || null;
   const isWithdrawOperatorSuspended =
-    (selectedWithdrawMethod?.provider === "ORANGE" && operatorSuspension.isOrangeSuspended) ||
-    (selectedWithdrawMethod?.provider === "MTN" && operatorSuspension.isMtnSuspended);
+    selectedWithdrawMethod?.provider === "ORANGE"
+      ? Boolean(operatorSuspension.isOrangeSuspended || operatorSuspension.orangeCashOutEnabled === false)
+      : selectedWithdrawMethod?.provider === "MTN"
+        ? Boolean(operatorSuspension.isMtnSuspended || operatorSuspension.mtnCashOutEnabled === false)
+        : false;
+
   const withdrawSuspendedReason =
     selectedWithdrawMethod?.provider === "ORANGE"
-      ? operatorSuspension.orangeSuspendedReason ||
+      ? operatorSuspension.orangeCashOutDisabledReason ||
+        operatorSuspension.orangeSuspendedReason ||
         "Les retraits Orange Money sont temporairement suspendus par DIVA Asso. Veuillez sélectionner un autre numéro validé."
-      : operatorSuspension.mtnSuspendedReason ||
+      : operatorSuspension.mtnCashOutDisabledReason ||
+        operatorSuspension.mtnSuspendedReason ||
         "Les retraits MTN Mobile Money sont temporairement suspendus par DIVA Asso. Veuillez sélectionner un autre numéro validé.";
 
   // Live countdown ticker for active loan above Recent Operations
@@ -175,6 +199,79 @@ export function WalletClient({
   // Show 3 first operations by default
   const displayedOperations = isExpanded ? operations : operations.slice(0, 3);
   const hasMoreThanThree = operations.length > 3;
+
+  // Live polling for Fapshi deposit confirmation
+  useEffect(() => {
+    if (!pollingTransId || pollingState !== "POLLING") return;
+
+    let stopped = false;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/wallet/topup/status?transId=${encodeURIComponent(pollingTransId)}`);
+        const data = await res.json().catch(() => null);
+        if (stopped) return;
+
+        if (data?.isSuccessful) {
+          clearInterval(interval);
+          setPollingState("SUCCESS");
+          if (typeof data.newBalance === "number") {
+            setBalance(data.newBalance);
+          }
+          const verifiedOp: WalletOperation = {
+            id: `wtx-${pollingTransId}`,
+            type: "DEPOSIT",
+            direction: "IN",
+            title: lang === "fr" ? "Recharge portefeuille" : "Wallet Top-up",
+            subtitle: `Mobile Money · ${phone}`,
+            amount: data.amount || topUpAmount,
+            formattedAmount: `+ ${formatXAF(data.amount || topUpAmount)}`,
+            fee: calculatedFee,
+            date: formatNowDateTime(),
+            timestamp: Date.now(),
+            status: "SUCCESSFUL",
+          };
+          setOperations((prev) => [verifiedOp, ...prev.filter((op) => op.id !== verifiedOp.id)]);
+          setTopUpMessage(data.message || (lang === "fr" ? "Recharge réussie avec succès !" : "Top-up successful!"));
+
+          setTimeout(() => {
+            setIsTopUpOpen(false);
+            setPollingTransId(null);
+            setPollingState("IDLE");
+            setTopUpMessage(null);
+          }, 2500);
+        } else if (data?.isFailed) {
+          clearInterval(interval);
+          setPollingState("FAILED");
+          setTopUpError(data.message || (lang === "fr" ? "Le paiement Mobile Money a été annulé ou a échoué." : "Payment cancelled or failed."));
+        }
+      } catch (err) {
+        console.error("Top-up poll error:", err);
+      }
+    }, 2500);
+
+    const countdown = setInterval(() => {
+      setPollingSecondsLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(countdown);
+          clearInterval(interval);
+          setPollingState("FAILED");
+          setTopUpError(
+            lang === "fr"
+              ? "Délai d'attente dépassé. Si votre compte a été débité, votre portefeuille sera crédité automatiquement dès confirmation de l'opérateur."
+              : "Timeout. If charged, your wallet will be credited automatically once confirmed.",
+          );
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      stopped = true;
+      clearInterval(interval);
+      clearInterval(countdown);
+    };
+  }, [pollingTransId, pollingState, phone, topUpAmount, calculatedFee, lang]);
 
   async function handleTopUp(e: React.FormEvent) {
     e.preventDefault();
@@ -214,32 +311,43 @@ export function WalletClient({
       const data = await res.json();
       if (!res.ok) {
         setTopUpError(data.error || "Erreur lors du rechargement");
+        setIsSubmitting(false);
         return;
       }
 
-      setTopUpMessage(data.message);
-      if (typeof data.newBalance === "number") {
+      // If Fapshi transaction ID returned, enter polling mode waiting for phone USSD PIN
+      if (data.transId) {
+        setPollingTransId(data.transId);
+        setPollingSecondsLeft(90);
+        setPollingState("POLLING");
+        setTopUpMessage(
+          data.message ||
+            `Veuillez valider le débit de ${formatXAF(totalDebit)} sur votre téléphone (${phone}).`,
+        );
+      } else if (typeof data.newBalance === "number") {
+        // Dev/Local immediate credit
         setBalance(data.newBalance);
+        const newOp: WalletOperation = {
+          id: `deposit-${Date.now()}`,
+          type: "DEPOSIT",
+          direction: "IN",
+          title: lang === "fr" ? "Recharge portefeuille" : "Wallet Top-up",
+          subtitle: `Mobile Money · ${phone}`,
+          amount: topUpAmount,
+          formattedAmount: `+ ${formatXAF(topUpAmount)}`,
+          fee: calculatedFee,
+          date: formatNowDateTime(),
+          timestamp: Date.now(),
+          status: "SUCCESSFUL",
+        };
+        setOperations((prev) => [newOp, ...prev]);
+        setTopUpMessage(data.message || (lang === "fr" ? "Recharge réussie !" : "Top-up successful!"));
+
+        setTimeout(() => {
+          setIsTopUpOpen(false);
+          setTopUpMessage(null);
+        }, 2500);
       }
-
-      const newOp: WalletOperation = {
-        id: `deposit-${Date.now()}`,
-        type: "DEPOSIT",
-        direction: "IN",
-        title: lang === "fr" ? "Recharge portefeuille" : "Wallet Top-up",
-        subtitle: `Mobile Money · ${phone}`,
-        amount: topUpAmount,
-        formattedAmount: `+ ${formatXAF(topUpAmount)}`,
-        fee: calculatedFee,
-        date: formatNowDateTime(),
-        timestamp: Date.now(),
-      };
-      setOperations((prev) => [newOp, ...prev]);
-
-      setTimeout(() => {
-        setIsTopUpOpen(false);
-        setTopUpMessage(null);
-      }, 2500);
     } catch {
       setTopUpError(
         lang === "fr"
@@ -704,107 +812,159 @@ export function WalletClient({
                 {topUpError}
               </div>
             )}
-            {topUpMessage && (
+            {topUpMessage && pollingState !== "POLLING" && (
               <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-medium flex items-center gap-2">
                 <span className="material-symbols-outlined text-emerald-700 text-[18px]">check_circle</span>
                 <span>{topUpMessage}</span>
               </div>
             )}
 
-            <form onSubmit={handleTopUp} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-700">Montant à recharger :</label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {[5000, 10000, 25000, 50000].map((amt) => (
-                    <button
-                      key={amt}
-                      type="button"
-                      onClick={() => setTopUpAmountInput(String(amt))}
-                      className={`py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                        topUpAmount === amt
-                          ? "bg-emerald-700 text-white border-emerald-700"
-                          : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
-                      }`}
-                    >
-                      {amt.toLocaleString("fr-FR")} F
-                    </button>
-                  ))}
+            {pollingState === "POLLING" ? (
+              <div className="flex flex-col items-center justify-center py-6 px-2 text-center gap-4">
+                <div className="relative flex items-center justify-center">
+                  <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-800 animate-pulse">
+                    <span className="material-symbols-outlined text-3xl">phone_iphone</span>
+                  </div>
+                  <div className="absolute inset-0 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
                 </div>
-                <div className="relative mt-1">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={topUpAmountInput}
-                    onChange={(e) => {
-                      const clean = e.target.value.replace(/\D/g, "").replace(/^0+/, "");
-                      setTopUpAmountInput(clean);
-                    }}
-                    placeholder="Montant (ex: 5000)"
-                    className="w-full bg-white border-2 border-emerald-600 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-600/25 focus:outline-none rounded-xl px-3 py-2.5 text-sm font-bold text-slate-900"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-700">
-                    FCFA
+
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-900">
+                    {lang === "fr" ? "Validation requise sur votre téléphone" : "Phone validation required"}
+                  </h4>
+                  <p className="text-xs text-slate-600 mt-1 max-w-xs leading-relaxed">
+                    {lang === "fr"
+                      ? `Veuillez composer votre code secret Mobile Money sur votre téléphone (${phone}) pour valider le débit de ${formatXAF(totalDebit)}.`
+                      : `Please enter your Mobile Money PIN on your phone (${phone}) to approve ${formatXAF(totalDebit)}.`}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold">
+                  <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
+                  <span>
+                    {lang === "fr" ? `Vérification automatique (${pollingSecondsLeft}s)` : `Checking status (${pollingSecondsLeft}s)`}
                   </span>
                 </div>
-              </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-700">Numéro MTN / Orange Money :</label>
-                <input
-                  type="tel"
-                  inputMode="tel"
-                  maxLength={9}
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 9))}
-                  placeholder="6XXXXXXXX"
-                  className="w-full bg-white border-2 border-emerald-600 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-600/25 focus:outline-none rounded-xl px-3 py-2.5 text-sm font-bold text-slate-900"
-                />
-                <OperatorBadge operator={topUpOperatorInfo} lang={lang} className="mt-1" />
-                {isTopUpOperatorSuspended && (
-                  <div className="mt-1.5 p-2.5 rounded-xl bg-red-50 border-2 border-red-400 text-xs text-red-800 font-semibold flex items-start gap-2">
-                    <span className="material-symbols-outlined text-red-600 text-[18px] flex-shrink-0">warning</span>
-                    <span>{topUpSuspendedReason}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col gap-1.5 text-xs">
-                <div className="flex justify-between text-slate-600">
-                  <span>Montant crédité :</span>
-                  <span className="font-bold text-slate-900">{formatXAF(topUpAmount)}</span>
-                </div>
-                <div className="flex justify-between text-slate-600">
-                  <span>Frais ({initialFeePercentage}%) :</span>
-                  <span className="font-bold text-slate-900">{formatXAF(calculatedFee)}</span>
-                </div>
-                <div className="pt-1 border-t border-slate-200 flex justify-between font-extrabold text-sm text-emerald-950">
-                  <span>Total prélevé :</span>
-                  <span className="text-emerald-800">{formatXAF(totalDebit)}</span>
-                </div>
-                <p className="text-[10px] text-slate-500 mt-0.5">
-                  {isPrivateMember
-                    ? "Frais de 5,1% appliqués pour les membres de cotisations privées."
-                    : "Frais opérateur Orange / MTN de 3,1% (cotisation publique)."}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => setIsTopUpOpen(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+                  onClick={() => {
+                    setPollingTransId(null);
+                    setPollingState("IDLE");
+                  }}
+                  className="text-xs text-slate-500 hover:text-slate-800 underline font-medium mt-2 cursor-pointer"
                 >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || isTopUpOperatorSuspended}
-                  className="flex-1 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
-                >
-                  {isSubmitting ? <LoadingSpinner /> : <span>Payer {formatXAF(totalDebit)}</span>}
+                  {lang === "fr" ? "Annuler l'attente" : "Cancel waiting"}
                 </button>
               </div>
-            </form>
+            ) : pollingState === "SUCCESS" ? (
+              <div className="flex flex-col items-center justify-center py-6 px-2 text-center gap-3">
+                <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-3xl">check_circle</span>
+                </div>
+                <h4 className="font-extrabold text-base text-slate-900">
+                  {lang === "fr" ? "Recharge réussie !" : "Top-up successful!"}
+                </h4>
+                <p className="text-xs text-slate-600">
+                  {topUpMessage || (lang === "fr" ? "Votre portefeuille a été crédité avec succès." : "Your wallet has been credited.")}
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleTopUp} className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-slate-700">Montant à recharger :</label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[5000, 10000, 25000, 50000].map((amt) => (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setTopUpAmountInput(String(amt))}
+                        className={`py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                          topUpAmount === amt
+                            ? "bg-emerald-700 text-white border-emerald-700"
+                            : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                        }`}
+                      >
+                        {amt.toLocaleString("fr-FR")} F
+                      </button>
+                    ))}
+                  </div>
+                  <div className="relative mt-1">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={topUpAmountInput}
+                      onChange={(e) => {
+                        const clean = e.target.value.replace(/\D/g, "").replace(/^0+/, "");
+                        setTopUpAmountInput(clean);
+                      }}
+                      placeholder="Montant (ex: 5000)"
+                      className="w-full bg-white border-2 border-emerald-600 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-600/25 focus:outline-none rounded-xl px-3 py-2.5 text-sm font-bold text-slate-900"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-700">
+                      FCFA
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-slate-700">Numéro MTN / Orange Money :</label>
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    maxLength={9}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 9))}
+                    placeholder="6XXXXXXXX"
+                    className="w-full bg-white border-2 border-emerald-600 focus:border-emerald-700 focus:ring-2 focus:ring-emerald-600/25 focus:outline-none rounded-xl px-3 py-2.5 text-sm font-bold text-slate-900"
+                  />
+                  <OperatorBadge operator={topUpOperatorInfo} lang={lang} className="mt-1" />
+                  {isTopUpOperatorSuspended && (
+                    <div className="mt-1.5 p-2.5 rounded-xl bg-red-50 border-2 border-red-400 text-xs text-red-800 font-semibold flex items-start gap-2">
+                      <span className="material-symbols-outlined text-red-600 text-[18px] flex-shrink-0">warning</span>
+                      <span>{topUpSuspendedReason}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col gap-1.5 text-xs">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Montant crédité :</span>
+                    <span className="font-bold text-slate-900">{formatXAF(topUpAmount)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Frais ({initialFeePercentage}%) :</span>
+                    <span className="font-bold text-slate-900">{formatXAF(calculatedFee)}</span>
+                  </div>
+                  <div className="pt-1 border-t border-slate-200 flex justify-between font-extrabold text-sm text-emerald-950">
+                    <span>Total prélevé :</span>
+                    <span className="text-emerald-800">{formatXAF(totalDebit)}</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    {isPrivateMember
+                      ? "Frais de 5,1% appliqués pour les membres de cotisations privées."
+                      : "Frais opérateur Orange / MTN de 3,1% (cotisation publique)."}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsTopUpOpen(false)}
+                    className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || isTopUpOperatorSuspended}
+                    className="flex-1 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  >
+                    {isSubmitting ? <LoadingSpinner /> : <span>Payer {formatXAF(totalDebit)}</span>}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

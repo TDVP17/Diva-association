@@ -4,6 +4,7 @@ import { initiateDirectPayment, initiateHostedPayment, normalizeCameroonPhone, F
 import { assertPriorCyclePaidOut } from "@/lib/round-robin-lock";
 import { computeProviderFee } from "@/lib/payment-fees";
 import { detectMobileMoneyProvider, fapshiMediumFor } from "@/lib/mobile-money-provider";
+import { checkFinancialServiceAvailability } from "@/lib/financial-service-control";
 import { resolveDueDateForSlot } from "@/lib/initiate-slot-payment";
 import { isAppLocked } from "@/lib/security";
 import type { PaymentProvider } from "@/generated/prisma/enums";
@@ -354,6 +355,21 @@ export async function initiateBulkPayment(
 
   try {
     const detectedProvider = detectMobileMoneyProvider(normalizedPhone);
+    if (detectedProvider) {
+      const serviceCheck = await checkFinancialServiceAvailability({
+        provider: detectedProvider,
+        direction: "IN",
+      });
+      if (!serviceCheck.allowed) {
+        return {
+          ok: false,
+          status: 503,
+          error:
+            serviceCheck.message ||
+            "Ce service est momentanément indisponible. Veuillez choisir un autre moyen de paiement ou réessayer ultérieurement.",
+        };
+      }
+    }
     const redirectUrl =
       options?.redirectUrl ||
       `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://divaasso.com"}/global-payment`;

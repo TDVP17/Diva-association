@@ -612,7 +612,7 @@ export async function runLoanPenaltySweep(now: Date = new Date()) {
           {
             userId: loan.userId,
             message: `Rappel important : la date limite de remboursement de votre prêt (${formatXAF(remaining)}) est le ${dueDateLabel} à 18h00. Pensez à rembourser à temps pour éviter +5 % de pénalité après 2 jours de retard.`,
-            actionUrl: "/wallet",
+            actionUrl: "/loans",
           },
         ],
       }).catch(() => {});
@@ -623,7 +623,7 @@ export async function runLoanPenaltySweep(now: Date = new Date()) {
         const html = renderBrandedEmailHtml({
           title: subject,
           bodyText,
-          actionUrl: "/wallet",
+          actionUrl: "/loans",
           actionLabel: "Rembourser mon prêt",
           lang: loan.user.preferredLang === "en" ? "en" : "fr",
         });

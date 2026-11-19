@@ -84,7 +84,7 @@ export function renderBrandedEmailHtml(params: BrandedEmailParams): string {
       const parsed = new URL(rawUrl);
       const baseOrigin = new URL(baseUrl).origin;
       if (parsed.origin === baseOrigin) {
-        targetUrl = `${baseUrl}/open?target=${encodeURIComponent(parsed.pathname + parsed.search)}`;
+        targetUrl = `${baseUrl}/r?dest=${encodeURIComponent(parsed.pathname + parsed.search)}`;
       } else {
         targetUrl = rawUrl;
       }
@@ -93,7 +93,7 @@ export function renderBrandedEmailHtml(params: BrandedEmailParams): string {
     }
   } else {
     const cleanPath = rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`;
-    targetUrl = `${baseUrl}/open?target=${encodeURIComponent(cleanPath)}`;
+    targetUrl = `${baseUrl}/r?dest=${encodeURIComponent(cleanPath)}`;
   }
 
   const actionButton = `
