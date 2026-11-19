@@ -1,12 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { type Lang } from "@/lib/i18n/translations";
 import type { DashboardSummaryData } from "@/lib/dashboard";
-
-const BALANCE_VISIBILITY_KEY = "diva_balance_hidden";
 
 export function DashboardClient({
   data,
@@ -17,28 +14,6 @@ export function DashboardClient({
   lang: Lang;
   accessDeniedError?: boolean;
 }) {
-  const [isBalanceHidden, setIsBalanceHidden] = useState(true);
-
-  // Synchronize balance visibility preference with localStorage
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(BALANCE_VISIBILITY_KEY);
-      if (stored !== null) {
-        setIsBalanceHidden(stored === "true");
-      }
-    } catch {}
-  }, []);
-
-  function toggleBalanceVisibility() {
-    setIsBalanceHidden((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(BALANCE_VISIBILITY_KEY, String(next));
-      } catch {}
-      return next;
-    });
-  }
-
   const { member, wallet, statistics, nextContribution, sessions, recentTransactions, loan, notifications } = data;
 
   return (
@@ -62,36 +37,19 @@ export function DashboardClient({
 
       {/* ── 1. EN-TÊTE PERSONNALISÉ ── */}
       <div className="flex items-center justify-between gap-3 pt-1">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="relative w-12 h-12 rounded-2xl overflow-hidden border-2 border-emerald-600/30 bg-emerald-50 flex items-center justify-center flex-shrink-0 shadow-xs">
-            {member.avatar ? (
-              <Image
-                src={member.avatar}
-                alt={member.fullName}
-                fill
-                sizes="48px"
-                className="object-cover"
-              />
-            ) : (
-              <span className="material-symbols-outlined text-emerald-800 text-[26px]">
-                account_circle
-              </span>
-            )}
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight truncate">
-              Bonjour, {member.firstName} 👋
-            </h1>
-            <p className="text-xs text-slate-500 font-medium truncate">
-              Bienvenue dans votre espace DIVA Asso
-            </p>
-          </div>
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">
+            Bonjour, {member.firstName} 👋
+          </h1>
+          <p className="text-xs text-slate-500 font-medium">
+            Bienvenue dans votre espace DIVA Asso
+          </p>
         </div>
 
         {/* Badge Étoiles Confiance */}
         <Link
           href="/loans"
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors flex-shrink-0 shadow-2xs"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors flex-shrink-0 shadow-2xs"
           title="Score de Confiance DIVA Asso"
         >
           <span className="material-symbols-outlined text-amber-500 text-[18px]">star</span>
@@ -99,78 +57,7 @@ export function DashboardClient({
         </Link>
       </div>
 
-      {/* ── 2. CARTE FINANCIÈRE "MON PORTEFEUILLE" (Fintech Premium) ── */}
-      <div className="relative rounded-3xl p-5 bg-gradient-to-br from-[#072d21] via-[#0b3d2e] to-[#0f513c] text-white shadow-lg border border-emerald-600/30 overflow-hidden">
-        {/* Subtle decorative glow */}
-        <div className="absolute -top-12 -right-12 w-44 h-44 bg-emerald-400/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute -bottom-10 -left-10 w-36 h-36 bg-amber-400/10 rounded-full blur-xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col gap-4">
-          {/* Top Label & Eye Toggle */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-emerald-300 text-[18px]">
-                account_balance_wallet
-              </span>
-              <span className="text-[11px] font-extrabold tracking-wider uppercase text-emerald-200/90">
-                Mon Portefeuille
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={toggleBalanceVisibility}
-              className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 transition-all text-white flex items-center justify-center cursor-pointer"
-              title={isBalanceHidden ? "Afficher le solde" : "Masquer le solde"}
-              aria-label={isBalanceHidden ? "Afficher le solde" : "Masquer le solde"}
-            >
-              <span className="material-symbols-outlined text-[18px]">
-                {isBalanceHidden ? "visibility_off" : "visibility"}
-              </span>
-            </button>
-          </div>
-
-          {/* Solde en gros chiffres */}
-          <div>
-            <div className="text-3xl sm:text-4xl font-extrabold tracking-tight font-numeric-data text-white">
-              {isBalanceHidden ? "•••••• FCFA" : wallet.formattedBalance}
-            </div>
-            <p className="text-[11px] text-emerald-200/80 mt-1 flex items-center gap-1.5">
-              <span>0% de frais sur les retraits</span>
-              <span>•</span>
-              <span>Frais recharge : {wallet.feePercentage}%</span>
-            </p>
-          </div>
-
-          {/* Boutons d'actions rapides du Portefeuille */}
-          <div className="pt-2 border-t border-white/10 flex items-center gap-2.5">
-            <Link
-              href="/wallet?action=recharge"
-              className="flex-1 py-2.5 px-3 rounded-xl bg-white text-emerald-950 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-emerald-50 active:scale-[0.98] transition-all shadow-sm"
-            >
-              <span className="material-symbols-outlined text-[18px] text-emerald-700">add_circle</span>
-              <span>Recharger</span>
-            </Link>
-
-            <Link
-              href="/wallet?action=withdraw"
-              className="flex-1 py-2.5 px-3 rounded-xl bg-white/15 hover:bg-white/20 active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-1.5 border border-white/20 transition-all backdrop-blur-xs"
-            >
-              <span className="material-symbols-outlined text-[18px]">payments</span>
-              <span>Retirer</span>
-            </Link>
-
-            <Link
-              href="/wallet"
-              className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center border border-white/15 transition-all"
-              title="Voir mon portefeuille complet"
-            >
-              <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* ── 3. ACTIONS RAPIDES (Quick Access 4 Grids) ── */}
+      {/* ── 2. ACTIONS RAPIDES (Quick Access 4 Grids) ── */}
       <div>
         <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-2.5 px-0.5">
           Actions rapides
@@ -226,7 +113,7 @@ export function DashboardClient({
         </div>
       </div>
 
-      {/* ── 4. APERÇU DE L'ACTIVITÉ DU MEMBRE (Statistiques réelles) ── */}
+      {/* ── 3. APERÇU DE L'ACTIVITÉ DU MEMBRE (Statistiques réelles) ── */}
       <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
         <div className="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col gap-0.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -269,7 +156,7 @@ export function DashboardClient({
         </div>
       </div>
 
-      {/* ── 5. MA PROCHAINE COTISATION (Échéance imminente ou Empty State) ── */}
+      {/* ── 4. MA PROCHAINE COTISATION (Échéance imminente ou Empty State) ── */}
       <div>
         <div className="flex items-center justify-between mb-2 px-0.5">
           <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
@@ -365,7 +252,7 @@ export function DashboardClient({
         )}
       </div>
 
-      {/* ── 6. MES TONTINES (Cards ou Empty State avec image) ── */}
+      {/* ── 5. MES TONTINES (Cards ou Empty State avec image) ── */}
       <div>
         <div className="flex items-center justify-between mb-2 px-0.5">
           <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
@@ -450,7 +337,7 @@ export function DashboardClient({
         )}
       </div>
 
-      {/* ── 7. RAPPEL PRÊT D'URGENCE (Si actif ou éligible) ── */}
+      {/* ── 6. RAPPEL PRÊT D'URGENCE (Si actif ou éligible) ── */}
       {loan.activeLoan ? (
         <div className="p-4 rounded-2xl bg-amber-50/80 border-2 border-amber-300 shadow-2xs flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -496,7 +383,7 @@ export function DashboardClient({
         </div>
       ) : null}
 
-      {/* ── 8. ACTIVITÉS RÉCENTES (Transactions réelles ou Empty State avec image) ── */}
+      {/* ── 7. ACTIVITÉS RÉCENTES (Transactions réelles ou Empty State avec image) ── */}
       <div>
         <div className="flex items-center justify-between mb-2 px-0.5">
           <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
@@ -568,7 +455,7 @@ export function DashboardClient({
         )}
       </div>
 
-      {/* ── 9. NOTIFICATIONS & ANNONCES RÉCENTES (Si existantes) ── */}
+      {/* ── 8. NOTIFICATIONS & ANNONCES RÉCENTES (Si existantes) ── */}
       {notifications.length > 0 && (
         <div>
           <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-2 px-0.5">
