@@ -33,6 +33,10 @@ interface OperatorSuspension {
   orangeSuspendedReason: string;
   isMtnSuspended: boolean;
   mtnSuspendedReason: string;
+  orangeCashInEnabled?: boolean;
+  orangeCashInDisabledReason?: string;
+  mtnCashInEnabled?: boolean;
+  mtnCashInDisabledReason?: string;
 }
 
 function sanitizeDigits(raw: string): string {
@@ -113,16 +117,16 @@ export function LoansClient({
 
   const isAmountValid = typedAmount >= 1_000 && typedAmount <= maxAllowed;
 
-  // Direct repayment operator check
+  // Direct repayment operator check (Cash-In)
   const repayOperatorInfo = getOperatorInfo(repayPhone, lang);
   const repayProvider = detectMobileMoneyProvider(repayPhone.replace(/\D/g, "").replace(/^237/, ""));
   const isRepayOperatorSuspended =
-    (repayProvider === "ORANGE" && operatorSuspension.isOrangeSuspended) ||
-    (repayProvider === "MTN" && operatorSuspension.isMtnSuspended);
+    (repayProvider === "ORANGE" && (operatorSuspension.isOrangeSuspended || operatorSuspension.orangeCashInEnabled === false)) ||
+    (repayProvider === "MTN" && (operatorSuspension.isMtnSuspended || operatorSuspension.mtnCashInEnabled === false));
   const repaySuspendedReason =
     repayProvider === "ORANGE"
-      ? operatorSuspension.orangeSuspendedReason || "Orange Money est temporairement suspendu."
-      : operatorSuspension.mtnSuspendedReason || "MTN Mobile Money est temporairement suspendu.";
+      ? operatorSuspension.orangeCashInDisabledReason || operatorSuspension.orangeSuspendedReason || "Orange Money est temporairement indisponible pour les paiements."
+      : operatorSuspension.mtnCashInDisabledReason || operatorSuspension.mtnSuspendedReason || "MTN Mobile Money est temporairement indisponible pour les paiements.";
 
   async function refreshAll() {
     const res = await fetch("/api/loans");
@@ -276,7 +280,7 @@ export function LoansClient({
               </span>
             ))}
             <span className="text-[11px] font-bold text-emerald-100 ml-1">
-              {eligibility.stars}/5
+              {eligibility.stars}/5 {eligibility.stars >= 4 ? "(Éligible)" : "(4★ requis)"}
             </span>
           </div>
         </div>
@@ -503,11 +507,20 @@ export function LoansClient({
       {!activeLoan && !pendingLoan && (
         <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-sm flex flex-col gap-4">
           {!eligibility.eligible || maxAllowed < 1_000 ? (
-            <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950 flex items-center gap-2.5">
-              <span className="material-symbols-outlined text-amber-700 text-[20px] flex-shrink-0">lock</span>
-              <span className="font-semibold">
-                Vous n&apos;êtes pas encore éligible au prêt d&apos;urgence pour le moment.
-              </span>
+            <div className="p-4 rounded-xl bg-amber-50 border-2 border-amber-300 text-xs text-amber-950 flex flex-col gap-2">
+              <div className="flex items-center gap-2 font-bold text-amber-900">
+                <span className="material-symbols-outlined text-amber-700 text-[20px] flex-shrink-0">lock</span>
+                <span>
+                  {eligibility.stars < 4
+                    ? `4 étoiles minimum requises (${eligibility.stars}/5 actuelles)`
+                    : "Prêt d'urgence non disponible"}
+                </span>
+              </div>
+              <p className="text-xs text-amber-900 leading-relaxed font-medium">
+                {eligibility.stars < 4
+                  ? "Pour avoir la possibilité de demander un prêt, vous devez avoir au moins 4 étoiles minimum. Chaque étoile s'obtient en terminant un cycle complet dans une cotisation publique sans jamais avoir eu d'amende."
+                  : (eligibility.reasons[0] || "Vous devez participer à une cotisation publique active avec une épargne acquise suffisante pour débloquer un prêt.")}
+              </p>
             </div>
           ) : (
             <form onSubmit={handleContinue} className="flex flex-col gap-4">

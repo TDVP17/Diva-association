@@ -298,7 +298,7 @@ export async function evaluateUserLoanEligibility(userId: string): Promise<LoanE
   }
   if (!hasFourStars) {
     reasons.push(
-      `Badge 4 étoiles requis (vous avez actuellement ${stars}/5 étoiles). Terminez un cycle complet sans amende pour augmenter vos étoiles.`,
+      `Badge 4 étoiles minimum requis pour demander un prêt (vous avez actuellement ${stars}/5 étoiles). Chaque étoile s'obtient en terminant un cycle complet dans une cotisation publique sans jamais avoir eu d'amende.`,
     );
   }
   if (!hasNoActiveFines) {

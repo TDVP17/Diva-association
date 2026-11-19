@@ -19,6 +19,9 @@ import { PrivateConfigEditor } from "./private-config-editor";
 import { WithdrawalLimitsEditor } from "./withdrawal-limits-editor";
 import { ROLE_KEY } from "@/lib/role-label";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function AdminSettingsPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");

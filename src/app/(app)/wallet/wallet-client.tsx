@@ -774,8 +774,8 @@ export function WalletClient({
             </p>
             <p className="text-[11px] text-slate-600">
               {userStars >= 4
-                ? `⭐ ${userStars}/5 étoiles — Vérifiez votre plafond disponible`
-                : `⭐ ${userStars}/5 étoiles (4 étoiles requises en cotisation publique)`}
+                ? `⭐ ${userStars}/5 étoiles — Vous remplissez le critère d'éligibilité (4★ min)`
+                : `⭐ ${userStars}/5 étoiles (4 étoiles minimum requises en cotisation publique sans amende)`}
             </p>
           </div>
         </div>
@@ -1053,17 +1053,17 @@ export function WalletClient({
                   <div className="flex flex-col gap-2">
                     {approvedMethods.map((m) => {
                       const isMethodSuspended =
-                        (m.provider === "ORANGE" && operatorSuspension.isOrangeSuspended) ||
-                        (m.provider === "MTN" && operatorSuspension.isMtnSuspended);
+                        (m.provider === "ORANGE" && (operatorSuspension.isOrangeSuspended || operatorSuspension.orangeCashOutEnabled === false)) ||
+                        (m.provider === "MTN" && (operatorSuspension.isMtnSuspended || operatorSuspension.mtnCashOutEnabled === false));
                       return (
                         <label
                           key={m.id}
-                          className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer ${
+                          className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
                             isMethodSuspended
-                              ? "border-red-300 bg-red-50/60"
+                              ? "border-red-300 bg-red-50/70 opacity-80 cursor-not-allowed"
                               : selectedMethodId === m.id
-                                ? "border-emerald-600 bg-emerald-50/70"
-                                : "border-slate-200"
+                                ? "border-emerald-600 bg-emerald-50/70 cursor-pointer shadow-xs"
+                                : "border-slate-200 cursor-pointer hover:border-slate-300"
                           }`}
                         >
                           <div className="flex items-center gap-2.5">
@@ -1071,7 +1071,8 @@ export function WalletClient({
                               type="radio"
                               name="withdraw-method"
                               checked={selectedMethodId === m.id}
-                              onChange={() => setSelectedMethodId(m.id)}
+                              onChange={() => !isMethodSuspended && setSelectedMethodId(m.id)}
+                              disabled={isMethodSuspended}
                               className="accent-emerald-700"
                             />
                             <div>
@@ -1082,8 +1083,8 @@ export function WalletClient({
                             </div>
                           </div>
                           {isMethodSuspended ? (
-                            <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-bold">
-                              Suspendu
+                            <span className="px-2 py-0.5 rounded-full bg-red-100 border border-red-300 text-red-700 text-[10px] font-bold">
+                              Retraits indisponibles
                             </span>
                           ) : (
                             <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">

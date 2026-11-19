@@ -6,6 +6,9 @@ import { evaluateUserLoanEligibility, syncLoanPenaltiesForUser } from "@/lib/loa
 import { getFallbackPaymentConfig } from "@/lib/fallback-payment-config";
 import { LoansClient, type LoanItem } from "./loans-client";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function LoansPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
@@ -71,6 +74,10 @@ export default async function LoansPage() {
         orangeSuspendedReason: operatorConfig.orangeSuspendedReason ?? "",
         isMtnSuspended: Boolean(operatorConfig.isMtnSuspended),
         mtnSuspendedReason: operatorConfig.mtnSuspendedReason ?? "",
+        orangeCashInEnabled: operatorConfig.orangeCashInEnabled ?? true,
+        orangeCashInDisabledReason: operatorConfig.orangeCashInDisabledReason ?? "",
+        mtnCashInEnabled: operatorConfig.mtnCashInEnabled ?? true,
+        mtnCashInDisabledReason: operatorConfig.mtnCashInDisabledReason ?? "",
       }}
     />
   );

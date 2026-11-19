@@ -14,6 +14,9 @@ import { FineRulePill } from "@/components/fine-rule-pill";
 import { SessionCardLink } from "./session-card-link";
 import { PotAmountBadge } from "./pot-amount-badge";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const TONTINE_LABELS: Record<string, string> = {
   HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
   MONTHLY_28: "Monthly Tontine (28th)",

@@ -149,6 +149,87 @@ export function FallbackPaymentEditor({
     }
   }
 
+  async function toggleGranular(field: "orangeCashIn" | "orangeCashOut" | "mtnCashIn" | "mtnCashOut") {
+    let nextOrangeCashIn = orangeCashInEnabled;
+    let nextOrangeCashOut = orangeCashOutEnabled;
+    let nextMtnCashIn = mtnCashInEnabled;
+    let nextMtnCashOut = mtnCashOutEnabled;
+
+    let actionLabel = "";
+    if (field === "orangeCashIn") {
+      nextOrangeCashIn = !orangeCashInEnabled;
+      setOrangeCashInEnabled(nextOrangeCashIn);
+      actionLabel = nextOrangeCashIn
+        ? (lang === "fr" ? "Dépôts & Paiements Orange Money réactivés !" : "Orange Money deposits reactivated!")
+        : (lang === "fr" ? "Dépôts & Paiements Orange Money désactivés." : "Orange Money deposits disabled.");
+    } else if (field === "orangeCashOut") {
+      nextOrangeCashOut = !orangeCashOutEnabled;
+      setOrangeCashOutEnabled(nextOrangeCashOut);
+      actionLabel = nextOrangeCashOut
+        ? (lang === "fr" ? "Retraits Orange Money réactivés !" : "Orange Money withdrawals reactivated!")
+        : (lang === "fr" ? "Retraits Orange Money désactivés." : "Orange Money withdrawals disabled.");
+    } else if (field === "mtnCashIn") {
+      nextMtnCashIn = !mtnCashInEnabled;
+      setMtnCashInEnabled(nextMtnCashIn);
+      actionLabel = nextMtnCashIn
+        ? (lang === "fr" ? "Dépôts & Paiements MTN MoMo réactivés !" : "MTN MoMo deposits reactivated!")
+        : (lang === "fr" ? "Dépôts & Paiements MTN MoMo désactivés." : "MTN MoMo deposits disabled.");
+    } else if (field === "mtnCashOut") {
+      nextMtnCashOut = !mtnCashOutEnabled;
+      setMtnCashOutEnabled(nextMtnCashOut);
+      actionLabel = nextMtnCashOut
+        ? (lang === "fr" ? "Retraits MTN MoMo réactivés !" : "MTN MoMo withdrawals reactivated!")
+        : (lang === "fr" ? "Retraits MTN MoMo désactivés." : "MTN MoMo withdrawals disabled.");
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/payments/fallback-config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isEnabled,
+          orangeUssdCode,
+          orangeBeneficiaryName,
+          mtnUssdCode,
+          mtnBeneficiaryName,
+          isOrangeSuspended,
+          orangeSuspendedReason,
+          isMtnSuspended,
+          mtnSuspendedReason,
+          orangeCashInEnabled: nextOrangeCashIn,
+          orangeCashOutEnabled: nextOrangeCashOut,
+          orangeCashInDisabledReason,
+          orangeCashOutDisabledReason,
+          mtnCashInEnabled: nextMtnCashIn,
+          mtnCashOutEnabled: nextMtnCashOut,
+          mtnCashInDisabledReason,
+          mtnCashOutDisabledReason,
+        }),
+      });
+      if (res.ok) {
+        setSavedMsg(actionLabel);
+        setTimeout(() => setSavedMsg(null), 3500);
+      } else {
+        const d = await res.json().catch(() => null);
+        setError(d?.error || "Erreur de mise à jour");
+        if (field === "orangeCashIn") setOrangeCashInEnabled(!nextOrangeCashIn);
+        if (field === "orangeCashOut") setOrangeCashOutEnabled(!nextOrangeCashOut);
+        if (field === "mtnCashIn") setMtnCashInEnabled(!nextMtnCashIn);
+        if (field === "mtnCashOut") setMtnCashOutEnabled(!nextMtnCashOut);
+      }
+    } catch {
+      setError("Erreur de connexion.");
+      if (field === "orangeCashIn") setOrangeCashInEnabled(!nextOrangeCashIn);
+      if (field === "orangeCashOut") setOrangeCashOutEnabled(!nextOrangeCashOut);
+      if (field === "mtnCashIn") setMtnCashInEnabled(!nextMtnCashIn);
+      if (field === "mtnCashOut") setMtnCashOutEnabled(!nextMtnCashOut);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function toggleOperator(operator: "ORANGE" | "MTN") {
     const nextOrange = operator === "ORANGE" ? !isOrangeSuspended : isOrangeSuspended;
     const nextMtn = operator === "MTN" ? !isMtnSuspended : isMtnSuspended;
@@ -293,11 +374,12 @@ export function FallbackPaymentEditor({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setOrangeCashInEnabled(!orangeCashInEnabled)}
+                  onClick={() => toggleGranular("orangeCashIn")}
                   disabled={saving || isOrangeSuspended}
                   className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-40 ${
                     orangeCashInEnabled && !isOrangeSuspended ? "bg-emerald-600" : "bg-red-500"
                   }`}
+                  title={orangeCashInEnabled ? "Désactiver les dépôts Orange" : "Activer les dépôts Orange"}
                 >
                   <span
                     className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
@@ -311,6 +393,7 @@ export function FallbackPaymentEditor({
                   type="text"
                   value={orangeCashInDisabledReason}
                   onChange={(e) => setOrangeCashInDisabledReason(e.target.value)}
+                  onBlur={handleSave}
                   placeholder={
                     lang === "fr"
                       ? "Message personnalisé (Optionnel) : Ex. Dépôts Orange temporairement indisponibles"
@@ -334,11 +417,12 @@ export function FallbackPaymentEditor({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setOrangeCashOutEnabled(!orangeCashOutEnabled)}
+                  onClick={() => toggleGranular("orangeCashOut")}
                   disabled={saving || isOrangeSuspended}
                   className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-40 ${
                     orangeCashOutEnabled && !isOrangeSuspended ? "bg-emerald-600" : "bg-red-500"
                   }`}
+                  title={orangeCashOutEnabled ? "Désactiver les retraits Orange" : "Activer les retraits Orange"}
                 >
                   <span
                     className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
@@ -352,6 +436,7 @@ export function FallbackPaymentEditor({
                   type="text"
                   value={orangeCashOutDisabledReason}
                   onChange={(e) => setOrangeCashOutDisabledReason(e.target.value)}
+                  onBlur={handleSave}
                   placeholder={
                     lang === "fr"
                       ? "Message personnalisé (Optionnel) : Ex. Retraits Orange indisponibles"
@@ -372,6 +457,7 @@ export function FallbackPaymentEditor({
                   rows={2}
                   value={orangeSuspendedReason}
                   onChange={(e) => setOrangeSuspendedReason(e.target.value)}
+                  onBlur={handleSave}
                   placeholder={
                     lang === "fr"
                       ? "Ex: Les paiements via Orange Money sont indisponibles pour le moment. Veuillez utiliser MTN Mobile Money."
@@ -430,11 +516,12 @@ export function FallbackPaymentEditor({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setMtnCashInEnabled(!mtnCashInEnabled)}
+                  onClick={() => toggleGranular("mtnCashIn")}
                   disabled={saving || isMtnSuspended}
                   className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-40 ${
                     mtnCashInEnabled && !isMtnSuspended ? "bg-emerald-600" : "bg-red-500"
                   }`}
+                  title={mtnCashInEnabled ? "Désactiver les dépôts MTN" : "Activer les dépôts MTN"}
                 >
                   <span
                     className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
@@ -448,6 +535,7 @@ export function FallbackPaymentEditor({
                   type="text"
                   value={mtnCashInDisabledReason}
                   onChange={(e) => setMtnCashInDisabledReason(e.target.value)}
+                  onBlur={handleSave}
                   placeholder={
                     lang === "fr"
                       ? "Message personnalisé (Optionnel) : Ex. Dépôts MTN temporairement indisponibles"
@@ -471,11 +559,12 @@ export function FallbackPaymentEditor({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setMtnCashOutEnabled(!mtnCashOutEnabled)}
+                  onClick={() => toggleGranular("mtnCashOut")}
                   disabled={saving || isMtnSuspended}
                   className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-40 ${
                     mtnCashOutEnabled && !isMtnSuspended ? "bg-emerald-600" : "bg-red-500"
                   }`}
+                  title={mtnCashOutEnabled ? "Désactiver les retraits MTN" : "Activer les retraits MTN"}
                 >
                   <span
                     className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
@@ -489,6 +578,7 @@ export function FallbackPaymentEditor({
                   type="text"
                   value={mtnCashOutDisabledReason}
                   onChange={(e) => setMtnCashOutDisabledReason(e.target.value)}
+                  onBlur={handleSave}
                   placeholder={
                     lang === "fr"
                       ? "Message personnalisé (Optionnel) : Ex. Retraits MTN indisponibles"
@@ -509,6 +599,7 @@ export function FallbackPaymentEditor({
                   rows={2}
                   value={mtnSuspendedReason}
                   onChange={(e) => setMtnSuspendedReason(e.target.value)}
+                  onBlur={handleSave}
                   placeholder={
                     lang === "fr"
                       ? "Ex: Les paiements via MTN Mobile Money sont indisponibles pour le moment. Veuillez effectuer votre paiement avec Orange Money."

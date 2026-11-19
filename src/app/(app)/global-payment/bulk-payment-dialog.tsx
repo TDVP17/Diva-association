@@ -20,6 +20,7 @@ import {
   NetworkFallbackProofStep,
   type FallbackPayableSlot,
 } from "@/components/network-fallback-proof-step";
+import type { FallbackPaymentConfigData } from "@/lib/fallback-ussd";
 
 interface QuoteItem {
   membershipSlotId: string;
@@ -79,17 +80,7 @@ export function BulkPaymentDialog({
   const [failCount, setFailCount] = useState(0);
   const [showWaitingHint, setShowWaitingHint] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(false);
-  const [fallbackConfig, setFallbackConfig] = useState<{
-    isEnabled: boolean;
-    orangeUssdCode: string;
-    orangeBeneficiaryName: string;
-    mtnUssdCode: string;
-    mtnBeneficiaryName: string;
-    isOrangeSuspended?: boolean;
-    orangeSuspendedReason?: string;
-    isMtnSuspended?: boolean;
-    mtnSuspendedReason?: string;
-  } | null>(null);
+  const [fallbackConfig, setFallbackConfig] = useState<FallbackPaymentConfigData | null>(null);
   const [showFallbackProof, setShowFallbackProof] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [walletSelected, setWalletSelected] = useState(false);
@@ -394,13 +385,21 @@ export function BulkPaymentDialog({
       return;
     }
     const detectedProvider = opInfo.provider;
-    const isOrangeSuspended = detectedProvider === "ORANGE" && Boolean(fallbackConfig?.isOrangeSuspended);
-    const isMtnSuspended = detectedProvider === "MTN" && Boolean(fallbackConfig?.isMtnSuspended);
+    const isOrangeSuspended =
+      detectedProvider === "ORANGE" &&
+      Boolean(fallbackConfig?.isOrangeSuspended || fallbackConfig?.orangeCashInEnabled === false);
+    const isMtnSuspended =
+      detectedProvider === "MTN" &&
+      Boolean(fallbackConfig?.isMtnSuspended || fallbackConfig?.mtnCashInEnabled === false);
     if (isOrangeSuspended || isMtnSuspended) {
       setPhoneError(
         isOrangeSuspended
-          ? (fallbackConfig?.orangeSuspendedReason?.trim() || (lang === "fr" ? "Les paiements via Orange Money sont indisponibles pour le moment." : "Orange Money payments are currently unavailable."))
-          : (fallbackConfig?.mtnSuspendedReason?.trim() || (lang === "fr" ? "Les paiements via MTN Mobile Money sont indisponibles pour le moment." : "MTN Mobile Money payments are currently unavailable."))
+          ? (fallbackConfig?.orangeCashInDisabledReason?.trim() ||
+              fallbackConfig?.orangeSuspendedReason?.trim() ||
+              (lang === "fr" ? "Les paiements via Orange Money sont indisponibles pour le moment." : "Orange Money payments are currently unavailable."))
+          : (fallbackConfig?.mtnCashInDisabledReason?.trim() ||
+              fallbackConfig?.mtnSuspendedReason?.trim() ||
+              (lang === "fr" ? "Les paiements via MTN Mobile Money sont indisponibles pour le moment." : "MTN Mobile Money payments are currently unavailable."))
       );
       return;
     }
@@ -452,16 +451,22 @@ export function BulkPaymentDialog({
 
   const operatorInfo = getOperatorInfo(phone, lang);
   const detectedProvider = operatorInfo.provider;
-  const isOrangeSuspended = detectedProvider === "ORANGE" && Boolean(fallbackConfig?.isOrangeSuspended);
-  const isMtnSuspended = detectedProvider === "MTN" && Boolean(fallbackConfig?.isMtnSuspended);
+  const isOrangeSuspended =
+    detectedProvider === "ORANGE" &&
+    Boolean(fallbackConfig?.isOrangeSuspended || fallbackConfig?.orangeCashInEnabled === false);
+  const isMtnSuspended =
+    detectedProvider === "MTN" &&
+    Boolean(fallbackConfig?.isMtnSuspended || fallbackConfig?.mtnCashInEnabled === false);
   const isCurrentOperatorSuspended = isOrangeSuspended || isMtnSuspended;
   const suspendedReason = isOrangeSuspended
-    ? (fallbackConfig?.orangeSuspendedReason?.trim() ||
+    ? (fallbackConfig?.orangeCashInDisabledReason?.trim() ||
+        fallbackConfig?.orangeSuspendedReason?.trim() ||
         (lang === "fr"
           ? "Les paiements via Orange Money sont indisponibles pour le moment. Veuillez utiliser un numéro MTN."
           : "Orange Money payments are currently unavailable. Please use an MTN number."))
     : isMtnSuspended
-    ? (fallbackConfig?.mtnSuspendedReason?.trim() ||
+    ? (fallbackConfig?.mtnCashInDisabledReason?.trim() ||
+        fallbackConfig?.mtnSuspendedReason?.trim() ||
         (lang === "fr"
           ? "Les paiements via MTN Mobile Money sont indisponibles pour le moment. Veuillez utiliser un numéro Orange."
           : "MTN Mobile Money payments are currently unavailable. Please use an Orange number."))

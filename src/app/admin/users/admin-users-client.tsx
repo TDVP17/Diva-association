@@ -1259,13 +1259,13 @@ export function AdminUsersClient({ lang }: { lang: Lang }) {
                 <li>{lang === "fr" ? "Par défaut, les 5 étoiles sont vides (0 étoile)." : "By default, all 5 stars are empty (0 stars)."}</li>
                 <li>
                   {lang === "fr"
-                    ? "À la fin d'un cycle complet de cotisation sans aucune amende, +1 étoile est attribuée automatiquement."
-                    : "+1 star is automatically awarded when a full cotisation cycle finishes without any fines."}
+                    ? "Pour avoir 1 étoile, le membre doit finir tout un cycle dans une cotisation publique sans jamais avoir eu d'amende."
+                    : "To earn 1 star, the member must complete a full cycle in a public cotisation without ever having had a fine."}
                 </li>
                 <li>
                   {lang === "fr"
-                    ? "Ces étoiles déterminent la capacité et l'éligibilité pour le futur système de prêts."
-                    : "These stars will be used for loan eligibility in the upcoming credit system."}
+                    ? "4 étoiles minimum sont strictement requises pour avoir la possibilité de demander un prêt d'urgence."
+                    : "4 stars minimum are strictly required to be eligible to request an emergency loan."}
                 </li>
               </ul>
             </div>

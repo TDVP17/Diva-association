@@ -78,6 +78,12 @@ export async function PUT(request: Request) {
     });
 
     revalidatePath("/admin/settings");
+    revalidatePath("/wallet");
+    revalidatePath("/loans");
+    revalidatePath("/sessions");
+    revalidatePath("/dashboard");
+    revalidatePath("/profile");
+    revalidatePath("/admin/withdrawals");
     return NextResponse.json({ ok: true, config: saved });
   } catch (err) {
     console.error("[fallback-config PUT] unexpected error:", err);

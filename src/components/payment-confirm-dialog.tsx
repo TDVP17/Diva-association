@@ -20,6 +20,7 @@ import {
   NetworkFallbackProofStep,
   type FallbackPayableSlot,
 } from "@/components/network-fallback-proof-step";
+import type { FallbackPaymentConfigData } from "@/lib/fallback-ussd";
 import type { MobileMoneyProvider } from "@/generated/prisma/enums";
 
 interface Quote {
@@ -122,17 +123,7 @@ export function PaymentConfirmDialog({
   const [canManageSavedMethods, setCanManageSavedMethods] = useState(false);
   const [selectedMethodId, setSelectedMethodId] = useState<string>("new");
   const [saveNewNumber, setSaveNewNumber] = useState(false);
-  const [fallbackConfig, setFallbackConfig] = useState<{
-    isEnabled: boolean;
-    orangeUssdCode: string;
-    orangeBeneficiaryName: string;
-    mtnUssdCode: string;
-    mtnBeneficiaryName: string;
-    isOrangeSuspended?: boolean;
-    orangeSuspendedReason?: string;
-    isMtnSuspended?: boolean;
-    mtnSuspendedReason?: string;
-  } | null>(null);
+  const [fallbackConfig, setFallbackConfig] = useState<FallbackPaymentConfigData | null>(null);
   const [showFallbackProof, setShowFallbackProof] = useState(false);
   // The phone actually sent to the payment endpoint — distinct from the
   // `phone` input state, which stays empty when a saved method (not the
@@ -196,19 +187,25 @@ export function PaymentConfirmDialog({
     : getOperatorInfo(phone, lang);
 
   const detectedProvider = operatorInfo.provider;
-  const isOrangeSuspended = detectedProvider === "ORANGE" && Boolean(fallbackConfig?.isOrangeSuspended);
-  const isMtnSuspended = detectedProvider === "MTN" && Boolean(fallbackConfig?.isMtnSuspended);
+  const isOrangeSuspended =
+    detectedProvider === "ORANGE" &&
+    Boolean(fallbackConfig?.isOrangeSuspended || fallbackConfig?.orangeCashInEnabled === false);
+  const isMtnSuspended =
+    detectedProvider === "MTN" &&
+    Boolean(fallbackConfig?.isMtnSuspended || fallbackConfig?.mtnCashInEnabled === false);
   const isCurrentOperatorSuspended = isOrangeSuspended || isMtnSuspended;
   const suspendedReason = isOrangeSuspended
-    ? (fallbackConfig?.orangeSuspendedReason?.trim() ||
+    ? (fallbackConfig?.orangeCashInDisabledReason?.trim() ||
+        fallbackConfig?.orangeSuspendedReason?.trim() ||
         (lang === "fr"
-          ? "Les paiements via Orange Money sont indisponibles pour le moment. Veuillez utiliser un numéro MTN."
-          : "Orange Money payments are currently unavailable. Please use an MTN number."))
+          ? "Les dépôts et paiements Orange Money sont indisponibles pour le moment. Veuillez utiliser un numéro MTN."
+          : "Orange Money deposits/payments are currently unavailable. Please use an MTN number."))
     : isMtnSuspended
-    ? (fallbackConfig?.mtnSuspendedReason?.trim() ||
+    ? (fallbackConfig?.mtnCashInDisabledReason?.trim() ||
+        fallbackConfig?.mtnSuspendedReason?.trim() ||
         (lang === "fr"
-          ? "Les paiements via MTN Mobile Money sont indisponibles pour le moment. Veuillez utiliser un numéro Orange."
-          : "MTN Mobile Money payments are currently unavailable. Please use an Orange number."))
+          ? "Les dépôts et paiements MTN Mobile Money sont indisponibles pour le moment. Veuillez utiliser un numéro Orange."
+          : "MTN Mobile Money deposits/payments are currently unavailable. Please use an Orange number."))
     : null;
   const isOperatorInvalid = usingNewNumber && operatorInfo.status === "unknown";
 
