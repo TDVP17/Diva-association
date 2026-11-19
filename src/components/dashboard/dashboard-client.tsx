@@ -114,7 +114,7 @@ export function DashboardClient({
       </div>
 
       {/* ── 3. APERÇU DE L'ACTIVITÉ DU MEMBRE (Statistiques réelles) ── */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+      <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
         <div className="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col gap-0.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
             Tontines actives
@@ -124,18 +124,6 @@ export function DashboardClient({
           </span>
           <span className="text-[10px] text-emerald-700 font-semibold">
             {statistics.activeSessionsCount > 0 ? "Inscrit" : "Aucune"}
-          </span>
-        </div>
-
-        <div className="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col gap-0.5">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Cotisations versées
-          </span>
-          <span className="text-lg font-extrabold text-emerald-800">
-            {statistics.completedContributionsCount}
-          </span>
-          <span className="text-[10px] text-slate-500 font-semibold truncate">
-            {wallet.formattedTotalContributed}
           </span>
         </div>
 
