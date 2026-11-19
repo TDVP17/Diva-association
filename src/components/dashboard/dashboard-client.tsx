@@ -39,7 +39,7 @@ export function DashboardClient({
       <div className="flex items-center justify-between gap-3 pt-1">
         <div className="min-w-0">
           <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">
-            Bonjour, {member.firstName} 👋
+            Coucou mon Asso 👋
           </h1>
           <p className="text-xs text-slate-500 font-medium">
             Bienvenue dans votre espace DIVA Asso
@@ -129,7 +129,7 @@ export function DashboardClient({
 
         <div className="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col gap-0.5">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Amendes
+            Amendes impayées
           </span>
           <span
             className={`text-lg font-extrabold ${
