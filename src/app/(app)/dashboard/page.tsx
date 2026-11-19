@@ -1,21 +1,11 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
-import { getContributionTotal } from "@/lib/tontine-engine";
-import { getLang, getTranslator } from "@/lib/i18n/get-lang";
-import { formatXAF } from "@/lib/format-currency";
-import { sessionStatusKey } from "@/lib/session-status-label";
-import { DescriptionPill } from "@/components/description-pill";
-import { SessionCardLink } from "../sessions/session-card-link";
+import { getLang } from "@/lib/i18n/get-lang";
+import { getDashboardData } from "@/lib/dashboard";
+import { DashboardClient } from "@/components/dashboard/dashboard-client";
 
-const TONTINE_LABELS: Record<string, string> = {
-  HEBDO_SUNDAY: "Weekly Tontine (Sunday)",
-  MONTHLY_28: "Monthly Tontine (28th)",
-  MONTHLY_25: "Monthly Tontine (25th)",
-  BIWEEKLY_SUNDAY: "Every 2 Weeks (Sunday)",
-  QUARTERLY_25: "Every 3 Months (25th)",
-};
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function DashboardPage({
   searchParams,
@@ -23,148 +13,21 @@ export default async function DashboardPage({
   searchParams?: Promise<{ error?: string }>;
 }) {
   const session = await auth();
-  if (!session?.user) redirect("/login");
+  if (!session?.user?.id) redirect("/login");
   const userId = session.user.id;
   const lang = await getLang();
-  const t = getTranslator(lang);
   const resolvedParams = searchParams ? await searchParams : {};
   const isAccessDenied = resolvedParams.error === "access_denied";
 
-  const [memberships, unpaidFines] = await Promise.all([
-    prisma.membership.findMany({
-      where: {
-        userId,
-        status: "APPROVED",
-        // Excludes only CLOSED — a DRAFT cotisation the member's already
-        // been approved into (drawing hasn't started yet) still belongs on
-        // the dashboard, it just isn't collecting contributions yet. This
-        // used to require DRAWING/ACTIVE specifically, which is what made
-        // an approved DRAFT membership vanish from the dashboard while
-        // still showing up on the Cotisations page.
-        tontineSession: { status: { not: "CLOSED" } },
-      },
-      include: {
-        tontineSession: {
-          include: {
-            memberships: {
-              where: { status: "APPROVED" },
-              select: { slots: { select: { id: true, officialPosition: true, ballDrawn: true } } },
-            },
-          },
-        },
-      },
-      orderBy: { joinedAt: "asc" },
-    }),
-    prisma.fine.aggregate({
-      where: { membershipSlot: { membership: { userId } }, status: "UNPAID" },
-      _sum: { amount: true },
-    }),
-  ]);
-
-  const totalFines = Number(unpaidFines._sum.amount ?? 0);
+  const dashboardData = await getDashboardData(userId, lang);
 
   return (
-    <main className="px-container-padding py-stack-gap-lg flex flex-col gap-stack-gap-lg max-w-3xl lg:max-w-5xl mx-auto w-full">
-      {isAccessDenied && (
-        <div className="bg-red-50 border-2 border-red-500/40 rounded-2xl p-4 flex items-center gap-3 text-red-900 shadow-sm animate-in fade-in duration-200">
-          <span className="material-symbols-outlined text-red-600 text-2xl flex-shrink-0">gpp_bad</span>
-          <div>
-            <h4 className="font-title-sm text-title-sm font-bold">{lang === "fr" ? "Accès refusé" : "Access Denied"}</h4>
-            <p className="font-body-sm text-body-sm text-red-800">
-              {lang === "fr"
-                ? "Vous ne faites pas partie de cette cotisation. L'accès est strictement réservé aux membres inscrits."
-                : "You are not a member of this cotisation. Access is strictly reserved for registered participants."}
-            </p>
-          </div>
-        </div>
-      )}
-      <section>
-        <div className="sticky top-16 z-30 bg-background py-2 -mx-container-padding px-container-padding mb-stack-gap-md flex items-center justify-between gap-2 flex-wrap">
-          <h2 className="font-title-md text-title-md text-primary">
-            {t("yourTontines")}
-          </h2>
-          <Link
-            href="/private-tontines"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-300/80 text-amber-900 font-label-sm text-label-sm font-semibold hover:bg-amber-100 transition-colors flex-shrink-0"
-          >
-            <span className="material-symbols-outlined text-[16px]">lock</span>
-            <span>{lang === "fr" ? "Créer ma cotisation" : "Create My Cotisation"}</span>
-          </Link>
-        </div>
-        {memberships.length === 0 ? (
-          <div className="bg-white rounded-xl p-8 text-center shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant flex flex-col items-center gap-stack-gap-sm">
-            <span className="material-symbols-outlined text-outline text-[40px]">account_balance</span>
-            <p className="font-body-md text-body-md text-on-surface-variant">{t("notInActiveTontine")}</p>
-            <Link
-              href="/sessions"
-              className="mt-1 px-4 py-2 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all"
-            >
-              {t("browseCotisations")}
-            </Link>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-stack-gap-md lg:grid lg:grid-cols-2 lg:gap-stack-gap-md">
-            {memberships.map((m) => {
-              const { amount, fee } = getContributionTotal({
-                amount: Number(m.tontineSession.amount),
-                fee: Number(m.tontineSession.fee),
-              });
-              return (
-                <SessionCardLink
-                  key={m.id}
-                  href={`/sessions/${m.tontineSession.id}`}
-                  className="group relative bg-white rounded-2xl p-3.5 sm:p-4 shadow-sm border-2 border-emerald-900/20 hover:border-emerald-700 flex items-center justify-between transition-all duration-150 active:scale-[0.98] active:bg-emerald-50/80 active:border-emerald-700 active:shadow-inner"
-                >
-                  <div>
-                    <h3 className="text-sm font-semibold text-primary uppercase tracking-wide">
-                      {m.tontineSession.title || TONTINE_LABELS[m.tontineSession.type]}
-                    </h3>
-                    {m.tontineSession.description && (
-                      <DescriptionPill
-                        description={m.tontineSession.description}
-                        label={t("seeDescription")}
-                      />
-                    )}
-                    {(() => {
-                      const allSlots = m.tontineSession.memberships?.flatMap((mem) => mem.slots) ?? [];
-                      const isDrawDone =
-                        m.tontineSession.status === "ACTIVE" ||
-                        (allSlots.length > 0 && allSlots.every((s) => s.officialPosition !== null));
-                      const effectiveStatus = isDrawDone ? "ACTIVE" : m.tontineSession.status;
-
-                      return (
-                        <p className="text-xs text-on-surface-variant mt-1 flex items-center gap-1.5 flex-wrap">
-                          <span className="font-numeric-data text-on-surface font-semibold">{formatXAF(amount)}</span>
-                          <span>({t("plusFeeSuffix", { fee: formatXAF(fee) })})</span>
-                          <span>&middot;</span>
-                          <span className="font-medium text-primary">{t(sessionStatusKey(effectiveStatus))}</span>
-                        </p>
-                      );
-                    })()}
-                  </div>
-                  <span className="material-symbols-outlined text-outline text-[20px]">chevron_right</span>
-                </SessionCardLink>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {totalFines > 0 && (
-        <Link
-          href="/fines"
-          className="bg-error-container/40 rounded-xl p-4 border border-error/30 flex items-center gap-3 hover:bg-error-container/60 transition-colors"
-        >
-          <span className="material-symbols-outlined text-error flex-shrink-0">warning</span>
-          <div className="flex-1 min-w-0">
-            <h4 className="font-label-sm text-label-sm text-on-error-container/80 mb-0.5">{t("unpaidFines")}</h4>
-            <p className="font-numeric-data text-numeric-data text-error">
-              {formatXAF(totalFines)}
-            </p>
-          </div>
-          <span className="material-symbols-outlined text-error flex-shrink-0">chevron_right</span>
-        </Link>
-      )}
+    <main className="px-container-padding pt-stack-gap-md pb-24 max-w-xl mx-auto w-full">
+      <DashboardClient
+        data={dashboardData}
+        lang={lang}
+        accessDeniedError={isAccessDenied}
+      />
     </main>
   );
 }

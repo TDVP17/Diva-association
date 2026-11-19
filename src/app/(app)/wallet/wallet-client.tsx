@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { type Lang } from "@/lib/i18n/translations";
 import { formatXAF } from "@/lib/format-currency";
 import { LoadingSpinner } from "@/components/loading-spinner";
@@ -144,6 +145,16 @@ export function WalletClient({
   const [savingPin, setSavingPin] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
   const [pinSuccess, setPinSuccess] = useState<string | null>(null);
+
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const action = searchParams.get("action");
+    if (action === "recharge" || action === "topup") {
+      setIsTopUpOpen(true);
+    } else if (action === "withdraw" || action === "retrait") {
+      setIsWithdrawOpen(true);
+    }
+  }, [searchParams]);
 
   // Fee calculations & live operator detection for top-up + global operator suspension check
   const feeRate = initialFeePercentage / 100;
