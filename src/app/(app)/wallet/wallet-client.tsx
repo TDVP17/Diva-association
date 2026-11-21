@@ -21,6 +21,10 @@ interface WalletOperation {
   date: string;
   timestamp: number;
   status?: string;
+  beneficiaryName?: string | null;
+  payerPhone?: string | null;
+  txRef?: string | null;
+  receiptPdfUrl?: string | null;
 }
 
 interface DisbursementMethodItem {
@@ -104,6 +108,7 @@ export function WalletClient({
   const [hasPin, setHasPin] = useState(initialHasPin);
   const [isBalanceHidden, setIsBalanceHidden] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [expandedTxId, setExpandedTxId] = useState<string | null>(null);
 
   // Top-up modal state (string input so deleting never leaves a sticky "0")
   const [isTopUpOpen, setIsTopUpOpen] = useState(false);
@@ -260,7 +265,18 @@ export function WalletClient({
         } else if (data?.isFailed) {
           clearInterval(interval);
           setPollingState("FAILED");
-          setTopUpError(data.message || (lang === "fr" ? "Le paiement Mobile Money a été annulé ou a échoué." : "Payment cancelled or failed."));
+          const opName =
+            topUpProvider === "ORANGE"
+              ? "Orange Money"
+              : topUpProvider === "MTN"
+                ? "MTN Mobile Money"
+                : "Orange Money ou MTN Mobile Money";
+          setTopUpError(
+            data.message ||
+              (lang === "fr"
+                ? `Le paiement ${opName} a été annulé, a expiré ou n'a pas pu aboutir.`
+                : "Payment cancelled or failed."),
+          );
         }
       } catch (err) {
         console.error("Top-up poll error:", err);
@@ -673,14 +689,17 @@ export function WalletClient({
         );
       })()}
 
-      {/* ── Section Opérations Récentes (Historique 1 mois) ── */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/80 flex flex-col gap-4">
+      {/* ── Section Historique des transactions (Accordéon replié par défaut) ── */}
+      <div className="bg-white rounded-3xl p-4 sm:p-6 shadow-sm border border-slate-200/80 flex flex-col gap-3.5">
         <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-          <h2 className="text-base font-bold text-slate-900">
-            {lang === "fr" ? "Opérations récentes" : "Recent operations"}
-          </h2>
-          <span className="text-[11px] font-semibold text-slate-400">
-            {lang === "fr" ? "30 derniers jours" : "Last 30 days"}
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-emerald-800 text-xl">receipt_long</span>
+            <h2 className="text-sm sm:text-base font-bold text-slate-900">
+              {lang === "fr" ? "Historique des transactions" : "Transaction History"}
+            </h2>
+          </div>
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            {lang === "fr" ? "Détails au clic" : "Tap for details"}
           </span>
         </div>
 
@@ -689,48 +708,141 @@ export function WalletClient({
             <span className="material-symbols-outlined text-4xl text-slate-300">receipt_long</span>
             <p className="text-xs font-medium text-slate-500">
               {lang === "fr"
-                ? "Aucune opération récente ce mois-ci."
-                : "No recent transactions this month."}
+                ? "Aucune transaction enregistrée."
+                : "No transactions recorded."}
             </p>
           </div>
         ) : (
-          <div className="flex flex-col divide-y divide-slate-100">
+          <div className="flex flex-col gap-2">
             {displayedOperations.map((op) => {
               const isCredit = op.direction === "IN";
+              const isTxOpen = expandedTxId === op.id;
+              const shareSummary = `${op.title} (${op.formattedAmount}) - DIVA Asso - Date: ${op.date} - Réf: ${op.txRef || op.id}`;
+              const whatsappShareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(
+                op.receiptPdfUrl
+                  ? `${shareSummary} - Reçu : ${(op.receiptPdfUrl.startsWith("http") ? op.receiptPdfUrl : `https://divaasso.com${op.receiptPdfUrl}`)}`
+                  : shareSummary
+              )}`;
+
               return (
                 <div
                   key={op.id}
-                  className="py-3.5 flex items-center justify-between gap-3 first:pt-1 last:pb-1"
+                  className="rounded-2xl border border-slate-200/80 bg-slate-50/60 overflow-hidden transition-all shadow-2xs hover:border-slate-300"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className={`w-9 h-9 rounded-2xl flex items-center justify-center flex-shrink-0 ${
-                        isCredit ? "bg-emerald-100 text-emerald-800" : "bg-red-50 text-red-600"
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[18px]">
-                        {isCredit ? "south_west" : "north_east"}
-                      </span>
+                  {/* ── Ligne fermée (Toujours visible et compacte) ── */}
+                  <div
+                    onClick={() => setExpandedTxId(isTxOpen ? null : op.id)}
+                    className="p-3 sm:p-3.5 flex items-center justify-between gap-2.5 cursor-pointer select-none hover:bg-slate-100/70 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div
+                        className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                          isCredit ? "bg-emerald-100 text-emerald-800" : "bg-red-50 text-red-600"
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[17px]">
+                          {isCredit ? "south_west" : "north_east"}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                          {op.title}
+                        </p>
+                        <p className="text-[10px] text-slate-500 truncate">
+                          {op.date}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">
-                        {op.title}
-                      </p>
-                      <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                        {op.subtitle} · {op.date}
-                      </p>
+
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="text-right">
+                        <span
+                          className={`text-xs sm:text-sm font-extrabold font-mono ${
+                            isCredit ? "text-emerald-700" : "text-red-600"
+                          }`}
+                        >
+                          {op.formattedAmount}
+                        </span>
+                        <span className="block text-[9px] font-bold text-emerald-800">
+                          {op.status}
+                        </span>
+                      </div>
+                      <span
+                        className={`material-symbols-outlined text-slate-400 text-lg transition-transform duration-200 ${
+                          isTxOpen ? "rotate-180 text-emerald-700" : ""
+                        }`}
+                      >
+                        expand_more
+                      </span>
                     </div>
                   </div>
 
-                  <div className="text-right flex-shrink-0">
-                    <span
-                      className={`text-xs sm:text-sm font-extrabold font-mono ${
-                        isCredit ? "text-emerald-700" : "text-red-600"
-                      }`}
-                    >
-                      {op.formattedAmount}
-                    </span>
-                  </div>
+                  {/* ── Détails ouverts (Seulement si déroulé) ── */}
+                  {isTxOpen && (
+                    <div className="px-3.5 pb-3.5 pt-2 border-t border-slate-200/70 bg-white flex flex-col gap-2.5 animate-in fade-in duration-150">
+                      <div className="text-xs text-slate-700 flex flex-col gap-1.5 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-[11px] font-bold text-slate-500">Raison :</span>
+                          <span className="font-semibold text-slate-900 text-right">{op.subtitle}</span>
+                        </div>
+
+                        {op.beneficiaryName && (
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-[11px] font-bold text-slate-500">Nom(s) :</span>
+                            <span className="font-semibold text-slate-900 text-right">{op.beneficiaryName}</span>
+                          </div>
+                        )}
+
+                        {op.payerPhone && (
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-[11px] font-bold text-slate-500">Téléphone :</span>
+                            <span className="font-mono text-slate-900 text-right">{op.payerPhone}</span>
+                          </div>
+                        )}
+
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-[11px] font-bold text-slate-500">Date & heure :</span>
+                          <span className="text-slate-900 text-right">{op.date}</span>
+                        </div>
+
+                        <div className="flex items-start justify-between gap-2 pt-1 border-t border-slate-200/60">
+                          <span className="text-[11px] font-bold text-slate-500">Réf. transaction :</span>
+                          <span className="font-mono text-[11px] text-slate-600 truncate max-w-[200px]">
+                            #{op.txRef || op.id}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* ── Boutons d'actions avec UNIQUEMENT des icônes ── */}
+                      <div className="flex items-center justify-end gap-2 pt-1">
+                        {op.receiptPdfUrl && (
+                          <a
+                            href={op.receiptPdfUrl.startsWith("http") ? op.receiptPdfUrl : op.receiptPdfUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="Télécharger"
+                            title="Télécharger"
+                            className="w-8 h-8 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white flex items-center justify-center transition-all active:scale-95 shadow-xs cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">download</span>
+                          </a>
+                        )}
+
+                        <a
+                          href={whatsappShareUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label="Partager"
+                          title="Partager"
+                          className="w-8 h-8 rounded-xl bg-[#25D366] hover:bg-[#128C7E] text-white flex items-center justify-center transition-all active:scale-95 shadow-xs cursor-pointer"
+                        >
+                          <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                            <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.275.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.1.824zm-3.423-10.416c-5.522 0-10 4.477-10 10 0 1.884.524 3.646 1.436 5.161l-1.524 5.568 5.736-1.505c1.458.825 3.142 1.298 4.939 1.298 5.522 0 10-4.477 10-10 0-5.523-4.478-10-10-10z" />
+                          </svg>
+                        </a>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -777,7 +889,7 @@ export function WalletClient({
         )}
       </div>
 
-      {/* ── Accès rapide Prêt d'Urgence Garanti (en bas des opérations récentes) ── */}
+      {/* ── Accès rapide Prêt d'Urgence Garanti (en bas de l'historique) ── */}
       <Link
         href="/loans"
         className="bg-gradient-to-r from-amber-50 to-emerald-50 rounded-2xl p-4 border border-amber-200/80 flex items-center justify-between gap-3 hover:shadow-md transition-all"
@@ -790,10 +902,12 @@ export function WalletClient({
             <p className="text-xs sm:text-sm font-extrabold text-slate-900">
               {lang === "fr" ? "Prêt d'urgence garanti" : "Guaranteed Emergency Loan"}
             </p>
-            <p className="text-[11px] text-slate-600">
-              {userStars >= 4
-                ? `⭐ ${userStars}/5 étoiles — Vous remplissez le critère d'éligibilité (4★ min)`
-                : `⭐ ${userStars}/5 étoiles (4 étoiles minimum requises en cotisation publique sans amende)`}
+            <p className="text-[11px]">
+              {userStars >= 4 ? (
+                <span className="text-emerald-800 font-bold">★ 4/5 étoiles · Éligible aux prêts</span>
+              ) : (
+                <span className="text-slate-500 font-medium">★ 4 étoiles requises</span>
+              )}
             </p>
           </div>
         </div>
@@ -983,14 +1097,14 @@ export function WalletClient({
                   <button
                     type="button"
                     onClick={() => setIsTopUpOpen(false)}
-                    className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+                    className="flex-1 py-1.5 px-3 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs cursor-pointer hover:bg-slate-50 transition-colors"
                   >
                     Annuler
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting || isTopUpOperatorSuspended || topUpAmount < 500 || phone.length < 9}
-                    className="flex-1 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-slate-400 flex items-center justify-center gap-1.5"
+                    className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-slate-400 flex items-center justify-center gap-1.5 transition-all active:scale-95"
                   >
                     {isSubmitting ? (
                       <LoadingSpinner />
@@ -1009,7 +1123,7 @@ export function WalletClient({
         </div>
       )}
 
-      {/* ── MODALE 2 : Retirer vers Mobile Money (Sécurisé PIN + Whitelist + Seuil 50k) ── */}
+      {/* ── MODALE 2 : Retirer vers MTN Mobile Money ou Orange Money (Sécurisé PIN + Whitelist + Validation Admin) ── */}
       {isWithdrawOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 flex flex-col gap-4 max-h-[92vh] overflow-y-auto">
@@ -1019,8 +1133,12 @@ export function WalletClient({
                   <span className="material-symbols-outlined text-xl">payments</span>
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-slate-900">Retirer vers Mobile Money</h3>
-                  <p className="text-[11px] text-emerald-700 font-semibold">0% de frais sur les retraits</p>
+                  <h3 className="font-bold text-sm text-slate-900">
+                    {lang === "fr" ? "Retirer vers MTN ou Orange Money" : "Withdraw to MTN or Orange Money"}
+                  </h3>
+                  <p className="text-[11px] text-emerald-700 font-semibold">
+                    {lang === "fr" ? "0% de frais sur les retraits · Virement direct" : "0% withdrawal fees"}
+                  </p>
                 </div>
               </div>
               <button
@@ -1047,7 +1165,7 @@ export function WalletClient({
               <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex flex-col gap-3">
                 <p className="font-bold">Code PIN à 4 chiffres requis</p>
                 <p>
-                  Pour votre sécurité anti-piratage, vous devez définir un code PIN à 4 chiffres avant d&apos;effectuer votre premier retrait.
+                  Pour votre sécurité anti-piratage, vous devez définir un code PIN à 4 chiffres avant d&apos;effectuer un retrait vers MTN Mobile Money ou Orange Money.
                 </p>
                 <button
                   type="button"
@@ -1062,15 +1180,31 @@ export function WalletClient({
               </div>
             ) : approvedMethods.length === 0 ? (
               <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex flex-col gap-3">
-                <p className="font-bold">Aucun numéro de retrait validé</p>
-                <p>
-                  Enregistrez votre numéro MTN ou Orange Money avec son nom officiel dans votre profil. Une fois vérifié et validé par DIVA Asso, vous pourrez retirer librement.
-                </p>
+                <p className="font-bold">Aucun numéro de retrait validé par l&apos;Admin</p>
+                {disbursementMethods.some((m) => m.status === "PENDING") ? (
+                  <div className="p-2.5 bg-amber-100/70 border border-amber-300 rounded-xl text-[11px] text-amber-950">
+                    <p className="font-semibold flex items-center gap-1 mb-1">
+                      <span className="material-symbols-outlined text-[16px] text-amber-800">hourglass_top</span>
+                      Numéro(s) en cours de validation :
+                    </p>
+                    {disbursementMethods
+                      .filter((m) => m.status === "PENDING")
+                      .map((m) => (
+                        <p key={m.id} className="text-slate-800">
+                          • {m.provider} {m.phone} ({m.accountName}) — en attente d&apos;approbation par l&apos;administration DIVA Asso.
+                        </p>
+                      ))}
+                  </div>
+                ) : (
+                  <p>
+                    Enregistrez votre numéro MTN Mobile Money ou Orange Money avec son nom officiel dans votre profil. Une fois vérifié et validé par l&apos;administration DIVA Asso, vous pourrez effectuer vos retraits.
+                  </p>
+                )}
                 <Link
                   href="/profile"
                   className="py-2.5 px-4 rounded-xl bg-emerald-700 text-white font-bold text-xs text-center"
                 >
-                  Enregistrer mon numéro de retrait
+                  Gérer mes numéros de retrait
                 </Link>
               </div>
             ) : (
@@ -1191,14 +1325,14 @@ export function WalletClient({
                   <button
                     type="button"
                     onClick={() => setIsWithdrawOpen(false)}
-                    className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+                    className="flex-1 py-1.5 px-3 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs cursor-pointer hover:bg-slate-50 transition-colors"
                   >
                     Annuler
                   </button>
                   <button
                     type="submit"
                     disabled={withdrawing || isWithdrawOperatorSuspended || balance < withdrawalLimits.minAmount}
-                    className="flex-1 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-slate-400 flex items-center justify-center gap-1.5"
+                    className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:bg-slate-400 flex items-center justify-center gap-1.5 transition-all active:scale-95"
                   >
                     {withdrawing ? (
                       <LoadingSpinner />

@@ -12,7 +12,7 @@ export default async function PrivateTontinesPage() {
   const userId = session.user.id;
   const lang = await getLang();
 
-  const [tontines, privateRules, creationConfig] = await Promise.all([
+  const [tontines, privateRules, creationConfig, currentUser, allPendingPrivate] = await Promise.all([
     prisma.tontineSession.findMany({
       where: {
         isPrivate: true,
@@ -44,7 +44,32 @@ export default async function PrivateTontinesPage() {
     }),
     getPrivateTontineRules(),
     getPrivateTontineConfig(),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, phone: true },
+    }),
+    prisma.tontineSession.findMany({
+      where: { isPrivate: true, softDeletedAt: null, privateApprovalStatus: "PENDING_ADMIN" },
+      include: { creator: { select: { id: true, name: true, phone: true } } },
+      orderBy: { startDate: "desc" },
+    }),
   ]);
+
+  const pendingGuarantorRequests = allPendingPrivate
+    .filter((s) => {
+      const cfg = (s.privateConfig as Record<string, unknown> | null) ?? {};
+      return cfg.guarantorId === userId && cfg.guarantorStatus === "PENDING";
+    })
+    .map((s) => {
+      const cfg = (s.privateConfig as Record<string, unknown> | null) ?? {};
+      return {
+        sessionId: s.id,
+        sessionTitle: s.title || "Cotisation privée",
+        amount: Number(s.amount),
+        creatorName: (cfg.creatorFullName as string) || s.creator?.name || "Un membre",
+        creatorPhone: s.creator?.phone || "",
+      };
+    });
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://divaasso.com";
 
@@ -121,6 +146,8 @@ export default async function PrivateTontinesPage() {
       privateRulesContent={privateRules.content}
       creationConfig={creationConfig}
       currentUserId={userId}
+      currentUserName={currentUser?.name || ""}
+      initialGuarantorRequests={pendingGuarantorRequests}
     />
   );
 }

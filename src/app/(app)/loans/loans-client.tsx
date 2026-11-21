@@ -286,7 +286,7 @@ export function LoansClient({
               </span>
             ))}
             <span className="text-[11px] font-bold text-emerald-100 ml-1">
-              {eligibility.stars}/5 {eligibility.stars >= 4 ? "(Éligible)" : "(4★ requis)"}
+              {eligibility.stars >= 4 ? "★ Éligible aux prêts" : "★ 4 étoiles requises"}
             </span>
           </div>
         </div>

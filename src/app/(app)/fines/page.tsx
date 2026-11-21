@@ -29,13 +29,16 @@ export default async function FinesPage() {
     prisma.user.findUnique({ where: { id: session.user.id }, select: { phone: true } }),
   ]);
 
-  const total = fines.reduce((sum, f) => sum + Number(f.amount), 0);
+  const totalRemaining = fines.reduce(
+    (sum, f) => sum + Math.max(0, Number(f.amount) - Number(f.paidAmount || 0)),
+    0,
+  );
 
   return (
     <main className="px-container-padding py-stack-gap-lg max-w-md mx-auto w-full">
       <h1 className="text-xl md:text-2xl font-bold text-on-surface mb-1">{t("unpaidFines")}</h1>
       <p className="font-numeric-data text-numeric-data text-error mb-stack-gap-lg">
-        {formatXAF(total)}
+        {formatXAF(totalRemaining)}
       </p>
 
       {fines.length === 0 ? (
@@ -48,6 +51,10 @@ export default async function FinesPage() {
             const tontineSession = f.membershipSlot.membership.tontineSession;
             const sessionLabel = tontineSession.title || TONTINE_LABELS[tontineSession.type] || tontineSession.type;
             const dueDateLabel = f.dueDate.toLocaleDateString("en-GB", { timeZone: "Africa/Douala" });
+            const totalFine = Number(f.amount);
+            const paid = Number(f.paidAmount || 0);
+            const remaining = Math.max(0, totalFine - paid);
+
             return (
               <div
                 key={f.id}
@@ -60,11 +67,17 @@ export default async function FinesPage() {
                     {t("fineReasonLatePayment", { date: dueDateLabel })}
                   </p>
                   <p className="font-numeric-data text-[18px] text-error mt-1">
-                    {formatXAF(Number(f.amount))}
+                    {formatXAF(remaining)}
                   </p>
+                  {paid > 0 && (
+                    <p className="text-[10px] text-slate-500 font-semibold">
+                      Déjà réglé : {formatXAF(paid)} / {formatXAF(totalFine)}
+                    </p>
+                  )}
                 </div>
                 <FinePayButton
                   fineId={f.id}
+                  remainingAmount={remaining}
                   description={`${t("paymentDescriptionPrefix")}: ${sessionLabel} — ${dueDateLabel}`}
                   defaultPhone={user?.phone}
                   lang={lang}

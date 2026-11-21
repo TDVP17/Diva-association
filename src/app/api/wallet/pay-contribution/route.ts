@@ -16,6 +16,7 @@ const payContributionSchema = z.object({
   membershipSlotIds: z.array(z.string().min(1)).min(1).optional(),
   fineId: z.string().min(1).optional(),
   dueDate: z.string().optional(),
+  partialAmount: z.number().int().min(100).optional(),
 });
 
 export async function POST(request: Request) {
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Paramètres de paiement invalides." }, { status: 400 });
   }
 
-  const { membershipSlotId, membershipSlotIds, fineId, dueDate: dueDateStr } = parsed.data;
+  const { membershipSlotId, membershipSlotIds, fineId, dueDate: dueDateStr, partialAmount } = parsed.data;
   const payer = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, name: true, email: true, phone: true, walletBalance: true, preferredLang: true },
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Utilisateur introuvable" }, { status: 404 });
   }
 
-  // Case A: Paying a Fine via DIVA Wallet (0% telecom fee)
+  // Case A: Paying a Fine via DIVA Wallet (0% telecom fee) — Full or Partial
   if (fineId) {
     const fine = await prisma.fine.findUnique({
       where: { id: fineId },
@@ -61,23 +62,36 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Cette amende est déjà réglée." }, { status: 409 });
     }
 
-    const fineAmount = Number(fine.amount);
+    const totalFine = Number(fine.amount);
+    const alreadyPaid = Number(fine.paidAmount || 0);
+    const remainingDue = Math.max(0, totalFine - alreadyPaid);
+
+    if (remainingDue <= 0) {
+      return NextResponse.json({ error: "Cette amende est déjà intégralement payée." }, { status: 409 });
+    }
+
+    const effectivePayAmount = partialAmount && partialAmount < remainingDue ? partialAmount : remainingDue;
+    const isFullSettlement = effectivePayAmount >= remainingDue;
+    const newPaidAmount = alreadyPaid + effectivePayAmount;
 
     try {
       const ledger = await prisma.$transaction(async (tx) => {
         const debit = await debitWalletTx(tx, {
           userId,
-          amount: fineAmount,
+          amount: effectivePayAmount,
           fee: 0,
           type: "FINE",
-          description: `Règlement amende (0% frais télécom) · ${fine.membershipSlot.beneficiaryName}`,
-          metadata: { fineId: fine.id, membershipSlotId: fine.membershipSlotId },
+          description: isFullSettlement
+            ? `Règlement amende (0% frais télécom) · ${fine.membershipSlot.beneficiaryName}`
+            : `Paiement partiel amende (${formatXAF(effectivePayAmount)} / ${formatXAF(totalFine)}) · ${fine.membershipSlot.beneficiaryName}`,
+          metadata: { fineId: fine.id, membershipSlotId: fine.membershipSlotId, isPartial: !isFullSettlement },
         });
 
         await tx.fine.update({
           where: { id: fine.id },
           data: {
-            status: "PAID",
+            status: isFullSettlement ? "PAID" : "UNPAID",
+            paidAmount: newPaidAmount,
             payerPhone: "DIVA_WALLET",
             failureReason: null,
           },
@@ -86,11 +100,11 @@ export async function POST(request: Request) {
         return debit;
       });
 
-      // Trigger 50% late beneficiary compensation in wallet
+      // Trigger 50% late beneficiary compensation in wallet based on the portion paid
       await creditLateBeneficiaryWithHalfFine({
         tontineSessionId: fine.membershipSlot.membership.tontineSessionId,
         dueDate: fine.dueDate,
-        fineAmount,
+        fineAmount: effectivePayAmount,
         finePayerName: payer.name,
         sessionTitle:
           fine.membershipSlot.membership.tontineSession.title ||
@@ -102,11 +116,17 @@ export async function POST(request: Request) {
       await logAudit({
         actorId: userId,
         actorRole: session.user.role,
-        action: "fine_paid_via_wallet",
+        action: isFullSettlement ? "fine_paid_via_wallet" : "fine_partial_paid_via_wallet",
         targetType: "Fine",
         targetId: fine.id,
         tontineSessionId: fine.membershipSlot.membership.tontineSessionId,
-        metadata: { amount: fineAmount, reference: ledger.reference },
+        metadata: {
+          amount: effectivePayAmount,
+          totalFine,
+          newPaidAmount,
+          remainingDue: Math.max(0, totalFine - newPaidAmount),
+          reference: ledger.reference,
+        },
         request,
       });
 
@@ -114,9 +134,11 @@ export async function POST(request: Request) {
         ok: true,
         status: "SUCCESSFUL",
         reference: ledger.reference,
-        totalPaid: fineAmount,
+        totalPaid: effectivePayAmount,
         newBalance: ledger.balanceAfter,
-        message: "Amende réglée instantanément via votre Portefeuille DIVA (0 % de frais opérateur) !",
+        message: isFullSettlement
+          ? "Amende réglée instantanément via votre Portefeuille DIVA (0 % de frais opérateur) !"
+          : `Versement partiel de ${formatXAF(effectivePayAmount)} enregistré avec succès sur votre amende (0 % de frais portefeuille). Reste à payer : ${formatXAF(Math.max(0, totalFine - newPaidAmount))}.`,
       });
     } catch (err) {
       if (err instanceof InsufficientWalletBalanceError) {

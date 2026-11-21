@@ -41,6 +41,16 @@ export async function PATCH(
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://divaasso.com";
 
   if (parsed.data.decision === "APPROVE") {
+    const cfg = (tontine.privateConfig as any) || {};
+    if (cfg.guarantorId && cfg.guarantorStatus !== "ACCEPTED") {
+      return NextResponse.json(
+        {
+          error: `Impossible d'approuver : le garant désigné (${cfg.guarantorName || "Garant"}) n'a pas encore validé sa prise en charge (Statut actuel : ${cfg.guarantorStatus === "REJECTED" ? "Refusé" : "En attente d'accord"}).`,
+        },
+        { status: 400 },
+      );
+    }
+
     const inviteToken = tontine.inviteToken || crypto.randomBytes(12).toString("base64url");
     const updated = await prisma.tontineSession.update({
       where: { id },

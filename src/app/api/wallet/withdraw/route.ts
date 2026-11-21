@@ -202,9 +202,8 @@ export async function POST(request: Request) {
   }
 
   const accountName = (method.accountName || user.name).trim();
-  // Tout argent déjà dans le compte principal (Portefeuille DIVA) est retiré automatiquement
-  // vers le numéro validé (protégé par PIN 4 chiffres + Whitelist + Lock 48h), sans repasser par l'Admin.
-  const requiresAdminApproval = false;
+  const threshold = limits.withdrawalApprovalThreshold ?? 50_000;
+  const requiresAdminApproval = amount >= threshold;
 
   // 4. Atomic debit + create WalletWithdrawal
   let withdrawal;
@@ -286,7 +285,7 @@ export async function POST(request: Request) {
       status: "PENDING_ADMIN",
       requiresAdminApproval: true,
       newBalance: balanceAfter,
-      message: `Votre demande de retrait de ${formatXAF(amount)} (>= 50 000 FCFA) a été transmise à l'administrateur DIVA Asso pour validation sécurisée.`,
+      message: `Votre demande de retrait de ${formatXAF(amount)} (≥ ${formatXAF(threshold)}) a été transmise à l'administrateur DIVA Asso pour validation sécurisée.`,
     });
   }
 

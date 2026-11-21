@@ -12,7 +12,8 @@ export interface WalletOperation {
     | "REFUND"
     | "ADMIN_ADJUST"
     | "LOAN_DISBURSEMENT"
-    | "LOAN_REPAYMENT";
+    | "LOAN_REPAYMENT"
+    | "RELATIVE_CONTRIBUTION";
   direction: "IN" | "OUT";
   title: string;
   subtitle: string;
@@ -23,6 +24,10 @@ export interface WalletOperation {
   timestamp: number;
   rawDate: Date;
   status: string;
+  beneficiaryName?: string | null;
+  payerPhone?: string | null;
+  txRef?: string | null;
+  receiptPdfUrl?: string | null;
 }
 
 /**
@@ -126,23 +131,74 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
         status: { in: ["SUCCESSFUL", "COMPLETED", "PAID"] },
       };
 
-  const walletTx = await prisma.walletTransaction.findMany({
-    where: walletTxWhere,
-    orderBy: { createdAt: "desc" },
-    take: options?.includeAllForAdmin ? 500 : 50,
-  });
-
-  // Pending deposits within the last 24 hours (waiting for PIN / confirmation)
-  const pendingDeposits = await prisma.walletTransaction.findMany({
-    where: {
-      userId,
-      status: "PENDING",
-      type: "DEPOSIT",
-      createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 5,
-  });
+  // 1. Fetch wallet ledger, contributions, relative contributions, and payouts
+  const [walletTx, pendingDeposits, ownContributions, relativeContributions, payouts] = await Promise.all([
+    prisma.walletTransaction.findMany({
+      where: walletTxWhere,
+      orderBy: { createdAt: "desc" },
+      take: options?.includeAllForAdmin ? 500 : 50,
+    }),
+    prisma.walletTransaction.findMany({
+      where: {
+        userId,
+        status: "PENDING",
+        type: "DEPOSIT",
+        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    }),
+    prisma.contribution.findMany({
+      where: {
+        membershipSlot: { membership: { userId } },
+        status: "PAID",
+        ...(options?.includeAllForAdmin ? {} : { paidAt: { gte: oneMonthAgo } }),
+      },
+      include: {
+        membershipSlot: {
+          include: {
+            membership: { include: { tontineSession: true } },
+          },
+        },
+        paidByUser: { select: { name: true } },
+      },
+      orderBy: { paidAt: "desc" },
+      take: options?.includeAllForAdmin ? 500 : 50,
+    }),
+    prisma.contribution.findMany({
+      where: {
+        paidByUserId: userId,
+        status: "PAID",
+        ...(options?.includeAllForAdmin ? {} : { paidAt: { gte: oneMonthAgo } }),
+        membershipSlot: { membership: { userId: { not: userId } } },
+      },
+      include: {
+        membershipSlot: {
+          include: {
+            membership: { include: { tontineSession: true, user: { select: { name: true } } } },
+          },
+        },
+      },
+      orderBy: { paidAt: "desc" },
+      take: options?.includeAllForAdmin ? 500 : 50,
+    }),
+    prisma.payout.findMany({
+      where: {
+        membershipSlot: { membership: { userId } },
+        status: { in: ["RELEASED", "CONFIRMED"] },
+        ...(options?.includeAllForAdmin ? {} : { releasedAt: { gte: oneMonthAgo } }),
+      },
+      include: {
+        membershipSlot: {
+          include: {
+            membership: { include: { tontineSession: true } },
+          },
+        },
+      },
+      orderBy: { releasedAt: "desc" },
+      take: options?.includeAllForAdmin ? 200 : 20,
+    }),
+  ]);
 
   const formatDateTime = (d: Date) => {
     const dateStr = d.toLocaleDateString("fr-FR", {
@@ -159,15 +215,22 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
     return `${dateStr} à ${timeStr}`;
   };
 
-  // Aggregate operations from confirmed wallet ledger records only
   const operations: WalletOperation[] = [];
+  const handledFapshiRefs = new Set<string>();
 
+  // A. Wallet ledger transactions
   for (const tx of walletTx) {
     const isCredit =
       tx.type === "DEPOSIT" ||
       tx.type === "PAYOUT" ||
       tx.type === "REFUND" ||
       tx.type === "LOAN_DISBURSEMENT";
+    if (tx.fapshiTxRef) handledFapshiRefs.add(tx.fapshiTxRef);
+
+    const meta = (tx.metadata as Record<string, unknown> | null) ?? {};
+    const metaPhone = typeof meta.phone === "string" ? meta.phone : user.phone;
+    const metaBeneficiary = typeof meta.accountName === "string" ? meta.accountName : null;
+
     operations.push({
       id: `wtx-${tx.id}`,
       type: tx.type,
@@ -195,9 +258,111 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
       date: formatDateTime(tx.createdAt),
       timestamp: tx.createdAt.getTime(),
       rawDate: tx.createdAt,
-      status: tx.status,
+      status: tx.status === "COMPLETED" || tx.status === "SUCCESSFUL" || tx.status === "PAID" ? "Validé" : tx.status,
+      beneficiaryName: metaBeneficiary || user.name,
+      payerPhone: metaPhone,
+      txRef: tx.fapshiTxRef || tx.id,
+      receiptPdfUrl: null,
     });
   }
+
+  // B. Relative contributions (cotisations pour un proche)
+  for (const c of relativeContributions) {
+    if (c.fapshiTxRef && handledFapshiRefs.has(c.fapshiTxRef)) continue;
+    if (c.fapshiTxRef) handledFapshiRefs.add(c.fapshiTxRef);
+
+    const sessionTitle =
+      c.membershipSlot.membership.tontineSession.title ||
+      c.membershipSlot.membership.tontineSession.type;
+    const beneficiary = `${c.membershipSlot.beneficiaryName} (${c.membershipSlot.membership.user.name})`;
+    const dateToUse = c.paidAt || c.createdAt;
+
+    operations.push({
+      id: `rel-contrib-${c.id}`,
+      type: "RELATIVE_CONTRIBUTION",
+      direction: "OUT",
+      title: "Cotisation pour un proche",
+      subtitle: `Cotisation pour un proche — ${sessionTitle} (${beneficiary})`,
+      amount: Number(c.amountPaid),
+      formattedAmount: `- ${formatXAF(Number(c.amountPaid))}`,
+      fee: Number(c.feePaid || 0),
+      date: formatDateTime(dateToUse),
+      timestamp: dateToUse.getTime(),
+      rawDate: dateToUse,
+      status: "Validé",
+      beneficiaryName: beneficiary,
+      payerPhone: c.payerPhone || user.phone,
+      txRef: c.fapshiTxRef || c.id,
+      receiptPdfUrl: c.bulkPaymentId
+        ? `/api/files/bulk-${c.bulkPaymentId}-payer.pdf`
+        : c.receiptPdfUrl,
+    });
+  }
+
+  // C. Own direct contributions (not already represented in walletTx)
+  for (const c of ownContributions) {
+    if (c.fapshiTxRef && handledFapshiRefs.has(c.fapshiTxRef)) continue;
+    if (c.fapshiTxRef) handledFapshiRefs.add(c.fapshiTxRef);
+
+    const sessionTitle =
+      c.membershipSlot.membership.tontineSession.title ||
+      c.membershipSlot.membership.tontineSession.type;
+    const beneficiary = c.membershipSlot.beneficiaryName;
+    const dateToUse = c.paidAt || c.createdAt;
+
+    operations.push({
+      id: `own-contrib-${c.id}`,
+      type: "CONTRIBUTION",
+      direction: "OUT",
+      title: "Cotisation tontine",
+      subtitle: `Cotisation — ${sessionTitle} (${beneficiary})`,
+      amount: Number(c.amountPaid),
+      formattedAmount: `- ${formatXAF(Number(c.amountPaid))}`,
+      fee: Number(c.feePaid || 0),
+      date: formatDateTime(dateToUse),
+      timestamp: dateToUse.getTime(),
+      rawDate: dateToUse,
+      status: "Validé",
+      beneficiaryName: beneficiary,
+      payerPhone: c.payerPhone || user.phone,
+      txRef: c.fapshiTxRef || c.id,
+      receiptPdfUrl: c.bulkPaymentId
+        ? `/api/files/bulk-${c.bulkPaymentId}-owner.pdf`
+        : c.receiptPdfUrl,
+    });
+  }
+
+  // D. Payouts received (gains de tontine)
+  for (const p of payouts) {
+    const sessionTitle =
+      p.membershipSlot.membership.tontineSession.title ||
+      p.membershipSlot.membership.tontineSession.type;
+    const beneficiary = p.membershipSlot.beneficiaryName;
+    const dateToUse = p.releasedAt || p.detailsSubmittedAt || new Date();
+    const payoutAmt = Number(p.netPayout || p.pot || 0);
+
+    operations.push({
+      id: `payout-${p.id}`,
+      type: "PAYOUT",
+      direction: "IN",
+      title: "Gain de tontine reçu",
+      subtitle: `Cagnotte tontine — ${sessionTitle} (${beneficiary})`,
+      amount: payoutAmt,
+      formattedAmount: `+ ${formatXAF(payoutAmt)}`,
+      fee: 0,
+      date: formatDateTime(dateToUse),
+      timestamp: dateToUse.getTime(),
+      rawDate: dateToUse,
+      status: "Validé",
+      beneficiaryName: beneficiary,
+      payerPhone: user.phone,
+      txRef: p.fapshiTransId || p.id,
+      receiptPdfUrl: `/api/payouts/${p.id}/receipt`,
+    });
+  }
+
+  // Sort unified operations by date descending
+  operations.sort((a, b) => b.timestamp - a.timestamp);
 
   // Count how many older wallet transactions exist
   const olderOperationsCount = options?.includeAllForAdmin

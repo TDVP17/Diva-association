@@ -19,6 +19,7 @@ export function WithdrawalLimitsEditor({
 }) {
   const [minInput, setMinInput] = useState(String(initialLimits.minWithdrawalAmount));
   const [maxInput, setMaxInput] = useState(String(initialLimits.maxWithdrawalAmount));
+  const [thresholdInput, setThresholdInput] = useState(String(initialLimits.withdrawalApprovalThreshold ?? 50000));
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
@@ -27,6 +28,7 @@ export function WithdrawalLimitsEditor({
     setStatus(null);
     const minVal = parseInt(minInput, 10) || 0;
     const maxVal = parseInt(maxInput, 10) || 0;
+    const thresholdVal = parseInt(thresholdInput, 10) || 50000;
     if (minVal < 100 || maxVal < minVal) {
       setStatus({
         type: "err",
@@ -43,6 +45,7 @@ export function WithdrawalLimitsEditor({
         body: JSON.stringify({
           minWithdrawalAmount: minVal,
           maxWithdrawalAmount: maxVal,
+          withdrawalApprovalThreshold: thresholdVal,
         }),
       });
       const data = await res.json();
@@ -54,8 +57,8 @@ export function WithdrawalLimitsEditor({
         type: "ok",
         text:
           lang === "fr"
-            ? "Plafonds de retrait globaux enregistrés !"
-            : "Global withdrawal limits saved!",
+            ? "Plafonds et seuil de validation de retrait enregistrés !"
+            : "Global withdrawal limits & approval threshold saved!",
       });
     } catch {
       setStatus({ type: "err", text: "Erreur réseau." });
@@ -68,11 +71,11 @@ export function WithdrawalLimitsEditor({
     <form onSubmit={handleSave} className="flex flex-col gap-3">
       <p className="text-xs text-slate-600">
         {lang === "fr"
-          ? "Définissez le montant minimum et maximum de retrait pour tous les utilisateurs. Vous pouvez aussi personnaliser le maximum d'un membre spécifique dans « Tous les utilisateurs »."
-          : "Set the global minimum and maximum withdrawal amounts. You can also customize an individual member's max limit in All Users."}
+          ? "Définissez le montant minimum et maximum de retrait ainsi que le seuil à partir duquel une validation manuelle par l'administrateur DIVA Asso est requise."
+          : "Set global minimum and maximum withdrawal amounts, and the threshold requiring manual admin approval."}
       </p>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <label className="block text-[11px] font-bold text-slate-700 mb-1">
             Minimum global (FCFA)
@@ -96,6 +99,21 @@ export function WithdrawalLimitsEditor({
             onChange={(e) => setMaxInput(sanitizeDigits(e.target.value))}
             className="w-full border-2 border-emerald-600 rounded-xl px-3 py-2 text-sm font-bold bg-white"
           />
+        </div>
+        <div>
+          <label className="block text-[11px] font-bold text-slate-700 mb-1">
+            Seuil validation Admin (FCFA)
+          </label>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={thresholdInput}
+            onChange={(e) => setThresholdInput(sanitizeDigits(e.target.value))}
+            className="w-full border-2 border-amber-600 rounded-xl px-3 py-2 text-sm font-bold bg-white"
+          />
+          <span className="text-[10px] text-slate-500 mt-0.5 block">
+            Dès ce montant : validation admin requise
+          </span>
         </div>
       </div>
 

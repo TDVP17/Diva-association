@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { formatXAF } from "@/lib/format-currency";
 import { LoadingSpinner } from "@/components/loading-spinner";
@@ -61,7 +61,17 @@ export interface PrivateTontineItem {
   privateAdditionalFeePayoutPct: number;
   privatePenaltyBeneficiaryPct: number;
   parentSessionId: string | null;
-  privateConfig?: { selectedActions?: string[] } | null;
+  privateConfig?: {
+    selectedActions?: string[];
+    creatorFullName?: string;
+    creatorPhotoUrl?: string;
+    creatorIdDocUrl?: string;
+    guarantorId?: string;
+    guarantorName?: string;
+    guarantorPhone?: string;
+    guarantorStatus?: string;
+    [key: string]: unknown;
+  } | null;
   startDate: string;
   limitTime: string;
   maxSlots: number | null;
@@ -113,18 +123,37 @@ function formatDateFr(isoOrYmd: string): string {
   });
 }
 
+export interface PendingGuarantorRequest {
+  sessionId: string;
+  sessionTitle: string;
+  amount: number;
+  creatorName: string;
+  creatorPhone: string;
+}
+
+export interface EligibleGuarantor {
+  id: string;
+  name: string;
+  phone: string | null;
+  publicSessionTitle: string;
+}
+
 export function PrivateTontinesClient({
   lang,
   initialTontines,
   privateRulesContent,
   creationConfig,
   currentUserId,
+  currentUserName = "",
+  initialGuarantorRequests = [],
 }: {
   lang: Lang;
   initialTontines: PrivateTontineItem[];
   privateRulesContent: string;
   creationConfig: PrivateTontineCreationConfig;
   currentUserId: string;
+  currentUserName?: string;
+  initialGuarantorRequests?: PendingGuarantorRequest[];
 }) {
   const availableAdminActions = creationConfig.actions.filter((a) => a.enabledByAdmin);
   const [selectedActions, setSelectedActions] = useState<string[]>(() =>
@@ -138,6 +167,8 @@ export function PrivateTontinesClient({
   }
 
   const [tontines, setTontines] = useState<PrivateTontineItem[]>(initialTontines);
+  const [guarantorRequests, setGuarantorRequests] = useState<PendingGuarantorRequest[]>(initialGuarantorRequests);
+  const [respondingGuarantorId, setRespondingGuarantorId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(initialTontines.length === 0);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -145,6 +176,16 @@ export function PrivateTontinesClient({
   const [managingId, setManagingId] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  // KYC & Guarantor state for private tontine creation
+  const [creatorFullName, setCreatorFullName] = useState(currentUserName);
+  const [creatorPhotoUrl, setCreatorPhotoUrl] = useState("");
+  const [creatorPhotoUploading, setCreatorPhotoUploading] = useState(false);
+  const [creatorIdDocUrl, setCreatorIdDocUrl] = useState("");
+  const [creatorIdDocUploading, setCreatorIdDocUploading] = useState(false);
+  const [guarantorId, setGuarantorId] = useState("");
+  const [eligibleGuarantors, setEligibleGuarantors] = useState<EligibleGuarantor[]>([]);
+  const [loadingGuarantors, setLoadingGuarantors] = useState(false);
 
   // Transfer ownership modal state
   const [transferTontineId, setTransferTontineId] = useState<string | null>(null);
@@ -228,6 +269,67 @@ export function PrivateTontinesClient({
     setEditMaxSlots(t.maxSlots ? String(t.maxSlots) : "");
   }
 
+  // Load eligible guarantors from public sessions
+  useEffect(() => {
+    if (!showCreate) return;
+    setLoadingGuarantors(true);
+    fetch("/api/private-tontines/eligible-guarantors")
+      .then((r) => r.json())
+      .then((d) => setEligibleGuarantors(d.guarantors || []))
+      .catch(() => {})
+      .finally(() => setLoadingGuarantors(false));
+  }, [showCreate]);
+
+  async function handleFileUpload(file: File, type: "photo" | "id_doc") {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("type", type);
+    if (type === "photo") setCreatorPhotoUploading(true);
+    else setCreatorIdDocUploading(true);
+
+    try {
+      const res = await fetch("/api/private-tontines/upload-doc", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCreateError(data.error || "Erreur lors du téléversement du fichier.");
+        return;
+      }
+      if (type === "photo") setCreatorPhotoUrl(data.url);
+      else setCreatorIdDocUrl(data.url);
+    } catch {
+      setCreateError("Erreur réseau lors du téléversement.");
+    } finally {
+      if (type === "photo") setCreatorPhotoUploading(false);
+      else setCreatorIdDocUploading(false);
+    }
+  }
+
+  async function handleGuarantorDecision(sessionId: string, decision: "ACCEPT" | "REJECT") {
+    setRespondingGuarantorId(sessionId);
+    try {
+      const res = await fetch(`/api/private-tontines/${sessionId}/guarantor-response`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Erreur lors de la réponse.");
+        return;
+      }
+      setGuarantorRequests((prev) => prev.filter((r) => r.sessionId !== sessionId));
+      setFeedback(data.message || (decision === "ACCEPT" ? "Cautionnement accepté !" : "Cautionnement refusé."));
+      await refreshList();
+    } catch {
+      alert("Erreur réseau.");
+    } finally {
+      setRespondingGuarantorId(null);
+    }
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setCreateError(null);
@@ -235,6 +337,23 @@ export function PrivateTontinesClient({
       setCreateError("Vous devez lire et accepter les règles des cotisations privées DIVA Asso.");
       return;
     }
+    if (!creatorFullName.trim()) {
+      setCreateError("Veuillez renseigner votre nom complet.");
+      return;
+    }
+    if (!creatorPhotoUrl) {
+      setCreateError("Veuillez téléverser votre photo portrait (au format image).");
+      return;
+    }
+    if (!creatorIdDocUrl) {
+      setCreateError("Veuillez téléverser votre pièce d'identité (CNI, récépissé ou passeport).");
+      return;
+    }
+    if (!guarantorId) {
+      setCreateError("Veuillez sélectionner un garant inscrit dans une cotisation publique DIVA Asso.");
+      return;
+    }
+
     const parsedAmount = Number(amountInput || "0");
     if (
       !Number.isFinite(parsedAmount) ||
@@ -246,14 +365,18 @@ export function PrivateTontinesClient({
       );
       return;
     }
-    if (maxSlots.trim()) {
-      const parsedSlots = Number(maxSlots);
-      if (parsedSlots < creationConfig.minSlots || parsedSlots > creationConfig.maxSlotsLimit) {
-        setCreateError(
-          `Le nombre de places doit être compris entre ${creationConfig.minSlots} et ${creationConfig.maxSlotsLimit}.`,
-        );
-        return;
-      }
+    const parsedSlots = Number(maxSlots || "0");
+    if (!Number.isFinite(parsedSlots) || parsedSlots < creationConfig.minSlots) {
+      setCreateError(
+        `Le nombre de places doit être supérieur ou égal au nombre minimal fixé par l'administrateur (${creationConfig.minSlots} places).`,
+      );
+      return;
+    }
+    if (parsedSlots > creationConfig.maxSlotsLimit) {
+      setCreateError(
+        `Le nombre de places ne peut pas dépasser ${creationConfig.maxSlotsLimit} places.`,
+      );
+      return;
     }
 
     setCreating(true);
@@ -270,12 +393,16 @@ export function PrivateTontinesClient({
           fineAmountPerPeriod: selectedActions.includes("allow_fines") ? Number(fineInput || "0") : 0,
           startDate,
           limitTime,
-          maxSlots: maxSlots.trim() ? Number(maxSlots) : null,
+          maxSlots: parsedSlots,
           creatorParticipates,
           privateAdditionalFeePayoutPct: additionalFeePayoutPct,
           privatePenaltyBeneficiaryPct: penaltyBeneficiaryPct,
           selectedActions,
           rulesAccepted: true,
+          creatorFullName: creatorFullName.trim(),
+          creatorPhotoUrl,
+          creatorIdDocUrl,
+          guarantorId,
           emergencyFund: emergencyFundEnabled
             ? {
                 enabled: true,
@@ -294,12 +421,15 @@ export function PrivateTontinesClient({
       setShowCreate(false);
       setTitle("");
       setDescription("");
+      setCreatorPhotoUrl("");
+      setCreatorIdDocUrl("");
+      setGuarantorId("");
       setRulesAccepted(false);
       setFeedback(
         data.message ||
           (lang === "fr"
-            ? "Demande envoyée ! Votre cotisation est en attente de validation par DIVA Asso. Dès validation, votre lien d'invitation sécurisé apparaîtra ici."
-            : "Submitted! Your private cotisation is awaiting DIVA Asso admin approval."),
+            ? "Demande envoyée ! Le garant désigné a été notifié. Dès acceptation du garant et validation par l'administration DIVA Asso, votre lien d'invitation sécurisé apparaîtra ici."
+            : "Submitted! Awaiting guarantor acceptance and DIVA Asso admin approval."),
       );
       await refreshList();
     } catch {
@@ -475,6 +605,54 @@ export function PrivateTontinesClient({
         </div>
       )}
 
+      {/* Pending Guarantor Requests Banner */}
+      {guarantorRequests.length > 0 && (
+        <div className="flex flex-col gap-3">
+          {guarantorRequests.map((req) => (
+            <div
+              key={req.sessionId}
+              className="p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+            >
+              <div className="flex items-start gap-2.5">
+                <span className="material-symbols-outlined text-amber-700 text-[24px] flex-shrink-0">
+                  verified_user
+                </span>
+                <div>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-950 text-[10px] font-extrabold uppercase">
+                    Demande de cautionnement
+                  </span>
+                  <p className="text-xs text-amber-950 font-bold mt-1">
+                    {req.creatorName} {req.creatorPhone ? `(${req.creatorPhone})` : ""} vous a désigné comme garant pour créer la cotisation privée « {req.sessionTitle} » ({formatXAF(req.amount)}).
+                  </p>
+                  <p className="text-[11px] text-slate-600 mt-0.5">
+                    Acceptez-vous de vous porter garant de cette cotisation privée ?
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-center">
+                <button
+                  type="button"
+                  disabled={respondingGuarantorId === req.sessionId}
+                  onClick={() => handleGuarantorDecision(req.sessionId, "REJECT")}
+                  className="px-3 py-1.5 rounded-xl border border-red-300 text-red-700 text-xs font-bold hover:bg-red-50 cursor-pointer disabled:opacity-50"
+                >
+                  Refuser
+                </button>
+                <button
+                  type="button"
+                  disabled={respondingGuarantorId === req.sessionId}
+                  onClick={() => handleGuarantorDecision(req.sessionId, "ACCEPT")}
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {respondingGuarantorId === req.sessionId ? <LoadingSpinner /> : <span className="material-symbols-outlined text-[16px]">check</span>}
+                  <span>Accepter d&apos;être garant</span>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Creation form */}
       {showCreate && (
         <form
@@ -522,6 +700,111 @@ export function PrivateTontinesClient({
                 placeholder="Ex: Épargne hebdomadaire et entraide mutuelle"
                 className="border-2 border-emerald-600 rounded-xl px-3.5 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/30"
               />
+            </div>
+
+            {/* Identité du créateur (KYC) & Cautionnement Garant */}
+            <div className="sm:col-span-2 rounded-2xl border-2 border-emerald-300 bg-emerald-50/50 p-4 flex flex-col gap-3">
+              <div className="flex items-center gap-2 text-emerald-950 font-bold text-xs uppercase">
+                <span className="material-symbols-outlined text-[18px] text-emerald-700">verified_user</span>
+                <span>Vérification d&apos;identité &amp; Cautionnement garant (Obligatoire)</span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Pour garantir la sécurité de la communauté, le créateur d&apos;une cotisation privée doit fournir son nom complet, une photo portrait, une pièce d&apos;identité (CNI, récépissé ou passeport) et désigner un garant membre d&apos;une cotisation publique.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-emerald-200">
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Nom et prénom(s) complets du créateur *
+                  </label>
+                  <input
+                    type="text"
+                    value={creatorFullName}
+                    onChange={(e) => setCreatorFullName(e.target.value)}
+                    placeholder="Ex: Valentine Dupont"
+                    className="w-full border-2 border-emerald-600 rounded-xl px-3.5 py-2 text-sm bg-white"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    1. Photo portrait du créateur *
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleFileUpload(f, "photo");
+                    }}
+                    className="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-emerald-700 file:text-white hover:file:bg-emerald-800 cursor-pointer"
+                  />
+                  {creatorPhotoUploading && (
+                    <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1 mt-1">
+                      <LoadingSpinner /> Téléversement de la photo...
+                    </span>
+                  )}
+                  {creatorPhotoUrl && !creatorPhotoUploading && (
+                    <span className="text-[10px] text-emerald-800 font-bold flex items-center gap-1 mt-1">
+                      ✓ Photo enregistrée avec succès
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    2. CNI / Récépissé / Passeport *
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleFileUpload(f, "id_doc");
+                    }}
+                    className="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-emerald-700 file:text-white hover:file:bg-emerald-800 cursor-pointer"
+                  />
+                  {creatorIdDocUploading && (
+                    <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1 mt-1">
+                      <LoadingSpinner /> Téléversement du document...
+                    </span>
+                  )}
+                  {creatorIdDocUrl && !creatorIdDocUploading && (
+                    <span className="text-[10px] text-emerald-800 font-bold flex items-center gap-1 mt-1">
+                      ✓ Document CNI enregistré avec succès
+                    </span>
+                  )}
+                </div>
+
+                <div className="sm:col-span-2 pt-2 border-t border-emerald-200">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Désignation du garant (Membre en cotisation publique DIVA Asso) *
+                  </label>
+                  {loadingGuarantors ? (
+                    <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                      <LoadingSpinner /> Recherche des membres éligibles...
+                    </p>
+                  ) : (
+                    <select
+                      value={guarantorId}
+                      onChange={(e) => setGuarantorId(e.target.value)}
+                      className="w-full border-2 border-emerald-600 rounded-xl px-3 py-2 text-xs font-semibold bg-white"
+                      required
+                    >
+                      <option value="">-- Choisir un membre garant --</option>
+                      {eligibleGuarantors.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.name} {g.phone ? `(${g.phone})` : ""} — Cotisation publique : {g.publicSessionTitle}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <span className="text-[10px] text-slate-500 mt-1 block leading-relaxed">
+                    Le garant doit figurer dans une cotisation publique active. Dès soumission, il recevra une notification pour accepter ou refuser de cautionner votre cotisation.
+                  </span>
+                </div>
+              </div>
             </div>
 
             {/* Creator participation role */}
@@ -625,16 +908,30 @@ export function PrivateTontinesClient({
 
             <div className="flex flex-col gap-1">
               <label className="text-xs font-bold text-slate-700">
-                Nombre de places / tours (min {creationConfig.minSlots})
+                Nombre de places / tours (min {creationConfig.minSlots}) *
               </label>
               <input
                 type="text"
                 inputMode="numeric"
+                required
                 value={maxSlots}
                 onChange={(e) => setMaxSlots(sanitizeNumericInput(e.target.value))}
-                placeholder="Ex: 10"
-                className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm bg-white"
+                placeholder={`Ex: ${creationConfig.minSlots}`}
+                className={`border-2 rounded-xl px-3.5 py-2.5 text-sm bg-white ${
+                  maxSlots && Number(maxSlots) < creationConfig.minSlots
+                    ? "border-red-500 bg-red-50/40 text-red-900"
+                    : "border-emerald-600"
+                }`}
               />
+              {maxSlots && Number(maxSlots) < creationConfig.minSlots ? (
+                <span className="text-[10px] text-red-600 font-bold mt-0.5">
+                  Le nombre de places doit être supérieur ou égal au nombre minimal fixé par l&apos;administrateur ({creationConfig.minSlots} places).
+                </span>
+              ) : (
+                <span className="text-[10px] text-slate-500 mt-0.5">
+                  Minimum requis par DIVA Asso : {creationConfig.minSlots} places
+                </span>
+              )}
             </div>
 
             {/* Platform Fee Notice */}
@@ -914,6 +1211,21 @@ export function PrivateTontinesClient({
                       {isPendingAdmin && (
                         <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-900 text-[10px] font-bold">
                           ⏳ En attente validation DIVA Asso
+                        </span>
+                      )}
+                      {t.isCreator && t.privateConfig?.guarantorStatus === "PENDING" && (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-950 text-[10px] font-bold">
+                          ⏳ Accord garant en attente ({t.privateConfig?.guarantorName || "Garant"})
+                        </span>
+                      )}
+                      {t.isCreator && t.privateConfig?.guarantorStatus === "ACCEPTED" && (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 text-[10px] font-bold">
+                          ✓ Garant validé ({t.privateConfig?.guarantorName || "Garant"})
+                        </span>
+                      )}
+                      {t.isCreator && t.privateConfig?.guarantorStatus === "REJECTED" && (
+                        <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-900 text-[10px] font-bold">
+                          ✕ Garant a refusé ({t.privateConfig?.guarantorName || "Garant"})
                         </span>
                       )}
                       {isRejectedAdmin && (

@@ -4,6 +4,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
+import { sendEmailSafe } from "@/lib/email/resend";
+import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { getPrivateTontineConfig } from "@/lib/private-tontine-config";
 import { isStartDateValidForCycle } from "@/lib/cycle-date-validation";
 import {
@@ -50,6 +52,10 @@ const createPrivateTontineSchema = z.object({
   fineAmountPerPeriod: z.number().int().min(0).max(100_000).optional(),
   fineIntervalHours: z.number().int().min(1).max(168).optional(),
   creatorParticipates: z.boolean().default(true),
+  creatorFullName: z.string().trim().min(3, "Veuillez renseigner votre nom complet."),
+  creatorPhotoUrl: z.string().min(1, "Veuillez fournir votre photo de profil / portrait."),
+  creatorIdDocUrl: z.string().min(1, "Veuillez fournir votre pièce d'identité (CNI / Récépissé / Passeport)."),
+  guarantorId: z.string().min(1, "Veuillez sélectionner un garant inscrit dans une cotisation publique."),
   privateAdditionalFeePayoutPct: z.number().int().min(0).max(100).default(100),
   privatePenaltyBeneficiaryPct: z.number().int().min(0).max(100).default(100),
   selectedActions: z.array(z.string().max(80)).max(30).optional(),
@@ -309,6 +315,27 @@ export async function POST(request: Request) {
     ? data.privatePenaltyBeneficiaryPct
     : 100;
 
+  // Verify designated guarantor
+  const guarantorMembership = await prisma.membership.findFirst({
+    where: {
+      userId: data.guarantorId,
+      status: "APPROVED",
+      tontineSession: { isPrivate: false, status: { not: "CLOSED" } },
+    },
+    include: {
+      user: { select: { id: true, name: true, phone: true, email: true, preferredLang: true } },
+      tontineSession: { select: { id: true, title: true, type: true } },
+    },
+  });
+
+  if (!guarantorMembership || !guarantorMembership.user) {
+    return NextResponse.json(
+      { error: "Le garant sélectionné doit impérativement être un membre actif et validé dans au moins une cotisation publique." },
+      { status: 400 },
+    );
+  }
+  const guarantorUser = guarantorMembership.user;
+
   // Create in PENDING_ADMIN with NO inviteToken yet — Admin must inspect and approve before invite link is activated!
   const created = await prisma.$transaction(async (tx) => {
     const tontine = await tx.tontineSession.create({
@@ -333,7 +360,18 @@ export async function POST(request: Request) {
         privatePenaltyBeneficiaryPct: penaltyPct,
         privateApprovalStatus: "PENDING_ADMIN",
         privateRulesAcceptedAt: new Date(),
-        privateConfig: { selectedActions: chosenActions },
+        privateConfig: {
+          selectedActions: chosenActions,
+          creatorFullName: data.creatorFullName,
+          creatorPhotoUrl: data.creatorPhotoUrl,
+          creatorIdDocUrl: data.creatorIdDocUrl,
+          guarantorId: data.guarantorId,
+          guarantorName: guarantorUser.name,
+          guarantorPhone: guarantorUser.phone,
+          guarantorPublicSession: guarantorMembership.tontineSession.title || guarantorMembership.tontineSession.type,
+          guarantorStatus: "PENDING",
+          guarantorRequestedAt: new Date().toISOString(),
+        },
       },
     });
 
@@ -377,7 +415,42 @@ export async function POST(request: Request) {
     return tontine;
   });
 
-  // Notify all Admins to inspect & approve
+  // 1. Notify Designated Guarantor
+  const gLang = guarantorUser.preferredLang === "en" ? "en" : "fr";
+  const guarantorMsg =
+    gLang === "fr"
+      ? `${data.creatorFullName} souhaite créer la cotisation privée « ${created.title} » et vous a désigné(e) comme garant. En tant que membre d'une cotisation publique DIVA Asso, acceptez-vous de vous porter garant en cas de défaillance ?`
+      : `${data.creatorFullName} wishes to create the private tontine "${created.title}" and designated you as guarantor. Do you accept to guarantee this cotisation?`;
+
+  await scheduleInAppNotifications({
+    tontineSessionId: created.id,
+    type: "ADMIN_BROADCAST",
+    recipients: [
+      {
+        userId: guarantorUser.id,
+        message: guarantorMsg,
+        actionUrl: "/private-tontines",
+      },
+    ],
+  }).catch(() => {});
+
+  if (guarantorUser.email) {
+    const gTitle =
+      gLang === "fr"
+        ? "Demande de cautionnement — Cotisation privée DIVA Asso"
+        : "Guarantee Request — DIVA Asso";
+    const gHtml = renderBrandedEmailHtml({
+      title: gTitle,
+      bodyText: guarantorMsg,
+      actionUrl: "/private-tontines",
+      actionLabel: gLang === "fr" ? "Répondre à la demande" : "Respond to request",
+      recipientName: guarantorUser.name,
+      lang: gLang,
+    });
+    await sendEmailSafe(guarantorUser.email, gTitle, gHtml).catch(() => {});
+  }
+
+  // 2. Notify all Admins to inspect & approve (noting guarantor pending)
   const admins = await prisma.user.findMany({
     where: { role: { in: ["ADMIN", "PRESIDENT"] }, isBanned: false },
     select: { id: true },

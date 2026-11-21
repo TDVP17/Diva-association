@@ -67,8 +67,8 @@ export function DeleteAccountCard({ lang }: { lang: Lang }) {
         <form onSubmit={handleDelete} className="pt-2 border-t border-red-100 flex flex-col gap-3">
           <p className="text-xs text-red-800 leading-relaxed">
             {lang === "fr"
-              ? "Attention : cette action désactive définitivement votre accès. Votre solde portefeuille doit être à 0 FCFA et vous ne devez avoir aucun prêt ou amende impayée. Tapez SUPPRIMER pour confirmer :"
-              : "Warning: this permanently closes your login access. Your wallet balance must be 0 FCFA and all loans/fines settled. Type SUPPRIMER to confirm:"}
+              ? "Attention : cette action désactive définitivement votre accès. Pour clôturer votre compte, vous devez être totalement en règle avec DIVA Asso : aucune cotisation en cours, aucun prêt actif, aucune amende impayée et un solde portefeuille à 0 FCFA. Même en tapant SUPPRIMER, la clôture sera strictement refusée si l'un de ces éléments est encore actif. Tapez SUPPRIMER pour confirmer :"
+              : "Warning: this permanently closes your login access. You must be in full good standing with DIVA Asso: no active cotisations, no open loans, no unpaid fines, and 0 FCFA wallet balance. Type SUPPRIMER to confirm:"}
           </p>
 
           {error && (

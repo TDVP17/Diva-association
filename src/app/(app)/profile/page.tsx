@@ -277,16 +277,6 @@ export default async function ProfilePage() {
           <span className="material-symbols-outlined text-outline">chevron_right</span>
         </Link>
         <Link
-          href="/history"
-          className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant hover:bg-surface-container-low transition-colors"
-        >
-          <span className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-primary">receipt_long</span>
-            <span className="font-label-md text-label-md text-on-surface">{t("transactionHistory")}</span>
-          </span>
-          <span className="material-symbols-outlined text-outline">chevron_right</span>
-        </Link>
-        <Link
           href="/reglement-general"
           className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-surface-variant hover:bg-surface-container-low transition-colors"
         >

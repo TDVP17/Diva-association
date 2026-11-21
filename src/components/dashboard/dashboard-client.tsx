@@ -41,9 +41,6 @@ export function DashboardClient({
           <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">
             Coucou mon Asso 👋
           </h1>
-          <p className="text-xs text-slate-500 font-medium">
-            Bienvenue dans votre espace DIVA Asso
-          </p>
         </div>
 
         {/* Badge Étoiles Confiance */}
@@ -72,7 +69,7 @@ export function DashboardClient({
               <span className="material-symbols-outlined text-[20px]">add_moderator</span>
             </div>
             <span className="text-[11px] font-bold text-slate-800 line-clamp-1">Créer</span>
-            <span className="text-[9px] text-slate-400">Privée</span>
+            <span className="text-[9px] text-slate-400">Cotis. privée</span>
           </Link>
 
           {/* Action 2: Cotiser */}
@@ -113,24 +110,40 @@ export function DashboardClient({
         </div>
       </div>
 
-      {/* ── 3. APERÇU DE L'ACTIVITÉ DU MEMBRE (Statistiques réelles) ── */}
+      {/* ── 3. APERÇU DE L'ACTIVITÉ DU MEMBRE (Statistiques réelles - Liens cliquables) ── */}
       <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
-        <div className="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col gap-0.5">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Tontines actives
-          </span>
+        <Link
+          href="/sessions"
+          className="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col gap-0.5 hover:border-emerald-400 hover:bg-emerald-50/20 active:scale-95 transition-all group cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Tontines actives
+            </span>
+            <span className="material-symbols-outlined text-slate-400 group-hover:text-emerald-600 text-sm transition-colors">
+              arrow_forward
+            </span>
+          </div>
           <span className="text-lg font-extrabold text-slate-900">
             {statistics.activeSessionsCount}
           </span>
           <span className="text-[10px] text-emerald-700 font-semibold">
             {statistics.activeSessionsCount > 0 ? "Inscrit" : "Aucune"}
           </span>
-        </div>
+        </Link>
 
-        <div className="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col gap-0.5">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Amendes impayées
-          </span>
+        <Link
+          href="/fines"
+          className="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col gap-0.5 hover:border-red-400 hover:bg-red-50/20 active:scale-95 transition-all group cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Amendes impayées
+            </span>
+            <span className="material-symbols-outlined text-slate-400 group-hover:text-red-600 text-sm transition-colors">
+              arrow_forward
+            </span>
+          </div>
           <span
             className={`text-lg font-extrabold ${
               statistics.unpaidFinesCount > 0 ? "text-red-600" : "text-emerald-700"
@@ -141,7 +154,7 @@ export function DashboardClient({
           <span className="text-[10px] text-slate-500 font-semibold">
             {statistics.unpaidFinesCount > 0 ? "À régulariser" : "Impeccable ✨"}
           </span>
-        </div>
+        </Link>
       </div>
 
       {/* ── 4. MA PROCHAINE COTISATION (Échéance imminente ou Empty State) ── */}

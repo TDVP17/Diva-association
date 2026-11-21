@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const [user, openLoansCount, unpaidFinesCount] = await Promise.all([
+  const [user, openLoansCount, unpaidFinesCount, activeCotisationsCount, pendingWithdrawalsCount] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, email: true, role: true, walletBalance: true },
@@ -42,6 +42,19 @@ export async function POST(request: Request) {
       where: {
         membershipSlot: { membership: { userId } },
         status: { in: ["UNPAID", "FAILED"] },
+      },
+    }),
+    prisma.membership.count({
+      where: {
+        userId,
+        status: "APPROVED",
+        tontineSession: { status: { in: ["ACTIVE", "DRAWING"] }, softDeletedAt: null },
+      },
+    }),
+    prisma.walletWithdrawal.count({
+      where: {
+        userId,
+        status: "PENDING_ADMIN",
       },
     }),
   ]);
@@ -57,6 +70,18 @@ export async function POST(request: Request) {
     );
   }
 
+  // 1. Strict Cotisation en cours guard
+  if (activeCotisationsCount > 0) {
+    return NextResponse.json(
+      {
+        error:
+          "Impossible de supprimer votre compte : vous participez actuellement à une ou plusieurs cotisations en cours. Vous devez obligatoirement achever tous vos cycles de cotisation et être en règle avec DIVA Asso avant de pouvoir clôturer votre compte.",
+      },
+      { status: 409 },
+    );
+  }
+
+  // 2. Open Loans guard
   if (openLoansCount > 0) {
     return NextResponse.json(
       { error: "Impossible de supprimer votre compte : vous avez un prêt d'urgence actif ou en retard non remboursé." },
@@ -64,13 +89,23 @@ export async function POST(request: Request) {
     );
   }
 
+  // 3. Unpaid Fines guard
   if (unpaidFinesCount > 0) {
     return NextResponse.json(
-      { error: "Impossible de supprimer votre compte : vous avez encore des amendes impayées." },
+      { error: "Impossible de supprimer votre compte : vous avez encore des amendes impayées à régulariser." },
       { status: 409 },
     );
   }
 
+  // 4. Pending Withdrawals guard
+  if (pendingWithdrawalsCount > 0) {
+    return NextResponse.json(
+      { error: "Impossible de supprimer votre compte : vous avez une demande de retrait en attente de validation par l'administration." },
+      { status: 409 },
+    );
+  }
+
+  // 5. Positive Wallet Balance guard
   if (Number(user.walletBalance || 0) > 0) {
     return NextResponse.json(
       {

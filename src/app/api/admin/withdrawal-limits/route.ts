@@ -11,6 +11,7 @@ const updateSchema = z
   .object({
     minWithdrawalAmount: z.number().int().min(100, "Minimum : 100 FCFA").max(10_000_000),
     maxWithdrawalAmount: z.number().int().min(500, "Maximum : au moins 500 FCFA").max(50_000_000),
+    withdrawalApprovalThreshold: z.number().int().min(1_000, "Seuil minimum : 1 000 FCFA").max(50_000_000).default(50_000),
   })
   .refine((d) => d.maxWithdrawalAmount >= d.minWithdrawalAmount, {
     message: "Le montant maximum doit être supérieur ou égal au montant minimum.",
@@ -38,6 +39,7 @@ export async function PUT(request: Request) {
   const saved = await setGlobalWithdrawalLimits(
     parsed.data.minWithdrawalAmount,
     parsed.data.maxWithdrawalAmount,
+    parsed.data.withdrawalApprovalThreshold,
   );
 
   await logAudit({

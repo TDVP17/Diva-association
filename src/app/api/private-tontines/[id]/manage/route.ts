@@ -114,7 +114,7 @@ export async function PATCH(
 
   const payload = parsed.data;
   const adminConfig = await getPrivateTontineConfig();
-  const minParticipants = tontine.privateMinParticipants ?? adminConfig.minSlots;
+  const minParticipants = Math.max(tontine.privateMinParticipants ?? adminConfig.minSlots, adminConfig.minSlots);
   const approvedMembers = tontine.memberships.filter((m) => m.status === "APPROVED");
   const approvedCount = approvedMembers.length;
 

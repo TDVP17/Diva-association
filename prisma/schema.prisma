@@ -795,6 +795,7 @@ model Fine {
   /// recomputed (upserted) idempotently by the daily penalty cron.
   dueDate          DateTime
   amount           Decimal    @db.Decimal(12, 2)
+  paidAmount       Decimal    @default(0) @db.Decimal(12, 2) @map("paid_amount")
   status           FineStatus @default(UNPAID)
   fapshiTxRef      String?    @unique
   /// Mobile Money / Orange Money number the USSD prompt was sent to for
@@ -1131,6 +1132,7 @@ model AppSetting {
   lockReason          String?   @map("lock_reason")
   minWithdrawalAmount Decimal   @default(1000) @db.Decimal(12, 2) @map("min_withdrawal_amount")
   maxWithdrawalAmount Decimal   @default(500000) @db.Decimal(12, 2) @map("max_withdrawal_amount")
+  withdrawalApprovalThreshold Decimal @default(50000) @db.Decimal(12, 2) @map("withdrawal_approval_threshold")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
   @@map("app_settings")

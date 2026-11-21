@@ -71,6 +71,7 @@ export function PaymentConfirmDialog({
   onProofSubmitted,
   onClose,
   onDiscardDraft,
+  initialFineRemaining,
 }: {
   lang: Lang;
   /** Exactly one of membershipSlotId/fineId must be set. */
@@ -93,11 +94,15 @@ export function PaymentConfirmDialog({
   onClose: () => void;
   /** Optional callback to discard a draft contribution. */
   onDiscardDraft?: () => void;
+  /** Optional remaining amount for fines to allow partial payment */
+  initialFineRemaining?: number;
 }) {
   const router = useRouter();
   const t = (key: TranslationKey, vars?: Record<string, string>) => translate(lang, key, vars);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [fineRepayMode, setFineRepayMode] = useState<"FULL" | "PARTIAL">("FULL");
+  const [finePartialInput, setFinePartialInput] = useState<string>("");
   const [phone, setPhone] = useState(defaultPhone ?? "");
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [step, setStep] = useState<Step>("form");
@@ -435,12 +440,14 @@ export function PaymentConfirmDialog({
     setPayError(null);
     setPayingWithWallet(true);
     try {
+      const parsedPartialFine =
+        fineId && fineRepayMode === "PARTIAL" ? parseInt(finePartialInput, 10) : undefined;
       const res = await fetch("/api/wallet/pay-contribution", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
           fineId
-            ? { fineId }
+            ? { fineId, ...(parsedPartialFine && parsedPartialFine > 0 ? { partialAmount: parsedPartialFine } : {}) }
             : { membershipSlotId, ...(dueDate ? { dueDate } : {}) },
         ),
       });
@@ -577,6 +584,51 @@ export function PaymentConfirmDialog({
               </p>
             )}
 
+            {fineId && (
+              <div className="mb-4 p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-col gap-2">
+                <span className="text-xs font-bold text-slate-800">Option de règlement de l&apos;amende :</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFineRepayMode("FULL")}
+                    className={`p-2 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                      fineRepayMode === "FULL"
+                        ? "bg-emerald-700 text-white border-emerald-700"
+                        : "bg-white text-slate-700 border-slate-300"
+                    }`}
+                  >
+                    Totalité ({formatXAF(initialFineRemaining ?? (quote?.baseTotal ?? 0))})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFineRepayMode("PARTIAL")}
+                    className={`p-2 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                      fineRepayMode === "PARTIAL"
+                        ? "bg-emerald-700 text-white border-emerald-700"
+                        : "bg-white text-slate-700 border-slate-300"
+                    }`}
+                  >
+                    Versement partiel
+                  </button>
+                </div>
+                {fineRepayMode === "PARTIAL" && (
+                  <div className="pt-2 border-t border-slate-200">
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Montant à verser (FCFA)
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={finePartialInput}
+                      onChange={(e) => setFinePartialInput(e.target.value.replace(/\D/g, ""))}
+                      placeholder="Ex: 1000"
+                      className="w-full border-2 border-emerald-600 rounded-lg px-3 py-1.5 text-xs font-bold bg-white"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
             {quote && (
               <div className="flex flex-col gap-2 mb-4 bg-surface-container-low p-3.5 rounded-xl border border-outline-variant">
                 <div className="flex justify-between items-center text-sm">
@@ -662,38 +714,44 @@ export function PaymentConfirmDialog({
 
                 {walletSelected && (
                   <div className="px-3 pb-2.5 pt-1 border-t border-emerald-200/70 flex flex-col gap-2">
-                    {walletBalance >= quote.baseTotal ? (
-                      <>
-                        <p className="text-[11px] text-emerald-900 font-medium">
+                    {(() => {
+                      const fineTargetAmount =
+                        fineId && fineRepayMode === "PARTIAL" && parseInt(finePartialInput, 10) > 0
+                          ? parseInt(finePartialInput, 10)
+                          : quote.baseTotal;
+                      return walletBalance >= fineTargetAmount ? (
+                        <>
+                          <p className="text-[11px] text-emerald-900 font-medium">
+                            {lang === "fr"
+                              ? `Vous allez régler ${fineId ? "l'amende" : "votre cotisation"} via votre Portefeuille DIVA Asso pour un montant de ${formatXAF(fineTargetAmount)} (0 % frais).`
+                              : `You will pay ${formatXAF(fineTargetAmount)} via your DIVA Asso Wallet (0% fees).`}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handlePayWithWallet}
+                            disabled={payingWithWallet || submitting}
+                            className="w-full py-2 px-3 rounded-lg bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] text-white font-bold text-xs transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5"
+                          >
+                            <span className="material-symbols-outlined text-[15px]">bolt</span>
+                            <span>
+                              {payingWithWallet
+                                ? lang === "fr"
+                                  ? "Paiement en cours..."
+                                  : "Processing..."
+                                : lang === "fr"
+                                  ? `Confirmer (${formatXAF(fineTargetAmount)})`
+                                  : `Confirm (${formatXAF(fineTargetAmount)})`}
+                            </span>
+                          </button>
+                        </>
+                      ) : (
+                        <p className="text-[11px] text-red-700 font-semibold">
                           {lang === "fr"
-                            ? `Vous allez cotiser via votre Portefeuille DIVA Asso pour un montant total de ${formatXAF(quote.baseTotal)} (0 % frais).`
-                            : `You will pay ${formatXAF(quote.baseTotal)} via your DIVA Asso Wallet (0% fees).`}
+                            ? "Solde insuffisant dans votre Portefeuille DIVA Asso pour régler ce montant."
+                            : "Insufficient balance in your DIVA Asso Wallet."}
                         </p>
-                        <button
-                          type="button"
-                          onClick={handlePayWithWallet}
-                          disabled={payingWithWallet || submitting}
-                          className="w-full py-2 px-3 rounded-lg bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] text-white font-bold text-xs transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5"
-                        >
-                          <span className="material-symbols-outlined text-[15px]">bolt</span>
-                          <span>
-                            {payingWithWallet
-                              ? lang === "fr"
-                                ? "Paiement en cours..."
-                                : "Processing..."
-                              : lang === "fr"
-                                ? `Confirmer (${formatXAF(quote.baseTotal)})`
-                                : `Confirm (${formatXAF(quote.baseTotal)})`}
-                          </span>
-                        </button>
-                      </>
-                    ) : (
-                      <p className="text-[11px] text-red-700 font-semibold">
-                        {lang === "fr"
-                          ? "Solde insuffisant dans votre Portefeuille DIVA Asso pour cotiser ce montant."
-                          : "Insufficient balance in your DIVA Asso Wallet."}
-                      </p>
-                    )}
+                      );
+                    })()}
                   </div>
                 )}
               </div>
@@ -830,14 +888,14 @@ export function PaymentConfirmDialog({
             <div className="flex gap-3">
               <button
                 onClick={onClose}
-                className="flex-1 px-3 py-2.5 rounded-lg border border-outline text-on-surface font-label-md text-label-md hover:bg-surface-variant/50 transition-colors"
+                className="flex-1 px-3 py-1.5 rounded-lg border border-outline text-on-surface text-xs font-bold hover:bg-surface-variant/50 transition-colors"
               >
                 {t("cancelAction")}
               </button>
               <button
                 onClick={() => handleConfirm()}
                 disabled={!quote || submitting || isCurrentOperatorSuspended || (usingNewNumber ? !phone.trim() || isOperatorInvalid : !selectedMethodId)}
-                className="flex-1 px-3 py-2.5 rounded-lg bg-primary text-on-primary font-label-md text-label-md hover:opacity-90 active:scale-95 transition-all disabled:opacity-60 cursor-pointer"
+                className="flex-1 px-3 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-bold hover:opacity-90 active:scale-95 transition-all disabled:opacity-60 cursor-pointer"
               >
                 {submitting
                   ? t("redirectingToFapshi")

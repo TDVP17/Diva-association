@@ -34,6 +34,16 @@ export interface AdminPrivateTontineRow {
     phone: string | null;
     memberCode: string | null;
   } | null;
+  creatorFullName?: string | null;
+  creatorPhotoUrl?: string | null;
+  creatorIdDocUrl?: string | null;
+  guarantorId?: string | null;
+  guarantorName?: string | null;
+  guarantorPhone?: string | null;
+  guarantorPublicSession?: string | null;
+  guarantorStatus?: string | null;
+  guarantorRespondedAt?: string | null;
+  guarantorDeclineReason?: string | null;
 }
 
 export function AdminPrivateTontinesClient({
@@ -296,6 +306,89 @@ export function AdminPrivateTontinesClient({
                     </p>
                   )}
 
+                  {/* KYC Créateur & Cautionnement Garant */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-3 border-t border-slate-200/80">
+                    {/* KYC Créateur */}
+                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 text-xs flex flex-col gap-1.5">
+                      <div className="flex items-center gap-1.5 text-slate-800 font-bold">
+                        <span className="material-symbols-outlined text-[16px] text-emerald-700">badge</span>
+                        <span>Identité du créateur (KYC)</span>
+                      </div>
+                      <p className="text-slate-600">
+                        Nom complet : <strong className="text-slate-900">{t.creatorFullName || t.creator?.name || "Non renseigné"}</strong>
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        {t.creatorPhotoUrl ? (
+                          <a
+                            href={t.creatorPhotoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-100 text-emerald-900 font-bold text-[10px] hover:bg-emerald-200"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">account_box</span>
+                            <span>Photo portrait ↗</span>
+                          </a>
+                        ) : (
+                          <span className="text-[10px] text-amber-700 font-medium">⚠️ Pas de photo</span>
+                        )}
+                        {t.creatorIdDocUrl ? (
+                          <a
+                            href={t.creatorIdDocUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-100 text-blue-900 font-bold text-[10px] hover:bg-blue-200"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">description</span>
+                            <span>Pièce CNI / Doc ↗</span>
+                          </a>
+                        ) : (
+                          <span className="text-[10px] text-amber-700 font-medium">⚠️ Pas de CNI</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Cautionnement Garant */}
+                    <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 text-xs flex flex-col gap-1.5">
+                      <div className="flex items-center gap-1.5 text-slate-800 font-bold">
+                        <span className="material-symbols-outlined text-[16px] text-emerald-700">security</span>
+                        <span>Garant désigné</span>
+                      </div>
+                      {t.guarantorId ? (
+                        <>
+                          <p className="text-slate-600">
+                            Nom : <strong className="text-slate-900">{t.guarantorName || "Garant"}</strong>
+                            {t.guarantorPhone ? ` · ${t.guarantorPhone}` : ""}
+                          </p>
+                          {t.guarantorPublicSession && (
+                            <p className="text-[10px] text-slate-500">
+                              Membre en cotisation publique : <em>{t.guarantorPublicSession}</em>
+                            </p>
+                          )}
+                          <div className="mt-1">
+                            {t.guarantorStatus === "ACCEPTED" ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-bold text-[10px]">
+                                <span className="material-symbols-outlined text-[12px]">check</span>
+                                <span>Cautionnement accepté par le garant</span>
+                              </span>
+                            ) : t.guarantorStatus === "REJECTED" ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-900 font-bold text-[10px]">
+                                <span className="material-symbols-outlined text-[12px]">close</span>
+                                <span>Cautionnement refusé par le garant</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-950 font-bold text-[10px]">
+                                <span className="material-symbols-outlined text-[12px]">hourglass_top</span>
+                                <span>En attente de l&apos;accord du garant</span>
+                              </span>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-[11px] text-slate-500">Aucun garant désigné.</p>
+                      )}
+                    </div>
+                  </div>
+
                   {t.inviteUrl && t.privateApprovalStatus === "APPROVED" && (
                     <p className="text-[11px] font-mono text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1 mt-2 break-all">
                       Lien actif : {t.inviteUrl}
@@ -317,19 +410,31 @@ export function AdminPrivateTontinesClient({
                     Voir détails
                   </Link>
                   {t.privateApprovalStatus !== "APPROVED" && (
-                    <button
-                      type="button"
-                      disabled={busyId === t.id}
-                      onClick={() => decide(t.id, "APPROVE")}
-                      className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
-                    >
-                      {busyId === t.id ? (
-                        <LoadingSpinner />
-                      ) : (
-                        <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                    <div className="flex flex-col items-end gap-1">
+                      <button
+                        type="button"
+                        disabled={busyId === t.id || (Boolean(t.guarantorId) && t.guarantorStatus !== "ACCEPTED")}
+                        onClick={() => decide(t.id, "APPROVE")}
+                        className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                        title={
+                          t.guarantorId && t.guarantorStatus !== "ACCEPTED"
+                            ? "Validation bloquée : le garant n'a pas encore accepté"
+                            : "Approuver et générer le lien"
+                        }
+                      >
+                        {busyId === t.id ? (
+                          <LoadingSpinner />
+                        ) : (
+                          <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                        )}
+                        <span>Valider &amp; Générer le lien</span>
+                      </button>
+                      {t.guarantorId && t.guarantorStatus !== "ACCEPTED" && (
+                        <span className="text-[10px] text-amber-700 font-bold">
+                          Accord du garant requis
+                        </span>
                       )}
-                      <span>Valider &amp; Générer le lien</span>
-                    </button>
+                    </div>
                   )}
                   {t.privateApprovalStatus !== "REJECTED" && (
                     <button

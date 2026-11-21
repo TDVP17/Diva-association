@@ -38,6 +38,7 @@ export async function GET() {
   return NextResponse.json({
     pendingCount: tontines.filter((t) => t.privateApprovalStatus === "PENDING_ADMIN").length,
     tontines: tontines.map((t) => {
+      const cfg = (t.privateConfig as Record<string, unknown> | null) ?? {};
       const approvedMembers = t.memberships.filter((m) => m.status === "APPROVED");
       const cyclesEstimate = Math.max(
         approvedMembers.length,
@@ -89,6 +90,16 @@ export async function GET() {
             }
           : null,
         creator: t.creator,
+        creatorFullName: cfg.creatorFullName || t.creator?.name || null,
+        creatorPhotoUrl: cfg.creatorPhotoUrl || null,
+        creatorIdDocUrl: cfg.creatorIdDocUrl || null,
+        guarantorId: cfg.guarantorId || null,
+        guarantorName: cfg.guarantorName || null,
+        guarantorPhone: cfg.guarantorPhone || null,
+        guarantorPublicSession: cfg.guarantorPublicSession || null,
+        guarantorStatus: cfg.guarantorStatus || (cfg.guarantorId ? "PENDING" : null),
+        guarantorRespondedAt: cfg.guarantorRespondedAt || null,
+        guarantorDeclineReason: cfg.guarantorDeclineReason || null,
       };
     }),
   });

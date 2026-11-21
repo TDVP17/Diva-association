@@ -9,11 +9,13 @@ export function FinePayButton({
   fineId,
   description,
   defaultPhone,
+  remainingAmount,
   lang,
 }: {
   fineId: string;
   description: string;
   defaultPhone?: string | null;
+  remainingAmount?: number;
   lang: Lang;
 }) {
   const t = (key: Parameters<typeof translate>[1]) => translate(lang, key);
@@ -36,6 +38,7 @@ export function FinePayButton({
           payAction="fine"
           description={description}
           defaultPhone={defaultPhone}
+          initialFineRemaining={remainingAmount}
           onSettled={() => router.refresh()}
           onClose={() => setShowConfirm(false)}
         />

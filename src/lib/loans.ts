@@ -59,12 +59,27 @@ export interface CollateralCalculationResult {
  * - Si C_net <= 0 (aucun solde positif acquis en caisse) => Plafond = 0 FCFA (PAS de +10 000 FCFA).
  * - Si et seulement si C_net > 0 ET au moins un nom reste à bouffer => Plafond = C_net + 10 000 FCFA.
  */
-export function calculateLoanCeiling(input: CollateralCalculationInput): CollateralCalculationResult {
+export function calculateLoanCeiling(
+  input: CollateralCalculationInput,
+  userStars?: number,
+): CollateralCalculationResult {
   const remainingDebtD = Math.max(0, Math.round(input.remainingDebtD));
   const guaranteedFutureGainG = Math.max(0, Math.round(input.guaranteedFutureGainG));
   const netCollateral = guaranteedFutureGainG - remainingDebtD;
 
+  // Un membre à 4 étoiles ou plus bénéficie de la confiance pleine de DIVA Asso
+  const isTrustedMember = (userStars ?? 0) >= LOAN_MIN_STARS;
+
   if (input.unpaidOutPublicSlotsCount <= 0 || netCollateral <= 0) {
+    if (isTrustedMember) {
+      return {
+        remainingDebtD,
+        guaranteedFutureGainG,
+        netCollateral: Math.max(0, netCollateral),
+        bonusToleranceApplied: LOAN_RISK_TOLERANCE_XAF,
+        maxLoanAmount: LOAN_RISK_TOLERANCE_XAF,
+      };
+    }
     return {
       remainingDebtD,
       guaranteedFutureGainG,
@@ -74,12 +89,13 @@ export function calculateLoanCeiling(input: CollateralCalculationInput): Collate
     };
   }
 
+  const calculatedMax = netCollateral + LOAN_RISK_TOLERANCE_XAF;
   return {
     remainingDebtD,
     guaranteedFutureGainG,
     netCollateral,
     bonusToleranceApplied: LOAN_RISK_TOLERANCE_XAF,
-    maxLoanAmount: netCollateral + LOAN_RISK_TOLERANCE_XAF,
+    maxLoanAmount: isTrustedMember ? Math.max(calculatedMax, LOAN_RISK_TOLERANCE_XAF) : calculatedMax,
   };
 }
 
@@ -283,11 +299,14 @@ export async function evaluateUserLoanEligibility(userId: string): Promise<LoanE
     }
   }
 
-  const collateral = calculateLoanCeiling({
-    remainingDebtD,
-    guaranteedFutureGainG,
-    unpaidOutPublicSlotsCount,
-  });
+  const collateral = calculateLoanCeiling(
+    {
+      remainingDebtD,
+      guaranteedFutureGainG,
+      unpaidOutPublicSlotsCount,
+    },
+    stars,
+  );
 
   const allowedAmounts = buildSystemLoanOptions(collateral.maxLoanAmount);
   const hasUnpaidOutSlots = unpaidOutPublicSlotsCount > 0;
@@ -298,7 +317,7 @@ export async function evaluateUserLoanEligibility(userId: string): Promise<LoanE
   }
   if (!hasFourStars) {
     reasons.push(
-      `Badge 4 étoiles minimum requis pour demander un prêt (vous avez actuellement ${stars}/5 étoiles). Chaque étoile s'obtient en terminant un cycle complet dans une cotisation publique sans jamais avoir eu d'amende.`,
+      "4 étoiles requises pour débloquer les prêts d'urgence (obtenues en terminant un cycle complet de cotisation publique sans amende).",
     );
   }
   if (!hasNoActiveFines) {
@@ -306,19 +325,19 @@ export async function evaluateUserLoanEligibility(userId: string): Promise<LoanE
       `Vous avez ${unpaidFinesCount} amende(s) impayée(s). Toute amende active bloque l'accès aux prêts.`,
     );
   }
-  if (!hasActivePublicParticipation) {
+  if (!hasFourStars && !hasActivePublicParticipation) {
     reasons.push(
-      "Vous devez participer à au moins une cotisation publique active DIVA Asso (les cotisations privées sont exclues).",
+      "Vous devez participer à au moins une cotisation publique active DIVA Asso.",
     );
   }
-  if (!hasUnpaidOutSlots) {
+  if (!hasFourStars && !hasUnpaidOutSlots) {
     reasons.push(
       "Vous avez déjà bouffé tous vos noms dans vos cotisations publiques actives (aucun nom restant en garantie).",
     );
   }
-  if (hasUnpaidOutSlots && collateral.netCollateral <= 0) {
+  if (!hasFourStars && hasUnpaidOutSlots && collateral.netCollateral <= 0) {
     reasons.push(
-      "Votre épargne nette acquise (cotisations déjà payées moins le reste dû sur vos noms déjà bouffés) est insuffisante pour débloquer un prêt.",
+      "Votre épargne nette acquise est insuffisante pour débloquer un prêt.",
     );
   }
   if (hasExistingActiveLoan) {
@@ -333,9 +352,6 @@ export async function evaluateUserLoanEligibility(userId: string): Promise<LoanE
     !user?.isBanned &&
     hasFourStars &&
     hasNoActiveFines &&
-    hasActivePublicParticipation &&
-    hasUnpaidOutSlots &&
-    collateral.netCollateral > 0 &&
     !hasExistingActiveLoan &&
     collateral.maxLoanAmount >= LOAN_MIN_AMOUNT_XAF;
 
