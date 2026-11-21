@@ -7,9 +7,10 @@ import { creditWalletTx } from "@/lib/wallet-ledger";
 import { normalizeCameroonPhone, initiateDirectPayment, getFapshiApiUser, getFapshiApiKey } from "@/lib/fapshi";
 import { detectMobileMoneyProvider, fapshiMediumFor } from "@/lib/mobile-money-provider";
 import { checkFinancialServiceAvailability } from "@/lib/financial-service-control";
+import { getGlobalWithdrawalLimits } from "@/lib/withdrawal-limits";
 
 const topUpSchema = z.object({
-  amount: z.number().int().min(500, "Le montant minimum de rechargement est de 500 FCFA").max(10000000),
+  amount: z.number().int().min(100, "Le montant minimum de rechargement est de 100 FCFA").max(50000000),
   phone: z.string().trim().min(9),
 });
 
@@ -29,6 +30,25 @@ export async function POST(request: Request) {
   }
 
   const { amount, phone: rawPhone } = parsed.data;
+
+  const globalLimits = await getGlobalWithdrawalLimits();
+  if (amount < globalLimits.minTopupAmount) {
+    return NextResponse.json(
+      {
+        error: `Le montant minimum de rechargement est de ${globalLimits.minTopupAmount.toLocaleString("fr-FR")} FCFA.`,
+      },
+      { status: 400 }
+    );
+  }
+  if (amount > globalLimits.maxTopupAmount) {
+    return NextResponse.json(
+      {
+        error: `Le montant maximum de rechargement est de ${globalLimits.maxTopupAmount.toLocaleString("fr-FR")} FCFA par opération.`,
+      },
+      { status: 400 }
+    );
+  }
+
   const phone = normalizeCameroonPhone(rawPhone);
   if (!phone) {
     return NextResponse.json(

@@ -9,12 +9,17 @@ import { logAudit } from "@/lib/audit";
 
 const updateSchema = z
   .object({
-    minWithdrawalAmount: z.number().int().min(100, "Minimum : 100 FCFA").max(10_000_000),
-    maxWithdrawalAmount: z.number().int().min(500, "Maximum : au moins 500 FCFA").max(50_000_000),
+    minWithdrawalAmount: z.number().int().min(100, "Minimum retrait : 100 FCFA").max(10_000_000),
+    maxWithdrawalAmount: z.number().int().min(500, "Maximum retrait : au moins 500 FCFA").max(50_000_000),
     withdrawalApprovalThreshold: z.number().int().min(1_000, "Seuil minimum : 1 000 FCFA").max(50_000_000).default(50_000),
+    minTopupAmount: z.number().int().min(100, "Minimum recharge : 100 FCFA").max(10_000_000).default(500),
+    maxTopupAmount: z.number().int().min(500, "Maximum recharge : au moins 500 FCFA").max(50_000_000).default(500_000),
   })
   .refine((d) => d.maxWithdrawalAmount >= d.minWithdrawalAmount, {
-    message: "Le montant maximum doit être supérieur ou égal au montant minimum.",
+    message: "Le montant maximum de retrait doit être supérieur ou égal au montant minimum.",
+  })
+  .refine((d) => d.maxTopupAmount >= d.minTopupAmount, {
+    message: "Le montant maximum de recharge doit être supérieur ou égal au montant minimum de recharge.",
   });
 
 export async function GET() {
@@ -40,6 +45,8 @@ export async function PUT(request: Request) {
     parsed.data.minWithdrawalAmount,
     parsed.data.maxWithdrawalAmount,
     parsed.data.withdrawalApprovalThreshold,
+    parsed.data.minTopupAmount,
+    parsed.data.maxTopupAmount,
   );
 
   await logAudit({

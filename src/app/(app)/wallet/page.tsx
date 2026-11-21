@@ -87,6 +87,8 @@ export default async function WalletPage() {
         withdrawalLimits={{
           minAmount: withdrawalLimits.minAmount,
           maxAmount: withdrawalLimits.maxAmount,
+          minTopupAmount: withdrawalLimits.minTopupAmount,
+          maxTopupAmount: withdrawalLimits.maxTopupAmount,
         }}
         operatorSuspension={{
           isOrangeSuspended: Boolean(operatorConfig.isOrangeSuspended),

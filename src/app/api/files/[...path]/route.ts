@@ -17,19 +17,40 @@ export async function GET(
   }
 
   const { path: segments } = await params;
-  // Every stored file lives under {category}/{ownerId}/{filename}. Avatars
-  // are shown to other members throughout the app (chat, session rosters,
-  // admin queues), so any authenticated user may read those back; every
-  // other category (receipts, etc.) stays owner/payer-or-admin only.
-  const [category, ownerId, ...rest] = segments;
-  if (!category || !ownerId || rest.length === 0) {
+  if (!segments || segments.length === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // Flexible routing for bulk receipts:
+  // - 1 segment:  /api/files/bulk-{id}(-owner|-payer)?.pdf
+  // - 2 segments: /api/files/receipts/bulk-{id}(-owner|-payer)?.pdf
+  // - 3 segments: /api/files/receipts/{ownerId}/bulk-{id}(-owner|-payer)?.pdf
+  const firstSeg = segments[0] ?? "";
+  const lastSeg = segments[segments.length - 1] ?? "";
+  const directBulkMatch =
+    firstSeg.match(/^bulk-([a-zA-Z0-9_-]+?)(?:-(owner|payer))?\.pdf$/) ||
+    lastSeg.match(/^bulk-([a-zA-Z0-9_-]+?)(?:-(owner|payer))?\.pdf$/);
+
+  let category: string;
+  let ownerId: string;
+  let filename: string;
+
+  if (directBulkMatch) {
+    category = "receipts";
+    filename = directBulkMatch[0];
+    ownerId = segments.length >= 3 ? segments[1] : session.user.id;
+  } else {
+    if (segments.length < 3) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    category = segments[0];
+    ownerId = segments[1];
+    filename = segments[2];
   }
 
   const isOwner = session.user.id === ownerId;
   const isAdmin = isAdminRole(session.user.role);
   const isPublicCategory = category === "avatars";
-  const filename = rest[0] ?? "";
 
   // Live consolidated bulk payment receipt:
   // /api/files/receipts/{targetUserId}/bulk-{bulkPaymentId}(-owner|-payer)?.pdf

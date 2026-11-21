@@ -1133,6 +1133,8 @@ model AppSetting {
   minWithdrawalAmount Decimal   @default(1000) @db.Decimal(12, 2) @map("min_withdrawal_amount")
   maxWithdrawalAmount Decimal   @default(500000) @db.Decimal(12, 2) @map("max_withdrawal_amount")
   withdrawalApprovalThreshold Decimal @default(50000) @db.Decimal(12, 2) @map("withdrawal_approval_threshold")
+  minTopupAmount      Decimal   @default(500) @db.Decimal(12, 2) @map("min_topup_amount")
+  maxTopupAmount      Decimal   @default(500000) @db.Decimal(12, 2) @map("max_topup_amount")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
   @@map("app_settings")

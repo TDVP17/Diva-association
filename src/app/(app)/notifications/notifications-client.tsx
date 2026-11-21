@@ -27,6 +27,17 @@ export function NotificationsClient({ lang }: { lang: Lang }) {
   const [notifications, setNotifications] = useState<NotificationRow[] | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  function toggleExpand(id: string, e?: React.MouseEvent) {
+    e?.stopPropagation();
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   const [pushStatus, setPushStatus] = useState<NotificationPermission | "unsupported">(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -257,52 +268,97 @@ export function NotificationsClient({ lang }: { lang: Lang }) {
           </div>
 
           <div className="flex flex-col gap-2">
-            {notifications.map((n) => (
-              <div
-                key={n.id}
-                className={`relative bg-white rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border p-3.5 flex flex-col gap-0.5 transition-colors ${
-                  n.readAt ? "border-surface-variant" : "border-emerald-600/40 bg-emerald-50/20"
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    dismiss(n.id);
-                  }}
-                  aria-label={lang === "fr" ? "Supprimer la notification" : t("dismissNotification")}
-                  title={lang === "fr" ? "Supprimer la notification" : "Delete notification"}
-                  className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer"
+            {notifications.map((n) => {
+              const isExpanded = expandedIds.has(n.id);
+              const rawMsg = renderNotificationMessage(n, lang);
+              const isLong = rawMsg.length > 110 || rawMsg.includes("\n");
+
+              return (
+                <div
+                  key={n.id}
+                  className={`relative bg-white rounded-2xl shadow-2xs border p-3 flex flex-col gap-1 transition-all ${
+                    n.readAt ? "border-slate-200/80" : "border-emerald-600/40 bg-emerald-50/15"
+                  }`}
                 >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleClick(n)}
-                  className="text-left flex flex-col gap-0.5 pr-6 cursor-pointer"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-label-sm text-[11px] text-emerald-800 font-bold uppercase tracking-wide">
-                      {t(TYPE_KEY[n.type] ?? "notifTypeAdminBroadcast")}
-                    </span>
-                    {!n.readAt && (
-                      <span className="w-2 h-2 rounded-full bg-emerald-600 flex-shrink-0" />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      dismiss(n.id);
+                    }}
+                    aria-label={lang === "fr" ? "Supprimer la notification" : t("dismissNotification")}
+                    title={lang === "fr" ? "Supprimer la notification" : "Delete notification"}
+                    className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">close</span>
+                  </button>
+
+                  <div className="text-left flex flex-col gap-0.5 pr-6">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="font-label-sm text-[10px] text-emerald-800 font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100/70">
+                          {t(TYPE_KEY[n.type] ?? "notifTypeAdminBroadcast")}
+                        </span>
+                        {!n.readAt && (
+                          <span className="w-2 h-2 rounded-full bg-emerald-600 flex-shrink-0 animate-pulse" />
+                        )}
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono flex-shrink-0">
+                        {new Date(n.sentAt).toLocaleString("fr-FR", {
+                          day: "2-digit",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          timeZone: "Africa/Douala",
+                        })}
+                      </span>
+                    </div>
+
+                    {n.contributionLabel && (
+                      <p className="text-[11px] text-slate-800 font-bold mt-0.5">
+                        {n.contributionLabel}
+                      </p>
                     )}
+
+                    {isExpanded ? (
+                      <p className="text-xs text-slate-700 whitespace-pre-line leading-relaxed mt-1">
+                        {rawMsg}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-slate-700 line-clamp-2 leading-snug mt-1">
+                        {rawMsg.replace(/[\r\n]+/g, " ")}
+                      </p>
+                    )}
+
+                    <div className="flex items-center justify-between gap-2 mt-1.5 pt-1 border-t border-slate-100">
+                      {isLong ? (
+                        <button
+                          type="button"
+                          onClick={(e) => toggleExpand(n.id, e)}
+                          className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 cursor-pointer flex items-center gap-0.5"
+                        >
+                          <span>{isExpanded ? (lang === "fr" ? "Réduire" : "Show less") : (lang === "fr" ? "Lire la suite" : "Read more")}</span>
+                          <span className="material-symbols-outlined text-[14px]">
+                            {isExpanded ? "expand_less" : "expand_more"}
+                          </span>
+                        </button>
+                      ) : <span />}
+
+                      {n.actionUrl && (
+                        <button
+                          type="button"
+                          onClick={() => handleClick(n)}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-900 hover:bg-emerald-100 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
+                        >
+                          <span>{lang === "fr" ? "Ouvrir" : "Open"}</span>
+                          <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  {n.contributionLabel && (
-                    <p className="font-label-sm text-[11px] text-on-surface-variant font-medium">
-                      {n.contributionLabel}
-                    </p>
-                  )}
-                  <p className="font-body-sm text-xs text-on-surface whitespace-pre-wrap leading-relaxed mt-0.5">
-                    {renderNotificationMessage(n, lang)}
-                  </p>
-                  <p className="font-label-sm text-[10px] text-on-surface-variant/70 mt-1">
-                    {new Date(n.sentAt).toLocaleString("en-GB", { timeZone: "Africa/Douala" })}
-                  </p>
-                </button>
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         </>
       )}

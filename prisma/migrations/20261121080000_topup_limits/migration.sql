@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "app_settings" ADD COLUMN IF NOT EXISTS "min_topup_amount" DECIMAL(12,2) NOT NULL DEFAULT 500;
+ALTER TABLE "app_settings" ADD COLUMN IF NOT EXISTS "max_topup_amount" DECIMAL(12,2) NOT NULL DEFAULT 500000;

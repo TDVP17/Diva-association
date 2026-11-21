@@ -59,7 +59,12 @@ interface WalletClientProps {
   olderOperationsCount: number;
   initialHasPin: boolean;
   withdrawalLockRemainingHours: number;
-  withdrawalLimits: { minAmount: number; maxAmount: number };
+  withdrawalLimits: {
+    minAmount: number;
+    maxAmount: number;
+    minTopupAmount?: number;
+    maxTopupAmount?: number;
+  };
   operatorSuspension: {
     isOrangeSuspended: boolean;
     orangeSuspendedReason: string;
@@ -312,11 +317,23 @@ export function WalletClient({
     setTopUpError(null);
     setTopUpMessage(null);
 
-    if (!topUpAmount || topUpAmount < 500) {
+    const minTopup = withdrawalLimits.minTopupAmount ?? 500;
+    const maxTopup = withdrawalLimits.maxTopupAmount ?? 500000;
+
+    if (!topUpAmount || topUpAmount < minTopup) {
       setTopUpError(
         lang === "fr"
-          ? "Le montant minimum de rechargement est de 500 FCFA."
-          : "Minimum top-up amount is 500 FCFA.",
+          ? `Le montant minimum de rechargement est de ${minTopup.toLocaleString("fr-FR")} FCFA.`
+          : `Minimum top-up amount is ${minTopup.toLocaleString("en-US")} FCFA.`,
+      );
+      return;
+    }
+
+    if (topUpAmount > maxTopup) {
+      setTopUpError(
+        lang === "fr"
+          ? `Le montant maximum de rechargement est de ${maxTopup.toLocaleString("fr-FR")} FCFA par opération.`
+          : `Maximum top-up amount is ${maxTopup.toLocaleString("en-US")} FCFA per operation.`,
       );
       return;
     }
@@ -713,16 +730,30 @@ export function WalletClient({
             </p>
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 max-h-[380px] sm:max-h-[460px] overflow-y-auto overscroll-contain pr-1">
             {displayedOperations.map((op) => {
               const isCredit = op.direction === "IN";
               const isTxOpen = expandedTxId === op.id;
               const shareSummary = `${op.title} (${op.formattedAmount}) - DIVA Asso - Date: ${op.date} - Réf: ${op.txRef || op.id}`;
-              const whatsappShareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(
-                op.receiptPdfUrl
-                  ? `${shareSummary} - Reçu : ${(op.receiptPdfUrl.startsWith("http") ? op.receiptPdfUrl : `https://divaasso.com${op.receiptPdfUrl}`)}`
-                  : shareSummary
-              )}`;
+              const receiptFullUrl = op.receiptPdfUrl
+                ? (op.receiptPdfUrl.startsWith("http") ? op.receiptPdfUrl : `https://divaasso.com${op.receiptPdfUrl}`)
+                : "";
+
+              const handleShareOperation = (e: React.MouseEvent) => {
+                e.stopPropagation();
+                const shareText = receiptFullUrl ? `${shareSummary}\nReçu : ${receiptFullUrl}` : shareSummary;
+                if (typeof navigator !== "undefined" && navigator.share) {
+                  navigator
+                    .share({
+                      title: "Reçu DIVA Asso",
+                      text: shareText,
+                      ...(receiptFullUrl ? { url: receiptFullUrl } : {}),
+                    })
+                    .catch(() => {});
+                } else {
+                  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`, "_blank");
+                }
+              };
 
               return (
                 <div
@@ -828,18 +859,15 @@ export function WalletClient({
                           </a>
                         )}
 
-                        <a
-                          href={whatsappShareUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
+                          onClick={handleShareOperation}
                           aria-label="Partager"
                           title="Partager"
-                          className="w-8 h-8 rounded-xl bg-[#25D366] hover:bg-[#128C7E] text-white flex items-center justify-center transition-all active:scale-95 shadow-xs cursor-pointer"
+                          className="w-8 h-8 rounded-xl bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center transition-all active:scale-95 shadow-xs cursor-pointer"
                         >
-                          <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                            <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.275.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.045.072.045.419-.1.824zm-3.423-10.416c-5.522 0-10 4.477-10 10 0 1.884.524 3.646 1.436 5.161l-1.524 5.568 5.736-1.505c1.458.825 3.142 1.298 4.939 1.298 5.522 0 10-4.477 10-10 0-5.523-4.478-10-10-10z" />
-                          </svg>
-                        </a>
+                          <span className="material-symbols-outlined text-[18px]">share</span>
+                        </button>
                       </div>
                     </div>
                   )}
@@ -1049,7 +1077,9 @@ export function WalletClient({
                     </span>
                   </div>
                   <p className="text-[10px] text-slate-500 mt-0.5">
-                    Min : 500 FCFA · Max journalier : 500 000 FCFA · Stockage portefeuille : Illimité
+                    {lang === "fr"
+                      ? `Min : ${(withdrawalLimits.minTopupAmount ?? 500).toLocaleString("fr-FR")} FCFA · Max par recharge : ${(withdrawalLimits.maxTopupAmount ?? 500000).toLocaleString("fr-FR")} FCFA · Solde cumulable sans limite`
+                      : `Min: ${(withdrawalLimits.minTopupAmount ?? 500).toLocaleString("en-US")} FCFA · Max per top-up: ${(withdrawalLimits.maxTopupAmount ?? 500000).toLocaleString("en-US")} FCFA · Unlimited balance accumulation`}
                   </p>
                 </div>
 
@@ -1165,7 +1195,9 @@ export function WalletClient({
               <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex flex-col gap-3">
                 <p className="font-bold">Code PIN à 4 chiffres requis</p>
                 <p>
-                  Pour votre sécurité anti-piratage, vous devez définir un code PIN à 4 chiffres avant d&apos;effectuer un retrait vers MTN Mobile Money ou Orange Money.
+                  {lang === "fr"
+                    ? "Pour la sécurité de vos fonds, vous devez définir un code PIN à 4 chiffres avant d'effectuer un retrait vers MTN Mobile Money ou Orange Money."
+                    : "For the security of your funds, you must set a 4-digit PIN code before making a withdrawal to MTN Mobile Money or Orange Money."}
                 </p>
                 <button
                   type="button"

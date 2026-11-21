@@ -294,8 +294,12 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
       payerPhone: c.payerPhone || user.phone,
       txRef: c.fapshiTxRef || c.id,
       receiptPdfUrl: c.bulkPaymentId
-        ? `/api/files/bulk-${c.bulkPaymentId}-payer.pdf`
-        : c.receiptPdfUrl,
+        ? `/api/files/receipts/${user.id}/bulk-${c.bulkPaymentId}-payer.pdf`
+        : c.receiptPdfUrl?.startsWith("/")
+          ? c.receiptPdfUrl
+          : c.receiptPdfUrl
+            ? `/api/files/${c.receiptPdfUrl}`
+            : null,
     });
   }
 
@@ -327,8 +331,12 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
       payerPhone: c.payerPhone || user.phone,
       txRef: c.fapshiTxRef || c.id,
       receiptPdfUrl: c.bulkPaymentId
-        ? `/api/files/bulk-${c.bulkPaymentId}-owner.pdf`
-        : c.receiptPdfUrl,
+        ? `/api/files/receipts/${user.id}/bulk-${c.bulkPaymentId}-owner.pdf`
+        : c.receiptPdfUrl?.startsWith("/")
+          ? c.receiptPdfUrl
+          : c.receiptPdfUrl
+            ? `/api/files/${c.receiptPdfUrl}`
+            : null,
     });
   }
 
