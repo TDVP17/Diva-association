@@ -13,7 +13,7 @@ export interface BrandedEmailParams {
   recipientName?: string;
 }
 
-export const ASSO_TITLE_BADGE = "Mon Asso 🌿";
+export const ASSO_TITLE_BADGE = "Coucou mon Asso 🌿";
 
 const LEADING_GREETING_PREFIX_RE =
   /^(?:salut|bonjour|bonsoir|coucou|hello|hi|hey)(?:\s*,?\s+[^\r\n!?:—]{1,40}?)?(?:\s*👋)?\s*(?:[!?:—-]+)\s*/iu;
@@ -30,14 +30,14 @@ export function stripLeadingGreetingPrefix(text: string): string {
 }
 
 /**
- * Formats an announcement/email title with "Mon Asso 🌿 — " (no personal greeting
+ * Formats an announcement/email title with "Coucou mon Asso 🌿 — " (no personal greeting
  * and no member name), replacing any leading greeting prefix cleanly.
  */
 export function formatBroadcastTitle(rawTitle: string): string {
   const cleaned = stripLeadingGreetingPrefix(rawTitle);
   if (!cleaned) return ASSO_TITLE_BADGE;
   if (/^(?:[\p{Extended_Pictographic}\uFE0F\u200D\s]*(?:DIVA\s+)?Asso\.?\b)/iu.test(cleaned)) {
-    return cleaned.replace(/^(?:[\p{Extended_Pictographic}\uFE0F\u200D\s]*(?:DIVA\s+)?Asso\.?\s*)/iu, "Mon Asso 🌿 ");
+    return cleaned.replace(/^(?:[\p{Extended_Pictographic}\uFE0F\u200D\s]*(?:DIVA\s+)?Asso\.?\s*)/iu, "Coucou mon Asso 🌿 ");
   }
   return `${ASSO_TITLE_BADGE} — ${cleaned}`;
 }
@@ -127,11 +127,19 @@ export function renderBrandedEmailHtml(params: BrandedEmailParams): string {
     ? formatBroadcastTitle(rawTitle)
     : rawTitle || ASSO_TITLE_BADGE;
 
-  if (
-    !cleanTitle ||
-    cleanTitle.toLowerCase() === "diva asso" ||
-    cleanTitle.toLowerCase() === "diva asso."
-  ) {
+  const genericTitles = [
+    "diva asso",
+    "diva asso.",
+    "mon asso",
+    "mon asso 🌿",
+    "coucou mon asso",
+    "coucou mon asso 🌿",
+    "annonce",
+    "announcement",
+    "notification",
+  ];
+
+  if (!cleanTitle || genericTitles.includes(cleanTitle.toLowerCase().trim())) {
     cleanTitle = ASSO_TITLE_BADGE;
   }
 
@@ -236,27 +244,27 @@ export async function sendWelcomeAndAdminNotifications(params: {
       : "Welcome to the DIVA Asso Community! 🎉";
 
   const userBodyHtml = `
-    <p style="margin-top: 0;">${lang === "fr" ? `Bonjour <strong>${firstName}</strong>,` : `Hello <strong>${firstName}</strong>,`}</p>
+    <p style="margin-top: 0;">${lang === "fr" ? `Bonjour <strong>${firstName}</strong> 👋,` : `Hello <strong>${firstName}</strong> 👋,`}</p>
     <p>
       ${
         lang === "fr"
-          ? "Nous sommes ravis de vous compter parmi nous ! Votre compte DIVA Asso est désormais actif."
-          : "We are thrilled to welcome you! Your DIVA Asso account is now active."
+          ? "🎉 Nous sommes ravis de vous compter parmi nous ! Votre compte <strong>DIVA Asso</strong> est désormais actif et prêt à l'emploi ✨."
+          : "🎉 We are thrilled to welcome you! Your <strong>DIVA Asso</strong> account is now active and ready ✨."
       }
     </p>
     
-    <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 16px; margin: 20px 0; text-align: center;">
-      <p style="margin: 0 0 6px 0; font-size: 13px; color: #166534; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-        ${lang === "fr" ? "Votre Matricule de Membre Personnel" : "Your Personal Member Code"}
+    <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 18px; margin: 20px 0; text-align: center;">
+      <p style="margin: 0 0 6px 0; font-size: 13px; color: #166534; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+        🛡️ ${lang === "fr" ? "Votre Matricule de Membre Personnel" : "Your Personal Member Code"}
       </p>
       <div style="font-size: 26px; font-weight: 800; color: #003528; letter-spacing: 2px;">
         ${params.memberCode}
       </div>
-      <p style="margin: 8px 0 0 0; font-size: 12px; color: #15803d;">
-        ${
+      <p style="margin: 8px 0 0 0; font-size: 12px; color: #15803d; font-weight: 500;">
+        💡 ${
           lang === "fr"
-            ? "Partagez ce matricule si un proche souhaite cotiser pour vous."
-            : "Share this code if a relative wants to pay a contribution on your behalf."
+            ? "Partagez ce matricule si un proche souhaite cotiser pour vous en toute sécurité."
+            : "Share this code if a relative wants to pay a contribution on your behalf safely."
         }
       </p>
     </div>
@@ -264,8 +272,8 @@ export async function sendWelcomeAndAdminNotifications(params: {
     <p>
       ${
         lang === "fr"
-          ? "Sur DIVA Asso, vous pouvez rejoindre des cotisations en toute confiance, suivre les cagnottes, effectuer vos paiements sécurisés par Mobile Money / Orange Money et télécharger vos reçus officiels."
-          : "On DIVA Asso, you can join tontines safely, track pots, make secure Mobile Money / Orange Money payments, and download your official receipts."
+          ? "🤝 Sur DIVA Asso, vous pouvez rejoindre des cotisations en toute sérénité, suivre l'évolution des cagnottes 💰, effectuer vos versements par Orange Money 🟠 ou Mobile Money 🟡, et débloquer des prêts d'urgence garantis ⭐ !"
+          : "🤝 On DIVA Asso, join tontines with total confidence, track community pots 💰, pay securely via Orange Money 🟠 or Mobile Money 🟡, and unlock guaranteed emergency loans ⭐!"
       }
     </p>
   `;

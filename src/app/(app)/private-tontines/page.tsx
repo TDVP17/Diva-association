@@ -12,7 +12,7 @@ export default async function PrivateTontinesPage() {
   const userId = session.user.id;
   const lang = await getLang();
 
-  const [tontines, privateRules, creationConfig, currentUser, allPendingPrivate] = await Promise.all([
+  const [tontines, privateRules, creationConfig, currentUser, allPrivateForGuarantor] = await Promise.all([
     prisma.tontineSession.findMany({
       where: {
         isPrivate: true,
@@ -49,13 +49,16 @@ export default async function PrivateTontinesPage() {
       select: { name: true, phone: true },
     }),
     prisma.tontineSession.findMany({
-      where: { isPrivate: true, softDeletedAt: null, privateApprovalStatus: "PENDING_ADMIN" },
-      include: { creator: { select: { id: true, name: true, phone: true } } },
+      where: { isPrivate: true, softDeletedAt: null },
+      include: {
+        creator: { select: { id: true, name: true, phone: true, image: true } },
+        memberships: { select: { id: true, status: true } },
+      },
       orderBy: { startDate: "desc" },
     }),
   ]);
 
-  const pendingGuarantorRequests = allPendingPrivate
+  const pendingGuarantorRequests = allPrivateForGuarantor
     .filter((s) => {
       const cfg = (s.privateConfig as Record<string, unknown> | null) ?? {};
       return cfg.guarantorId === userId && cfg.guarantorStatus === "PENDING";
@@ -68,6 +71,31 @@ export default async function PrivateTontinesPage() {
         amount: Number(s.amount),
         creatorName: (cfg.creatorFullName as string) || s.creator?.name || "Un membre",
         creatorPhone: s.creator?.phone || "",
+        creatorPhotoUrl: (cfg.creatorPhotoUrl as string) || null,
+      };
+    });
+
+  const acceptedGuaranteedEngagements = allPrivateForGuarantor
+    .filter((s) => {
+      const cfg = (s.privateConfig as Record<string, unknown> | null) ?? {};
+      return cfg.guarantorId === userId && cfg.guarantorStatus === "ACCEPTED";
+    })
+    .map((s) => {
+      const cfg = (s.privateConfig as Record<string, unknown> | null) ?? {};
+      return {
+        sessionId: s.id,
+        sessionTitle: s.title || "Cotisation privée",
+        amount: Number(s.amount),
+        frequency: s.type,
+        creatorId: s.creatorId,
+        creatorName: (cfg.creatorFullName as string) || s.creator?.name || "Membre cautionné",
+        creatorPhone: s.creator?.phone || "",
+        creatorPhotoUrl: (cfg.creatorPhotoUrl as string) || null,
+        creatorIdDocUrl: (cfg.creatorIdDocUrl as string) || null,
+        privateApprovalStatus: s.privateApprovalStatus,
+        sessionStatus: s.status,
+        guarantorRespondedAt: (cfg.guarantorRespondedAt as string) || null,
+        approvedMembersCount: s.memberships?.filter((m) => m.status === "APPROVED").length ?? 0,
       };
     });
 
@@ -92,7 +120,7 @@ export default async function PrivateTontinesPage() {
       privateAdditionalFeePayoutPct: t.privateAdditionalFeePayoutPct ?? 100,
       privatePenaltyBeneficiaryPct: t.privatePenaltyBeneficiaryPct ?? 100,
       parentSessionId: t.parentSessionId ?? null,
-      privateConfig: (t.privateConfig as { selectedActions?: string[] } | null) ?? null,
+      privateConfig: (t.privateConfig as PrivateTontineItem["privateConfig"]) ?? null,
       startDate: t.startDate.toISOString(),
       limitTime: t.limitTime,
       maxSlots: t.maxSlots ? Number(t.maxSlots) : null,
@@ -148,6 +176,7 @@ export default async function PrivateTontinesPage() {
       currentUserId={userId}
       currentUserName={currentUser?.name || ""}
       initialGuarantorRequests={pendingGuarantorRequests}
+      initialGuaranteedEngagements={acceptedGuaranteedEngagements}
     />
   );
 }

@@ -77,19 +77,19 @@ export async function PATCH(
       }).catch((err) => console.error("[admin/private-tontines] notify creator error:", err));
 
       if (tontine.creator.email) {
-        const subject = `Cotisation privée validée : ${tontine.title || "DIVA Asso"}`;
+        const subject = `✨ Cotisation privée validée : ${tontine.title || "DIVA Asso"} 🎉`;
         const text = [
-          `Bonjour ${tontine.creator.name},`,
+          `Bonjour ${tontine.creator.name} 👋,`,
           "",
-          `Votre cotisation privée « ${tontine.title || "Cotisation privée"} » a été approuvée par l'administration DIVA Asso.`,
+          `🎉 Excellente nouvelle ! Votre cotisation privée « ${tontine.title || "Cotisation privée"} » a été officiellement approuvée par l'administration DIVA Asso 🤝.`,
           "",
-          `Votre lien d'invitation sécurisé est désormais disponible :`,
+          `🔗 Votre lien d'invitation sécurisé est désormais disponible et actif :`,
           inviteUrl,
           "",
-          `Rappel : chaque personne invitée devra posséder un compte DIVA Asso avant de pouvoir intégrer votre cotisation privée.`,
+          `💡 Rappel : chaque participant invité devra créer ou posséder un compte sur DIVA Asso avant de pouvoir intégrer votre cercle privé 🛡️.`,
           "",
           `Cordialement,`,
-          `L'équipe DIVA Asso.`,
+          `L'équipe DIVA Asso 🌿.`,
         ].join("\n");
         const html = renderBrandedEmailHtml({
           title: subject,
@@ -144,15 +144,17 @@ export async function PATCH(
     }).catch((err) => console.error("[admin/private-tontines] notify reject error:", err));
 
     if (tontine.creator.email) {
-      const subject = `Demande de cotisation privée refusée : ${tontine.title || "DIVA Asso"}`;
+      const subject = `⚠️ Demande de cotisation privée refusée : ${tontine.title || "DIVA Asso"}`;
       const text = [
-        `Bonjour ${tontine.creator.name},`,
+        `Bonjour ${tontine.creator.name} 👋,`,
         "",
-        `Votre demande de création de cotisation privée « ${tontine.title || "Cotisation privée"} » a été refusée par DIVA Asso.`,
-        `Motif : ${reason}`,
+        `Votre demande de création de cotisation privée « ${tontine.title || "Cotisation privée"} » n'a pas été retenue par l'administration DIVA Asso ⚠️.`,
+        `📋 Motif indiqué : ${reason}`,
+        "",
+        `N'hésitez pas à corriger les éléments indiqués ou à contacter l'équipe pour plus d'informations 🤝.`,
         "",
         `Cordialement,`,
-        `L'équipe DIVA Asso.`,
+        `L'équipe DIVA Asso 🌿.`,
       ].join("\n");
       const html = renderBrandedEmailHtml({
         title: subject,

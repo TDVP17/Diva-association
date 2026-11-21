@@ -97,15 +97,15 @@ export async function awardStarsForCompletedSession(
 
         if (m.user.email) {
           const emailSubject = unlockedLoan
-            ? "⭐ Félicitations ! Vous avez débloqué l'accès aux Prêts d'Urgence DIVA Asso !"
-            : "⭐ +1 Étoile de confiance remportée sur DIVA Asso !";
+            ? "⭐ Félicitations ! Vous avez débloqué l'accès aux Prêts d'Urgence DIVA Asso ! 🎉"
+            : "⭐ +1 Étoile de confiance remportée sur DIVA Asso ! 👏";
 
           const bodyText = [
-            `Vous avez terminé l'ensemble du cycle de la cotisation publique ${session.title} avec une assiduité exemplaire, sans jamais avoir reçu la moindre amende.`,
-            `Votre score de confiance a été revalorisé : ${currentStars}/5 ➜ ${nextStars}/5 étoiles ⭐.`,
+            `🎉 Félicitations ! Vous avez complété avec succès l'ensemble du cycle de la cotisation « ${session.title} » sans jamais recevoir la moindre amende 👏.`,
+            `⭐ Votre score de confiance a été revalorisé : ${currentStars}/5 ➜ ${nextStars}/5 étoiles ✨.`,
             unlockedLoan
-              ? `Vous avez désormais atteint le palier de 4 étoiles minimum requis ! Vous pouvez à présent solliciter des prêts d'urgence garantis par votre épargne active sur DIVA Asso.`
-              : `Continuez vos cotisations sans amende pour atteindre le palier de 4 étoiles et devenir éligible aux prêts d'urgence.`,
+              ? `🚀 Vous avez atteint le palier clé de 4 étoiles ! Vous pouvez désormais solliciter des prêts d'urgence garantis par DIVA Asso en toute sérénité 🛡️.`
+              : `💪 Continuez sur cette belle lancée : dès 4 étoiles, vous serez immédiatement éligible aux prêts d'urgence sécurisés DIVA Asso 🌿.`,
           ].join("\n\n");
 
           const emailHtml = renderBrandedEmailHtml({

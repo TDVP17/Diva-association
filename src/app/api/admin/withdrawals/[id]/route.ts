@@ -267,11 +267,11 @@ export async function PATCH(
 
   if (withdrawal.user.email) {
     const html = renderBrandedEmailHtml({
-      title: lang === "fr" ? "Retrait validé et viré ✅" : "Withdrawal Approved & Sent ✅",
+      title: lang === "fr" ? "💰 Retrait validé et viré avec succès ! ✨" : "💰 Withdrawal Approved & Disbursed! ✨",
       bodyText:
         lang === "fr"
-          ? `Bonjour ${withdrawal.user.name},\n\nVotre retrait de ${formatXAF(amount)} vers votre numéro ${withdrawal.provider} ${withdrawal.phone} (${withdrawal.accountName}) a été approuvé et exécuté sans frais.\nRéférence : ${fapshiTransId}.`
-          : `Hello ${withdrawal.user.name},\n\nYour withdrawal of ${formatXAF(amount)} to ${withdrawal.provider} ${withdrawal.phone} (${withdrawal.accountName}) has been approved and sent with 0% fees.\nReference: ${fapshiTransId}.`,
+          ? `Bonjour ${withdrawal.user.name} 👋,\n\n🎉 Votre demande de retrait de ${formatXAF(amount)} vers votre numéro ${withdrawal.provider} ${withdrawal.phone} (${withdrawal.accountName}) a été approuvée et transférée avec 0% de frais 💸 !\n\n🛡️ Référence officielle : ${fapshiTransId}.`
+          : `Hello ${withdrawal.user.name} 👋,\n\n🎉 Your withdrawal request of ${formatXAF(amount)} to your ${withdrawal.provider} number ${withdrawal.phone} (${withdrawal.accountName}) has been approved and sent with 0% fees 💸!\n\n🛡️ Official Reference: ${fapshiTransId}.`,
       actionUrl: "/wallet",
       actionLabel: lang === "fr" ? "Voir mon portefeuille" : "View My Wallet",
       lang,
@@ -279,8 +279,8 @@ export async function PATCH(
     await sendEmailSafe(
       withdrawal.user.email,
       lang === "fr"
-        ? `DIVA Asso — Retrait de ${formatXAF(amount)} viré !`
-        : `DIVA Asso — Withdrawal of ${formatXAF(amount)} Sent!`,
+        ? `💰 DIVA Asso — Retrait de ${formatXAF(amount)} viré ! ✨`
+        : `💰 DIVA Asso — Withdrawal of ${formatXAF(amount)} Sent! ✨`,
       html,
     ).catch(() => {});
   }

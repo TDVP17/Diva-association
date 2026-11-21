@@ -74,11 +74,11 @@ export async function POST(
     const creatorMessage =
       decision === "ACCEPT"
         ? (creatorLang === "fr"
-            ? `${guarantorUser?.name || "Votre garant"} a accepté votre demande de cautionnement pour « ${tontine.title} ». Votre dossier est désormais transmis à l'administrateur DIVA Asso pour validation finale.`
-            : `${guarantorUser?.name || "Your guarantor"} accepted your guarantee request for "${tontine.title}". Your application is now with the DIVA Asso admin for final validation.`)
+            ? `🤝 ${guarantorUser?.name || "Votre garant"} a accepté de vous cautionner pour « ${tontine.title} » 🎉 ! Votre dossier est désormais transmis à l'administration DIVA Asso pour validation finale 🛡️.`
+            : `🤝 ${guarantorUser?.name || "Your guarantor"} accepted to guarantee you for "${tontine.title}" 🎉! Your application is now with DIVA Asso admin for final validation 🛡️.`)
         : (creatorLang === "fr"
-            ? `${guarantorUser?.name || "Votre garant"} a décliné votre demande de cautionnement pour « ${tontine.title} ».`
-            : `${guarantorUser?.name || "Your guarantor"} declined your guarantee request for "${tontine.title}".`);
+            ? `⚠️ ${guarantorUser?.name || "Votre garant"} a décliné votre demande de cautionnement pour « ${tontine.title} ». Vous pouvez sélectionner un autre garant 🤝.`
+            : `⚠️ ${guarantorUser?.name || "Your guarantor"} declined your guarantee request for "${tontine.title}". You may select another guarantor 🤝.`);
 
     await scheduleInAppNotifications({
       tontineSessionId: tontine.id,
@@ -95,8 +95,8 @@ export async function POST(
     if (tontine.creator.email) {
       const emailTitle =
         decision === "ACCEPT"
-          ? (creatorLang === "fr" ? "Garant validé pour votre cotisation privée ! 🌿" : "Guarantor confirmed for your private tontine! 🌿")
-          : (creatorLang === "fr" ? "Réponse à votre demande de garant" : "Update on your guarantor request");
+          ? (creatorLang === "fr" ? "🤝 Cautionnement validé par votre garant ! 🎉" : "🤝 Guarantee confirmed by your guarantor! 🎉")
+          : (creatorLang === "fr" ? "⚠️ Réponse à votre demande de garant" : "⚠️ Update on your guarantor request");
 
       const emailHtml = renderBrandedEmailHtml({
         title: emailTitle,

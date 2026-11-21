@@ -419,8 +419,8 @@ export async function POST(request: Request) {
   const gLang = guarantorUser.preferredLang === "en" ? "en" : "fr";
   const guarantorMsg =
     gLang === "fr"
-      ? `${data.creatorFullName} souhaite créer la cotisation privée « ${created.title} » et vous a désigné(e) comme garant. En tant que membre d'une cotisation publique DIVA Asso, acceptez-vous de vous porter garant en cas de défaillance ?`
-      : `${data.creatorFullName} wishes to create the private tontine "${created.title}" and designated you as guarantor. Do you accept to guarantee this cotisation?`;
+      ? `🤝 ${data.creatorFullName} souhaite créer la cotisation privée « ${created.title} » 💰 et vous a désigné(e) comme garant 🛡️. En tant que membre d'une cotisation publique DIVA Asso, acceptez-vous de vous porter garant en cas de défaillance ?`
+      : `🤝 ${data.creatorFullName} wishes to create the private tontine "${created.title}" 💰 and designated you as guarantor 🛡️. As a public member of DIVA Asso, do you accept to guarantee this cotisation?`;
 
   await scheduleInAppNotifications({
     tontineSessionId: created.id,
@@ -437,8 +437,8 @@ export async function POST(request: Request) {
   if (guarantorUser.email) {
     const gTitle =
       gLang === "fr"
-        ? "Demande de cautionnement — Cotisation privée DIVA Asso"
-        : "Guarantee Request — DIVA Asso";
+        ? "🤝 Demande de cautionnement — Cotisation privée DIVA Asso 🛡️"
+        : "🤝 Guarantee Request — Private Tontine DIVA Asso 🛡️";
     const gHtml = renderBrandedEmailHtml({
       title: gTitle,
       bodyText: guarantorMsg,
