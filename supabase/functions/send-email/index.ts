@@ -45,7 +45,38 @@ function htmlToPlainText(html: string): string {
     .trim();
 }
 
-const ASSO_TITLE_BADGE = "Asso 🌿";
+const ASSO_TITLE_BADGE = "Coucou mon Asso 🌿";
+
+function enrichWithEmailEmojis(text: string): string {
+  if (!text) return "";
+  let enriched = text;
+
+  const replacements: Array<[RegExp, string]> = [
+    [/\b(cotisation|cotisations)\b(?!\s*[\p{Extended_Pictographic}])/giu, "$1 💳"],
+    [/\b(portefeuille|wallet)\b(?!\s*[\p{Extended_Pictographic}])/giu, "$1 💼"],
+    [/\b(amende|amendes)\b(?!\s*[\p{Extended_Pictographic}])/giu, "$1 ⚠️"],
+    [/\b(prêt|prêts|loan|loans)\b(?!\s*[\p{Extended_Pictographic}])/giu, "$1 🤝"],
+    [/\b(retrait|retraits|withdrawal)\b(?!\s*[\p{Extended_Pictographic}])/giu, "$1 💸"],
+    [/\b(tontine|tontines)\b(?!\s*[\p{Extended_Pictographic}])/giu, "$1 👥"],
+    [/\b(cagnotte|cagnottes)\b(?!\s*[\p{Extended_Pictographic}])/giu, "$1 💰"],
+    [/\b(Orange Money)\b(?!\s*[\p{Extended_Pictographic}])/giu, "$1 🟠"],
+    [/\b(MTN|Mobile Money|MoMo)\b(?!\s*[\p{Extended_Pictographic}])/giu, "$1 🟡"],
+    [/\b(validé|validée|approuvé|approuvée|succès|success)\b(?!\s*[\p{Extended_Pictographic}])/giu, "$1 ✅"],
+    [/\b(archivée\/supprimée|archivée|supprimée)\b(?!\s*[\p{Extended_Pictographic}])/giu, "$1 📁"],
+    [/\b(sécurité|code secret|code pin)\b(?!\s*[\p{Extended_Pictographic}])/giu, "$1 🔒"],
+    [/\b(rappel|urgent)\b(?!\s*[\p{Extended_Pictographic}])/giu, "$1 ⏰"],
+    [/\b(bienvenue|welcome|félicitations)\b(?!\s*[\p{Extended_Pictographic}])/giu, "$1 🎉"],
+    [/\b(merci)\b(?!\s*[\p{Extended_Pictographic}])/giu, "$1 🙏"],
+  ];
+
+  for (const [pattern, replacement] of replacements) {
+    enriched = enriched.replace(pattern, replacement);
+  }
+
+  enriched = enriched.replace(/([\p{Extended_Pictographic}])\s*\1+/gu, "$1");
+
+  return enriched;
+}
 
 const LEADING_GREETING_PREFIX_RE =
   /^(?:salut|bonjour|bonsoir|coucou|hello|hi|hey)(?:\s*,?\s+[^\r\n!?:—]{1,40}?)?(?:\s*👋)?\s*(?:[!?:—-]+)\s*/iu;
@@ -63,8 +94,8 @@ function stripLeadingGreetingPrefix(text: string): string {
 function formatBroadcastTitle(rawTitle: string): string {
   const cleaned = stripLeadingGreetingPrefix(rawTitle);
   if (!cleaned) return ASSO_TITLE_BADGE;
-  if (/^(?:[\p{Extended_Pictographic}\uFE0F\u200D\s]*(?:DIVA\s+)?Asso\b)/iu.test(cleaned)) {
-    return cleaned;
+  if (/^(?:[\p{Extended_Pictographic}\uFE0F\u200D\s]*(?:DIVA\s+)?Asso\.?\b)/iu.test(cleaned)) {
+    return cleaned.replace(/^(?:[\p{Extended_Pictographic}\uFE0F\u200D\s]*(?:DIVA\s+)?Asso\.?\s*)/iu, "Coucou mon Asso 🌿 ");
   }
   return `${ASSO_TITLE_BADGE} — ${cleaned}`;
 }
@@ -125,13 +156,33 @@ function renderBrandedEmailHtml(params: BrandedEmailParams): string {
   };
 
   const rawTitle = (params.title || "").trim();
-  const cleanTitle = LEADING_GREETING_PREFIX_RE.test(rawTitle)
+  let cleanTitle = LEADING_GREETING_PREFIX_RE.test(rawTitle)
     ? formatBroadcastTitle(rawTitle)
     : rawTitle || ASSO_TITLE_BADGE;
 
+  const genericTitles = [
+    "diva asso",
+    "diva asso.",
+    "mon asso",
+    "mon asso 🌿",
+    "coucou mon asso",
+    "coucou mon asso 🌿",
+    "annonce",
+    "announcement",
+    "notification",
+  ];
+
+  if (
+    !cleanTitle ||
+    genericTitles.includes(cleanTitle.toLowerCase().trim()) ||
+    /^(?:[\p{Extended_Pictographic}\uFE0F\u200D\s]*(?:DIVA\s+)?Asso\.?\s*)$/iu.test(cleanTitle)
+  ) {
+    cleanTitle = ASSO_TITLE_BADGE;
+  }
+
   let content = "";
   if (params.bodyHtml) {
-    const cleanHtml = sanitizeEmailBody(params.bodyHtml);
+    const cleanHtml = enrichWithEmailEmojis(sanitizeEmailBody(params.bodyHtml));
     const htmlHeadText = cleanHtml
       .replace(/<[^>]+>/g, "\n")
       .split(/\r?\n/)
@@ -142,7 +193,7 @@ function renderBrandedEmailHtml(params: BrandedEmailParams): string {
     content = hasOpeningGreeting(htmlHeadText) ? cleanHtml : `${greetingHtml}${cleanHtml}`;
   } else {
     const rawText = params.bodyText || "";
-    const cleanText = sanitizeEmailBody(rawText).trim();
+    const cleanText = enrichWithEmailEmojis(sanitizeEmailBody(rawText).trim());
     const standaloneGreetingMatch = cleanText.match(STANDALONE_GREETING_LINE_RE);
 
     if (standaloneGreetingMatch) {
@@ -370,7 +421,7 @@ Deno.serve(async (req: Request) => {
       }
 
       const lang = user.preferredLang === "en" ? "en" : "fr";
-      let subject = "DIVA Asso";
+      let subject = ASSO_TITLE_BADGE;
       let bodyText = notif.message || "";
 
       if (notif.type === "ADMIN_BROADCAST") {
