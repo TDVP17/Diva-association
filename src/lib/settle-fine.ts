@@ -7,6 +7,7 @@ import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { formatXAF } from "@/lib/format-currency";
 import { creditWalletTx } from "@/lib/wallet-ledger";
 import { calculatePenaltySplit } from "@/lib/private-tontine-finance";
+import { getCycleDateForRound, toDueDateKey } from "@/lib/tontine-engine";
 
 import { TONTINE_TYPE_LABELS as TONTINE_LABELS } from "@/lib/tontine-labels";
 
@@ -52,6 +53,9 @@ export async function creditLateBeneficiaryWithHalfFine(params: {
     const sessionRow = await prisma.tontineSession.findUnique({
       where: { id: params.tontineSessionId },
       select: {
+        id: true,
+        type: true,
+        startDate: true,
         isPrivate: true,
         creatorId: true,
         privatePenaltyBeneficiaryPct: true,
@@ -65,11 +69,13 @@ export async function creditLateBeneficiaryWithHalfFine(params: {
     const split = calculatePenaltySplit(params.fineAmount, beneficiaryPct);
 
     // 1. Chercher le payout prévu ou déjà créé pour cette échéance (dueDate)
-    const cyclePayout = await prisma.payout.findUnique({
+    const normalizedDueDate = toDueDateKey(new Date(params.dueDate));
+    const cyclePayout = await prisma.payout.findFirst({
       where: {
-        tontineSessionId_dueDate: {
-          tontineSessionId: params.tontineSessionId,
-          dueDate: params.dueDate,
+        tontineSessionId: params.tontineSessionId,
+        dueDate: {
+          gte: new Date(normalizedDueDate.getTime() - 12 * 3600 * 1000),
+          lte: new Date(normalizedDueDate.getTime() + 36 * 3600 * 1000),
         },
       },
       include: {
@@ -85,7 +91,35 @@ export async function creditLateBeneficiaryWithHalfFine(params: {
 
     let targetUser = cyclePayout?.membershipSlot?.membership?.user;
 
-    // 2. Si pas de payout pour cette date, chercher le membre dont c'est le tour
+    // 2. Si pas de payout pour cette date, calculer le round exact correspondant à dueDate
+    if (!targetUser && sessionRow?.startDate && sessionRow.type) {
+      for (let r = 1; r <= 100; r++) {
+        try {
+          const rDate = getCycleDateForRound(sessionRow.type, sessionRow.startDate, r);
+          if (toDueDateKey(rDate).getTime() === normalizedDueDate.getTime()) {
+            const slotForRound = await prisma.membershipSlot.findFirst({
+              where: {
+                membership: { tontineSessionId: params.tontineSessionId },
+                officialPosition: r,
+              },
+              include: {
+                membership: {
+                  include: { user: true },
+                },
+              },
+            });
+            if (slotForRound?.membership?.user) {
+              targetUser = slotForRound.membership.user;
+            }
+            break;
+          }
+        } catch {
+          break;
+        }
+      }
+    }
+
+    // 3. Fallback : premier slot en attente de payout ordonné par position officielle
     if (!targetUser) {
       const designatedSlot = await prisma.membershipSlot.findFirst({
         where: {
@@ -103,7 +137,23 @@ export async function creditLateBeneficiaryWithHalfFine(params: {
       targetUser = designatedSlot?.membership?.user;
     }
 
-    // 3. Créditer atomiquement le bénéficiaire retardé (et le créateur pour le solde en cotisation privée)
+    const dueDateObj = new Date(params.dueDate);
+    const dueDateFormattedFr = new Intl.DateTimeFormat("fr-FR", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: "Africa/Douala",
+    }).format(dueDateObj);
+    const dueDateFormattedEn = new Intl.DateTimeFormat("en-GB", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: "Africa/Douala",
+    }).format(dueDateObj);
+
+    // 4. Créditer atomiquement le bénéficiaire retardé (et le créateur pour le solde en cotisation privée)
     await prisma.$transaction(async (tx) => {
       if (targetUser && split.toDelayedBeneficiary > 0) {
         await creditWalletTx(tx, {
@@ -111,11 +161,12 @@ export async function creditLateBeneficiaryWithHalfFine(params: {
           amount: split.toDelayedBeneficiary,
           fee: 0,
           type: "PAYOUT",
-          description: `Part ${split.beneficiaryPercentage}% amende de retard (+${formatXAF(split.toDelayedBeneficiary)}) suite au retard de ${params.finePayerName} · ${params.sessionTitle}`,
+          description: `Indemnité de retard (+${formatXAF(split.toDelayedBeneficiary)}) : ${split.beneficiaryPercentage}% amende payée par ${params.finePayerName} pour votre tour du ${dueDateFormattedFr} · ${params.sessionTitle}`,
           metadata: {
             fineId: params.fineId ?? null,
             tontineSessionId: params.tontineSessionId,
             role: "delayed_beneficiary",
+            dueDate: params.dueDate instanceof Date ? params.dueDate.toISOString() : params.dueDate,
           },
         });
       }
@@ -130,23 +181,25 @@ export async function creditLateBeneficiaryWithHalfFine(params: {
           amount: split.toRemainingRecipient,
           fee: 0,
           type: "PAYOUT",
-          description: `Part gestionnaire (${100 - split.beneficiaryPercentage}%) amende payée par ${params.finePayerName} · ${params.sessionTitle}`,
+          description: `Part gestionnaire (${100 - split.beneficiaryPercentage}%) amende payée par ${params.finePayerName} pour l'échéance du ${dueDateFormattedFr} · ${params.sessionTitle}`,
           metadata: {
             fineId: params.fineId ?? null,
             tontineSessionId: params.tontineSessionId,
             role: "private_creator_penalty_share",
+            dueDate: params.dueDate instanceof Date ? params.dueDate.toISOString() : params.dueDate,
           },
         });
       }
     });
 
-    // 4. Notifier les bénéficiaires APRÈS crédit réussi
+    // 5. Notifier les bénéficiaires APRÈS crédit réussi
     if (targetUser && split.toDelayedBeneficiary > 0) {
       const benLang = targetUser.preferredLang === "en" ? "en" : "fr";
+      const dueDateLabel = benLang === "fr" ? dueDateFormattedFr : dueDateFormattedEn;
       const notifMsg =
         benLang === "fr"
-          ? `Vous avez reçu ${formatXAF(split.toDelayedBeneficiary)} (${split.beneficiaryPercentage}% de l'amende de retard payée) crédités dans votre Portefeuille DIVA Asso suite au retard de cotisation dans ${params.sessionTitle}.`
-          : `You received ${formatXAF(split.toDelayedBeneficiary)} (${split.beneficiaryPercentage}% late fine share) credited to your DIVA Asso Wallet for ${params.sessionTitle}.`;
+          ? `🌿 Bonne nouvelle ! Vous avez reçu ${formatXAF(split.toDelayedBeneficiary)} (${split.beneficiaryPercentage}% d'amende de retard payée par ${params.finePayerName}) disponible sur votre Portefeuille DIVA Asso suite au retard sur votre tour de cotisation du ${dueDateLabel} (« ${params.sessionTitle} »).`
+          : `🌿 Great news! You received ${formatXAF(split.toDelayedBeneficiary)} (${split.beneficiaryPercentage}% late fine compensation paid by ${params.finePayerName}) in your DIVA Asso Wallet for your cotisation turn on ${dueDateLabel} (« ${params.sessionTitle} »).`;
 
       await scheduleInAppNotifications({
         tontineSessionId: params.tontineSessionId,
@@ -163,8 +216,8 @@ export async function creditLateBeneficiaryWithHalfFine(params: {
       if (targetUser.email) {
         const emailTitle =
           benLang === "fr"
-            ? "Indemnité de retard reçue sur votre Portefeuille ! 🌿💰"
-            : "Late fine compensation credited to your Wallet! 🌿💰";
+            ? `🌿 Indemnité de retard de ${formatXAF(split.toDelayedBeneficiary)} reçue sur votre Portefeuille !`
+            : `🌿 Late fine compensation of ${formatXAF(split.toDelayedBeneficiary)} credited to your Wallet!`;
         const emailHtml = renderBrandedEmailHtml({
           title: emailTitle,
           bodyText: notifMsg,
