@@ -152,7 +152,10 @@ export interface EligibleGuarantor {
   id: string;
   name: string;
   phone: string | null;
+  email?: string | null;
   publicSessionTitle: string;
+  stars?: number;
+  avatar?: string | null;
 }
 
 export function PrivateTontinesClient({
@@ -205,8 +208,11 @@ export function PrivateTontinesClient({
   const [creatorIdDocUrl, setCreatorIdDocUrl] = useState("");
   const [creatorIdDocUploading, setCreatorIdDocUploading] = useState(false);
   const [guarantorId, setGuarantorId] = useState("");
+  const [guarantorQuery, setGuarantorQuery] = useState("");
+  const [selectedGuarantor, setSelectedGuarantor] = useState<EligibleGuarantor | null>(null);
   const [eligibleGuarantors, setEligibleGuarantors] = useState<EligibleGuarantor[]>([]);
   const [loadingGuarantors, setLoadingGuarantors] = useState(false);
+  const [guarantorSearched, setGuarantorSearched] = useState(false);
 
   // Transfer ownership modal state
   const [transferTontineId, setTransferTontineId] = useState<string | null>(null);
@@ -290,16 +296,49 @@ export function PrivateTontinesClient({
     setEditMaxSlots(t.maxSlots ? String(t.maxSlots) : "");
   }
 
-  // Load eligible guarantors from public sessions
+  // Debounce search eligible guarantors from public sessions
   useEffect(() => {
-    if (!showCreate) return;
+    const trimmed = guarantorQuery.trim();
+    if (trimmed.length < 2) {
+      setEligibleGuarantors([]);
+      setGuarantorSearched(false);
+      setLoadingGuarantors(false);
+      return;
+    }
     setLoadingGuarantors(true);
-    fetch("/api/private-tontines/eligible-guarantors")
-      .then((r) => r.json())
-      .then((d) => setEligibleGuarantors(d.guarantors || []))
-      .catch(() => {})
-      .finally(() => setLoadingGuarantors(false));
-  }, [showCreate]);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/private-tontines/eligible-guarantors?q=${encodeURIComponent(trimmed)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setEligibleGuarantors(data.guarantors || []);
+          setGuarantorSearched(true);
+        }
+      } catch {
+        // ignore
+      } finally {
+        setLoadingGuarantors(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [guarantorQuery]);
+
+  function handleSelectGuarantor(g: EligibleGuarantor) {
+    setSelectedGuarantor(g);
+    setGuarantorId(g.id);
+    setGuarantorQuery("");
+    setEligibleGuarantors([]);
+    setGuarantorSearched(false);
+  }
+
+  function handleResetGuarantor() {
+    setSelectedGuarantor(null);
+    setGuarantorId("");
+    setGuarantorQuery("");
+    setEligibleGuarantors([]);
+    setGuarantorSearched(false);
+  }
 
   async function handleFileUpload(file: File, type: "photo" | "id_doc") {
     const formData = new FormData();
@@ -465,6 +504,10 @@ export function PrivateTontinesClient({
       setCreatorPhotoUrl("");
       setCreatorIdDocUrl("");
       setGuarantorId("");
+      setSelectedGuarantor(null);
+      setGuarantorQuery("");
+      setEligibleGuarantors([]);
+      setGuarantorSearched(false);
       setRulesAccepted(false);
       setFeedback(
         data.message ||
@@ -820,29 +863,120 @@ export function PrivateTontinesClient({
 
                 <div className="sm:col-span-2 pt-2 border-t border-emerald-200">
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Désignation du garant (Membre en cotisation publique DIVA Asso) *
+                    {lang === "fr" ? "Qui est votre Garant ? *" : "Who is your Guarantor? *"}
                   </label>
-                  {loadingGuarantors ? (
-                    <p className="text-xs text-slate-500 flex items-center gap-1.5">
-                      <LoadingSpinner /> Recherche des membres éligibles...
-                    </p>
+
+                  {selectedGuarantor ? (
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-50 border-2 border-emerald-600 text-slate-800">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-full bg-emerald-700 text-white font-bold flex items-center justify-center text-sm flex-shrink-0 shadow-sm">
+                          {selectedGuarantor.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-xs text-slate-900 truncate">
+                              {selectedGuarantor.name}
+                            </span>
+                            <span className="text-[10px] bg-amber-100 text-amber-900 font-extrabold px-1.5 py-0.5 rounded-full flex-shrink-0">
+                              ⭐ {selectedGuarantor.stars ?? 5}/5
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-emerald-800 font-medium truncate">
+                            {lang === "fr" ? "Cotisation publique :" : "Public cotisation:"}{" "}
+                            {selectedGuarantor.publicSessionTitle}
+                          </p>
+                          {selectedGuarantor.email && (
+                            <p className="text-[10px] text-slate-500 truncate">{selectedGuarantor.email}</p>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleResetGuarantor}
+                        className="px-3 py-1.5 text-xs font-bold text-slate-700 hover:text-red-700 hover:bg-white rounded-lg border border-slate-300 transition-colors flex-shrink-0 ml-2"
+                      >
+                        {lang === "fr" ? "Changer" : "Change"}
+                      </button>
+                    </div>
                   ) : (
-                    <select
-                      value={guarantorId}
-                      onChange={(e) => setGuarantorId(e.target.value)}
-                      className="w-full border-2 border-emerald-600 rounded-xl px-3 py-2 text-xs font-semibold bg-white"
-                      required
-                    >
-                      <option value="">-- Choisir un membre garant --</option>
-                      {eligibleGuarantors.map((g) => (
-                        <option key={g.id} value={g.id}>
-                          {g.name} {g.phone ? `(${g.phone})` : ""} — Cotisation publique : {g.publicSessionTitle}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex flex-col gap-2">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={guarantorQuery}
+                          onChange={(e) => setGuarantorQuery(e.target.value)}
+                          placeholder={
+                            lang === "fr"
+                              ? "Entrez le nom ou l'e-mail de votre garant..."
+                              : "Enter your guarantor's name or email..."
+                          }
+                          className="w-full border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-xs font-semibold bg-white pr-9 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                        <div className="absolute right-3 top-2.5 text-slate-400">
+                          {loadingGuarantors ? (
+                            <LoadingSpinner />
+                          ) : (
+                            <span className="material-symbols-outlined text-[18px]">search</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {guarantorQuery.trim().length > 0 && guarantorQuery.trim().length < 2 && (
+                        <p className="text-[10px] text-slate-500">
+                          {lang === "fr"
+                            ? "Tapez au moins 2 caractères pour rechercher..."
+                            : "Type at least 2 characters to search..."}
+                        </p>
+                      )}
+
+                      {guarantorSearched && !loadingGuarantors && eligibleGuarantors.length === 0 && (
+                        <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 leading-relaxed">
+                          {lang === "fr"
+                            ? "Aucun membre trouvé dans une cotisation publique active avec ce nom ou cet e-mail. Vérifiez l'orthographe ou demandez son adresse e-mail exacte enregistrée sur DIVA Asso."
+                            : "No member found in an active public cotisation with this name or email. Please check spelling or verify their registered email on DIVA Asso."}
+                        </div>
+                      )}
+
+                      {eligibleGuarantors.length > 0 && (
+                        <div className="flex flex-col gap-1.5 max-h-56 overflow-y-auto rounded-xl border-2 border-emerald-300 bg-white p-1.5 shadow-md">
+                          {eligibleGuarantors.map((g) => (
+                            <button
+                              key={g.id}
+                              type="button"
+                              onClick={() => handleSelectGuarantor(g)}
+                              className="w-full text-left p-2.5 rounded-lg hover:bg-emerald-50 transition-colors flex items-center justify-between gap-2 border border-transparent hover:border-emerald-300 cursor-pointer"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs flex-shrink-0">
+                                  {g.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-bold text-xs text-slate-900 truncate">{g.name}</span>
+                                    <span className="text-[10px] bg-amber-100 text-amber-800 font-extrabold px-1.5 py-0.2 rounded-full">
+                                      ⭐ {g.stars ?? 5}/5
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-emerald-700 font-medium truncate">
+                                    {lang === "fr" ? "Cotisation :" : "Cotisation:"} {g.publicSessionTitle}
+                                  </p>
+                                  {g.email && <p className="text-[10px] text-slate-400 truncate">{g.email}</p>}
+                                </div>
+                              </div>
+                              <span className="text-xs font-bold text-white bg-emerald-700 px-2.5 py-1 rounded-md flex-shrink-0 shadow-xs">
+                                {lang === "fr" ? "Sélectionner" : "Select"}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
-                  <span className="text-[10px] text-slate-500 mt-1 block leading-relaxed">
-                    Le garant doit figurer dans une cotisation publique active. Dès soumission, il recevra une notification pour accepter ou refuser de cautionner votre cotisation.
+
+                  <span className="text-[10px] text-slate-500 mt-1.5 block leading-relaxed">
+                    {lang === "fr"
+                      ? "Dès soumission, votre garant recevra une alerte pour accepter ou refuser de cautionner votre cotisation."
+                      : "Upon submission, your guarantor will receive an alert to accept or decline."}
                   </span>
                 </div>
               </div>

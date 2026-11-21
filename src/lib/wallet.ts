@@ -160,7 +160,8 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
             membership: { include: { tontineSession: true } },
           },
         },
-        paidByUser: { select: { name: true } },
+        paidByUser: { select: { name: true, phone: true } },
+        bulkPayment: { select: { payerPhone: true } },
       },
       orderBy: { paidAt: "desc" },
       take: options?.includeAllForAdmin ? 500 : 50,
@@ -175,9 +176,11 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
       include: {
         membershipSlot: {
           include: {
-            membership: { include: { tontineSession: true, user: { select: { name: true } } } },
+            membership: { include: { tontineSession: true, user: { select: { name: true, phone: true } } } },
           },
         },
+        paidByUser: { select: { name: true, phone: true } },
+        bulkPayment: { select: { payerPhone: true } },
       },
       orderBy: { paidAt: "desc" },
       take: options?.includeAllForAdmin ? 500 : 50,
@@ -276,6 +279,7 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
       c.membershipSlot.membership.tontineSession.type;
     const beneficiary = `${c.membershipSlot.beneficiaryName} (${c.membershipSlot.membership.user.name})`;
     const dateToUse = c.paidAt || c.createdAt;
+    const phoneWhoPaid = c.payerPhone || c.bulkPayment?.payerPhone || c.paidByUser?.phone || user.phone;
 
     operations.push({
       id: `rel-contrib-${c.id}`,
@@ -291,7 +295,7 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
       rawDate: dateToUse,
       status: "Validé",
       beneficiaryName: beneficiary,
-      payerPhone: c.payerPhone || user.phone,
+      payerPhone: phoneWhoPaid,
       txRef: c.fapshiTxRef || c.id,
       receiptPdfUrl: c.bulkPaymentId
         ? `/api/files/receipts/${user.id}/bulk-${c.bulkPaymentId}-payer.pdf`
@@ -299,7 +303,7 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
           ? c.receiptPdfUrl
           : c.receiptPdfUrl
             ? `/api/files/${c.receiptPdfUrl}`
-            : null,
+            : `/api/files/receipts/${c.membershipSlot.membership.userId}/${c.id}.pdf`,
     });
   }
 
@@ -313,6 +317,7 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
       c.membershipSlot.membership.tontineSession.type;
     const beneficiary = c.membershipSlot.beneficiaryName;
     const dateToUse = c.paidAt || c.createdAt;
+    const phoneWhoPaid = c.payerPhone || c.bulkPayment?.payerPhone || c.paidByUser?.phone || user.phone;
 
     operations.push({
       id: `own-contrib-${c.id}`,
@@ -328,7 +333,7 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
       rawDate: dateToUse,
       status: "Validé",
       beneficiaryName: beneficiary,
-      payerPhone: c.payerPhone || user.phone,
+      payerPhone: phoneWhoPaid,
       txRef: c.fapshiTxRef || c.id,
       receiptPdfUrl: c.bulkPaymentId
         ? `/api/files/receipts/${user.id}/bulk-${c.bulkPaymentId}-owner.pdf`
@@ -336,7 +341,7 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
           ? c.receiptPdfUrl
           : c.receiptPdfUrl
             ? `/api/files/${c.receiptPdfUrl}`
-            : null,
+            : `/api/files/receipts/${user.id}/${c.id}.pdf`,
     });
   }
 

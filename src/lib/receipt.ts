@@ -7,9 +7,12 @@ import { formatXAF } from "@/lib/format-currency";
 
 const ASSOCIATION_EMAIL = "divaassociation17@gmail.com";
 
-function sanitizePdfText(input: string): string {
+function sanitizePdfText(input: string | undefined | null): string {
+  if (!input) return "";
   // StandardFonts.Helvetica uses WinAnsi encoding; replace non-WinAnsi glyphs (e.g. emojis) safely.
-  return input.replace(/[^\x20-\x7E\xA0-\xFF\u2013\u2014\u2018\u2019\u201C\u201D\u2026\u20AC]/g, "").trim();
+  return String(input)
+    .replace(/[^\x20-\x7E\xA0-\xFF\u2013\u2014\u2018\u2019\u201C\u201D\u2026\u20AC]/g, "")
+    .trim();
 }
 
 export interface ReceiptData {
@@ -23,7 +26,7 @@ export interface ReceiptData {
   paymentMethod?: string;
   /** @deprecated Excluded from payment receipts per user preference (no 3.1% gateway fee in receipts). */
   operatorName?: string | null;
-  tontineType: TontineType;
+  tontineType?: TontineType;
   /** Optional session title (falls back to TONTINE_LABELS[tontineType]). */
   sessionLabel?: string;
   amount: number;
@@ -127,16 +130,21 @@ export async function generateReceiptPdf(data: ReceiptData): Promise<Buffer> {
     }
     y -= 10;
   } else {
-    row("Name", data.memberName);
+    row("Name", data.memberName || "Membre");
   }
 
   if (data.paidByName && data.paidByName !== data.memberName) {
     row("Paid by", data.paidByName);
   }
-  row("Tontine", data.sessionLabel || TONTINE_LABELS[data.tontineType]);
+  const tontineTitle =
+    data.sessionLabel ||
+    (data.tontineType ? TONTINE_LABELS[data.tontineType] || String(data.tontineType) : "") ||
+    "Cotisation";
+  row("Tontine", tontineTitle);
   row("Payment method", data.paymentMethod ?? "Mobile Money / Orange Money");
-  row("Date", data.paidAt.toLocaleString("en-GB", { timeZone: "Africa/Douala" }));
-  row("Transaction Ref", data.transRef);
+  const paidDate = data.paidAt ? new Date(data.paidAt) : new Date();
+  row("Date", paidDate.toLocaleString("en-GB", { timeZone: "Africa/Douala" }));
+  row("Transaction Ref", data.transRef || "-");
   row("Status", "Successful");
   y -= 10;
 

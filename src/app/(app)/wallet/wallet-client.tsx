@@ -558,71 +558,73 @@ export function WalletClient({
 
   return (
     <div className="flex flex-col gap-5 max-w-xl mx-auto w-full pb-24 px-4 sm:px-0">
-      {/* ── En-tête de la page ── */}
-      <div className="flex items-center justify-between pt-2">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-            {lang === "fr" ? "Mon portefeuille" : "My Wallet"}
-          </h1>
-          <p className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mt-0.5">
-            {lang === "fr" ? "Vue générale de vos finances" : "General overview of your finances"}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setIsPinOpen(true)}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-emerald-50 text-emerald-900 border border-emerald-200/80 text-xs font-bold hover:bg-emerald-100 transition-colors cursor-pointer"
-          title="Sécurité Code PIN"
-        >
-          <span className="material-symbols-outlined text-[18px]">pin</span>
-          <span>{hasPin ? "PIN actif" : "Définir PIN"}</span>
-        </button>
-      </div>
-
-      {/* ── Carte principale du solde (Vert Foncé DIVA Asso) ── */}
-      <div className="bg-[#0b3d2e] rounded-2xl p-4 sm:p-5 text-white shadow-lg relative overflow-hidden flex flex-col gap-3 border border-emerald-900/40">
-        <div className="absolute -right-8 -top-8 w-28 h-28 rounded-full bg-emerald-500/10 blur-xl pointer-events-none" />
-        <div className="absolute -left-8 -bottom-8 w-24 h-24 rounded-full bg-emerald-400/10 blur-lg pointer-events-none" />
-
-        <div className="flex items-center justify-between relative z-10">
+      {/* ── En-tête fixe en dur (« Mon Portefeuille » en vert ne bouge pas au scroll) ── */}
+      <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-md pt-2 pb-3 -mx-4 px-4 sm:-mx-0 sm:px-0 flex flex-col gap-3 border-b border-slate-200/50 shadow-2xs">
+        <div className="flex items-center justify-between">
           <div>
-            <span className="text-[11px] sm:text-xs font-medium text-emerald-200/90 tracking-wide block">
-              {lang === "fr" ? "Solde disponible" : "Available balance"}
-            </span>
-            <p className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-0.5">
-              {isBalanceHidden ? "•••••• FCFA" : formatXAF(balance)}
+            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
+              {lang === "fr" ? "Mon portefeuille" : "My Wallet"}
+            </h1>
+            <p className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider mt-0.5">
+              {lang === "fr" ? "Vue générale de vos finances" : "General overview of your finances"}
             </p>
           </div>
           <button
             type="button"
-            onClick={() => setIsBalanceHidden((prev) => !prev)}
-            className="p-1.5 rounded-full hover:bg-white/10 text-emerald-200 transition-colors cursor-pointer self-start"
-            title={isBalanceHidden ? "Afficher le solde" : "Masquer le solde"}
+            onClick={() => setIsPinOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-emerald-50 text-emerald-900 border border-emerald-200/80 text-xs font-bold hover:bg-emerald-100 transition-colors cursor-pointer"
+            title="Sécurité Code PIN"
           >
-            <span className="material-symbols-outlined text-[20px]">
-              {isBalanceHidden ? "visibility_off" : "visibility"}
-            </span>
+            <span className="material-symbols-outlined text-[18px]">pin</span>
+            <span>{hasPin ? "PIN actif" : "Définir PIN"}</span>
           </button>
         </div>
 
-        {/* Actions: Recharger + Retirer côte à côte sur 1 seule ligne */}
-        <div className="relative z-10 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setIsTopUpOpen(true)}
-            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white text-emerald-950 font-bold text-xs hover:bg-emerald-50 active:scale-95 transition-all shadow-sm cursor-pointer whitespace-nowrap"
-          >
-            <span className="material-symbols-outlined text-[16px] text-emerald-800">add_circle</span>
-            <span>{lang === "fr" ? "Recharger" : "Top up"}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsWithdrawOpen(true)}
-            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600/40 hover:bg-emerald-600/60 text-white border border-emerald-300/30 font-bold text-xs active:scale-95 transition-all cursor-pointer whitespace-nowrap"
-          >
-            <span className="material-symbols-outlined text-[16px]">payments</span>
-            <span>{lang === "fr" ? "Retirer" : "Withdraw"}</span>
-          </button>
+        {/* ── Carte principale du solde (Vert Foncé DIVA Asso) ── */}
+        <div className="bg-[#0b3d2e] rounded-2xl p-4 sm:p-5 text-white shadow-lg relative overflow-hidden flex flex-col gap-3 border border-emerald-900/40">
+          <div className="absolute -right-8 -top-8 w-28 h-28 rounded-full bg-emerald-500/10 blur-xl pointer-events-none" />
+          <div className="absolute -left-8 -bottom-8 w-24 h-24 rounded-full bg-emerald-400/10 blur-lg pointer-events-none" />
+
+          <div className="flex items-center justify-between relative z-10">
+            <div>
+              <span className="text-[11px] sm:text-xs font-medium text-emerald-200/90 tracking-wide block">
+                {lang === "fr" ? "Solde disponible" : "Available balance"}
+              </span>
+              <p className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-0.5">
+                {isBalanceHidden ? "•••••• FCFA" : formatXAF(balance)}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsBalanceHidden((prev) => !prev)}
+              className="p-1.5 rounded-full hover:bg-white/10 text-emerald-200 transition-colors cursor-pointer self-start"
+              title={isBalanceHidden ? "Afficher le solde" : "Masquer le solde"}
+            >
+              <span className="material-symbols-outlined text-[20px]">
+                {isBalanceHidden ? "visibility_off" : "visibility"}
+              </span>
+            </button>
+          </div>
+
+          {/* Actions: Recharger + Retirer côte à côte sur 1 seule ligne */}
+          <div className="relative z-10 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setIsTopUpOpen(true)}
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white text-emerald-950 font-bold text-xs hover:bg-emerald-50 active:scale-95 transition-all shadow-sm cursor-pointer whitespace-nowrap"
+            >
+              <span className="material-symbols-outlined text-[16px] text-emerald-800">add_circle</span>
+              <span>{lang === "fr" ? "Recharger" : "Top up"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsWithdrawOpen(true)}
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600/40 hover:bg-emerald-600/60 text-white border border-emerald-300/30 font-bold text-xs active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+            >
+              <span className="material-symbols-outlined text-[16px]">payments</span>
+              <span>{lang === "fr" ? "Retirer" : "Withdraw"}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -730,7 +732,7 @@ export function WalletClient({
             </p>
           </div>
         ) : (
-          <div className="flex flex-col gap-2 max-h-[380px] sm:max-h-[460px] overflow-y-auto overscroll-contain pr-1">
+          <div className="flex flex-col gap-2">
             {displayedOperations.map((op) => {
               const isCredit = op.direction === "IN";
               const isTxOpen = expandedTxId === op.id;
@@ -826,7 +828,9 @@ export function WalletClient({
 
                         {op.payerPhone && (
                           <div className="flex items-start justify-between gap-2">
-                            <span className="text-[11px] font-bold text-slate-500">Téléphone :</span>
+                            <span className="text-[11px] font-bold text-slate-500">
+                              {lang === "fr" ? "N° de paiement :" : "Payer phone:"}
+                            </span>
                             <span className="font-mono text-slate-900 text-right">{op.payerPhone}</span>
                           </div>
                         )}
