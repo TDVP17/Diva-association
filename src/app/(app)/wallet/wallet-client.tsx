@@ -736,18 +736,28 @@ export function WalletClient({
             {displayedOperations.map((op) => {
               const isCredit = op.direction === "IN";
               const isTxOpen = expandedTxId === op.id;
-              const shareSummary = `${op.title} (${op.formattedAmount}) - DIVA Asso - Date: ${op.date} - Réf: ${op.txRef || op.id}`;
-              const receiptFullUrl = op.receiptPdfUrl
-                ? (op.receiptPdfUrl.startsWith("http") ? op.receiptPdfUrl : `https://divaasso.com${op.receiptPdfUrl}`)
+              const receiptWithLang = op.receiptPdfUrl
+                ? op.receiptPdfUrl.includes("?")
+                  ? `${op.receiptPdfUrl}&lang=${lang}`
+                  : `${op.receiptPdfUrl}?lang=${lang}`
                 : "";
+              const receiptFullUrl = receiptWithLang
+                ? receiptWithLang.startsWith("http")
+                  ? receiptWithLang
+                  : `https://divaasso.com${receiptWithLang}`
+                : "";
+
+              const shareText =
+                lang === "fr"
+                  ? `🌿 DIVA Asso - Reçu de transaction\n${op.title} : ${op.formattedAmount}\n${op.subtitle ? `${op.subtitle}\n` : ""}${op.payerPhone ? `N° de paiement : ${op.payerPhone}\n` : ""}Date : ${op.date}\nRéf : #${op.txRef || op.id}${receiptFullUrl ? `\nTélécharger le reçu : ${receiptFullUrl}` : ""}`
+                  : `🌿 DIVA Asso - Transaction Receipt\n${op.title}: ${op.formattedAmount}\n${op.subtitle ? `${op.subtitle}\n` : ""}${op.payerPhone ? `Payment: ${op.payerPhone}\n` : ""}Date: ${op.date}\nRef: #${op.txRef || op.id}${receiptFullUrl ? `\nDownload receipt: ${receiptFullUrl}` : ""}`;
 
               const handleShareOperation = (e: React.MouseEvent) => {
                 e.stopPropagation();
-                const shareText = receiptFullUrl ? `${shareSummary}\nReçu : ${receiptFullUrl}` : shareSummary;
                 if (typeof navigator !== "undefined" && navigator.share) {
                   navigator
                     .share({
-                      title: "Reçu DIVA Asso",
+                      title: lang === "fr" ? "Reçu DIVA Asso" : "DIVA Asso Receipt",
                       text: shareText,
                       ...(receiptFullUrl ? { url: receiptFullUrl } : {}),
                     })
@@ -850,13 +860,13 @@ export function WalletClient({
 
                       {/* ── Boutons d'actions avec UNIQUEMENT des icônes ── */}
                       <div className="flex items-center justify-end gap-2 pt-1">
-                        {op.receiptPdfUrl && (
+                        {receiptWithLang && (
                           <a
-                            href={op.receiptPdfUrl.startsWith("http") ? op.receiptPdfUrl : op.receiptPdfUrl}
+                            href={receiptWithLang}
                             target="_blank"
                             rel="noopener noreferrer"
-                            aria-label="Télécharger"
-                            title="Télécharger"
+                            aria-label={lang === "fr" ? "Télécharger le reçu" : "Download receipt"}
+                            title={lang === "fr" ? "Télécharger le reçu" : "Download receipt"}
                             className="w-8 h-8 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white flex items-center justify-center transition-all active:scale-95 shadow-xs cursor-pointer"
                           >
                             <span className="material-symbols-outlined text-[18px]">download</span>

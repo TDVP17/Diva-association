@@ -16,6 +16,14 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const langParam = new URL(_request.url).searchParams.get("lang");
+  const userLang: "fr" | "en" =
+    langParam === "en" || langParam === "fr"
+      ? langParam
+      : (session.user as { preferredLang?: string })?.preferredLang === "en"
+        ? "en"
+        : "fr";
+
   const { path: segments } = await params;
   if (!segments || segments.length === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -133,14 +141,31 @@ export async function GET(
           ? targetContribs.find((c) => c.paidByUser)?.paidByUser?.name ?? bulkPayment.user?.name
           : undefined;
 
+        const isBulkFromWallet =
+          bulkPayment.payerPhone === "DIVA_WALLET" ||
+          (bulkPayment.transId && bulkPayment.transId.includes("WALLET")) ||
+          targetContribs.some((c) => c.payerPhone === "DIVA_WALLET");
+
+        const bulkPhone =
+          bulkPayment.payerPhone && bulkPayment.payerPhone !== "DIVA_WALLET"
+            ? bulkPayment.payerPhone
+            : targetContribs.find((c) => c.payerPhone && c.payerPhone !== "DIVA_WALLET")?.payerPhone ||
+              bulkPayment.user?.phone ||
+              null;
+
+        const bulkPaymentMethod = isBulkFromWallet
+          ? (userLang === "fr" ? "Portefeuille DIVA Asso" : "DIVA Asso Wallet")
+          : bulkPhone || (userLang === "fr" ? "Mobile Money / Orange Money" : "Mobile Money / Orange Money");
+
         const pdfBytes = await generateReceiptPdf({
+          lang: userLang,
           memberName:
             beneficiaryNames.length === 1
               ? `${firstOwner.name} — ${beneficiaryNames[0]}`
               : firstOwner.name,
           beneficiaryNames: beneficiaryNames.length > 1 ? beneficiaryNames : undefined,
           paidByName,
-          paymentMethod: "Mobile Money / Orange Money",
+          paymentMethod: bulkPaymentMethod,
           tontineType: firstSession.type,
           sessionLabel:
             distinctSessions.length === 1
@@ -154,7 +179,10 @@ export async function GET(
           paidAt: targetContribs[0].paidAt ?? targetContribs[0].createdAt,
         });
 
-        const downloadFilename = `Recu_DIVA_Paiement_${bulkPayment.transId ?? bulkPaymentId}.pdf`;
+        const downloadFilename =
+          userLang === "fr"
+            ? `Recu_DIVA_Paiement_${bulkPayment.transId ?? bulkPaymentId}.pdf`
+            : `Receipt_DIVA_Payment_${bulkPayment.transId ?? bulkPaymentId}.pdf`;
         return new NextResponse(new Uint8Array(pdfBytes), {
           headers: {
             "Content-Type": "application/pdf",
@@ -206,10 +234,26 @@ export async function GET(
             ? contrib.paidByUser.name
             : undefined;
 
+        const isContribFromWallet =
+          contrib.payerPhone === "DIVA_WALLET" ||
+          Boolean(contrib.fapshiTxRef && contrib.fapshiTxRef.startsWith("wtx_"));
+
+        const contribPhone =
+          contrib.payerPhone && contrib.payerPhone !== "DIVA_WALLET"
+            ? contrib.payerPhone
+            : contrib.paidByUser?.phone || u.phone || null;
+
+        const contribPaymentMethod = isContribFromWallet
+          ? (userLang === "fr" ? "Portefeuille DIVA Asso" : "DIVA Asso Wallet")
+          : contrib.recordedByAdminId
+            ? (userLang === "fr" ? "Enregistré par l'administrateur" : "Recorded by admin")
+            : contribPhone || (userLang === "fr" ? "Mobile Money / Orange Money" : "Mobile Money / Orange Money");
+
         const pdfBytes = await generateReceiptPdf({
+          lang: userLang,
           memberName: `${u.name} — ${contrib.membershipSlot.beneficiaryName}`,
           paidByName,
-          paymentMethod: contrib.recordedByAdminId ? "Recorded by admin" : "Mobile Money / Orange Money",
+          paymentMethod: contribPaymentMethod,
           tontineType: s.type,
           sessionLabel: s.title || TONTINE_TYPE_LABELS[s.type],
           amount: Number(contrib.amountPaid),
@@ -219,7 +263,10 @@ export async function GET(
           transRef: contrib.fapshiTxRef ?? contrib.id,
           paidAt: contrib.paidAt ?? contrib.createdAt,
         });
-        const downloadFilename = `Recu_DIVA_Cotisation_${contrib.fapshiTxRef ?? contrib.id}.pdf`;
+        const downloadFilename =
+          userLang === "fr"
+            ? `Recu_DIVA_Cotisation_${contrib.fapshiTxRef ?? contrib.id}.pdf`
+            : `Receipt_DIVA_Contribution_${contrib.fapshiTxRef ?? contrib.id}.pdf`;
         return new NextResponse(new Uint8Array(pdfBytes), {
           headers: {
             "Content-Type": "application/pdf",

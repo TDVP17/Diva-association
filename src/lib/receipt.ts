@@ -5,8 +5,6 @@ import type { TontineType } from "@/generated/prisma/enums";
 import { TONTINE_TYPE_LABELS as TONTINE_LABELS } from "@/lib/tontine-labels";
 import { formatXAF } from "@/lib/format-currency";
 
-const ASSOCIATION_EMAIL = "divaassociation17@gmail.com";
-
 function sanitizePdfText(input: string | undefined | null): string {
   if (!input) return "";
   // StandardFonts.Helvetica uses WinAnsi encoding; replace non-WinAnsi glyphs (e.g. emojis) safely.
@@ -16,6 +14,7 @@ function sanitizePdfText(input: string | undefined | null): string {
 }
 
 export interface ReceiptData {
+  lang?: "fr" | "en";
   /// The beneficiary — whose contribution this credits (or account owner name when beneficiaryNames is provided).
   memberName: string;
   /// Optional list of contributed slot/beneficiary names for a consolidated multi-slot receipt.
@@ -40,10 +39,11 @@ export interface ReceiptData {
 }
 
 export async function generateReceiptPdf(data: ReceiptData): Promise<Buffer> {
+  const isFr = data.lang !== "en";
   const namesList = (data.beneficiaryNames ?? []).filter((n) => n.trim().length > 0);
   const hasMultipleNames = namesList.length > 1;
   const extraNamesHeight = hasMultipleNames ? namesList.length * 16 + 18 : 0;
-  const pageHeight = Math.max(620, 560 + extraNamesHeight);
+  const pageHeight = Math.max(600, 530 + extraNamesHeight);
 
   const doc = await PDFDocument.create();
   const page = doc.addPage([420, pageHeight]);
@@ -58,21 +58,23 @@ export async function generateReceiptPdf(data: ReceiptData): Promise<Buffer> {
   const left = 40;
   const right = 420 - left;
 
+  const receiptTitle = isFr ? "Reçu de paiement" : "Payment Receipt";
+
   try {
     const logoBytes = await readFile(path.join(process.cwd(), "public", "icons", "icon-512.png"));
     const logoImage = await doc.embedPng(logoBytes);
     const logoSize = 36;
     page.drawImage(logoImage, { x: left, y: y - logoSize + 8, width: logoSize, height: logoSize });
     page.drawText("DIVA Asso.", { x: left + logoSize + 10, y, size: 20, font: bold, color: primary });
-    page.drawText("Payment Receipt", { x: left + logoSize + 10, y: y - 20, size: 12, font, color: muted });
+    page.drawText(receiptTitle, { x: left + logoSize + 10, y: y - 20, size: 12, font, color: muted });
   } catch {
     // Logo optional — the receipt is still valid without it.
     page.drawText("DIVA Asso.", { x: left, y, size: 20, font: bold, color: primary });
-    page.drawText("Payment Receipt", { x: left, y: y - 20, size: 12, font, color: muted });
+    page.drawText(receiptTitle, { x: left, y: y - 20, size: 12, font, color: muted });
   }
-  y -= 44;
-  page.drawText(ASSOCIATION_EMAIL, { x: left, y, size: 9, font, color: muted });
-  y -= 26;
+
+  // DIVA Asso email is permanently removed from receipt as requested
+  y -= 48;
 
   page.drawLine({
     start: { x: left, y },
@@ -80,7 +82,7 @@ export async function generateReceiptPdf(data: ReceiptData): Promise<Buffer> {
     thickness: 1,
     color: rgb(0.9, 0.91, 0.91),
   });
-  y -= 30;
+  y -= 26;
 
   const fitValue = (value: string, valueFont: typeof font, valueSize: number, maxWidth: number) => {
     const clean = sanitizePdfText(value);
@@ -112,9 +114,12 @@ export async function generateReceiptPdf(data: ReceiptData): Promise<Buffer> {
     y -= 26;
   };
 
+  const memberLabel = isFr ? "Membre" : "Member";
   if (hasMultipleNames) {
-    row("Membre", data.memberName);
-    const listLabel = `Noms cotisés (${namesList.length})`;
+    row(memberLabel, data.memberName);
+    const listLabel = isFr
+      ? `Noms cotisés (${namesList.length})`
+      : `Contributed names (${namesList.length})`;
     page.drawText(listLabel, { x: left, y, size: 11, font, color: muted });
     for (const itemName of namesList) {
       const safeName = fitValue(itemName, bold, 10.5, 220);
@@ -130,22 +135,27 @@ export async function generateReceiptPdf(data: ReceiptData): Promise<Buffer> {
     }
     y -= 10;
   } else {
-    row("Name", data.memberName || "Membre");
+    row(memberLabel, data.memberName || (isFr ? "Membre" : "Member"));
   }
 
   if (data.paidByName && data.paidByName !== data.memberName) {
-    row("Paid by", data.paidByName);
+    row(isFr ? "Payé par" : "Paid by", data.paidByName);
   }
+
   const tontineTitle =
     data.sessionLabel ||
     (data.tontineType ? TONTINE_LABELS[data.tontineType] || String(data.tontineType) : "") ||
-    "Cotisation";
-  row("Tontine", tontineTitle);
-  row("Payment method", data.paymentMethod ?? "Mobile Money / Orange Money");
+    (isFr ? "Cotisation" : "Cotisation");
+  row(isFr ? "Cotisation" : "Cotisation", tontineTitle);
+
+  // Mode de paiement : Numéro de téléphone ou Portefeuille DIVA Asso
+  const defaultMethod = isFr ? "Mobile Money / Orange Money" : "Mobile Money / Orange Money";
+  row(isFr ? "Mode de paiement" : "Payment method", data.paymentMethod || defaultMethod);
+
   const paidDate = data.paidAt ? new Date(data.paidAt) : new Date();
-  row("Date", paidDate.toLocaleString("en-GB", { timeZone: "Africa/Douala" }));
-  row("Transaction Ref", data.transRef || "-");
-  row("Status", "Successful");
+  row("Date", paidDate.toLocaleString(isFr ? "fr-FR" : "en-GB", { timeZone: "Africa/Douala" }));
+  row(isFr ? "Réf. transaction" : "Transaction Ref", data.transRef || "-");
+  row(isFr ? "Statut" : "Status", isFr ? "Validé" : "Successful");
   y -= 10;
 
   page.drawLine({
@@ -156,24 +166,29 @@ export async function generateReceiptPdf(data: ReceiptData): Promise<Buffer> {
   });
   y -= 30;
 
-  row("Cotisation pour le pot", formatXAF(data.amount));
-  if (data.fee && data.fee > 0) row("Frais", formatXAF(data.fee));
-  if (data.fine > 0) row("Pénalité de retard", formatXAF(data.fine));
+  row(isFr ? "Cotisation pour le pot" : "Pot contribution", formatXAF(data.amount));
+  if (data.fee && data.fee > 0) row(isFr ? "Frais de gestion" : "Service fee", formatXAF(data.fee));
+  if (data.fine > 0) row(isFr ? "Pénalité de retard" : "Late penalty", formatXAF(data.fine));
   y -= 10;
 
   // Receipts strictly exclude the 3.1% operator fee
   const netTotal = data.amount + (data.fee || 0) + (data.fine || 0);
   const exactTotal = netTotal > 0 ? netTotal : data.total;
-  row("TOTAL PAYÉ", formatXAF(exactTotal), { emphasize: true });
+  row(isFr ? "TOTAL PAYÉ" : "TOTAL PAID", formatXAF(exactTotal), { emphasize: true });
 
   y -= 30;
-  page.drawText("Merci pour votre contribution chez DIVA asso.", {
-    x: left,
-    y,
-    size: 9,
-    font,
-    color: muted,
-  });
+  page.drawText(
+    isFr
+      ? "Merci pour votre contribution chez DIVA Asso."
+      : "Thank you for your contribution to DIVA Asso.",
+    {
+      x: left,
+      y,
+      size: 9,
+      font,
+      color: muted,
+    },
+  );
 
   const pdfBytes = await doc.save();
   return Buffer.from(pdfBytes);
