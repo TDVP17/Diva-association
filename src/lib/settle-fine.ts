@@ -161,7 +161,7 @@ export async function creditLateBeneficiaryWithHalfFine(params: {
           amount: split.toDelayedBeneficiary,
           fee: 0,
           type: "PAYOUT",
-          description: `Indemnité de retard (+${formatXAF(split.toDelayedBeneficiary)}) : ${split.beneficiaryPercentage}% amende payée par ${params.finePayerName} pour votre tour du ${dueDateFormattedFr} · ${params.sessionTitle}`,
+          description: `Indemnité de retard (+${formatXAF(split.toDelayedBeneficiary)}) : amende payée par ${params.finePayerName} pour votre tour du ${dueDateFormattedFr} · ${params.sessionTitle}`,
           metadata: {
             fineId: params.fineId ?? null,
             tontineSessionId: params.tontineSessionId,
@@ -181,7 +181,7 @@ export async function creditLateBeneficiaryWithHalfFine(params: {
           amount: split.toRemainingRecipient,
           fee: 0,
           type: "PAYOUT",
-          description: `Part gestionnaire (${100 - split.beneficiaryPercentage}%) amende payée par ${params.finePayerName} pour l'échéance du ${dueDateFormattedFr} · ${params.sessionTitle}`,
+          description: `Part gestionnaire amende payée par ${params.finePayerName} pour l'échéance du ${dueDateFormattedFr} · ${params.sessionTitle}`,
           metadata: {
             fineId: params.fineId ?? null,
             tontineSessionId: params.tontineSessionId,
@@ -198,8 +198,8 @@ export async function creditLateBeneficiaryWithHalfFine(params: {
       const dueDateLabel = benLang === "fr" ? dueDateFormattedFr : dueDateFormattedEn;
       const notifMsg =
         benLang === "fr"
-          ? `🌿 Bonne nouvelle ! Vous avez reçu ${formatXAF(split.toDelayedBeneficiary)} (${split.beneficiaryPercentage}% d'amende de retard payée par ${params.finePayerName}) disponible sur votre Portefeuille DIVA Asso suite au retard sur votre tour de cotisation du ${dueDateLabel} (« ${params.sessionTitle} »).`
-          : `🌿 Great news! You received ${formatXAF(split.toDelayedBeneficiary)} (${split.beneficiaryPercentage}% late fine compensation paid by ${params.finePayerName}) in your DIVA Asso Wallet for your cotisation turn on ${dueDateLabel} (« ${params.sessionTitle} »).`;
+          ? `🌿 Bonne nouvelle ! Vous avez reçu une indemnité de retard de ${formatXAF(split.toDelayedBeneficiary)} payée par ${params.finePayerName} disponible sur votre Portefeuille DIVA Asso suite au retard sur votre tour de cotisation du ${dueDateLabel} (« ${params.sessionTitle} »).`
+          : `🌿 Great news! You received a late fine compensation of ${formatXAF(split.toDelayedBeneficiary)} paid by ${params.finePayerName} in your DIVA Asso Wallet for your cotisation turn on ${dueDateLabel} (« ${params.sessionTitle} »).`;
 
       await scheduleInAppNotifications({
         tontineSessionId: params.tontineSessionId,
@@ -235,7 +235,7 @@ export async function creditLateBeneficiaryWithHalfFine(params: {
       sessionRow.creatorId &&
       split.toRemainingRecipient > 0
     ) {
-      const creatorMsg = `Vous avez reçu ${formatXAF(split.toRemainingRecipient)} (${100 - split.beneficiaryPercentage}% de l'amende payée par ${params.finePayerName}) dans votre Portefeuille DIVA Asso pour « ${params.sessionTitle} ».`;
+      const creatorMsg = `Vous avez reçu une indemnité d'amende de ${formatXAF(split.toRemainingRecipient)} payée par ${params.finePayerName} dans votre Portefeuille DIVA Asso pour « ${params.sessionTitle} ».`;
       await scheduleInAppNotifications({
         tontineSessionId: params.tontineSessionId,
         type: "PAYMENT_SUCCESS",

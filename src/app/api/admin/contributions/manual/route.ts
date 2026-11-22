@@ -10,6 +10,7 @@ import { logAudit } from "@/lib/audit";
 const bodySchema = z.object({
   membershipSlotId: z.string().min(1),
   dueDate: z.coerce.date().optional(),
+  action: z.enum(["mark", "unmark"]).optional().default("mark"),
 });
 
 export async function POST(request: Request) {
@@ -20,22 +21,51 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
-  const { membershipSlotId } = parsed.data;
+  const { membershipSlotId, action } = parsed.data;
 
   try {
     const slot = await prisma.membershipSlot.findUnique({
       where: { id: membershipSlotId },
       include: { membership: { include: { tontineSession: true } } },
     });
-    if (!slot || !["DRAWING", "ACTIVE"].includes(slot.membership.tontineSession.status)) {
-      return NextResponse.json({ error: "This slot's session isn't currently open for contributions" }, { status: 404 });
+    if (!slot || !["OPEN", "DRAWING", "ACTIVE", "LOCKED"].includes(slot.membership.tontineSession.status)) {
+      return NextResponse.json({ error: "Cette session n'est pas ouverte aux cotisations actuellement" }, { status: 404 });
     }
     if (slot.membership.status !== "APPROVED") {
-      return NextResponse.json({ error: "This member's join request hasn't been approved yet" }, { status: 403 });
+      return NextResponse.json({ error: "L'adhésion de ce membre n'est pas encore approuvée" }, { status: 403 });
     }
 
     const { tontineSession } = slot.membership;
     const dueDate = await resolveDueDateForSlot(membershipSlotId, tontineSession, parsed.data.dueDate);
+
+    // Cas Décocher (Annuler la validation manuelle)
+    if (action === "unmark") {
+      const existing = await prisma.contribution.findUnique({
+        where: { membershipSlotId_dueDate: { membershipSlotId, dueDate } },
+      });
+      if (!existing || existing.status !== "PAID") {
+        return NextResponse.json({ error: "Cette cotisation n'est pas marquée comme payée." }, { status: 404 });
+      }
+
+      await prisma.contribution.delete({
+        where: { id: existing.id },
+      });
+
+      await logAudit({
+        actorId: admin.user.id,
+        actorRole: admin.user.role,
+        action: "admin_unmarked_payment",
+        targetType: "Contribution",
+        targetId: existing.id,
+        tontineSessionId: slot.membership.tontineSessionId,
+        metadata: { membershipSlotId, dueDate: dueDate.toISOString() },
+        request,
+      });
+
+      return NextResponse.json({ ok: true, unmarked: true });
+    }
+
+    // Cas Cocher (Validation manuelle de cotisation)
     const { amount, fee } = getContributionTotal({
       amount: Number(tontineSession.amount),
       fee: Number(tontineSession.fee),
@@ -45,9 +75,19 @@ export async function POST(request: Request) {
       where: { membershipSlotId_dueDate: { membershipSlotId, dueDate } },
     });
     if (existing?.status === "PAID") {
-      return NextResponse.json({ error: "This contribution is already paid" }, { status: 409 });
+      return NextResponse.json({ ok: true, alreadyPaid: true });
     }
 
+    // 1. Supprimer ou annuler toute amende de retard impayée liée à ce slot pour cette échéance
+    await prisma.fine.deleteMany({
+      where: {
+        membershipSlotId,
+        dueDate,
+        status: { in: ["UNPAID", "FAILED"] },
+      },
+    });
+
+    // 2. Créer ou mettre à jour la contribution en PAID
     const contribution = await prisma.contribution.upsert({
       where: { membershipSlotId_dueDate: { membershipSlotId, dueDate } },
       create: {
@@ -90,11 +130,11 @@ export async function POST(request: Request) {
       request,
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, marked: true });
   } catch (err) {
     console.error("[contributions/manual] unexpected error:", err);
     return NextResponse.json(
-      { error: "Could not record this contribution. Please try again." },
+      { error: "Impossible d'enregistrer cette cotisation. Veuillez réessayer." },
       { status: 500 },
     );
   }

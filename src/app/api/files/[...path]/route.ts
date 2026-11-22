@@ -102,8 +102,8 @@ export async function GET(
         const scoped =
           roleHint === "owner" || (roleHint !== "payer" && ownerId !== bulkPayment.userId)
             ? bulkPayment.contributions.filter(
-                (c) => c.membershipSlot.membership.userId === ownerId,
-              )
+              (c) => c.membershipSlot.membership.userId === ownerId,
+            )
             : bulkPayment.contributions;
 
         const targetContribs = scoped.length > 0 ? scoped : bulkPayment.contributions;
@@ -150,8 +150,8 @@ export async function GET(
           bulkPayment.payerPhone && bulkPayment.payerPhone !== "DIVA_WALLET"
             ? bulkPayment.payerPhone
             : targetContribs.find((c) => c.payerPhone && c.payerPhone !== "DIVA_WALLET")?.payerPhone ||
-              bulkPayment.user?.phone ||
-              null;
+            bulkPayment.user?.phone ||
+            null;
 
         const bulkPaymentMethod = isBulkFromWallet
           ? (userLang === "fr" ? "Portefeuille DIVA Asso" : "DIVA Asso Wallet")

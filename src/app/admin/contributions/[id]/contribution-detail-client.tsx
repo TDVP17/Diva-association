@@ -392,12 +392,33 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
   }, [tontineSessionId]);
 
   const [markingPaidSlotId, setMarkingPaidSlotId] = useState<string | null>(null);
+  const [cancellingFineId, setCancellingFineId] = useState<string | null>(null);
+  const [memberSearchQuery, setMemberSearchQuery] = useState("");
+  const [memberFilterStatus, setMemberFilterStatus] = useState<"ALL" | "UNPAID" | "PAID">("ALL");
+
+  const filteredSlots = useMemo(() => {
+    if (!session?.slots) return [];
+    return session.slots.filter((s) => {
+      if (memberFilterStatus === "UNPAID" && s.paidThisCycle) return false;
+      if (memberFilterStatus === "PAID" && !s.paidThisCycle) return false;
+      if (memberSearchQuery.trim()) {
+        const q = memberSearchQuery.toLowerCase();
+        const matchesName = s.name?.toLowerCase().includes(q);
+        const matchesBeneficiary = s.beneficiaryName?.toLowerCase().includes(q);
+        const matchesPhone = s.phone?.includes(q);
+        const matchesCode = s.memberCode?.toLowerCase().includes(q);
+        const matchesPos = s.officialPosition ? String(s.officialPosition) === q : false;
+        return Boolean(matchesName || matchesBeneficiary || matchesPhone || matchesCode || matchesPos);
+      }
+      return true;
+    });
+  }, [session?.slots, memberFilterStatus, memberSearchQuery]);
 
   async function markSlotPaidManually(slot: AdminSlot) {
     const confirmMsg =
       lang === "fr"
-        ? `Confirmer que ${slot.beneficiaryName} (${slot.name}) a bien cotisé pour ce cycle ? (Validation manuelle sans preuve)`
-        : `Confirm that ${slot.beneficiaryName} (${slot.name}) has paid for this cycle? (Manual validation without proof)`;
+        ? `Confirmer que ${slot.beneficiaryName} (${slot.name}) a bien cotisé pour ce cycle ? (Validation manuelle sans preuve - annule toute amende)`
+        : `Confirm that ${slot.beneficiaryName} (${slot.name}) has paid for this cycle? (Manual validation without proof - waives any late fine)`;
     if (!window.confirm(confirmMsg)) return;
 
     setMarkingPaidSlotId(slot.id);
@@ -414,6 +435,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
       }
       await refreshSession();
       fetch(`/api/admin/sessions/${tontineSessionId}/ledger`).then((r) => r.json()).then(setLedger);
+      fetch(`/api/admin/sessions/${tontineSessionId}/fines`).then((r) => r.json()).then((b) => setFines(b.fines ?? []));
       fetch(`/api/admin/transactions?tontineSessionId=${tontineSessionId}`)
         .then((r) => r.json())
         .then((b) => setTransactions(b.transactions ?? []));
@@ -421,6 +443,66 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
       alert(lang === "fr" ? "Erreur réseau. Veuillez réessayer." : "Network error. Please try again.");
     } finally {
       setMarkingPaidSlotId(null);
+    }
+  }
+
+  async function unmarkSlotPaidManually(slot: AdminSlot) {
+    const confirmMsg =
+      lang === "fr"
+        ? `Voulez-vous vraiment décocher la cotisation de ${slot.beneficiaryName} (${slot.name}) et la remettre en impayée ?`
+        : `Do you really want to unmark the contribution for ${slot.beneficiaryName} (${slot.name}) and set it back to unpaid?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setMarkingPaidSlotId(slot.id);
+    try {
+      const res = await fetch("/api/admin/contributions/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ membershipSlotId: slot.id, action: "unmark" }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        alert(body?.error || (lang === "fr" ? "Erreur lors de l'opération." : "Error while unmarking."));
+        return;
+      }
+      await refreshSession();
+      fetch(`/api/admin/sessions/${tontineSessionId}/ledger`).then((r) => r.json()).then(setLedger);
+      fetch(`/api/admin/sessions/${tontineSessionId}/fines`).then((r) => r.json()).then((b) => setFines(b.fines ?? []));
+      fetch(`/api/admin/transactions?tontineSessionId=${tontineSessionId}`)
+        .then((r) => r.json())
+        .then((b) => setTransactions(b.transactions ?? []));
+    } catch {
+      alert(lang === "fr" ? "Erreur réseau. Veuillez réessayer." : "Network error. Please try again.");
+    } finally {
+      setMarkingPaidSlotId(null);
+    }
+  }
+
+  async function cancelFine(fineId: string, memberLabel: string) {
+    const confirmMsg =
+      lang === "fr"
+        ? `Voulez-vous annuler l'amende de ${memberLabel} ? (Elle sera supprimée)`
+        : `Do you want to cancel the fine for ${memberLabel}? (It will be deleted)`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setCancellingFineId(fineId);
+    try {
+      const res = await fetch(`/api/admin/sessions/${tontineSessionId}/fines?fineId=${fineId}`, {
+        method: "DELETE",
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        alert(body?.error || (lang === "fr" ? "Erreur lors de l'annulation." : "Error while cancelling fine."));
+        return;
+      }
+      fetch(`/api/admin/sessions/${tontineSessionId}/fines`)
+        .then((r) => r.json())
+        .then((b) => setFines(b.fines ?? []));
+      fetch(`/api/admin/sessions/${tontineSessionId}/ledger`).then((r) => r.json()).then(setLedger);
+    } catch {
+      alert(lang === "fr" ? "Erreur réseau." : "Network error.");
+    } finally {
+      setCancellingFineId(null);
     }
   }
 
@@ -2340,7 +2422,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
           </section>
 
           <section>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-stack-gap-md">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
               <h3 className="font-title-md text-title-md text-primary flex items-center gap-2">
                 <span className="material-symbols-outlined">group</span>
                 {t("membersLabel")} ({session.slots.filter((s) => s.paidThisCycle).length}/{session.slots.length})
@@ -2376,8 +2458,78 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                 )}
               </div>
             </div>
+
+            {/* Barre de recherche et filtres pour cocher les noms facilement */}
+            <div className="bg-white rounded-xl border border-outline-variant/30 p-3 mb-3 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
+              <div className="relative flex-1">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
+                  search
+                </span>
+                <input
+                  type="text"
+                  value={memberSearchQuery}
+                  onChange={(e) => setMemberSearchQuery(e.target.value)}
+                  placeholder={
+                    lang === "fr"
+                      ? "Rechercher un membre ou un nom de part (ex: Ecladore)..."
+                      : "Search member, slot alias (e.g. Ecladore)..."
+                  }
+                  className="w-full pl-9 pr-7 py-2 text-xs sm:text-sm rounded-lg border border-outline-variant/40 focus:border-primary focus:outline-none bg-slate-50/50"
+                />
+                {memberSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setMemberSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setMemberFilterStatus("ALL")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    memberFilterStatus === "ALL"
+                      ? "bg-slate-900 text-white shadow-2xs"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
+                >
+                  {lang === "fr" ? "Tous" : "All"} ({session.slots.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMemberFilterStatus("UNPAID")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    memberFilterStatus === "UNPAID"
+                      ? "bg-amber-600 text-white shadow-2xs"
+                      : "bg-amber-50 text-amber-900 border border-amber-200/60 hover:bg-amber-100"
+                  }`}
+                >
+                  {lang === "fr" ? "À cocher (Impayés)" : "To Mark (Unpaid)"} ({session.slots.filter((s) => !s.paidThisCycle).length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMemberFilterStatus("PAID")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    memberFilterStatus === "PAID"
+                      ? "bg-emerald-700 text-white shadow-2xs"
+                      : "bg-emerald-50 text-emerald-900 border border-emerald-200/60 hover:bg-emerald-100"
+                  }`}
+                >
+                  {lang === "fr" ? "Cotisés" : "Paid"} ({session.slots.filter((s) => s.paidThisCycle).length})
+                </button>
+              </div>
+            </div>
+
             <div className="bg-surface rounded-xl shadow-[0px_4px_20px_rgba(30,41,59,0.05)] border border-outline-variant/30 overflow-hidden divide-y divide-outline-variant/20">
-              {session.slots.map((s) => (
+              {filteredSlots.length === 0 ? (
+                <div className="p-8 text-center text-slate-500 text-xs sm:text-sm">
+                  {lang === "fr" ? "Aucun membre ne correspond à cette recherche." : "No members match this filter."}
+                </div>
+              ) : (
+                filteredSlots.map((s) => (
                 <div
                   key={s.id}
                   className="p-3.5 sm:p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 bg-white hover:bg-slate-50/50 transition-colors"
@@ -2407,8 +2559,9 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                           </span>
                         )}
                         {s.paidThisCycle ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full font-label-sm text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                            {t("paidStatus")}
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-label-sm text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            <span className="material-symbols-outlined text-[13px]">check</span>
+                            <span>{t("paidStatus")}</span>
                           </span>
                         ) : s.hasPendingProof ? (
                           <button
@@ -2466,8 +2619,8 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                         className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-600 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-label-sm text-xs font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-50"
                         title={
                           lang === "fr"
-                            ? `Cocher que ${s.beneficiaryName} a cotisé pour ce cycle (même sans preuve)`
-                            : `Mark ${s.beneficiaryName} as paid for this cycle (even without proof)`
+                            ? `Cocher que ${s.beneficiaryName} a cotisé pour ce cycle (annule toute amende)`
+                            : `Mark ${s.beneficiaryName} as paid for this cycle (waives any fine)`
                         }
                       >
                         <span className="material-symbols-outlined text-[16px]">check_circle</span>
@@ -2476,6 +2629,22 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                             ? (lang === "fr" ? "Validation..." : "Validating...")
                             : (lang === "fr" ? "Cocher cotisé" : "Mark paid")}
                         </span>
+                      </button>
+                    )}
+                    {s.paidThisCycle && session.status !== "CLOSED" && (
+                      <button
+                        type="button"
+                        onClick={() => unmarkSlotPaidManually(s)}
+                        disabled={markingPaidSlotId === s.id}
+                        className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-300 text-slate-700 bg-slate-50 hover:bg-slate-100 active:scale-95 text-xs font-semibold transition-all shadow-2xs cursor-pointer disabled:opacity-50"
+                        title={
+                          lang === "fr"
+                            ? `Décocher la cotisation de ${s.beneficiaryName}`
+                            : `Unmark contribution for ${s.beneficiaryName}`
+                        }
+                      >
+                        <span className="material-symbols-outlined text-[15px] text-slate-500">undo</span>
+                        <span>{lang === "fr" ? "Décocher" : "Unmark"}</span>
                       </button>
                     )}
                     {session.status !== "CLOSED" && (
@@ -2540,7 +2709,7 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                     </button>
                   </div>
                 </div>
-              ))}
+              )))}
             </div>
           </section>
 
@@ -3778,15 +3947,29 @@ export function ContributionDetailClient({ tontineSessionId, lang }: { tontineSe
                       {new Date(f.dueDate).toLocaleDateString("en-GB", { timeZone: "Africa/Douala" })}
                     </p>
                   </div>
-                  <div className="text-right flex-shrink-0 ml-2">
-                    <p className="font-numeric-data text-[14px] text-error">{formatXAF(f.amount)}</p>
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-md font-label-sm text-label-sm ${
-                        f.status === "UNPAID" ? "bg-error-container text-on-error-container" : "bg-[#d1fae5] text-[#065f46]"
-                      }`}
-                    >
-                      {t(FINE_STATUS_KEY[f.status] ?? "unpaidStatus")}
-                    </span>
+                  <div className="text-right flex-shrink-0 ml-2 flex items-center gap-2">
+                    <div>
+                      <p className="font-numeric-data text-[14px] text-error">{formatXAF(f.amount)}</p>
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-md font-label-sm text-label-sm ${
+                          f.status === "UNPAID" ? "bg-error-container text-on-error-container" : "bg-[#d1fae5] text-[#065f46]"
+                        }`}
+                      >
+                        {t(FINE_STATUS_KEY[f.status] ?? "unpaidStatus")}
+                      </span>
+                    </div>
+                    {f.status === "UNPAID" && (
+                      <button
+                        type="button"
+                        onClick={() => cancelFine(f.id, `${f.beneficiaryName} (${f.memberName})`)}
+                        disabled={cancellingFineId === f.id}
+                        className="px-2.5 py-1 rounded-lg border border-error/30 text-error bg-error/5 hover:bg-error/10 text-xs font-semibold transition-all disabled:opacity-50 flex items-center gap-1 cursor-pointer active:scale-95"
+                        title={lang === "fr" ? "Annuler / Supprimer cette amende" : "Cancel / Delete this fine"}
+                      >
+                        <span className="material-symbols-outlined text-[14px]">cancel</span>
+                        <span>{cancellingFineId === f.id ? "..." : (lang === "fr" ? "Annuler" : "Waive")}</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
