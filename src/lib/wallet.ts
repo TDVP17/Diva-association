@@ -220,6 +220,7 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
 
   const operations: WalletOperation[] = [];
   const handledFapshiRefs = new Set<string>();
+  const handledPayoutIds = new Set<string>();
 
   // A. Wallet ledger transactions
   for (const tx of walletTx) {
@@ -231,6 +232,9 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
     if (tx.fapshiTxRef) handledFapshiRefs.add(tx.fapshiTxRef);
 
     const meta = (tx.metadata as Record<string, unknown> | null) ?? {};
+    if (typeof meta.payoutId === "string") {
+      handledPayoutIds.add(meta.payoutId);
+    }
     const metaPhone = typeof meta.phone === "string" ? meta.phone : user.phone;
     const metaBeneficiary = typeof meta.accountName === "string" ? meta.accountName : null;
 
@@ -271,6 +275,7 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
 
   // B. Relative contributions (cotisations pour un proche)
   for (const c of relativeContributions) {
+    if (c.payerPhone === "DIVA_WALLET") continue;
     if (c.fapshiTxRef && handledFapshiRefs.has(c.fapshiTxRef)) continue;
     if (c.fapshiTxRef) handledFapshiRefs.add(c.fapshiTxRef);
 
@@ -309,6 +314,7 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
 
   // C. Own direct contributions (not already represented in walletTx)
   for (const c of ownContributions) {
+    if (c.payerPhone === "DIVA_WALLET") continue;
     if (c.fapshiTxRef && handledFapshiRefs.has(c.fapshiTxRef)) continue;
     if (c.fapshiTxRef) handledFapshiRefs.add(c.fapshiTxRef);
 
@@ -347,6 +353,11 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
 
   // D. Payouts received (gains de tontine)
   for (const p of payouts) {
+    // Deduplicate: if payout was already credited in walletTx or payoutPhone is DIVA_WALLET, skip
+    if (handledPayoutIds.has(p.id) || p.payoutPhone === "DIVA_WALLET") {
+      continue;
+    }
+
     const sessionTitle =
       p.membershipSlot.membership.tontineSession.title ||
       p.membershipSlot.membership.tontineSession.type;

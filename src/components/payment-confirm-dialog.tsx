@@ -135,7 +135,7 @@ export function PaymentConfirmDialog({
   // free-text field) is what's being used.
   const [usedPhone, setUsedPhone] = useState("");
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
-  const [walletSelected, setWalletSelected] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<"WALLET" | "OPERATOR">("WALLET");
   const [payingWithWallet, setPayingWithWallet] = useState(false);
 
   useEffect(() => {
@@ -145,6 +145,9 @@ export function PaymentConfirmDialog({
       .then((data: { user?: { walletBalance?: number } } | null) => {
         if (!cancelled && data?.user && typeof data.user.walletBalance === "number") {
           setWalletBalance(data.user.walletBalance);
+          if (data.user.walletBalance <= 0) {
+            setPaymentMode("OPERATOR");
+          }
         }
       })
       .catch(() => {});
@@ -630,6 +633,35 @@ export function PaymentConfirmDialog({
             )}
 
             {quote && (
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMode("WALLET")}
+                  className={`p-2.5 rounded-xl text-xs font-bold border-2 flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    paymentMode === "WALLET"
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-950 shadow-xs"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[17px] text-emerald-700">account_balance_wallet</span>
+                  <span>Portefeuille (0% frais)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMode("OPERATOR")}
+                  className={`p-2.5 rounded-xl text-xs font-bold border-2 flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    paymentMode === "OPERATOR"
+                      ? "border-emerald-600 bg-emerald-50 text-emerald-950 shadow-xs"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[17px] text-amber-700">phone_android</span>
+                  <span>Orange / MTN Money</span>
+                </button>
+              </div>
+            )}
+
+            {quote && (
               <div className="flex flex-col gap-2 mb-4 bg-surface-container-low p-3.5 rounded-xl border border-outline-variant">
                 <div className="flex justify-between items-center text-sm">
                   <span className="font-body-md text-body-md text-on-surface-variant">{t("paymentPurposeLabel")}</span>
@@ -663,101 +695,132 @@ export function PaymentConfirmDialog({
                     <span className="font-label-md text-label-md text-on-surface">{formatXAF(quote.baseTotal)}</span>
                   </div>
                 )}
-                <div className="flex justify-between items-center text-sm">
-                  <span className="font-body-md text-body-md text-on-surface-variant flex items-center gap-1.5">
-                    <span>{operatorFeeLabel}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-semibold font-numeric-data">3,1%</span>
-                  </span>
-                  <span className="font-label-md text-label-md text-on-surface font-semibold text-amber-950">
-                    +{formatXAF(providerFeeAmount)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center border-t border-outline-variant pt-2.5 mt-1 bg-primary/5 -mx-3.5 -mb-3.5 p-3.5 rounded-b-xl border-t">
+                {paymentMode === "WALLET" ? (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="font-body-md text-body-md text-on-surface-variant flex items-center gap-1.5">
+                      <span>{lang === "fr" ? "Frais opérateur télécom" : "Operator telecom fees"}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 font-semibold font-numeric-data">0%</span>
+                    </span>
+                    <span className="font-label-md text-label-md text-emerald-700 font-bold">
+                      0 FCFA ({lang === "fr" ? "Sans frais réseau" : "No network fee"})
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="font-body-md text-body-md text-on-surface-variant flex items-center gap-1.5">
+                      <span>{operatorFeeLabel}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-semibold font-numeric-data">3,1%</span>
+                    </span>
+                    <span className="font-label-md text-label-md text-on-surface font-semibold text-amber-950">
+                      +{formatXAF(providerFeeAmount)}
+                    </span>
+                  </div>
+                )}
+                <div className={`flex justify-between items-center border-t border-outline-variant pt-2.5 mt-1 -mx-3.5 -mb-3.5 p-3.5 rounded-b-xl border-t ${
+                  paymentMode === "WALLET" ? "bg-emerald-500/10" : "bg-primary/5"
+                }`}>
                   <span className="font-label-md text-sm text-on-surface font-black uppercase tracking-wider">
                     {lang === "fr" ? "TOTAL À DÉBITER" : "TOTAL TO DEBIT"}
                   </span>
-                  <span className="font-headline-sm text-xl text-primary font-black">
-                    {formatXAF(totalCharged)}
+                  <span className={`font-headline-sm text-xl font-black ${
+                    paymentMode === "WALLET" ? "text-emerald-900" : "text-primary"
+                  }`}>
+                    {paymentMode === "WALLET"
+                      ? formatXAF(
+                          fineId && fineRepayMode === "PARTIAL" && parseInt(finePartialInput, 10) > 0
+                            ? parseInt(finePartialInput, 10)
+                            : quote.baseTotal
+                        )
+                      : formatXAF(totalCharged)}
                   </span>
                 </div>
               </div>
             )}
 
-            {quote && walletBalance !== null && (
-              <div className="mb-3 rounded-xl border border-emerald-600/40 bg-emerald-50/70 overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setWalletSelected((prev) => !prev)}
-                  className="w-full px-3 py-2 flex items-center justify-between gap-2 text-left hover:bg-emerald-100/50 transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="material-symbols-outlined text-emerald-700 text-[18px] flex-shrink-0">
-                      account_balance_wallet
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-xs font-extrabold text-emerald-950 truncate">
-                        {lang === "fr"
-                          ? "Payer via mon Portefeuille DIVA Asso"
-                          : "Pay via DIVA Asso Wallet"}
-                      </p>
-                      <p className="text-[10px] font-semibold text-emerald-700">
-                        {lang === "fr"
-                          ? "0 % frais opérateur (sans frais Orange/MTN)"
-                          : "0% operator fee (no Orange/MTN fees)"}
-                      </p>
-                    </div>
+            {/* A. Si mode Portefeuille sélectionné */}
+            {quote && paymentMode === "WALLET" && (
+              <div className="mb-4 flex flex-col gap-3">
+                <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
+                  <div>
+                    <p className="font-bold text-emerald-950">
+                      {lang === "fr" ? "Solde disponible sur votre Portefeuille" : "Available Wallet Balance"}
+                    </p>
+                    <p className="text-[11px] text-emerald-700">
+                      {lang === "fr" ? "Règlement direct 0% de frais Orange/MTN" : "Direct debit 0% Orange/MTN fee"}
+                    </p>
                   </div>
-                  <span className="material-symbols-outlined text-emerald-800 text-[18px] flex-shrink-0">
-                    {walletSelected ? "expand_less" : "chevron_right"}
+                  <span className="font-extrabold text-sm text-emerald-900">
+                    {formatXAF(walletBalance ?? 0)}
                   </span>
-                </button>
+                </div>
 
-                {walletSelected && (
-                  <div className="px-3 pb-2.5 pt-1 border-t border-emerald-200/70 flex flex-col gap-2">
-                    {(() => {
-                      const fineTargetAmount =
-                        fineId && fineRepayMode === "PARTIAL" && parseInt(finePartialInput, 10) > 0
-                          ? parseInt(finePartialInput, 10)
-                          : quote.baseTotal;
-                      return walletBalance >= fineTargetAmount ? (
-                        <>
-                          <p className="text-[11px] text-emerald-900 font-medium">
-                            {lang === "fr"
-                              ? `Vous allez régler ${fineId ? "l'amende" : "votre cotisation"} via votre Portefeuille DIVA Asso pour un montant de ${formatXAF(fineTargetAmount)} (0 % frais).`
-                              : `You will pay ${formatXAF(fineTargetAmount)} via your DIVA Asso Wallet (0% fees).`}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={handlePayWithWallet}
-                            disabled={payingWithWallet || submitting}
-                            className="w-full py-2 px-3 rounded-lg bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] text-white font-bold text-xs transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5"
-                          >
-                            <span className="material-symbols-outlined text-[15px]">bolt</span>
-                            <span>
-                              {payingWithWallet
-                                ? lang === "fr"
-                                  ? "Paiement en cours..."
-                                  : "Processing..."
-                                : lang === "fr"
-                                  ? `Confirmer (${formatXAF(fineTargetAmount)})`
-                                  : `Confirm (${formatXAF(fineTargetAmount)})`}
-                            </span>
-                          </button>
-                        </>
-                      ) : (
-                        <p className="text-[11px] text-red-700 font-semibold">
-                          {lang === "fr"
-                            ? "Solde insuffisant dans votre Portefeuille DIVA Asso pour régler ce montant."
-                            : "Insufficient balance in your DIVA Asso Wallet."}
-                        </p>
-                      );
-                    })()}
-                  </div>
-                )}
+                {(() => {
+                  const targetAmt =
+                    fineId && fineRepayMode === "PARTIAL" && parseInt(finePartialInput, 10) > 0
+                      ? parseInt(finePartialInput, 10)
+                      : quote.baseTotal;
+
+                  return (walletBalance ?? 0) >= targetAmt ? (
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={onClose}
+                        className="flex-1 px-3 py-2.5 rounded-xl border border-outline text-on-surface text-xs font-bold hover:bg-surface-variant/50 transition-colors"
+                      >
+                        {t("cancelAction")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handlePayWithWallet}
+                        disabled={payingWithWallet || submitting}
+                        className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs sm:text-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                      >
+                        {payingWithWallet ? (
+                          <span>{lang === "fr" ? "Paiement en cours..." : "Processing..."}</span>
+                        ) : (
+                          <>
+                            <span className="material-symbols-outlined text-[17px]">bolt</span>
+                            <span>{lang === "fr" ? `Confirmer (${formatXAF(targetAmt)})` : `Confirm (${formatXAF(targetAmt)})`}</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex flex-col gap-2">
+                      <p className="font-bold">
+                        {lang === "fr"
+                          ? `Solde portefeuille insuffisant (${formatXAF(walletBalance ?? 0)} disponibles pour ${formatXAF(targetAmt)} requis).`
+                          : `Insufficient wallet balance (${formatXAF(walletBalance ?? 0)} available for ${formatXAF(targetAmt)} needed).`}
+                      </p>
+                      <p className="text-[11px] text-amber-800">
+                        {lang === "fr"
+                          ? "Veuillez basculer sur l'option « Orange / MTN Money » ci-dessus ou recharger votre portefeuille."
+                          : "Please select Orange / MTN Money above or top up your wallet."}
+                      </p>
+                      <div className="flex gap-2 mt-1">
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMode("OPERATOR")}
+                          className="flex-1 py-2 px-3 rounded-lg bg-amber-800 hover:bg-amber-900 text-white font-bold text-center text-xs"
+                        >
+                          {lang === "fr" ? "Payer par Orange / MTN" : "Pay via Orange / MTN"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={onClose}
+                          className="px-3 py-2 rounded-lg border border-slate-300 text-xs font-semibold"
+                        >
+                          {t("cancelAction")}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
-            {quote && (
+            {/* B. Si mode Orange / MTN sélectionné */}
+            {quote && paymentMode === "OPERATOR" && (
               <div className="mb-4">
                 <label className="font-label-sm text-label-sm text-on-surface-variant block mb-1">
                   {t("mobileMoneyPhoneLabel")}
@@ -880,28 +943,28 @@ export function PaymentConfirmDialog({
                     </div>
                   </div>
                 )}
+
+                {payError && <p className="font-label-sm text-label-sm text-error mt-3">{payError}</p>}
+
+                <div className="flex gap-3 mt-4">
+                  <button
+                    onClick={onClose}
+                    className="flex-1 px-3 py-1.5 rounded-lg border border-outline text-on-surface text-xs font-bold hover:bg-surface-variant/50 transition-colors"
+                  >
+                    {t("cancelAction")}
+                  </button>
+                  <button
+                    onClick={() => handleConfirm()}
+                    disabled={!quote || submitting || isCurrentOperatorSuspended || (usingNewNumber ? !phone.trim() || isOperatorInvalid : !selectedMethodId)}
+                    className="flex-1 px-3 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-bold hover:opacity-90 active:scale-95 transition-all disabled:opacity-60 cursor-pointer"
+                  >
+                    {submitting
+                      ? t("redirectingToFapshi")
+                      : (lang === "fr" ? `Payer ${formatXAF(totalCharged)}` : `Pay ${formatXAF(totalCharged)}`)}
+                  </button>
+                </div>
               </div>
             )}
-
-            {payError && <p className="font-label-sm text-label-sm text-error mb-4">{payError}</p>}
-
-            <div className="flex gap-3">
-              <button
-                onClick={onClose}
-                className="flex-1 px-3 py-1.5 rounded-lg border border-outline text-on-surface text-xs font-bold hover:bg-surface-variant/50 transition-colors"
-              >
-                {t("cancelAction")}
-              </button>
-              <button
-                onClick={() => handleConfirm()}
-                disabled={!quote || submitting || isCurrentOperatorSuspended || (usingNewNumber ? !phone.trim() || isOperatorInvalid : !selectedMethodId)}
-                className="flex-1 px-3 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-bold hover:opacity-90 active:scale-95 transition-all disabled:opacity-60 cursor-pointer"
-              >
-                {submitting
-                  ? t("redirectingToFapshi")
-                  : (lang === "fr" ? `Payer ${formatXAF(totalCharged)}` : `Pay ${formatXAF(totalCharged)}`)}
-              </button>
-            </div>
           </>
         )}
 

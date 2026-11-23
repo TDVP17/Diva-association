@@ -15,6 +15,8 @@ import {
 import { sendPayout, FapshiPayoutError } from "@/lib/fapshi-payout";
 import { fapshiMediumFor } from "@/lib/mobile-money-provider";
 import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
+import { sendEmailSafe } from "@/lib/email/resend";
+import { renderBrandedEmailHtml } from "@/lib/email/template";
 import { formatXAF } from "@/lib/format-currency";
 import { logAudit } from "@/lib/audit";
 import { getEffectiveWithdrawalLimits } from "@/lib/withdrawal-limits";
@@ -269,6 +271,24 @@ export async function POST(request: Request) {
       }).catch(() => {});
     }
 
+    // Notify the member that their withdrawal request was submitted
+    const userLang = (user as { preferredLang?: string }).preferredLang || "fr";
+    const userPendingMsg =
+      userLang === "en"
+        ? `Your withdrawal request of ${formatXAF(amount)} to ${method.provider} ${method.phone} has been submitted to DIVA Asso admin for validation.`
+        : `Votre demande de retrait de ${formatXAF(amount)} vers ${method.provider} ${method.phone} a bien été enregistrée et est en attente de validation par l'administration.`;
+
+    await scheduleInAppNotifications({
+      type: "ADMIN_BROADCAST",
+      recipients: [
+        {
+          userId,
+          message: userPendingMsg,
+          actionUrl: "/wallet",
+        },
+      ],
+    }).catch(() => {});
+
     await logAudit({
       actorId: userId,
       actorRole: session.user.role,
@@ -349,6 +369,40 @@ export async function POST(request: Request) {
       fapshiTransId,
     },
   });
+
+  // Notify member that their automated withdrawal was completed
+  const userLang = (user as { preferredLang?: string }).preferredLang || "fr";
+  const userCompletedMsg =
+    userLang === "en"
+      ? `Your withdrawal of ${formatXAF(amount)} has been sent successfully to your ${method.provider} account ${method.phone} (0% fees). New wallet balance: ${formatXAF(balanceAfter)}.`
+      : `Votre retrait de ${formatXAF(amount)} a été transféré avec succès vers votre compte ${method.provider} ${method.phone} (0 % de frais). Nouveau solde : ${formatXAF(balanceAfter)}.`;
+
+  await scheduleInAppNotifications({
+    type: "ADMIN_BROADCAST",
+    recipients: [
+      {
+        userId,
+        message: userCompletedMsg,
+        actionUrl: "/wallet",
+      },
+    ],
+  }).catch(() => {});
+
+  if (user.email) {
+    const emailTitle =
+      userLang === "en"
+        ? `Withdrawal completed (${formatXAF(amount)}) — DIVA Asso`
+        : `Retrait effectué avec succès (${formatXAF(amount)}) — DIVA Asso`;
+    const html = renderBrandedEmailHtml({
+      title: emailTitle,
+      bodyText: userCompletedMsg,
+      actionUrl: "/wallet",
+      actionLabel: userLang === "en" ? "View my wallet" : "Voir mon portefeuille",
+      recipientName: user.name,
+      lang: userLang === "en" ? "en" : "fr",
+    });
+    await sendEmailSafe(user.email, emailTitle, html).catch(() => {});
+  }
 
   await logAudit({
     actorId: userId,
