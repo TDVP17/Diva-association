@@ -384,9 +384,9 @@ export function renderFineNoticeMessage(
 
 export function renderFoodTurnMessage(lang: string, name: string): string {
   if (lang === "en") {
-    return `Hello, ${name} 👋! It's your turn to receive the payout! 🍲🎉 All members have contributed: please provide your phone number and Orange/MTN Money account name to receive your transfer.`;
+    return `Hello, ${name} 👋! It's your turn to receive the payout! 🍲🎉 All members have contributed: your pot is credited directly to your DIVA Asso Wallet. You can withdraw anytime!`;
   }
-  return `Salut, ${name} 👋 ! C'est votre tour de bouffer la cagnotte ! 🍲🎉 Tous les membres ont cotisé : veuillez fournir votre numéro de téléphone et le nom du compte Orange/MTN Money pour recevoir votre virement.`;
+  return `Salut, ${name} 👋 ! C'est votre tour de bouffer la cagnotte ! 🍲🎉 Tous les membres ont cotisé : votre cagnotte est rechargée directement sur votre Portefeuille DIVA Asso. Vous pouvez faire un retrait à tout moment !`;
 }
 
 export function renderTurnReminderTomorrowMessage(
@@ -397,9 +397,9 @@ export function renderTurnReminderTomorrowMessage(
   position: number,
 ): string {
   if (lang === "en") {
-    return `Hello, ${name} 👋 🎉 Tomorrow is your turn to receive the ${sessionTitle} pot (position #${position})! Estimated amount: ${formatXAF(estimatedAmount)}. Please make sure your payout details are up to date!`;
+    return `Hello, ${name} 👋 🎉 Tomorrow is your turn to receive the ${sessionTitle} pot (position #${position})! Estimated amount: ${formatXAF(estimatedAmount)}. The payout will be credited directly to your DIVA Asso Wallet!`;
   }
-  return `Salut, ${name} 👋 🎉 Demain, c'est votre tour de bouffer la cagnotte pour « ${sessionTitle} » (position n°${position}) ! Montant estimé : ${formatXAF(estimatedAmount)}. Assurez-vous que vos coordonnées de retrait sont bien renseignées !`;
+  return `Salut, ${name} 👋 🎉 Demain, c'est votre tour de bouffer la cagnotte pour « ${sessionTitle} » (position n°${position}) ! Montant estimé : ${formatXAF(estimatedAmount)}. La cagnotte sera rechargée directement sur votre Portefeuille DIVA Asso !`;
 }
 
 export function renderAdvanceReminderMessage(

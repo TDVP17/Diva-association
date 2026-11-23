@@ -10,6 +10,7 @@ import { scheduleInAppNotifications } from "@/lib/notifications/dispatch";
 import { formatXAF } from "@/lib/format-currency";
 import { translate, type Lang } from "@/lib/i18n/translations";
 import { TONTINE_TYPE_LABELS } from "@/lib/tontine-labels";
+import { executeWalletPayoutForSlot } from "@/lib/execute-wallet-payout";
 
 export type ContributionWithSlot = Contribution & {
   membershipSlot: MembershipSlot & {
@@ -180,38 +181,15 @@ export async function settleContribution(
         });
 
         if (totalRequired > 0 && paidCount >= totalRequired) {
-          const alreadyAlerted = await prisma.notification.findFirst({
-            where: {
-              userId: designatedSlot.membership.userId,
+          // Automatic wallet credit for the designated beneficiary!
+          try {
+            await executeWalletPayoutForSlot({
               tontineSessionId: membership.tontineSessionId,
-              type: "PAYOUT_TURN",
-              createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-            },
-          });
-
-          if (!alreadyAlerted) {
-            const benUser = designatedSlot.membership.user;
-            const benLang: Lang = benUser.preferredLang === "en" ? "en" : "fr";
-            const benRawName = benUser.name.trim();
-            const benFirstName = benRawName.split(/\s+/)[0] || benRawName;
-            const alertMsg =
-              benLang === "fr"
-                ? `Salut, ${benFirstName} 👋 ! C'est à votre tour de bouffer la cagnotte de ${sessionLabel} ! 🎉 Tous les membres ont cotisé : veuillez fournir obligatoirement vos deux numéros (un MTN et un Orange) avec les noms de chaque compte pour que DIVA Asso effectue votre virement.`
-                : `Hello, ${benFirstName} 👋! It's your turn to receive the ${sessionLabel} payout! 🎉 All members have contributed: please provide BOTH your MTN Mobile Money and Orange Money numbers with their respective account names so DIVA Asso can process your transfer.`;
-
-            await scheduleInAppNotifications({
-              tontineSessionId: membership.tontineSessionId,
-              type: "PAYOUT_TURN",
-              recipients: [
-                {
-                  userId: benUser.id,
-                  message: alertMsg,
-                  messageKey: "payoutTurnNotifMessage",
-                  messageVars: { name: benFirstName, cotisation: sessionLabel },
-                  actionUrl: `/sessions/${membership.tontineSessionId}`,
-                },
-              ],
+              membershipSlotId: designatedSlot.id,
+              dueDate: contribution.dueDate,
             });
+          } catch (autoErr) {
+            console.error("[settleContribution] Auto wallet payout execution failed:", autoErr);
           }
         }
       }

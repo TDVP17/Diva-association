@@ -2012,7 +2012,7 @@ async function checkAndTriggerMilestone100Percent(
               recipients: [
                 {
                   userId: designated.memberships.userId,
-                  message: `C'est à votre tour de bouffer la cagnotte de ${sessionLabel} ! 🎉 Tous les membres ont cotisé : veuillez fournir votre numéro Mobile/Orange Money pour recevoir votre virement.`,
+                  message: `C'est votre tour de bouffer la cagnotte de ${sessionLabel} ! 🎉 Votre compte principal (Portefeuille DIVA Asso) est rechargé automatiquement. Vous pouvez effectuer un retrait à tout moment !`,
                   messageKey: "payoutTurnNotifMessage",
                   messageVars: { cotisation: sessionLabel },
                   actionUrl: `/sessions/${sessionId}`,
