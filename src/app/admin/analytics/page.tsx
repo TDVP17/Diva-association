@@ -25,26 +25,95 @@ export default async function AdminAnalyticsPage() {
         </p>
       </div>
 
-      {/* ── SECTION 1 : PORTEFEUILLE DES MEMBRES ── */}
-      <section className="bg-gradient-to-r from-emerald-900 to-[#064e3b] text-white rounded-3xl p-6 sm:p-7 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-emerald-800">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center flex-shrink-0">
-            <span className="material-symbols-outlined text-3xl text-emerald-300">account_balance_wallet</span>
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-emerald-200 uppercase tracking-wider">
-              {lang === "fr" ? "Solde total portefeuilles membres" : "Total Members Wallet Balance"}
-            </p>
-            <p className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-0.5">
-              {formatXAF(data.totalMembersWalletBalance)}
-            </p>
-            <p className="text-[11px] text-emerald-300/80 mt-0.5">
-              {lang === "fr"
-                ? `Montant total actuellement disponible dans les portefeuilles (${data.totalUsersWithWallet} comptes)`
-                : `Total funds currently available in member wallets (${data.totalUsersWithWallet} accounts)`}
-            </p>
+      {/* ── SECTION 1 : PORTEFEUILLE DES MEMBRES & FLUX ── */}
+      <section className="flex flex-col gap-4">
+        <div className="bg-gradient-to-r from-emerald-900 via-[#064e3b] to-emerald-950 text-white rounded-3xl p-6 sm:p-7 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-emerald-800">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center flex-shrink-0">
+              <span className="material-symbols-outlined text-3xl text-emerald-300">account_balance_wallet</span>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-emerald-200 uppercase tracking-wider">
+                {lang === "fr" ? "Solde total disponible dans les portefeuilles" : "Total Available Wallet Balance"}
+              </p>
+              <p className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-0.5">
+                {formatXAF(data.wallet.totalBalance)}
+              </p>
+              <p className="text-[11px] text-emerald-300/80 mt-0.5">
+                {lang === "fr"
+                  ? `Fonds actuellement détenus par les membres (${data.wallet.membersWithBalance.length} compte(s) avec solde positif)`
+                  : `Funds currently held by members (${data.wallet.membersWithBalance.length} account(s) with positive balance)`}
+              </p>
+            </div>
           </div>
         </div>
+
+        {/* Sous-cartes des flux de portefeuille */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Cagnottes & Recharges versées sur portefeuilles */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-sm text-emerald-600">arrow_downward</span>
+              {lang === "fr" ? "Crédits portefeuilles (Bouffes / Recharges)" : "Total Credited to Wallets"}
+            </span>
+            <p className="text-xl sm:text-2xl font-extrabold text-emerald-800 mt-2">
+              {formatXAF(data.wallet.totalCredited)}
+            </p>
+            <span className="text-[10px] text-slate-400 mt-1">
+              {lang === "fr" ? "Cagnottes bouffées et recharges versées" : "Pots won and deposits credited"}
+            </span>
+          </div>
+
+          {/* Retraits vers MOMO / OM */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-sm text-rose-600">arrow_upward</span>
+              {lang === "fr" ? "Retraits vers Orange / MTN Money" : "Withdrawals to Mobile Money"}
+            </span>
+            <p className="text-xl sm:text-2xl font-extrabold text-rose-700 mt-2">
+              {formatXAF(data.wallet.totalWithdrawn)}
+            </p>
+            <span className="text-[10px] text-slate-400 mt-1">
+              {lang === "fr" ? "Retraits effectués par les membres" : "Funds withdrawn to external accounts"}
+            </span>
+          </div>
+
+          {/* Cotisations payées depuis le portefeuille */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-sm text-blue-600">sync_alt</span>
+              {lang === "fr" ? "Cotisé depuis le portefeuille" : "Contributed from Wallet"}
+            </span>
+            <p className="text-xl sm:text-2xl font-extrabold text-blue-800 mt-2">
+              {formatXAF(data.wallet.totalContributed)}
+            </p>
+            <span className="text-[10px] text-slate-400 mt-1">
+              {lang === "fr" ? "Cotisations réglées avec le solde" : "Contributions paid using wallet balance"}
+            </span>
+          </div>
+        </div>
+
+        {/* Détail des comptes ayant un solde actif */}
+        {data.wallet.membersWithBalance.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+            <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">
+              {lang === "fr" ? "Membres avec solde disponible sur portefeuille" : "Members with available wallet balance"}
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              {data.wallet.membersWithBalance.map((m) => (
+                <div
+                  key={m.id}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 font-semibold"
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span>{m.name}</span>
+                  {m.phone && <span className="text-emerald-700/80 text-[11px]">({m.phone})</span>}
+                  <span className="font-extrabold text-emerald-800 ml-1">{formatXAF(m.balance)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ── SECTION 2 : COTISATIONS PUBLIQUES ── */}

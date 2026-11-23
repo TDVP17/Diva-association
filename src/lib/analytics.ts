@@ -47,6 +47,18 @@ export interface RevenueAnalytics {
   // Portefeuilles des membres
   totalMembersWalletBalance: number;
   totalUsersWithWallet: number;
+  wallet: {
+    totalBalance: number;
+    totalCredited: number;
+    totalWithdrawn: number;
+    totalContributed: number;
+    membersWithBalance: {
+      id: string;
+      name: string;
+      phone: string | null;
+      balance: number;
+    }[];
+  };
 
   // Globaux
   totalFees: number;
@@ -67,7 +79,14 @@ export interface RevenueAnalytics {
  * 3. Total soldes portefeuilles des membres
  */
 export async function getRevenueAnalytics(): Promise<RevenueAnalytics> {
-  const [sessions, walletAgg] = await Promise.all([
+  const [
+    sessions,
+    walletAgg,
+    walletDepositAgg,
+    walletWithdrawalAgg,
+    walletContributionAgg,
+    usersWithBalance,
+  ] = await Promise.all([
     prisma.tontineSession.findMany({
       select: {
         id: true,
@@ -104,10 +123,52 @@ export async function getRevenueAnalytics(): Promise<RevenueAnalytics> {
       _sum: { walletBalance: true },
       _count: { id: true },
     }),
+    prisma.walletTransaction.aggregate({
+      where: {
+        status: "COMPLETED",
+        type: { in: ["PAYOUT", "DEPOSIT"] },
+      },
+      _sum: { amount: true },
+    }),
+    prisma.walletTransaction.aggregate({
+      where: {
+        status: "COMPLETED",
+        type: "WITHDRAWAL",
+      },
+      _sum: { amount: true },
+    }),
+    prisma.walletTransaction.aggregate({
+      where: {
+        status: "COMPLETED",
+        type: "CONTRIBUTION",
+      },
+      _sum: { amount: true },
+    }),
+    prisma.user.findMany({
+      where: {
+        walletBalance: { gt: 0 },
+      },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        walletBalance: true,
+      },
+      orderBy: { walletBalance: "desc" },
+    }),
   ]);
 
   const totalMembersWalletBalance = Number(walletAgg._sum.walletBalance || 0);
   const totalUsersWithWallet = walletAgg._count.id;
+  const totalCredited = Number(walletDepositAgg._sum.amount || 0);
+  const totalWithdrawn = Number(walletWithdrawalAgg._sum.amount || 0);
+  const totalContributed = Number(walletContributionAgg._sum.amount || 0);
+  const membersWithBalance = usersWithBalance.map((u) => ({
+    id: u.id,
+    name: u.name,
+    phone: u.phone,
+    balance: Number(u.walletBalance),
+  }));
 
   const perSession: SessionRevenue[] = sessions.map((s) => {
     const isPrivate = Boolean(s.isPrivate);
@@ -193,6 +254,13 @@ export async function getRevenueAnalytics(): Promise<RevenueAnalytics> {
     },
     totalMembersWalletBalance,
     totalUsersWithWallet,
+    wallet: {
+      totalBalance: totalMembersWalletBalance,
+      totalCredited,
+      totalWithdrawn,
+      totalContributed,
+      membersWithBalance,
+    },
     totalFees: perSession.reduce((sum, s) => sum + s.fees, 0),
     totalFines: perSession.reduce((sum, s) => sum + s.fines, 0),
     totalRevenue: perSession.reduce((sum, s) => sum + s.total, 0),

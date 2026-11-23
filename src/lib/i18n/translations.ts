@@ -268,7 +268,7 @@ export const translations = {
     payoutDetailsSubmittedNotice:
       "Your payout details have been submitted to DIVA Asso (MTN: {mtnPhone} - {mtnName} | Orange: {orangePhone} - {orangeName}). The transfer is being processed.",
     payoutTurnAlertPrompt:
-      "Action required: You must provide both your MTN and Orange Money account numbers with names to receive your payout.",
+      "Good news: All members have contributed! Your pot has been credited directly into your DIVA Asso Wallet. You can withdraw anytime to your verified phone number.",
     mtnSectionTitle: "MTN Mobile Money Account",
     orangeSectionTitle: "Orange Money Account",
     mtnPhoneLabel: "MTN Mobile Money Number",
@@ -889,7 +889,7 @@ export const translations = {
     fineReminderMessage:
       "Hello {name} ❤️\nThis is a friendly reminder about your outstanding fine of {amount}. Please remember to settle it before the contribution closes so that you remain eligible to participate in future contributions. 🙏",
     foodTurnMessage:
-      "Hello, {name} 👋! It's your turn to receive the payout! 🍲🎉 All members have contributed: please provide your phone number and Orange/MTN Money account name to receive your transfer.",
+      "Hello, {name} 👋! It's your turn to receive the payout! 🍲🎉 All members have contributed: your pot is credited directly to your DIVA Asso Wallet. You can withdraw anytime to your verified phone number!",
     notifTypeContributionReminder: "Contribution Reminder",
     notifTypeFineReminder: "Fine Reminder",
     notifTypeFoodTurn: "It's Your Turn!",
@@ -1549,7 +1549,7 @@ export const translations = {
     payoutDetailsSubmittedNotice:
       "Vos coordonnées ont été transmises à DIVA Asso (MTN : {mtnPhone} - {mtnName} | Orange : {orangePhone} - {orangeName}). Le virement est en cours de traitement.",
     payoutTurnAlertPrompt:
-      "Action requise : Vous devez obligatoirement fournir vos deux numéros (MTN et Orange) avec leurs noms respectifs pour recevoir votre virement.",
+      "Bonne nouvelle : Tous les membres ont cotisé ! Votre cagnotte a été rechargée directement sur votre Portefeuille DIVA Asso. Vous pouvez effectuer votre retrait à tout moment vers votre numéro vérifié.",
     mtnSectionTitle: "Compte MTN Mobile Money",
     orangeSectionTitle: "Compte Orange Money",
     mtnPhoneLabel: "Numéro MTN Mobile Money",
@@ -2173,7 +2173,7 @@ export const translations = {
     fineReminderMessage:
       "Salut, {name} 👋 ❤️\n\nPetit rappel amical concernant votre amende impayée de {amount}. Merci de la régler avant la clôture de la cotisation pour rester éligible aux prochaines cotisations. 🙏",
     foodTurnMessage:
-      "Salut, {name} 👋 ! C'est votre tour de bouffer la cagnotte ! 🍲🎉 Tous les membres ont cotisé : veuillez fournir votre numéro de téléphone et le nom du compte Orange/MTN Money pour recevoir votre virement.",
+      "Salut, {name} 👋 ! C'est votre tour de bouffer la cagnotte ! 🍲🎉 Tous les membres ont cotisé : votre cagnotte a été rechargée directement sur votre Portefeuille DIVA Asso. Vous pouvez effectuer un retrait à tout moment vers votre numéro vérifié !",
     notifTypeContributionReminder: "Rappel de cotisation",
     notifTypeFineReminder: "Rappel d'amende",
     notifTypeFoodTurn: "C'est ton tour !",
