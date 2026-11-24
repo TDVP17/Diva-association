@@ -1566,7 +1566,7 @@ export const translations = {
     waPayoutReleasedWithDeduction:
       "Compte principal rechargé — DIVA Asso\n\nFélicitations {name} ! Votre Portefeuille DIVA Asso a été rechargé de {amount} pour votre bouffe de {beneficiary} (après déduction de {deducted} d'amendes, prêts ou cotisations). Vous pouvez retirer votre argent à tout moment, ou laisser une partie pour cotiser automatiquement sans payer de frais Orange ou MTN.",
     waTurnReminderTomorrow:
-      "⏰ Rappel — DIVA Asso\n\nBonjour {name},\n\nDemain ({date}) est la date estimée de votre tour pour recevoir la cagnotte de {cotisation} (position n°{position}).\n\n💰 Montant estimé : {amount}\n\nAssurez-vous que vos coordonnées Mobile / Orange Money sont à jour dans votre profil. En cas de question, contactez le support depuis l'application.\n\nL'équipe DIVA Asso",
+      "⏰ Rappel — DIVA Asso\n\nSalut {name},\n\nDemain ({date}) est la date estimée de votre tour pour recevoir la cagnotte de {cotisation} (position n°{position}).\n\n💰 Montant estimé : {amount}\n\nAssurez-vous que vos coordonnées Mobile / Orange Money sont à jour dans votre profil. En cas de question, contactez le support depuis l'application.\n\nL'équipe DIVA Asso",
     turnReminderTomorrowNotifMessage: "Demain ({date}) est la date estimée de votre tour pour recevoir la cagnotte de {cotisation} — position n°{position}, environ {amount}.",
     notifTypeTurnReminderTomorrow: "Votre tour est demain",
     myConversations: "Mes conversations",
@@ -2131,7 +2131,7 @@ export const translations = {
     downloadReceiptPdf: "Télécharger le reçu (PDF)",
     paymentReceivedEmailSubject: "Paiement reçu — {session}",
     paymentSentEmailSubject: "Paiement envoyé — {session}",
-    paymentReceivedEmailGreeting: "Bonjour {name},",
+    paymentReceivedEmailGreeting: "Salut {name},",
     paymentReceivedEmailIntro: "🎉 Votre contribution a été reçue avec succès.",
     thankYouContributionLine: "Merci pour votre contribution chez DIVA asso.",
     contributionsNav: "Cotisations",

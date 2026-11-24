@@ -38,74 +38,79 @@ export function DashboardClient({
       {/* ── 1. EN-TÊTE PERSONNALISÉ ── */}
       <div className="flex items-center justify-between gap-3 pt-1">
         <div className="min-w-0">
-          <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">
-            Coucou mon Asso 👋
+          <h1 className="text-lg sm:text-xl font-extrabold text-[#003528] tracking-tight flex items-center gap-1.5">
+            <span>Coucou mon Asso</span>
+            <span className="text-xl">🌿</span>
           </h1>
+          <p className="text-[11px] font-bold text-[#025b34] mt-0.5">
+            Votre espace solidaire &amp; financier sécurisé
+          </p>
         </div>
 
         {/* Badge Étoiles Confiance */}
         <Link
           href="/loans"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors flex-shrink-0 shadow-2xs"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#efc25b]/20 border border-[#efc25b] hover:bg-[#efc25b]/30 transition-colors flex-shrink-0 shadow-2xs"
           title="Score de Confiance DIVA Asso"
         >
-          <span className="material-symbols-outlined text-amber-500 text-[18px]">star</span>
-          <span className="text-xs font-extrabold text-amber-900">{member.stars}/5</span>
+          <span className="material-symbols-outlined text-[#efc25b] text-[18px]">star</span>
+          <span className="text-xs font-black text-[#003528]">{member.stars}/5</span>
         </Link>
       </div>
 
       {/* ── 2. ACTIONS RAPIDES (Quick Access 4 Grids) ── */}
       <div>
-        <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-2.5 px-0.5">
-          Actions rapides
+        <h2 className="text-xs font-extrabold uppercase tracking-wider text-[#025b34] mb-2.5 px-0.5 flex items-center gap-1">
+          <span className="material-symbols-outlined text-[15px] text-[#efc25b]">bolt</span>
+          <span>Actions rapides</span>
         </h2>
         <div className="grid grid-cols-4 gap-2 sm:gap-2.5">
           {/* Action 1: Créer cotisation privée */}
           <Link
             href="/private-tontines"
-            className="flex flex-col items-center justify-center p-3 rounded-2xl bg-white border border-slate-200/80 hover:border-amber-400 hover:bg-amber-50/40 active:scale-95 transition-all text-center group shadow-2xs"
+            className="flex flex-col items-center justify-center p-3 rounded-2xl bg-gradient-to-b from-white to-[#efc25b]/10 border border-[#efc25b]/40 hover:border-[#efc25b] active:scale-95 transition-all text-center group shadow-2xs"
           >
-            <div className="w-10 h-10 rounded-xl bg-amber-100/80 text-amber-900 flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-xl bg-[#efc25b]/25 text-[#003528] flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
               <span className="material-symbols-outlined text-[20px]">add_moderator</span>
             </div>
-            <span className="text-[11px] font-bold text-slate-800 line-clamp-1">Créer</span>
-            <span className="text-[9px] text-slate-400">Cotis. privée</span>
+            <span className="text-[11px] font-extrabold text-slate-800 line-clamp-1">Créer</span>
+            <span className="text-[9px] text-[#025b34] font-semibold">Cotis. privée</span>
           </Link>
 
           {/* Action 2: Cotiser */}
           <Link
             href="/sessions"
-            className="flex flex-col items-center justify-center p-3 rounded-2xl bg-white border border-slate-200/80 hover:border-emerald-500 hover:bg-emerald-50/40 active:scale-95 transition-all text-center group shadow-2xs"
+            className="flex flex-col items-center justify-center p-3 rounded-2xl bg-gradient-to-b from-white to-[#025b34]/10 border border-[#025b34]/30 hover:border-[#025b34] active:scale-95 transition-all text-center group shadow-2xs"
           >
-            <div className="w-10 h-10 rounded-xl bg-emerald-100/80 text-emerald-900 flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-xl bg-[#025b34] text-white flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform shadow-xs">
               <span className="material-symbols-outlined text-[20px]">payments</span>
             </div>
-            <span className="text-[11px] font-bold text-slate-800 line-clamp-1">Cotiser</span>
-            <span className="text-[9px] text-slate-400">Session</span>
+            <span className="text-[11px] font-extrabold text-slate-800 line-clamp-1">Cotiser</span>
+            <span className="text-[9px] text-[#025b34] font-semibold">Session</span>
           </Link>
 
           {/* Action 3: Découvrir cotisations publiques */}
           <Link
             href="/sessions"
-            className="flex flex-col items-center justify-center p-3 rounded-2xl bg-white border border-slate-200/80 hover:border-blue-400 hover:bg-blue-50/40 active:scale-95 transition-all text-center group shadow-2xs"
+            className="flex flex-col items-center justify-center p-3 rounded-2xl bg-gradient-to-b from-white to-[#025b34]/5 border border-slate-200 hover:border-[#025b34] active:scale-95 transition-all text-center group shadow-2xs"
           >
-            <div className="w-10 h-10 rounded-xl bg-blue-100/80 text-blue-900 flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-xl bg-[#003528]/10 text-[#003528] flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
               <span className="material-symbols-outlined text-[20px]">explore</span>
             </div>
-            <span className="text-[11px] font-bold text-slate-800 line-clamp-1">Découvrir</span>
-            <span className="text-[9px] text-slate-400">Publiques</span>
+            <span className="text-[11px] font-extrabold text-slate-800 line-clamp-1">Découvrir</span>
+            <span className="text-[9px] text-slate-500 font-medium">Publiques</span>
           </Link>
 
           {/* Action 4: Portefeuille */}
           <Link
             href="/wallet"
-            className="flex flex-col items-center justify-center p-3 rounded-2xl bg-white border border-slate-200/80 hover:border-teal-500 hover:bg-teal-50/40 active:scale-95 transition-all text-center group shadow-2xs"
+            className="flex flex-col items-center justify-center p-3 rounded-2xl bg-gradient-to-b from-white to-[#efc25b]/15 border border-[#efc25b]/45 hover:border-[#efc25b] active:scale-95 transition-all text-center group shadow-2xs"
           >
-            <div className="w-10 h-10 rounded-xl bg-teal-100/80 text-teal-900 flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-xl bg-[#003528] text-[#efc25b] flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform shadow-xs">
               <span className="material-symbols-outlined text-[20px]">account_balance_wallet</span>
             </div>
-            <span className="text-[11px] font-bold text-slate-800 line-clamp-1">Portefeuille</span>
-            <span className="text-[9px] text-slate-400">Finances</span>
+            <span className="text-[11px] font-extrabold text-slate-800 line-clamp-1">Portefeuille</span>
+            <span className="text-[9px] text-[#025b34] font-bold">Finances</span>
           </Link>
         </div>
       </div>
@@ -114,39 +119,39 @@ export function DashboardClient({
       <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
         <Link
           href="/sessions"
-          className="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col gap-0.5 hover:border-emerald-400 hover:bg-emerald-50/20 active:scale-95 transition-all group cursor-pointer"
+          className="p-3.5 rounded-2xl bg-gradient-to-br from-white to-[#025b34]/5 border border-[#025b34]/30 shadow-2xs flex flex-col gap-0.5 hover:border-[#025b34] active:scale-95 transition-all group cursor-pointer"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#025b34]">
               Tontines actives
             </span>
-            <span className="material-symbols-outlined text-slate-400 group-hover:text-emerald-600 text-sm transition-colors">
+            <span className="material-symbols-outlined text-[#025b34] group-hover:translate-x-0.5 text-sm transition-transform">
               arrow_forward
             </span>
           </div>
-          <span className="text-lg font-extrabold text-slate-900">
+          <span className="text-xl font-black text-[#003528]">
             {statistics.activeSessionsCount}
           </span>
-          <span className="text-[10px] text-emerald-700 font-semibold">
+          <span className="text-[10px] text-[#025b34] font-extrabold">
             {statistics.activeSessionsCount > 0 ? "Inscrit" : "Aucune"}
           </span>
         </Link>
 
         <Link
           href="/fines"
-          className="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex flex-col gap-0.5 hover:border-red-400 hover:bg-red-50/20 active:scale-95 transition-all group cursor-pointer"
+          className="p-3.5 rounded-2xl bg-gradient-to-br from-white to-amber-50/30 border border-slate-200/90 shadow-2xs flex flex-col gap-0.5 hover:border-amber-400 active:scale-95 transition-all group cursor-pointer"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
               Amendes impayées
             </span>
-            <span className="material-symbols-outlined text-slate-400 group-hover:text-red-600 text-sm transition-colors">
+            <span className="material-symbols-outlined text-slate-400 group-hover:text-amber-700 text-sm transition-colors">
               arrow_forward
             </span>
           </div>
           <span
-            className={`text-lg font-extrabold ${
-              statistics.unpaidFinesCount > 0 ? "text-red-600" : "text-emerald-700"
+            className={`text-xl font-black ${
+              statistics.unpaidFinesCount > 0 ? "text-red-600" : "text-[#025b34]"
             }`}
           >
             {statistics.unpaidFinesCount}
@@ -160,15 +165,15 @@ export function DashboardClient({
       {/* ── 4. MA PROCHAINE COTISATION (Échéance imminente ou Empty State) ── */}
       <div>
         <div className="flex items-center justify-between mb-2 px-0.5">
-          <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
+          <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-600">
             Ma prochaine cotisation
           </h2>
           {nextContribution && (
             <span
-              className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
+              className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
                 nextContribution.isOverdue
                   ? "bg-red-100 text-red-800"
-                  : "bg-emerald-100 text-emerald-900"
+                  : "bg-[#025b34]/10 text-[#025b34] border border-[#025b34]/20"
               }`}
             >
               {nextContribution.isOverdue ? "En retard" : "Échéance à venir"}
@@ -181,17 +186,17 @@ export function DashboardClient({
             className={`rounded-2xl p-4 sm:p-5 border-2 shadow-xs transition-all ${
               nextContribution.isOverdue
                 ? "bg-red-50/60 border-red-300"
-                : "bg-white border-emerald-600/30"
+                : "bg-gradient-to-br from-white via-emerald-50/30 to-[#025b34]/5 border-[#025b34]/40"
             }`}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">
+                  <h3 className="font-extrabold text-[#003528] text-sm sm:text-base">
                     {nextContribution.sessionTitle}
                   </h3>
                   {nextContribution.isPrivate && (
-                    <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 text-[10px] font-extrabold">
+                    <span className="px-1.5 py-0.5 rounded bg-[#efc25b]/20 text-[#003528] border border-[#efc25b]/60 text-[10px] font-extrabold">
                       Privée
                     </span>
                   )}
@@ -200,7 +205,7 @@ export function DashboardClient({
                   Nom : <strong>{nextContribution.beneficiaryName}</strong>
                 </p>
                 <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[16px] text-slate-400">
+                  <span className="material-symbols-outlined text-[16px] text-[#025b34]">
                     event
                   </span>
                   <span>{nextContribution.formattedDueDate}</span>
@@ -208,10 +213,10 @@ export function DashboardClient({
               </div>
 
               <div className="text-right flex-shrink-0">
-                <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                <span className="text-[10px] font-bold uppercase text-slate-500 block">
                   Montant
                 </span>
-                <span className="text-base sm:text-lg font-extrabold text-emerald-800">
+                <span className="text-base sm:text-lg font-black text-[#025b34]">
                   {nextContribution.formattedAmount}
                 </span>
               </div>
@@ -225,7 +230,7 @@ export function DashboardClient({
               </span>
               <Link
                 href={`/sessions/${nextContribution.sessionId}`}
-                className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white font-bold text-xs flex items-center gap-1 transition-all shadow-xs flex-shrink-0"
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#025b34] to-[#003528] hover:opacity-95 active:scale-95 text-white font-bold text-xs flex items-center gap-1 transition-all shadow-xs border border-[#efc25b]/30 flex-shrink-0"
               >
                 <span>Cotiser</span>
                 <span className="material-symbols-outlined text-[16px]">arrow_forward</span>

@@ -270,7 +270,7 @@ export async function PATCH(
       title: lang === "fr" ? "💰 Retrait validé et viré avec succès ! ✨" : "💰 Withdrawal Approved & Disbursed! ✨",
       bodyText:
         lang === "fr"
-          ? `Bonjour ${withdrawal.user.name} 👋,\n\n🎉 Votre demande de retrait de ${formatXAF(amount)} vers votre numéro ${withdrawal.provider} ${withdrawal.phone} (${withdrawal.accountName}) a été approuvée et transférée avec 0% de frais 💸 !\n\n🛡️ Référence officielle : ${fapshiTransId}.`
+          ? `Salut ${withdrawal.user.name} 👋,\n\n🎉 Votre demande de retrait de ${formatXAF(amount)} vers votre numéro ${withdrawal.provider} ${withdrawal.phone} (${withdrawal.accountName}) a été approuvée et transférée avec 0% de frais 💸 !\n\n🛡️ Référence officielle : ${fapshiTransId}.`
           : `Hello ${withdrawal.user.name} 👋,\n\n🎉 Your withdrawal request of ${formatXAF(amount)} to your ${withdrawal.provider} number ${withdrawal.phone} (${withdrawal.accountName}) has been approved and sent with 0% fees 💸!\n\n🛡️ Official Reference: ${fapshiTransId}.`,
       actionUrl: "/wallet",
       actionLabel: lang === "fr" ? "Voir mon portefeuille" : "View My Wallet",

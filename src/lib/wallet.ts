@@ -280,9 +280,13 @@ export async function getUserWalletData(userId: string, options?: { includeAllFo
     if (c.fapshiTxRef) handledFapshiRefs.add(c.fapshiTxRef);
 
     const sessionTitle =
-      c.membershipSlot.membership.tontineSession.title ||
-      c.membershipSlot.membership.tontineSession.type;
-    const beneficiary = `${c.membershipSlot.beneficiaryName} (${c.membershipSlot.membership.user.name})`;
+      c.membershipSlot?.membership?.tontineSession?.title ||
+      c.membershipSlot?.membership?.tontineSession?.type ||
+      "Tontine";
+    const beneficiaryUserName = c.membershipSlot?.membership?.user?.name;
+    const beneficiary = beneficiaryUserName
+      ? `${c.membershipSlot?.beneficiaryName || ""} (${beneficiaryUserName})`
+      : c.membershipSlot?.beneficiaryName || "Proche";
     const dateToUse = c.paidAt || c.createdAt;
     const phoneWhoPaid = c.payerPhone || c.bulkPayment?.payerPhone || c.paidByUser?.phone || user.phone;
 

@@ -83,7 +83,7 @@ export async function POST(request: Request) {
   if (purpose === "PHONE_CHANGE") {
     title = lang === "fr" ? "Validation de votre numéro WhatsApp" : "WhatsApp Number Verification";
     bodyHtml = `
-      <p style="margin-top: 0;">${lang === "fr" ? `Bonjour <strong>${user.name}</strong>,` : `Hello <strong>${user.name}</strong>,`}</p>
+      <p style="margin-top: 0;">${lang === "fr" ? `Salut <strong>${user.name}</strong>,` : `Hello <strong>${user.name}</strong>,`}</p>
       <p>
         ${
           lang === "fr"
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
   } else if (purpose === "EMAIL_CHANGE") {
     title = lang === "fr" ? "Validation de votre nouvelle adresse e-mail" : "New Email Address Verification";
     bodyHtml = `
-      <p style="margin-top: 0;">${lang === "fr" ? `Bonjour <strong>${user.name}</strong>,` : `Hello <strong>${user.name}</strong>,`}</p>
+      <p style="margin-top: 0;">${lang === "fr" ? `Salut <strong>${user.name}</strong>,` : `Hello <strong>${user.name}</strong>,`}</p>
       <p>
         ${
           lang === "fr"
@@ -143,7 +143,7 @@ export async function POST(request: Request) {
   } else {
     title = lang === "fr" ? "Code de sécurité DIVA Asso" : "DIVA Asso Security Code";
     bodyHtml = `
-      <p style="margin-top: 0;">${lang === "fr" ? `Bonjour <strong>${user.name}</strong>,` : `Hello <strong>${user.name}</strong>,`}</p>
+      <p style="margin-top: 0;">${lang === "fr" ? `Salut <strong>${user.name}</strong>,` : `Hello <strong>${user.name}</strong>,`}</p>
       <p>${lang === "fr" ? "Voici votre code de sécurité unique pour confirmer votre modification :" : "Here is your unique security code to confirm your change:"}</p>
       <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 20px; margin: 24px 0; text-align: center;">
         <div style="font-size: 34px; font-weight: 800; color: #003528; letter-spacing: 6px;">

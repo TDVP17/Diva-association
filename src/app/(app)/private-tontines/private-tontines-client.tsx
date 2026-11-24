@@ -207,6 +207,9 @@ export function PrivateTontinesClient({
   const [creatorPhotoUploading, setCreatorPhotoUploading] = useState(false);
   const [creatorIdDocUrl, setCreatorIdDocUrl] = useState("");
   const [creatorIdDocUploading, setCreatorIdDocUploading] = useState(false);
+  const [creatorIdDocVersoUrl, setCreatorIdDocVersoUrl] = useState("");
+  const [creatorIdDocVersoUploading, setCreatorIdDocVersoUploading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [guarantorId, setGuarantorId] = useState("");
   const [guarantorQuery, setGuarantorQuery] = useState("");
   const [selectedGuarantor, setSelectedGuarantor] = useState<EligibleGuarantor | null>(null);
@@ -340,12 +343,13 @@ export function PrivateTontinesClient({
     setGuarantorSearched(false);
   }
 
-  async function handleFileUpload(file: File, type: "photo" | "id_doc") {
+  async function handleFileUpload(file: File, type: "photo" | "id_doc" | "id_doc_verso") {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("type", type);
     if (type === "photo") setCreatorPhotoUploading(true);
-    else setCreatorIdDocUploading(true);
+    else if (type === "id_doc") setCreatorIdDocUploading(true);
+    else setCreatorIdDocVersoUploading(true);
 
     try {
       const res = await fetch("/api/private-tontines/upload-doc", {
@@ -354,16 +358,36 @@ export function PrivateTontinesClient({
       });
       const data = await res.json();
       if (!res.ok) {
-        setCreateError(data.error || "Erreur lors du téléversement du fichier.");
+        const errMsg = data.error || "Erreur lors du téléversement du fichier.";
+        setCreateError(errMsg);
+        if (type === "photo") setFieldErrors((prev) => ({ ...prev, creatorPhotoUrl: errMsg }));
+        else if (type === "id_doc") setFieldErrors((prev) => ({ ...prev, creatorIdDocUrl: errMsg }));
         return;
       }
-      if (type === "photo") setCreatorPhotoUrl(data.url);
-      else setCreatorIdDocUrl(data.url);
+      const uploadedUrl = data.url || data.fileUrl;
+      if (type === "photo") {
+        setCreatorPhotoUrl(uploadedUrl);
+        setFieldErrors((prev) => {
+          const next = { ...prev };
+          delete next.creatorPhotoUrl;
+          return next;
+        });
+      } else if (type === "id_doc") {
+        setCreatorIdDocUrl(uploadedUrl);
+        setFieldErrors((prev) => {
+          const next = { ...prev };
+          delete next.creatorIdDocUrl;
+          return next;
+        });
+      } else {
+        setCreatorIdDocVersoUrl(uploadedUrl);
+      }
     } catch {
       setCreateError("Erreur réseau lors du téléversement.");
     } finally {
       if (type === "photo") setCreatorPhotoUploading(false);
-      else setCreatorIdDocUploading(false);
+      else if (type === "id_doc") setCreatorIdDocUploading(false);
+      else setCreatorIdDocVersoUploading(false);
     }
   }
 
@@ -413,25 +437,22 @@ export function PrivateTontinesClient({
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setCreateError(null);
-    if (!rulesAccepted) {
-      setCreateError("Vous devez lire et accepter les règles des cotisations privées DIVA Asso.");
-      return;
+    const errs: Record<string, string> = {};
+
+    if (!title.trim()) {
+      errs.title = "Veuillez renseigner un nom pour votre cotisation.";
     }
     if (!creatorFullName.trim()) {
-      setCreateError("Veuillez renseigner votre nom complet.");
-      return;
+      errs.creatorFullName = "Veuillez renseigner votre nom complet.";
     }
     if (!creatorPhotoUrl) {
-      setCreateError("Veuillez téléverser votre photo portrait (au format image).");
-      return;
+      errs.creatorPhotoUrl = "Veuillez téléverser votre photo portrait (au format image).";
     }
     if (!creatorIdDocUrl) {
-      setCreateError("Veuillez téléverser votre pièce d'identité (CNI, récépissé ou passeport).");
-      return;
+      errs.creatorIdDocUrl = "Veuillez téléverser votre pièce d'identité (CNI recto, récépissé ou passeport).";
     }
     if (!guarantorId) {
-      setCreateError("Veuillez sélectionner un garant inscrit dans une cotisation publique DIVA Asso.");
-      return;
+      errs.guarantorId = "Veuillez sélectionner un garant inscrit dans une cotisation publique DIVA Asso.";
     }
 
     const parsedAmount = Number(amountInput || "0");
@@ -440,24 +461,30 @@ export function PrivateTontinesClient({
       parsedAmount < creationConfig.minAmount ||
       parsedAmount > creationConfig.maxAmount
     ) {
-      setCreateError(
-        `La mise unitaire doit être comprise entre ${formatXAF(creationConfig.minAmount)} et ${formatXAF(creationConfig.maxAmount)}.`,
-      );
-      return;
+      errs.amount = `La mise unitaire doit être comprise entre ${formatXAF(creationConfig.minAmount)} et ${formatXAF(creationConfig.maxAmount)}.`;
     }
+
     const parsedSlots = Number(maxSlots || "0");
     if (!Number.isFinite(parsedSlots) || parsedSlots < creationConfig.minSlots) {
-      setCreateError(
-        `Le nombre de places doit être supérieur ou égal au nombre minimal fixé par l'administrateur (${creationConfig.minSlots} places).`,
-      );
+      errs.maxSlots = `Le nombre de places doit être supérieur ou égal au nombre minimal requis (${creationConfig.minSlots} places).`;
+    } else if (parsedSlots > creationConfig.maxSlotsLimit) {
+      errs.maxSlots = `Le nombre de places ne peut pas dépasser ${creationConfig.maxSlotsLimit} places.`;
+    }
+
+    if (!rulesAccepted) {
+      errs.rulesAccepted = "Vous devez lire et accepter les règles des cotisations privées DIVA Asso.";
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setFieldErrors(errs);
+      setCreateError("Veuillez renseigner et corriger les champs obligatoires signalés en rouge ci-dessous.");
       return;
     }
-    if (parsedSlots > creationConfig.maxSlotsLimit) {
-      setCreateError(
-        `Le nombre de places ne peut pas dépasser ${creationConfig.maxSlotsLimit} places.`,
-      );
-      return;
-    }
+
+    setFieldErrors({});
+    const finalIdDocUrl = creatorIdDocVersoUrl
+      ? `${creatorIdDocUrl},${creatorIdDocVersoUrl}`
+      : creatorIdDocUrl;
 
     setCreating(true);
     try {
@@ -465,7 +492,7 @@ export function PrivateTontinesClient({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title,
+          title: title.trim(),
           description: description.trim() || undefined,
           type,
           amount: parsedAmount,
@@ -481,7 +508,7 @@ export function PrivateTontinesClient({
           rulesAccepted: true,
           creatorFullName: creatorFullName.trim(),
           creatorPhotoUrl,
-          creatorIdDocUrl,
+          creatorIdDocUrl: finalIdDocUrl,
           guarantorId,
           emergencyFund: emergencyFundEnabled
             ? {
@@ -503,6 +530,8 @@ export function PrivateTontinesClient({
       setDescription("");
       setCreatorPhotoUrl("");
       setCreatorIdDocUrl("");
+      setCreatorIdDocVersoUrl("");
+      setFieldErrors({});
       setGuarantorId("");
       setSelectedGuarantor(null);
       setGuarantorQuery("");
@@ -769,10 +798,24 @@ export function PrivateTontinesClient({
                 type="text"
                 required
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  if (fieldErrors.title) {
+                    setFieldErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.title;
+                      return next;
+                    });
+                  }
+                }}
                 placeholder="Ex: Tontine Solidarité Famille"
-                className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/30"
+                className={`border-2 rounded-xl px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600/30 ${
+                  fieldErrors.title ? "border-red-500 bg-red-50/20" : "border-emerald-600"
+                }`}
               />
+              {fieldErrors.title && (
+                <p className="text-xs font-bold text-red-600 mt-0.5">{fieldErrors.title}</p>
+              )}
             </div>
 
             <div className="flex flex-col gap-1 sm:col-span-2">
@@ -804,11 +847,25 @@ export function PrivateTontinesClient({
                   <input
                     type="text"
                     value={creatorFullName}
-                    onChange={(e) => setCreatorFullName(e.target.value)}
+                    onChange={(e) => {
+                      setCreatorFullName(e.target.value);
+                      if (fieldErrors.creatorFullName) {
+                        setFieldErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.creatorFullName;
+                          return next;
+                        });
+                      }
+                    }}
                     placeholder="Ex: Valentine Dupont"
-                    className="w-full border-2 border-emerald-600 rounded-xl px-3.5 py-2 text-sm bg-white"
+                    className={`w-full border-2 rounded-xl px-3.5 py-2 text-sm bg-white ${
+                      fieldErrors.creatorFullName ? "border-red-500 bg-red-50/20" : "border-emerald-600"
+                    }`}
                     required
                   />
+                  {fieldErrors.creatorFullName && (
+                    <p className="text-xs font-bold text-red-600 mt-1">{fieldErrors.creatorFullName}</p>
+                  )}
                 </div>
 
                 <div>
@@ -834,11 +891,14 @@ export function PrivateTontinesClient({
                       ✓ Photo enregistrée avec succès
                     </span>
                   )}
+                  {fieldErrors.creatorPhotoUrl && (
+                    <p className="text-xs font-bold text-red-600 mt-1">{fieldErrors.creatorPhotoUrl}</p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    2. CNI / Récépissé / Passeport *
+                    2. CNI / Récépissé / Passeport (Recto / Face avant) *
                   </label>
                   <input
                     type="file"
@@ -856,7 +916,35 @@ export function PrivateTontinesClient({
                   )}
                   {creatorIdDocUrl && !creatorIdDocUploading && (
                     <span className="text-[10px] text-emerald-800 font-bold flex items-center gap-1 mt-1">
-                      ✓ Document CNI enregistré avec succès
+                      ✓ Document (Recto) enregistré avec succès
+                    </span>
+                  )}
+                  {fieldErrors.creatorIdDocUrl && (
+                    <p className="text-xs font-bold text-red-600 mt-1">{fieldErrors.creatorIdDocUrl}</p>
+                  )}
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    3. CNI (Verso / Face arrière - optionnel ou recommandé si 2 faces)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleFileUpload(f, "id_doc_verso");
+                    }}
+                    className="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-slate-700 file:text-white hover:file:bg-slate-800 cursor-pointer"
+                  />
+                  {creatorIdDocVersoUploading && (
+                    <span className="text-[10px] text-emerald-700 font-bold flex items-center gap-1 mt-1">
+                      <LoadingSpinner /> Téléversement du verso...
+                    </span>
+                  )}
+                  {creatorIdDocVersoUrl && !creatorIdDocVersoUploading && (
+                    <span className="text-[10px] text-emerald-800 font-bold flex items-center gap-1 mt-1">
+                      ✓ Verso CNI enregistré avec succès
                     </span>
                   )}
                 </div>
@@ -1065,10 +1153,24 @@ export function PrivateTontinesClient({
                 inputMode="numeric"
                 required
                 value={amountInput}
-                onChange={(e) => setAmountInput(sanitizeNumericInput(e.target.value))}
+                onChange={(e) => {
+                  setAmountInput(sanitizeNumericInput(e.target.value));
+                  if (fieldErrors.amount) {
+                    setFieldErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.amount;
+                      return next;
+                    });
+                  }
+                }}
                 placeholder="Ex: 2 500 FCFA"
-                className="border-2 border-emerald-600 rounded-xl px-3.5 py-2.5 text-sm font-bold bg-white"
+                className={`border-2 rounded-xl px-3.5 py-2.5 text-sm font-bold bg-white ${
+                  fieldErrors.amount ? "border-red-500 bg-red-50/20" : "border-emerald-600"
+                }`}
               />
+              {fieldErrors.amount && (
+                <p className="text-xs font-bold text-red-600 mt-0.5">{fieldErrors.amount}</p>
+              )}
             </div>
 
             <div className="flex flex-col gap-1">
@@ -1090,17 +1192,30 @@ export function PrivateTontinesClient({
                 inputMode="numeric"
                 required
                 value={maxSlots}
-                onChange={(e) => setMaxSlots(sanitizeNumericInput(e.target.value))}
+                onChange={(e) => {
+                  setMaxSlots(sanitizeNumericInput(e.target.value));
+                  if (fieldErrors.maxSlots) {
+                    setFieldErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.maxSlots;
+                      return next;
+                    });
+                  }
+                }}
                 placeholder={`Ex: ${creationConfig.minSlots}`}
                 className={`border-2 rounded-xl px-3.5 py-2.5 text-sm bg-white ${
-                  maxSlots && Number(maxSlots) < creationConfig.minSlots
+                  fieldErrors.maxSlots || (maxSlots && Number(maxSlots) < creationConfig.minSlots)
                     ? "border-red-500 bg-red-50/40 text-red-900"
                     : "border-emerald-600"
                 }`}
               />
-              {maxSlots && Number(maxSlots) < creationConfig.minSlots ? (
+              {fieldErrors.maxSlots ? (
                 <span className="text-[10px] text-red-600 font-bold mt-0.5">
-                  Le nombre de places doit être supérieur ou égal au nombre minimal fixé par l&apos;administrateur ({creationConfig.minSlots} places).
+                  {fieldErrors.maxSlots}
+                </span>
+              ) : maxSlots && Number(maxSlots) < creationConfig.minSlots ? (
+                <span className="text-[10px] text-red-600 font-bold mt-0.5">
+                  Le nombre de places doit être supérieur ou égal au nombre minimal requis ({creationConfig.minSlots} places).
                 </span>
               ) : (
                 <span className="text-[10px] text-slate-500 mt-0.5">
@@ -1119,7 +1234,7 @@ export function PrivateTontinesClient({
                 Frais sur tout argent qui entre : 5,1% · Frais sur tout ce qui sort : 0%
               </p>
               <p className="text-[11px] text-slate-600 leading-relaxed">
-                Les frais sont appliqués uniquement lors des dépôts et des cotisations. Tous les retraits et décaissements de gains vers Mobile Money sont strictement sans frais (0%).
+                Les frais sont appliqués uniquement lors des dépôts et des cotisations. Tous les retraits et décaissements de gains vers MTN MoMo et Orange Money sont strictement sans frais (0%).
               </p>
             </div>
 
@@ -1310,13 +1425,25 @@ export function PrivateTontinesClient({
               <input
                 type="checkbox"
                 checked={rulesAccepted}
-                onChange={(e) => setRulesAccepted(e.target.checked)}
+                onChange={(e) => {
+                  setRulesAccepted(e.target.checked);
+                  if (fieldErrors.rulesAccepted) {
+                    setFieldErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.rulesAccepted;
+                      return next;
+                    });
+                  }
+                }}
                 className="mt-0.5 w-4 h-4 accent-emerald-700 rounded cursor-pointer flex-shrink-0"
               />
               <span className="text-xs font-semibold text-slate-800">
                 J&apos;ai lu et j&apos;accepte intégralement les règles des cotisations privées DIVA Asso. Je comprends que ma cotisation doit être validée par DIVA Asso avant activation du lien d&apos;invitation.
               </span>
             </label>
+            {fieldErrors.rulesAccepted && (
+              <p className="text-xs font-bold text-red-600 mt-0.5">{fieldErrors.rulesAccepted}</p>
+            )}
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
@@ -1329,7 +1456,7 @@ export function PrivateTontinesClient({
             </button>
             <button
               type="submit"
-              disabled={creating || !rulesAccepted}
+              disabled={creating}
               className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {creating ? <LoadingSpinner /> : <span className="material-symbols-outlined text-[18px]">send</span>}

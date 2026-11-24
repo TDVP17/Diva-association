@@ -310,7 +310,7 @@ export async function requestPasswordResetAction(
       <p style="font-size: 15px; line-height: 1.6; color: #334155; margin-top: 0;">
         ${
           lang === "fr"
-            ? `Bonjour <strong>${user.name}</strong>, voici votre code de vérification pour réinitialiser votre mot de passe :`
+            ? `Salut <strong>${user.name}</strong>, voici votre code de vérification pour réinitialiser votre mot de passe :`
             : `Hello <strong>${user.name}</strong>, here is your verification code to reset your password:`
         }
       </p>
@@ -516,7 +516,7 @@ export async function requestSignUpCodeAction(
   const emailHtml = renderBrandedEmailHtml({
     title: subject,
     bodyHtml: `
-      <p style="margin-top: 0;">${lang === "fr" ? `Bonjour <strong>${fullName}</strong>,` : `Hello <strong>${fullName}</strong>,`}</p>
+      <p style="margin-top: 0;">${lang === "fr" ? `Salut <strong>${fullName}</strong>,` : `Hello <strong>${fullName}</strong>,`}</p>
       <p>
         ${
           lang === "fr"

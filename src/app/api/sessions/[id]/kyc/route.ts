@@ -473,7 +473,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             title: gLang === "fr" ? "Demande de garant — Action requise 🤝" : "Guarantor Request — Action Required 🤝",
             bodyText:
               gLang === "fr"
-                ? `Bonjour ${verifiedGuarantor.name},\n\n${applicantLabel} souhaite intégrer la cotisation « ${tontineSession.title || tontineSession.type} » et vous a désigné comme son garant.\n\nL'administrateur ne pourra valider son entrée qu'après votre lecture et acceptation officielle des engagements de garant.\n\nConnectez-vous pour consulter les conditions et répondre à cette demande.`
+                ? `Salut ${verifiedGuarantor.name},\n\n${applicantLabel} souhaite intégrer la cotisation « ${tontineSession.title || tontineSession.type} » et vous a désigné comme son garant.\n\nL'administrateur ne pourra valider son entrée qu'après votre lecture et acceptation officielle des engagements de garant.\n\nConnectez-vous pour consulter les conditions et répondre à cette demande.`
                 : `Hello ${verifiedGuarantor.name},\n\n${applicantLabel} requested to join "${tontineSession.title || tontineSession.type}" and selected you as guarantor.\n\nThe administrator can only approve their entry after you review and accept the guarantor commitments.`,
             actionUrl: "/guarantor-requests",
             actionLabel: gLang === "fr" ? "Lire les engagements & Répondre" : "Review Commitments & Respond",

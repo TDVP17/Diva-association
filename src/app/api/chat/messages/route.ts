@@ -119,7 +119,7 @@ export async function POST(request: Request) {
       const emailHtml = renderBrandedEmailHtml({
         title: `Nouveau message de ${senderName}`,
         bodyHtml: `
-          <p style="margin-top: 0;">Bonjour,</p>
+          <p style="margin-top: 0;">Salut,</p>
           <p>Vous avez reçu un nouveau message de <strong>${senderName}</strong> :</p>
           <div style="padding: 14px 16px; background-color: #f1f5f9; border-left: 3px solid #003528; border-radius: 8px; margin: 16px 0; font-style: italic; color: #1e293b;">
             « ${preview} »

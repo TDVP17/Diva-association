@@ -4,11 +4,15 @@ import { saveFile } from "@/lib/storage";
 
 const ALLOWED_TYPES: Record<string, string> = {
   "image/jpeg": ".jpg",
+  "image/jpg": ".jpg",
   "image/png": ".png",
   "image/webp": ".webp",
+  "image/gif": ".gif",
+  "image/heic": ".heic",
+  "image/heif": ".heif",
   "application/pdf": ".pdf",
 };
-const MAX_BYTES = 5 * 1024 * 1024; // 5MB
+const MAX_BYTES = 10 * 1024 * 1024; // 10MB
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -25,7 +29,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Aucun fichier fourni" }, { status: 400 });
     }
 
-    const ext = ALLOWED_TYPES[file.type];
+    let ext = ALLOWED_TYPES[file.type.toLowerCase()];
+    if (!ext && file.name) {
+      const match = file.name.match(/\.(jpe?g|png|webp|gif|heic|heif|pdf)$/i);
+      if (match) {
+        ext = match[0].toLowerCase();
+        if (ext === ".jpeg") ext = ".jpg";
+      }
+    }
+
     if (!ext) {
       return NextResponse.json(
         { error: "Format non pris en charge. Veuillez téléverser une image (JPG, PNG, WebP) ou un PDF." },
@@ -34,7 +46,7 @@ export async function POST(request: Request) {
     }
 
     if (file.size > MAX_BYTES) {
-      return NextResponse.json({ error: "La taille maximale autorisée est de 5 Mo." }, { status: 400 });
+      return NextResponse.json({ error: "La taille maximale autorisée est de 10 Mo." }, { status: 400 });
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -42,7 +54,7 @@ export async function POST(request: Request) {
     await saveFile(key, buffer);
 
     const fileUrl = `/api/files/${key}`;
-    return NextResponse.json({ ok: true, fileUrl });
+    return NextResponse.json({ ok: true, url: fileUrl, fileUrl });
   } catch (err) {
     console.error("[upload-doc] error:", err);
     return NextResponse.json({ error: "Erreur lors du téléversement du document." }, { status: 500 });

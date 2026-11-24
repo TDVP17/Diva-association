@@ -196,7 +196,7 @@ export async function POST(request: Request) {
       isStarted && positionsLabel
         ? lang === "en"
           ? `Hello ${userFirstName} 👋! Your name(s) (${finalNames.join(", ")}) have been added to ${sessionTitle} at the end of the payout order (${positionsLabel}).`
-          : `Bonjour ${userFirstName} 👋 ! Vos nom(s) (${finalNames.join(", ")}) ont été ajoutés dans la cotisation « ${sessionTitle} » en fin d'ordre de bouffe (place ${positionsLabel}).`
+          : `Salut ${userFirstName} 👋 ! Vos nom(s) (${finalNames.join(", ")}) ont été ajoutés dans la cotisation « ${sessionTitle} » en fin d'ordre de bouffe (place ${positionsLabel}).`
         : translate(lang, "memberApprovedMessage", {
             name: userFirstName,
             session: sessionTitle,

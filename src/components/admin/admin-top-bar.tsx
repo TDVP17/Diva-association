@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { signOut } from "@/auth";
 import { LanguageToggle } from "@/components/language-toggle";
+import { QuickSearch } from "@/components/quick-search";
 import { NotificationBell } from "@/components/notification-bell";
 import { TopRightMenu, type TopRightMenuItem } from "@/components/top-right-menu";
 import { translate, type Lang } from "@/lib/i18n/translations";
@@ -75,6 +76,7 @@ export async function AdminTopBar({
         </div>
       </div>
       <nav className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+        <QuickSearch lang={lang} dark />
         <LanguageToggle currentLang={lang} dark />
         <Link
           href="/admin/support"

@@ -344,7 +344,7 @@ export async function POST(request: Request) {
         title: lang === "fr" ? "Paiement via Portefeuille confirmé ✅" : "Wallet Payment Confirmed ✅",
         bodyText:
           lang === "fr"
-            ? `Bonjour ${payerDisplay},\n\nVotre cotisation pour ${namesSummary} d'un montant de ${formatXAF(grandTotal)} a été réglée instantanément depuis votre Portefeuille DIVA Asso (0% de frais opérateur).\nRéférence : ${ledger.reference}\nNouveau solde portefeuille : ${formatXAF(ledger.balanceAfter)}.`
+            ? `Salut ${payerDisplay},\n\nVotre cotisation pour ${namesSummary} d'un montant de ${formatXAF(grandTotal)} a été réglée instantanément depuis votre Portefeuille DIVA Asso (0% de frais opérateur).\nRéférence : ${ledger.reference}\nNouveau solde portefeuille : ${formatXAF(ledger.balanceAfter)}.`
             : `Hello ${payerDisplay},\n\nYour contribution for ${namesSummary} of ${formatXAF(grandTotal)} was paid instantly from your DIVA Asso Wallet (0% operator fee).\nReference: ${ledger.reference}\nNew wallet balance: ${formatXAF(ledger.balanceAfter)}.`,
         actionUrl: `/wallet`,
         actionLabel: lang === "fr" ? "Voir mon portefeuille" : "View My Wallet",

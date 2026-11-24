@@ -137,7 +137,7 @@ export async function POST(request: Request) {
         }).catch(() => {});
 
         const subject = `DIVA Asso — Nouveau numéro de retrait à valider (${memberName})`;
-        const bodyText = `Bonjour,\n\n${memberName} vient d'enregistrer un numéro de retrait ${providerLabel} (${normalizedPhone} — Titulaire : ${accountName || "Non renseigné"}).\n\nConnectez-vous à l'espace Admin pour vérifier et valider ou annuler ce numéro.`;
+        const bodyText = `Salut,\n\n${memberName} vient d'enregistrer un numéro de retrait ${providerLabel} (${normalizedPhone} — Titulaire : ${accountName || "Non renseigné"}).\n\nConnectez-vous à l'espace Admin pour vérifier et valider ou annuler ce numéro.`;
         const html = renderBrandedEmailHtml({
           title: subject,
           bodyText,

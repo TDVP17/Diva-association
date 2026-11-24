@@ -332,15 +332,18 @@ export function AdminPrivateTontinesClient({
                           <span className="text-[10px] text-amber-700 font-medium">⚠️ Pas de photo</span>
                         )}
                         {t.creatorIdDocUrl ? (
-                          <a
-                            href={t.creatorIdDocUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-100 text-blue-900 font-bold text-[10px] hover:bg-blue-200"
-                          >
-                            <span className="material-symbols-outlined text-[14px]">description</span>
-                            <span>Pièce CNI / Doc ↗</span>
-                          </a>
+                          t.creatorIdDocUrl.split(",").map((docUrl, idx) => (
+                            <a
+                              key={docUrl}
+                              href={docUrl.trim()}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-100 text-blue-900 font-bold text-[10px] hover:bg-blue-200"
+                            >
+                              <span className="material-symbols-outlined text-[14px]">description</span>
+                              <span>CNI {t.creatorIdDocUrl!.includes(",") ? (idx === 0 ? "Recto ↗" : "Verso ↗") : "Doc ↗"}</span>
+                            </a>
+                          ))
                         ) : (
                           <span className="text-[10px] text-amber-700 font-medium">⚠️ Pas de CNI</span>
                         )}

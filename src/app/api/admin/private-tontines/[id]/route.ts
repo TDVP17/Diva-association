@@ -79,7 +79,7 @@ export async function PATCH(
       if (tontine.creator.email) {
         const subject = `✨ Cotisation privée validée : ${tontine.title || "DIVA Asso"} 🎉`;
         const text = [
-          `Bonjour ${tontine.creator.name} 👋,`,
+          `Salut ${tontine.creator.name} 👋,`,
           "",
           `🎉 Excellente nouvelle ! Votre cotisation privée « ${tontine.title || "Cotisation privée"} » a été officiellement approuvée par l'administration DIVA Asso 🤝.`,
           "",
@@ -146,7 +146,7 @@ export async function PATCH(
     if (tontine.creator.email) {
       const subject = `⚠️ Demande de cotisation privée refusée : ${tontine.title || "DIVA Asso"}`;
       const text = [
-        `Bonjour ${tontine.creator.name} 👋,`,
+        `Salut ${tontine.creator.name} 👋,`,
         "",
         `Votre demande de création de cotisation privée « ${tontine.title || "Cotisation privée"} » n'a pas été retenue par l'administration DIVA Asso ⚠️.`,
         `📋 Motif indiqué : ${reason}`,

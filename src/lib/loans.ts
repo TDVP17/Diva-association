@@ -635,7 +635,7 @@ export async function runLoanPenaltySweep(now: Date = new Date()) {
 
       if (loan.user.email) {
         const subject = `DIVA Asso — Rappel de remboursement de votre prêt (${formatXAF(remaining)})`;
-        const bodyText = `Bonjour ${loan.user.name},\n\nLa date limite de remboursement de votre prêt d'urgence arrive demain : le ${dueDateLabel} à 18h00.\n\n• Montant restant à rembourser : ${formatXAF(remaining)}\n\nVous pouvez rembourser dès maintenant depuis votre Portefeuille DIVA Asso ou par paiement direct Orange Money / MTN Mobile Money.\nPassé ce délai à 18h00, une pénalité de +5 % sera appliquée après 2 jours de retard.`;
+        const bodyText = `Salut ${loan.user.name},\n\nLa date limite de remboursement de votre prêt d'urgence arrive demain : le ${dueDateLabel} à 18h00.\n\n• Montant restant à rembourser : ${formatXAF(remaining)}\n\nVous pouvez rembourser dès maintenant depuis votre Portefeuille DIVA Asso ou par paiement direct Orange Money / MTN Mobile Money.\nPassé ce délai à 18h00, une pénalité de +5 % sera appliquée après 2 jours de retard.`;
         const html = renderBrandedEmailHtml({
           title: subject,
           bodyText,

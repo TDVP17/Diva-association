@@ -67,8 +67,8 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
         );
         setAlertMessage(
           lang === "fr"
-            ? "Bonjour ! Vous êtes inscrit sur DIVA Asso mais vous n'avez pas encore rejoint de cotisation. Venez découvrir les sessions ouvertes et démarrez votre épargne solidaire en toute sécurité sur divaasso.com !"
-            : "Hello! You are registered on DIVA Asso but have not joined any cotisation yet. Explore the open sessions and start saving securely on divaasso.com!",
+            ? "Coucou mon Asso 🌿 Salut ! Vous êtes inscrit sur DIVA Asso mais vous n'avez pas encore rejoint de cotisation. Venez découvrir les sessions ouvertes et démarrez votre épargne solidaire en toute sécurité sur divaasso.com !"
+            : "Coucou mon Asso 🌿 Hello! You are registered on DIVA Asso but have not joined any cotisation yet. Explore the open sessions and start saving securely on divaasso.com!",
         );
         setShowAlertModal(true);
       }
@@ -402,8 +402,8 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
                       );
                       setAlertMessage(
                         lang === "fr"
-                          ? "Bonjour ! Vous êtes inscrit sur DIVA Asso mais vous n'avez pas encore rejoint de cotisation. Venez découvrir les sessions ouvertes et démarrez votre épargne solidaire en toute sécurité sur divaasso.com !"
-                          : "Hello! You are registered on DIVA Asso but have not joined any cotisation yet. Explore the open sessions and start saving securely on divaasso.com!",
+                          ? "Coucou mon Asso 🌿 Salut ! Vous êtes inscrit sur DIVA Asso mais vous n'avez pas encore rejoint de cotisation. Venez découvrir les sessions ouvertes et démarrez votre épargne solidaire en toute sécurité sur divaasso.com !"
+                          : "Coucou mon Asso 🌿 Hello! You are registered on DIVA Asso but have not joined any cotisation yet. Explore the open sessions and start saving securely on divaasso.com!",
                       );
                     }}
                     className="text-xs px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 transition-colors inline-flex items-center gap-1 font-medium"
@@ -421,8 +421,8 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
                       );
                       setAlertMessage(
                         lang === "fr"
-                          ? `Bonjour ! La session de cotisation ${selectedSession ? `« ${selectedSession} » ` : ""}va débuter très prochainement. Les places se remplissent vite : qu'attendez-vous pour intégrer le groupe et choisir vos numéros ? Rejoignez-nous dès maintenant sur divaasso.com !`
-                          : `Hello! The cotisation session ${selectedSession ? `"${selectedSession}" ` : ""}is starting soon. Slots are filling up fast: join the group and choose your positions today on divaasso.com!`
+                          ? `Coucou mon Asso 🌿 Salut ! La session de cotisation ${selectedSession ? `« ${selectedSession} » ` : ""}va débuter très prochainement. Les places se remplissent vite : qu'attendez-vous pour intégrer le groupe et choisir vos numéros ? Rejoignez-nous dès maintenant sur divaasso.com !`
+                          : `Coucou mon Asso 🌿 Hello! The cotisation session ${selectedSession ? `"${selectedSession}" ` : ""}is starting soon. Slots are filling up fast: join the group and choose your positions today on divaasso.com!`
                       );
                     }}
                     className="text-xs px-3 py-1.5 rounded-lg border border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 transition-colors inline-flex items-center gap-1 font-medium"
@@ -440,8 +440,8 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
                       );
                       setAlertMessage(
                         lang === "fr"
-                          ? `Bonjour ! Les cotisations pour la session ${selectedSession ? `« ${selectedSession} » ` : ""}sont ouvertes. N'oubliez pas d'effectuer votre versement aujourd'hui afin de permettre au bénéficiaire de recevoir son tour sans retard.`
-                          : `Hello! Contributions for ${selectedSession ? `"${selectedSession}" ` : ""}are currently open. Please make sure to pay your slot today so the beneficiary receives their payout on time.`
+                          ? `Coucou mon Asso 🌿 Salut ! Les cotisations pour la session ${selectedSession ? `« ${selectedSession} » ` : ""}sont ouvertes. N'oubliez pas d'effectuer votre versement aujourd'hui afin de permettre au bénéficiaire de recevoir son tour sans retard.`
+                          : `Coucou mon Asso 🌿 Hello! Contributions for ${selectedSession ? `"${selectedSession}" ` : ""}are currently open. Please make sure to pay your slot today so the beneficiary receives their payout on time.`
                       );
                     }}
                     className="text-xs px-3 py-1.5 rounded-lg border border-outline-variant bg-surface text-on-surface hover:bg-surface-variant transition-colors inline-flex items-center gap-1 font-medium"
@@ -458,8 +458,8 @@ export function AdminNotificationsClient({ lang }: { lang: Lang }) {
                       );
                       setAlertMessage(
                         lang === "fr"
-                          ? `Bonjour à tous les membres ! Une nouvelle information importante est disponible sur votre espace DIVA Asso. Connectez-vous dès maintenant sur divaasso.com pour suivre vos cotisations.`
-                          : `Hello to all members! An important update is available in your DIVA Asso. account. Log in to divaasso.com to stay informed.`
+                          ? `Coucou mon Asso 🌿 Salut à tous les membres ! Une nouvelle information importante est disponible sur votre espace DIVA Asso. Connectez-vous dès maintenant sur divaasso.com pour suivre vos cotisations.`
+                          : `Coucou mon Asso 🌿 Hello to all members! An important update is available in your DIVA Asso. account. Log in to divaasso.com to stay informed.`
                       );
                     }}
                     className="text-xs px-3 py-1.5 rounded-lg border border-outline-variant bg-surface text-on-surface hover:bg-surface-variant transition-colors inline-flex items-center gap-1 font-medium"

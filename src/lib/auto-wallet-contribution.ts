@@ -178,7 +178,7 @@ export async function runAutoWalletContributionsSweep(options?: {
               : `DIVA Asso — Insufficient Wallet Balance (${sessionTitle})`;
           const bodyText =
             lang === "fr"
-              ? `Bonjour ${user.name},\n\nVotre cotisation dans « ${sessionTitle} » a lieu demain. Votre solde actuel dans le Portefeuille DIVA Asso (${formatXAF(available)}) est insuffisant pour régler l'ensemble de vos noms (${allNamesList}).\n\n• Montant total requis : ${formatXAF(totalNeeded)}\n• Solde disponible : ${formatXAF(available)}\n\nAucun nom n'a été cotisé automatiquement. Veuillez recharger votre Portefeuille DIVA Asso ou régler directement par Mobile Money afin d'éviter toute amende.`
+              ? `Salut ${user.name},\n\nVotre cotisation dans « ${sessionTitle} » a lieu demain. Votre solde actuel dans le Portefeuille DIVA Asso (${formatXAF(available)}) est insuffisant pour régler l'ensemble de vos noms (${allNamesList}).\n\n• Montant total requis : ${formatXAF(totalNeeded)}\n• Solde disponible : ${formatXAF(available)}\n\nAucun nom n'a été cotisé automatiquement. Veuillez recharger votre Portefeuille DIVA Asso ou régler directement par Mobile Money afin d'éviter toute amende.`
               : `Hello ${user.name},\n\nYour contribution in "${sessionTitle}" is due tomorrow. Your current DIVA Asso Wallet balance (${formatXAF(available)}) is insufficient to cover all your slots (${allNamesList}, total required: ${formatXAF(totalNeeded)}). No slot was debited. Please top up your wallet or pay directly.`;
           const html = renderBrandedEmailHtml({
             title: subject,
@@ -283,7 +283,7 @@ export async function runAutoWalletContributionsSweep(options?: {
               : `DIVA Asso — Automatic Contribution Paid (${formatXAF(totalNeeded)})`;
           const bodyText =
             lang === "fr"
-              ? `Bonjour ${user.name},\n\nVotre cotisation pour ${allNamesList} dans « ${sessionTitle} » a été prélevée automatiquement depuis votre Portefeuille DIVA Asso (la veille de l'échéance) sans aucun frais Orange ou MTN.\n\n• Montant prélevé : ${formatXAF(totalNeeded)} (0 % frais opérateur)\n• Nouveau solde portefeuille : ${formatXAF(ledger.balanceAfter)}\n\nTous vos noms sont désormais cochés.`
+              ? `Salut ${user.name},\n\nVotre cotisation pour ${allNamesList} dans « ${sessionTitle} » a été prélevée automatiquement depuis votre Portefeuille DIVA Asso (la veille de l'échéance) sans aucun frais Orange ou MTN.\n\n• Montant prélevé : ${formatXAF(totalNeeded)} (0 % frais opérateur)\n• Nouveau solde portefeuille : ${formatXAF(ledger.balanceAfter)}\n\nTous vos noms sont désormais cochés.`
               : `Hello ${user.name},\n\nYour contribution for ${allNamesList} in "${sessionTitle}" was automatically paid from your DIVA Asso Wallet with 0% operator fees.\n\n• Amount debited: ${formatXAF(totalNeeded)}\n• New wallet balance: ${formatXAF(ledger.balanceAfter)}`;
           const html = renderBrandedEmailHtml({
             title: subject,

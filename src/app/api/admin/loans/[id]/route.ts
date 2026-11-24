@@ -104,7 +104,7 @@ export async function PATCH(
         title: lang === "fr" ? "Prêt approuvé et crédité" : "Loan Approved & Credited",
         bodyText:
           lang === "fr"
-            ? `Bonjour ${loan.user.name},\n\nVotre demande de prêt de ${formatXAF(principal)} a été approuvée par l'administrateur DIVA Asso et créditée dans votre Portefeuille DIVA Asso.\n\n• Montant emprunté : ${formatXAF(principal)}\n• Total à rembourser : ${formatXAF(totalDue)}\n• Date limite de remboursement : ${dueDateLabel} à 18h00\n• Nouveau solde portefeuille : ${formatXAF(ledger.balanceAfter)}.`
+            ? `Salut ${loan.user.name},\n\nVotre demande de prêt de ${formatXAF(principal)} a été approuvée par l'administrateur DIVA Asso et créditée dans votre Portefeuille DIVA Asso.\n\n• Montant emprunté : ${formatXAF(principal)}\n• Total à rembourser : ${formatXAF(totalDue)}\n• Date limite de remboursement : ${dueDateLabel} à 18h00\n• Nouveau solde portefeuille : ${formatXAF(ledger.balanceAfter)}.`
             : `Hello ${loan.user.name},\n\nYour loan request of ${formatXAF(principal)} was approved by DIVA Asso and credited to your DIVA Asso Wallet.\n\n• Principal: ${formatXAF(principal)}\n• Total due: ${formatXAF(totalDue)}\n• Deadline: ${dueDateLabel} at 18:00\n• New balance: ${formatXAF(ledger.balanceAfter)}.`,
         actionUrl: "/loans",
         actionLabel: lang === "fr" ? "Consulter mon prêt" : "View My Loan",

@@ -26,31 +26,31 @@ export function LanguageToggle({
     });
   }
 
-  const inactiveClass = dark
-    ? "px-3 py-1 rounded-full font-label-sm text-label-sm text-on-primary/70 hover:bg-white/10"
-    : "px-3 py-1 rounded-full font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container-low";
-  const activeClass = dark
-    ? "px-3 py-1 rounded-full font-label-sm text-label-sm bg-white/20 text-on-primary"
-    : "px-3 py-1 rounded-full font-label-sm text-label-sm bg-primary text-on-primary";
+  const baseClasses = dark
+    ? "bg-white/10 hover:bg-white/20 text-white border-white/25"
+    : "bg-surface-container-low hover:bg-surface-container text-on-surface border-outline-variant/70";
 
   return (
-    <div className={`flex gap-1 ${className ?? ""}`}>
-      <button
-        type="button"
-        onClick={() => handleChange("en")}
+    <div className={`relative inline-flex items-center ${className ?? ""}`}>
+      <select
+        value={currentLang}
+        onChange={(e) => handleChange(e.target.value as Lang)}
         disabled={pending}
-        className={currentLang === "en" ? activeClass : inactiveClass}
+        aria-label="Langue / Language"
+        className={`appearance-none cursor-pointer text-xs font-black uppercase rounded-lg pl-2 pr-5 py-1 border transition-colors focus:outline-none focus:ring-1 focus:ring-primary ${baseClasses} ${
+          pending ? "opacity-60" : ""
+        }`}
       >
-        EN
-      </button>
-      <button
-        type="button"
-        onClick={() => handleChange("fr")}
-        disabled={pending}
-        className={currentLang === "fr" ? activeClass : inactiveClass}
+        <option value="fr" className="text-slate-900 bg-white">FR</option>
+        <option value="en" className="text-slate-900 bg-white">EN</option>
+      </select>
+      <span
+        className={`material-symbols-outlined text-[15px] pointer-events-none absolute right-1 ${
+          dark ? "text-white/80" : "text-on-surface-variant"
+        }`}
       >
-        FR
-      </button>
+        expand_more
+      </span>
     </div>
   );
 }

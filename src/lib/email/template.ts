@@ -135,7 +135,7 @@ export function renderBrandedEmailHtml(params: BrandedEmailParams): string {
   const actionButton = `
     <div style="margin: 28px 0 10px 0; text-align: center;">
       <a href="${targetUrl}" 
-         style="background-color: ${primaryColor}; color: #ffffff; padding: 13px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block; box-shadow: 0 2px 4px rgba(0,53,40,0.15);">
+         style="background: linear-gradient(135deg, #025b34 0%, #003528 100%); color: #ffffff; border: 1.5px solid #efc25b; padding: 13px 30px; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 15px; display: inline-block; box-shadow: 0 4px 14px rgba(2,91,52,0.3); letter-spacing: 0.3px;">
         ${params.actionLabel || (params.lang === "en" ? "Open in App" : "Ouvrir dans l'application")}
       </a>
     </div>
@@ -151,9 +151,11 @@ export function renderBrandedEmailHtml(params: BrandedEmailParams): string {
 
   const sanitizeEmailBody = (str: string) => {
     return str
+      .replace(/\b(?:Bonjour|Bonsoir)\b/gi, "Salut")
       .replace(/Salut,\s*\{name\}\s*👋/g, firstName ? `Salut, ${firstName} 👋` : "Salut 👋")
       .replace(/Hello,\s*\{name\}\s*👋/g, firstName ? `Hello, ${firstName} 👋` : "Hello 👋")
-      .replace(/Bonjour,\s*\{name\}\s*👋/g, firstName ? `Bonjour, ${firstName} 👋` : "Bonjour 👋")
+      .replace(/Bonjour,\s*\{name\}\s*👋/g, firstName ? `Salut, ${firstName} 👋` : "Salut 👋")
+      .replace(/Bonsoir,\s*\{name\}\s*👋/g, firstName ? `Salut, ${firstName} 👋` : "Salut 👋")
       .replace(/,\s*\{name\}/g, firstName ? `, ${firstName}` : "")
       .replace(/\{name\}/g, firstName || "");
   };
@@ -218,23 +220,31 @@ export function renderBrandedEmailHtml(params: BrandedEmailParams): string {
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>${cleanTitle}</title>
     </head>
-    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px 12px; -webkit-font-smoothing: antialiased;">
-      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);">
-        <!-- En-tête avec Logo Officiel DIVA Asso -->
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f3; margin: 0; padding: 24px 12px; -webkit-font-smoothing: antialiased;">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 580px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #d1fae5; overflow: hidden; box-shadow: 0 8px 24px rgba(0, 53, 40, 0.08);">
+        <!-- Barre d'accentuation or #efc25b -->
         <tr>
-          <td style="padding: 26px 24px 20px; text-align: center; background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%); border-bottom: 1px solid #f1f5f9;">
+          <td style="height: 5px; background: linear-gradient(90deg, #efc25b 0%, #fed65b 50%, #efc25b 100%);"></td>
+        </tr>
+
+        <!-- En-tête avec Logo Officiel DIVA Asso et Badge Coucou mon Asso -->
+        <tr>
+          <td style="padding: 26px 24px 22px; text-align: center; background: linear-gradient(180deg, #003528 0%, #025b34 100%); border-bottom: 2px solid #efc25b;">
             <a href="${baseUrl}" target="_blank" style="text-decoration: none; display: inline-block;">
-              <img src="${logoUrl}" alt="DIVA Asso" width="60" height="60" style="display: block; margin: 0 auto 10px; border-radius: 14px; border: 1px solid #e2e8f0;" />
-              <span style="display: block; font-size: 20px; font-weight: 800; color: #003528; letter-spacing: -0.5px;">DIVA Asso.</span>
+              <img src="${logoUrl}" alt="DIVA Asso" width="68" height="68" style="display: block; margin: 0 auto 10px; object-fit: contain;" />
+              <span style="display: block; font-size: 22px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px;">DIVA Asso.</span>
             </a>
+            <div style="display: inline-block; margin-top: 10px; background-color: rgba(239, 194, 91, 0.2); border: 1px solid #efc25b; color: #efc25b; padding: 4px 16px; border-radius: 20px; font-size: 13px; font-weight: 800; letter-spacing: 0.3px;">
+              Coucou mon Asso 🌿
+            </div>
           </td>
         </tr>
         
         <!-- Contenu du message -->
         <tr>
-          <td style="padding: 28px 28px 20px;">
-            <h2 style="color: #0f172a; font-size: 18px; font-weight: 700; margin-top: 0; margin-bottom: 18px; line-height: 1.4;">${cleanTitle}</h2>
-            <div style="font-size: 15px; line-height: 1.6; color: #334155;">
+          <td style="padding: 30px 28px 22px;">
+            <h2 style="color: #003528; font-size: 18px; font-weight: 800; margin-top: 0; margin-bottom: 18px; line-height: 1.4; border-left: 4px solid #efc25b; padding-left: 12px;">${cleanTitle}</h2>
+            <div style="font-size: 15px; line-height: 1.65; color: #334155;">
               ${content}
             </div>
             ${actionButton}
@@ -243,16 +253,16 @@ export function renderBrandedEmailHtml(params: BrandedEmailParams): string {
 
         <!-- Pied de page -->
         <tr>
-          <td style="padding: 20px 24px 28px; background-color: #f8fafc; border-top: 1px solid #f1f5f9; text-align: center;">
-            <p style="font-size: 12px; color: #64748b; margin: 0 0 6px 0;">
+          <td style="padding: 22px 24px 26px; background: linear-gradient(180deg, #025b34 0%, #003528 100%); border-top: 1px solid #003528; text-align: center; color: #d1fae5;">
+            <p style="font-size: 12px; color: #ffffff; margin: 0 0 6px 0; font-weight: 600;">
               <strong>DIVA Asso.</strong> — ${
                 params.lang === "en"
-                  ? "Plateforme sécurisée de gestion des tontines, cotisations et prêts"
+                  ? "Secure management of tontines, contributions, and guaranteed loans"
                   : "Plateforme sécurisée de gestion des tontines, cotisations et prêts"
               }
             </p>
-            <p style="font-size: 11px; color: #94a3b8; margin: 0;">
-              © ${new Date().getFullYear()} <a href="https://divaasso.com" style="color: #003528; text-decoration: underline;">divaasso.com</a> • Cameroun
+            <p style="font-size: 11px; color: #efc25b; margin: 0; font-weight: 600;">
+              © ${new Date().getFullYear()} <a href="https://divaasso.com" style="color: #efc25b; text-decoration: underline;">divaasso.com</a> • Cameroun
             </p>
           </td>
         </tr>
@@ -284,7 +294,7 @@ export async function sendWelcomeAndAdminNotifications(params: {
       : "Welcome to the DIVA Asso Community! 🎉";
 
   const userBodyHtml = `
-    <p style="margin-top: 0;">${lang === "fr" ? `Bonjour <strong>${firstName}</strong> 👋,` : `Hello <strong>${firstName}</strong> 👋,`}</p>
+    <p style="margin-top: 0;">${lang === "fr" ? `Salut <strong>${firstName}</strong> 👋,` : `Hello <strong>${firstName}</strong> 👋,`}</p>
     <p>
       ${
         lang === "fr"
