@@ -97,7 +97,12 @@ export async function generateArchivePdf(memberName: string, year: number, rows:
 
   let logoImage: Awaited<ReturnType<PDFDocument["embedPng"]>> | null = null;
   try {
-    const logoBytes = await readFile(path.join(process.cwd(), "public", "icons", "icon-512.png"));
+    let logoBytes: Buffer;
+    try {
+      logoBytes = await readFile(path.join(process.cwd(), "public", "new-logo.png"));
+    } catch {
+      logoBytes = await readFile(path.join(process.cwd(), "public", "icons", "icon-512.png"));
+    }
     logoImage = await doc.embedPng(logoBytes);
   } catch {
     // Logo optional — the archive is still valid without it.

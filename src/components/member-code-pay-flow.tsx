@@ -223,7 +223,7 @@ export function MemberCodePayFlow({
                           : `${typeof window !== "undefined" ? window.location.origin : ""}${lastPaidConfirmation.receiptUrl.startsWith("/") ? lastPaidConfirmation.receiptUrl : `/api/files/${lastPaidConfirmation.receiptUrl}`}`)
                       : `${typeof window !== "undefined" ? window.location.origin : ""}/history`;
                     const text = lang === "fr"
-                      ? `Bonjour, j'ai effectué le paiement de la cotisation pour *${lastPaidConfirmation.beneficiaryName}* (${lastPaidConfirmation.tontineSessionTitle}) d'un montant de *${formatXAF(lastPaidConfirmation.amount)}*. Reçu disponible ici : ${fullUrl}`
+                      ? `Salut, j'ai effectué le paiement de la cotisation pour *${lastPaidConfirmation.beneficiaryName}* (${lastPaidConfirmation.tontineSessionTitle}) d'un montant de *${formatXAF(lastPaidConfirmation.amount)}*. Reçu disponible ici : ${fullUrl}`
                       : `Hello, I made the contribution payment for *${lastPaidConfirmation.beneficiaryName}* (${lastPaidConfirmation.tontineSessionTitle}) for an amount of *${formatXAF(lastPaidConfirmation.amount)}*. Receipt available here: ${fullUrl}`;
                     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
                     window.open(waUrl, "_blank", "noopener,noreferrer");
@@ -428,7 +428,7 @@ export function MemberCodePayFlow({
                     <a
                       href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
                         lang === "fr"
-                          ? `Bonjour, voici le reçu de cotisation pour ${s.beneficiaryName} (${s.tontineSessionTitle}) : ${s.receiptUrl.startsWith("http") ? s.receiptUrl : `${typeof window !== "undefined" ? window.location.origin : ""}${s.receiptUrl.startsWith("/") ? s.receiptUrl : `/api/files/${s.receiptUrl}`}`}`
+                          ? `Salut, voici le reçu de cotisation pour ${s.beneficiaryName} (${s.tontineSessionTitle}) : ${s.receiptUrl.startsWith("http") ? s.receiptUrl : `${typeof window !== "undefined" ? window.location.origin : ""}${s.receiptUrl.startsWith("/") ? s.receiptUrl : `/api/files/${s.receiptUrl}`}`}`
                           : `Hello, here is the contribution receipt for ${s.beneficiaryName} (${s.tontineSessionTitle}): ${s.receiptUrl.startsWith("http") ? s.receiptUrl : `${typeof window !== "undefined" ? window.location.origin : ""}${s.receiptUrl.startsWith("/") ? s.receiptUrl : `/api/files/${s.receiptUrl}`}`}`,
                       )}`}
                       target="_blank"

@@ -290,12 +290,13 @@ export function ChatClient({
                 <span className="material-symbols-outlined">arrow_back</span>
               </Link>
             )}
-            <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-title-md text-title-md overflow-hidden flex-shrink-0">
-              {active.avatar ? (
+            <div className="w-10 h-10 rounded-full bg-white border border-emerald-200/60 shadow-2xs flex items-center justify-center font-title-md text-title-md overflow-hidden flex-shrink-0 p-1">
+              {!isAdmin ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={active.avatar} alt={!isAdmin ? t("customerSupport") : active.name} className="w-full h-full object-cover" />
-              ) : !isAdmin ? (
-                <span className="material-symbols-outlined text-[22px] text-emerald-800">support_agent</span>
+                <img src="/new-logo.png?v=2" alt={t("customerSupport")} className="w-full h-full object-contain" />
+              ) : active.avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={active.avatar} alt={active.name} className="w-full h-full object-cover" />
               ) : (
                 initials(active.name)
               )}

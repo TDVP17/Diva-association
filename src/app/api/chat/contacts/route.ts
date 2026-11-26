@@ -93,11 +93,11 @@ export async function GET() {
   if (adminUser) {
     const [withAdmin] = await withLastMessage(session.user.id, [adminUser.id]);
     admin = withAdmin
-      ? { ...withAdmin, name: "Support client" }
+      ? { ...withAdmin, name: "Support client", avatar: "/new-logo.png?v=2" }
       : {
           id: adminUser.id,
           name: "Support client",
-          avatar: adminUser.avatar ?? adminUser.image,
+          avatar: "/new-logo.png?v=2",
           lastMessageAt: null,
           lastMessagePreview: null,
           unreadCount: 0,

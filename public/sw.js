@@ -18,8 +18,8 @@
 //     principle the original version of this file was built around, now
 //     scoped precisely to the calls where staleness would actually mislead
 //     someone, instead of blocking page-shell caching entirely.
-const CACHE_NAME = "diva-shell-v5";
-const STATIC_ASSETS = ["/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png", "/offline.html"];
+const CACHE_NAME = "diva-shell-v6";
+const STATIC_ASSETS = ["/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png", "/new-logo.png", "/offline.html"];
 
 self.addEventListener("install", (event) => {
   // cache.addAll() is all-or-nothing — one failed request (offline install,
@@ -150,7 +150,7 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "DIVA Asso.";
   const options = {
     body: payload.body || "",
-    icon: "/icons/icon-192.png",
+    icon: "/new-logo.png",
     badge: "/icons/refined-mark.png",
     vibrate: [200, 100, 200],
     tag: payload.tag || "diva-" + Date.now(),

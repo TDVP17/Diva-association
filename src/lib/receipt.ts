@@ -61,7 +61,12 @@ export async function generateReceiptPdf(data: ReceiptData): Promise<Buffer> {
   const receiptTitle = isFr ? "Reçu de paiement" : "Payment Receipt";
 
   try {
-    const logoBytes = await readFile(path.join(process.cwd(), "public", "icons", "icon-512.png"));
+    let logoBytes: Buffer;
+    try {
+      logoBytes = await readFile(path.join(process.cwd(), "public", "new-logo.png"));
+    } catch {
+      logoBytes = await readFile(path.join(process.cwd(), "public", "icons", "icon-512.png"));
+    }
     const logoImage = await doc.embedPng(logoBytes);
     const logoSize = 36;
     page.drawImage(logoImage, { x: left, y: y - logoSize + 8, width: logoSize, height: logoSize });

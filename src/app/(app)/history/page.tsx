@@ -651,7 +651,7 @@ export default async function HistoryPage() {
                     <a
                       href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
                         lang === "fr"
-                          ? `Bonjour, voici le reçu de cotisation pour ${r.beneficiaryName} (${r.sessionLabel}) : ${r.receiptPdfUrl.startsWith("http") ? r.receiptPdfUrl : `/api/files/${r.receiptPdfUrl}`}`
+                          ? `Salut, voici le reçu de cotisation pour ${r.beneficiaryName} (${r.sessionLabel}) : ${r.receiptPdfUrl.startsWith("http") ? r.receiptPdfUrl : `/api/files/${r.receiptPdfUrl}`}`
                           : `Hello, here is the contribution receipt for ${r.beneficiaryName} (${r.sessionLabel}): ${r.receiptPdfUrl.startsWith("http") ? r.receiptPdfUrl : `/api/files/${r.receiptPdfUrl}`}`,
                       )}`}
                       target="_blank"

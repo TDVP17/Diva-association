@@ -42,7 +42,12 @@ export async function generatePayoutReceiptPdf(data: PayoutReceiptData): Promise
 
   // Header with Logo
   try {
-    const logoBytes = await readFile(path.join(process.cwd(), "public", "icons", "icon-512.png"));
+    let logoBytes: Buffer;
+    try {
+      logoBytes = await readFile(path.join(process.cwd(), "public", "new-logo.png"));
+    } catch {
+      logoBytes = await readFile(path.join(process.cwd(), "public", "icons", "icon-512.png"));
+    }
     const logoImage = await doc.embedPng(logoBytes);
     const logoSize = 42;
     page.drawImage(logoImage, { x: left, y: y - logoSize + 10, width: logoSize, height: logoSize });

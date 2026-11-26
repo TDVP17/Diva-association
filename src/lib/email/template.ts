@@ -98,7 +98,7 @@ export function getAppBaseUrl(): string {
  */
 export function renderBrandedEmailHtml(params: BrandedEmailParams): string {
   const baseUrl = params.baseUrl || getAppBaseUrl();
-  const logoUrl = `${baseUrl}/icons/icon-512.png`;
+  const logoUrl = `${baseUrl}/new-logo.png?v=2`;
   const primaryColor = "#003528";
   const rawUrl = params.actionUrl?.trim() || "/dashboard";
   let targetUrl = "";
